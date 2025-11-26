@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ppi_sis_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 180903
+      POSTGRES_DB: ppi_sis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: ppi_sis_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_HOST=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=180903
+      - DB_NAME=ppi_sis
+      - DB_PORT=5432
+      - JWT_SECRET=secret_key_change_me
+    depends_on:
+      - postgres
+
+  frontend:
+    build: ./frontend
+    container_name: ppi_sis_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
