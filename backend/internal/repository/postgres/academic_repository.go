@@ -69,15 +69,18 @@ func (r *AcademicRepository) CreateSchedule(schedule *domain.Schedule) error {
 	return r.db.Create(schedule).Error
 }
 
-func (r *AcademicRepository) GetAllSchedules(classID uint, teacherID string) ([]domain.Schedule, error) {
+func (r *AcademicRepository) GetAllSchedules(unitID, classID uint, teacherID string) ([]domain.Schedule, error) {
 	var schedules []domain.Schedule
-	query := r.db.Preload("Class").Preload("Subject").Preload("Teacher")
+	query := r.db.Preload("Class").Preload("Subject").Preload("Teacher.User")
 
+	if unitID != 0 {
+		query = query.Joins("JOIN classes ON classes.id = schedules.class_id").Where("classes.unit_id = ?", unitID)
+	}
 	if classID != 0 {
-		query = query.Where("class_id = ?", classID)
+		query = query.Where("schedules.class_id = ?", classID)
 	}
 	if teacherID != "" {
-		query = query.Where("teacher_id = ?", teacherID)
+		query = query.Where("schedules.teacher_id = ?", teacherID)
 	}
 
 	err := query.Find(&schedules).Error

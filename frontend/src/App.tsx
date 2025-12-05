@@ -14,6 +14,7 @@ import Elearning from './pages/admin/Elearning';
 import Notifications from './pages/admin/Notifications';
 import TeacherSchedule from './pages/teacher/TeacherSchedule';
 import TeacherGrades from './pages/teacher/TeacherGrades';
+import HomeroomStudents from './pages/teacher/HomeroomStudents';
 import TeacherAttendance from './pages/teacher/TeacherAttendance';
 import HomeroomClass from './pages/teacher/HomeroomClass';
 import HomeroomReportCards from './pages/teacher/HomeroomReportCards';
@@ -46,6 +47,7 @@ import ParentChildBK from './pages/parent/ParentChildBK';
 import AdminNotificationManagement from './pages/admin/AdminNotificationManagement';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import AdminPPDB from './pages/admin/AdminPPDB';
+import AdminAlumni from './pages/admin/AdminAlumni';
 import AdminPublicContent from './pages/admin/AdminPublicContent';
 
 function App() {
@@ -77,11 +79,14 @@ function App() {
                                     <Route path="admin/contacts" element={<AdminContactMessages />} />
                                     <Route path="admin/finance" element={<Finance />} />
                                     <Route path="admin/elearning" element={<Elearning />} />
+                                    <Route path="admin/ppdb" element={<AdminPPDB />} />
+                                    <Route path="admin/alumni" element={<AdminAlumni />} />
                                     <Route path="admin/bk" element={<BK />} />
 
                                     {/* Teacher/Student Routes */}
-                                    <Route path="schedule" element={<TeacherSchedule />} />
-                                    <Route path="grades" element={<TeacherGrades />} />
+                                    <Route path="teacher/schedule" element={<TeacherSchedule />} />
+                                    <Route path="teacher/students" element={<HomeroomStudents />} />
+                                    <Route path="teacher/grades" element={<TeacherGrades />} />
                                     <Route path="attendance/:scheduleId" element={<TeacherAttendance />} />
                                     <Route path="homeroom" element={<HomeroomClass />} />
                                     <Route path="homeroom/report-card/:studentId" element={<HomeroomReportCards />} />

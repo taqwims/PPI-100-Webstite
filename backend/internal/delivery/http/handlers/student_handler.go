@@ -126,10 +126,12 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 }
 
 type UpdateStudentRequest struct {
-	Name    string `json:"name" binding:"required"`
-	Email   string `json:"email" binding:"required,email"`
-	NISN    string `json:"nisn" binding:"required"`
-	ClassID uint   `json:"class_id" binding:"required"`
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	NISN     string `json:"nisn" binding:"required"`
+	ClassID  uint   `json:"class_id" binding:"required"`
+	UnitID   uint   `json:"unit_id" binding:"required"`
+	ParentID string `json:"parent_id"`
 }
 
 func (h *StudentHandler) UpdateStudent(c *gin.Context) {
@@ -140,7 +142,17 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		return
 	}
 
-	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.NISN, req.ClassID); err != nil {
+	var parentUUID *uuid.UUID
+	if req.ParentID != "" {
+		parsedUUID, err := uuid.Parse(req.ParentID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parent ID"})
+			return
+		}
+		parentUUID = &parsedUUID
+	}
+
+	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

@@ -1,7 +1,10 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, Calendar, CreditCard, Bell, Settings, LogOut, AlertTriangle, FileText, GraduationCap, X, Mail, Send } from 'lucide-react';
+import {
+    LayoutDashboard, Users, BookOpen, Calendar, FileText,
+    Settings, LogOut, Bell, Menu, X, GraduationCap,
+    DollarSign, AlertTriangle, MessageSquare, CreditCard, Mail, Send
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
 
@@ -28,11 +31,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
             { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
             { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
+            { icon: Users, label: 'Data PPDB', path: '/dashboard/admin/ppdb' },
+            { icon: GraduationCap, label: 'Data Alumni', path: '/dashboard/admin/alumni' },
+            { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/admin/bk' },
         ];
 
         const teacher = [
-            { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/schedule' },
-            { icon: FileText, label: 'Input Nilai', path: '/dashboard/grades' },
+            { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/teacher/schedule' },
+            { icon: Users, label: 'Data Siswa', path: '/dashboard/teacher/students' },
+            { icon: FileText, label: 'Input Nilai', path: '/dashboard/teacher/grades' },
             { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
             { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
         ];

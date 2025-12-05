@@ -40,9 +40,9 @@ const Academic = () => {
     });
 
     const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
-        queryKey: ['academic_schedules'],
+        queryKey: ['academic_schedules', unitID],
         queryFn: async () => {
-            const res = await api.get('/academic/schedules');
+            const res = await api.get(`/academic/schedules?unit_id=${unitID}`);
             return res.data || [];
         }
     });

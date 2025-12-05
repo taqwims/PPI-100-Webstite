@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Search, Trash2, User, Save, Edit2 } from 'lucide-react';
+import { Search, User, Save, Edit2 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
@@ -23,10 +23,8 @@ interface Student {
     unit_id: number;
 }
 
-const Students: React.FC = () => {
+const HomeroomStudents: React.FC = () => {
     const { user } = useAuth();
-    // Initialize unitID based on user role. Super Admin (role_id 1) defaults to 1, others use their assigned unit_id.
-    const [unitID, setUnitID] = useState(user?.role_id === 1 ? 1 : user?.unit_id || 1);
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -39,38 +37,45 @@ const Students: React.FC = () => {
         password: '',
         nisn: '',
         class_id: '',
-        unit_id: unitID,
+        unit_id: 1, // Default, will be updated from student
         parent_id: '',
     });
 
-    // Update formData.unit_id when unitID changes
-    React.useEffect(() => {
-        setFormData(prev => ({ ...prev, unit_id: unitID }));
-    }, [unitID]);
+    // Fetch Homeroom Class
+    const { data: homeroomClass } = useQuery({
+        queryKey: ['homeroom-class'],
+        queryFn: async () => {
+            const res = await api.get('/academic/classes/homeroom');
+            return res.data;
+        },
+    });
 
-    // Fetch Students
+    // Fetch Students in Homeroom Class
     const { data: students, isLoading } = useQuery({
-        queryKey: ['students', unitID],
+        queryKey: ['homeroom-students', homeroomClass?.id],
         queryFn: async () => {
-            const res = await api.get(`/students/?unit_id=${unitID}`);
-            return res.data;
+            if (!homeroomClass?.id) return [];
+            // We need an endpoint to get students by class. 
+            // Assuming /students?class_id=... works or we filter client side from all students (less efficient).
+            // Let's try fetching all students for the unit and filtering by class_id.
+            const res = await api.get(`/students/?unit_id=${homeroomClass.unit_id}`);
+            return res.data.filter((s: any) => s.class_id === homeroomClass.id);
         },
+        enabled: !!homeroomClass?.id,
     });
 
-    // Fetch Classes
+    // Fetch Classes (for editing class)
     const { data: classes } = useQuery({
-        queryKey: ['classes', unitID],
+        queryKey: ['classes', homeroomClass?.unit_id],
         queryFn: async () => {
-            const res = await api.get(`/academic/classes?unit_id=${unitID}`);
+            if (!homeroomClass?.unit_id) return [];
+            const res = await api.get(`/academic/classes?unit_id=${homeroomClass.unit_id}`);
             return res.data;
         },
+        enabled: !!homeroomClass?.unit_id,
     });
 
-    // Fetch Parents (Users with role_id 7)
-    // We need an endpoint to get all parents. Assuming /users?role_id=7 exists or we filter client side.
-    // Ideally backend should provide /users/parents endpoint.
-    // Let's use /users and filter for now, or check if there's a better way.
-    // Actually, let's assume we can fetch all users and filter by role 7.
+    // Fetch Parents
     const { data: parents } = useQuery({
         queryKey: ['parents'],
         queryFn: async () => {
@@ -79,29 +84,12 @@ const Students: React.FC = () => {
         },
     });
 
-    // Mutations
-    const createMutation = useMutation({
-        mutationFn: (data: any) => api.post('/students/', data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students'] });
-            setIsModalOpen(false);
-            resetForm();
-        },
-    });
-
     const updateMutation = useMutation({
         mutationFn: (data: any) => api.put(`/students/${editingStudent?.id}`, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['homeroom-students'] });
             setIsModalOpen(false);
             resetForm();
-        },
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: (id: string) => api.delete(`/students/${id}`),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students'] });
         },
     });
 
@@ -112,7 +100,7 @@ const Students: React.FC = () => {
             password: '',
             nisn: '',
             class_id: '',
-            unit_id: unitID,
+            unit_id: 1,
             parent_id: '',
         });
         setEditingStudent(null);
@@ -123,19 +111,13 @@ const Students: React.FC = () => {
         setFormData({
             name: student.user.name,
             email: student.user.email,
-            password: '', // Password not filled for edit
+            password: '',
             nisn: student.nisn,
             class_id: student.class?.id.toString() || '',
             unit_id: student.unit_id,
-            parent_id: (student as any).parent_id || '', // Need to ensure student object has parent_id
+            parent_id: (student as any).parent_id || '',
         });
         setIsModalOpen(true);
-    };
-
-    const handleDelete = (id: string) => {
-        if (confirm('Apakah Anda yakin ingin menghapus siswa ini?')) {
-            deleteMutation.mutate(id);
-        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -143,15 +125,12 @@ const Students: React.FC = () => {
         const payload = {
             ...formData,
             class_id: Number(formData.class_id),
-            unit_id: unitID,
+            unit_id: Number(formData.unit_id),
         };
 
         if (editingStudent) {
-            // Remove password if empty during edit
             if (!payload.password) delete (payload as any).password;
             updateMutation.mutate(payload);
-        } else {
-            createMutation.mutate(payload);
         }
     };
 
@@ -160,16 +139,17 @@ const Students: React.FC = () => {
         student.nisn.includes(search)
     );
 
+    if (!homeroomClass && !isLoading) {
+        return <div className="p-6 text-white">Anda belum ditugaskan sebagai wali kelas.</div>;
+    }
+
     return (
         <div className="space-y-6 p-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Data Siswa</h1>
-                    <p className="text-gray-400">Kelola data siswa per unit</p>
+                    <h1 className="text-2xl font-bold text-white">Data Siswa Kelas {homeroomClass?.name}</h1>
+                    <p className="text-gray-400">Kelola data siswa di kelas Anda</p>
                 </div>
-                <ButtonGlass onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2">
-                    <Plus size={18} /> Tambah Siswa
-                </ButtonGlass>
             </div>
 
             <CardGlass className="p-6 space-y-4">
@@ -181,22 +161,6 @@ const Students: React.FC = () => {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
-                    </div>
-                    <div className="flex gap-2">
-                        {user?.role_id === 1 ? (
-                            <select
-                                className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                value={unitID}
-                                onChange={(e) => setUnitID(Number(e.target.value))}
-                            >
-                                <option value={1} className="bg-gray-900">MTS</option>
-                                <option value={2} className="bg-gray-900">MA</option>
-                            </select>
-                        ) : (
-                            <div className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
-                                {unitID === 1 ? 'MTS' : 'MA'}
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -245,12 +209,6 @@ const Students: React.FC = () => {
                                             >
                                                 <Edit2 size={16} />
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(student.id)}
-                                                className="p-2 hover:bg-white/10 rounded-lg text-red-400 transition-colors"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
                                         </div>
                                     </TableCellGlass>
                                 </TableRowGlass>
@@ -263,7 +221,7 @@ const Students: React.FC = () => {
             <ModalGlass
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title={editingStudent ? "Edit Siswa" : "Tambah Siswa Baru"}
+                title="Edit Siswa"
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <InputGlass
@@ -279,15 +237,6 @@ const Students: React.FC = () => {
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         required
                     />
-                    {!editingStudent && (
-                        <InputGlass
-                            label="Password"
-                            type="password"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            required={!editingStudent}
-                        />
-                    )}
                     <InputGlass
                         label="NISN"
                         value={formData.nisn}
@@ -306,6 +255,19 @@ const Students: React.FC = () => {
                             {classes?.map((c: any) => (
                                 <option key={c.id} value={c.id} className="bg-gray-900">{c.name}</option>
                             ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1 ml-1">Unit</label>
+                        <select
+                            value={formData.unit_id}
+                            onChange={(e) => setFormData({ ...formData, unit_id: Number(e.target.value) })}
+                            className="w-full glass-input"
+                            required
+                        >
+                            <option value={1} className="bg-gray-900">MTS</option>
+                            <option value={2} className="bg-gray-900">MA</option>
                         </select>
                     </div>
 
@@ -337,4 +299,4 @@ const Students: React.FC = () => {
     );
 };
 
-export default Students;
+export default HomeroomStudents;

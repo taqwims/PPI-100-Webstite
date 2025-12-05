@@ -121,6 +121,17 @@ func (u *AcademicUsecase) GetStudentClassIDByUserID(userID string) (uint, error)
 	return user.Student.ClassID, nil
 }
 
+func (u *AcademicUsecase) GetTeacherIDByUserID(userID string) (string, error) {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil {
+		return "", err
+	}
+	if user.Teacher == nil {
+		return "", errors.New("user is not a teacher")
+	}
+	return user.Teacher.ID.String(), nil
+}
+
 func (u *AcademicUsecase) GetAllSubjects(unitID uint) ([]domain.Subject, error) {
 	return u.academicRepo.GetAllSubjects(unitID)
 }
@@ -142,8 +153,8 @@ func (u *AcademicUsecase) CreateSchedule(req domain.Schedule) error {
 	return u.academicRepo.CreateSchedule(&req)
 }
 
-func (u *AcademicUsecase) GetAllSchedules(classID uint, teacherID string) ([]domain.Schedule, error) {
-	return u.academicRepo.GetAllSchedules(classID, teacherID)
+func (u *AcademicUsecase) GetAllSchedules(unitID, classID uint, teacherID string) ([]domain.Schedule, error) {
+	return u.academicRepo.GetAllSchedules(unitID, classID, teacherID)
 }
 
 func (u *AcademicUsecase) UpdateSchedule(id uint, req domain.Schedule) error {

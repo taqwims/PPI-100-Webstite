@@ -165,6 +165,7 @@ func (h *AcademicHandler) CreateSchedule(c *gin.Context) {
 }
 
 func (h *AcademicHandler) GetAllSchedules(c *gin.Context) {
+	unitID, _ := strconv.Atoi(c.Query("unit_id"))
 	classID, _ := strconv.Atoi(c.Query("class_id"))
 	teacherID := c.Query("teacher_id")
 
@@ -179,15 +180,22 @@ func (h *AcademicHandler) GetAllSchedules(c *gin.Context) {
 			}
 
 			if userID != "" {
+				// Try to get Student Class ID
 				cid, err := h.academicUsecase.GetStudentClassIDByUserID(userID)
 				if err == nil {
 					classID = int(cid)
+				} else {
+					// If not student, try to get Teacher ID
+					tid, err := h.academicUsecase.GetTeacherIDByUserID(userID)
+					if err == nil {
+						teacherID = tid
+					}
 				}
 			}
 		}
 	}
 
-	schedules, err := h.academicUsecase.GetAllSchedules(uint(classID), teacherID)
+	schedules, err := h.academicUsecase.GetAllSchedules(uint(unitID), uint(classID), teacherID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

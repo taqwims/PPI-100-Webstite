@@ -58,7 +58,7 @@ func (u *StudentUsecase) CreateStudent(name, email, password, nisn string, class
 	return u.studentRepo.Create(student)
 }
 
-func (u *StudentUsecase) UpdateStudent(id string, name, email, nisn string, classID uint) error {
+func (u *StudentUsecase) UpdateStudent(id string, name, email, nisn string, classID, unitID uint, parentID *uuid.UUID) error {
 	student, err := u.studentRepo.GetByID(id)
 	if err != nil {
 		return err
@@ -78,6 +78,8 @@ func (u *StudentUsecase) UpdateStudent(id string, name, email, nisn string, clas
 	// Update Student
 	student.NISN = nisn
 	student.ClassID = classID
+	student.UnitID = unitID
+	student.ParentID = parentID
 	return u.studentRepo.Update(student)
 }
 

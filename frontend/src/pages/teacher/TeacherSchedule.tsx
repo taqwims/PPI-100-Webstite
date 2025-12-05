@@ -4,7 +4,7 @@ import api from '../../services/api';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import { Calendar, Clock, BookOpen, Users } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+
 
 interface Schedule {
     id: number;
@@ -16,7 +16,7 @@ interface Schedule {
 }
 
 const TeacherSchedule: React.FC = () => {
-    const { user } = useAuth();
+    // const { user } = useAuth();
 
     // In a real app, we would get the teacher ID from the user context or a separate API call
     // For now, we'll assume the user ID is linked to a teacher record and the backend handles the mapping
@@ -46,24 +46,12 @@ const TeacherSchedule: React.FC = () => {
     // No, backend expects `teacher_id` (UUID of teacher table), not `user_id`.
 
     // Workaround: We will fetch all teachers, find the one matching current user's email/ID, then use that ID.
-    const { data: teachers } = useQuery({
-        queryKey: ['teachers'],
+    const { data: schedules, isLoading } = useQuery({
+        queryKey: ['schedules', 'teacher'],
         queryFn: async () => {
-            const response = await api.get('/teachers/');
+            const response = await api.get('/academic/schedules');
             return response.data;
         }
-    });
-
-    const currentTeacher = teachers?.find((t: any) => t.user.id === user?.id);
-
-    const { data: schedules, isLoading } = useQuery({
-        queryKey: ['schedules', currentTeacher?.id],
-        queryFn: async () => {
-            if (!currentTeacher?.id) return [];
-            const response = await api.get(`/academic/schedules?teacher_id=${currentTeacher.id}`);
-            return response.data;
-        },
-        enabled: !!currentTeacher?.id
     });
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
