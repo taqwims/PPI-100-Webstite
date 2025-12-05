@@ -175,9 +175,9 @@ const AdminPublicContent: React.FC = () => {
             <TableBodyGlass>
                 {teachers?.map((t: any) => (
                     <TableRowGlass key={t.id}>
-                        <TableCellGlass><span className="font-medium text-white">{t.name}</span></TableCellGlass>
-                        <TableCellGlass><span className="text-gray-300">{t.position}</span></TableCellGlass>
-                        <TableCellGlass><span className="text-gray-400 text-sm truncate max-w-xs">{t.bio}</span></TableCellGlass>
+                        <TableCellGlass><span className="font-medium text-slate-300-300">{t.name}</span></TableCellGlass>
+                        <TableCellGlass><span className="text-slate-300-300">{t.position}</span></TableCellGlass>
+                        <TableCellGlass><span className="text-slate-300-400 text-sm truncate max-w-xs">{t.bio}</span></TableCellGlass>
                         <TableCellGlass className="text-right">
                             <div className="flex justify-end gap-2">
                                 <button onClick={() => handleOpenModal(t)} className="p-2 hover:bg-white/10 rounded-lg text-indigo-400 transition-colors">
@@ -207,8 +207,8 @@ const AdminPublicContent: React.FC = () => {
             <TableBodyGlass>
                 {downloads?.map((d: any) => (
                     <TableRowGlass key={d.id}>
-                        <TableCellGlass><span className="font-medium text-white">{d.title}</span></TableCellGlass>
-                        <TableCellGlass><span className="text-gray-300">{d.category}</span></TableCellGlass>
+                        <TableCellGlass><span className="font-medium text-slate-900">{d.title}</span></TableCellGlass>
+                        <TableCellGlass><span className="text-slate-300-300">{d.category}</span></TableCellGlass>
                         <TableCellGlass>
                             <a href={d.file_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-sm">Download</a>
                         </TableCellGlass>
@@ -242,10 +242,10 @@ const AdminPublicContent: React.FC = () => {
             <TableBodyGlass>
                 {alumni?.map((a: any) => (
                     <TableRowGlass key={a.id}>
-                        <TableCellGlass><span className="font-medium text-white">{a.name}</span></TableCellGlass>
-                        <TableCellGlass><span className="text-gray-300">{a.graduation_year}</span></TableCellGlass>
-                        <TableCellGlass><span className="text-gray-300">{a.profession}</span></TableCellGlass>
-                        <TableCellGlass><span className="text-gray-400 text-sm truncate max-w-xs">{a.testimony}</span></TableCellGlass>
+                        <TableCellGlass><span className="font-medium text-slate-900">{a.name}</span></TableCellGlass>
+                        <TableCellGlass><span className="text-slate-300-300">{a.graduation_year}</span></TableCellGlass>
+                        <TableCellGlass><span className="text-slate-300-300">{a.profession}</span></TableCellGlass>
+                        <TableCellGlass><span className="text-slate-300-400 text-sm truncate max-w-xs">{a.testimony}</span></TableCellGlass>
                         <TableCellGlass className="text-right">
                             <div className="flex justify-end gap-2">
                                 <button onClick={() => handleOpenModal(a)} className="p-2 hover:bg-white/10 rounded-lg text-indigo-400 transition-colors">
@@ -266,8 +266,8 @@ const AdminPublicContent: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Konten Publik</h1>
-                    <p className="text-gray-400">Kelola konten website publik</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Konten Publik</h1>
+                    <p className="text-slate-300-400">Kelola konten website publik</p>
                 </div>
                 <ButtonGlass onClick={() => handleOpenModal()} className="flex items-center gap-2">
                     <Plus size={18} /> Tambah Data
@@ -277,19 +277,19 @@ const AdminPublicContent: React.FC = () => {
             <div className="flex space-x-4 border-b border-white/10 pb-4">
                 <button
                     onClick={() => setActiveTab('teachers')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'teachers' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'teachers' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <Users size={18} /> Guru
                 </button>
                 <button
                     onClick={() => setActiveTab('downloads')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'downloads' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'downloads' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <Download size={18} /> Download
                 </button>
                 <button
                     onClick={() => setActiveTab('alumni')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'alumni' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'alumni' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <GraduationCap size={18} /> Alumni
                 </button>

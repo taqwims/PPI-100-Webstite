@@ -33,6 +33,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
             { icon: Users, label: 'Data PPDB', path: '/dashboard/admin/ppdb' },
             { icon: GraduationCap, label: 'Data Alumni', path: '/dashboard/admin/alumni' },
+            { icon: Users, label: 'Dewan Asatidz', path: '/dashboard/admin/teachers' },
+            { icon: FileText, label: 'Pusat Unduhan', path: '/dashboard/admin/downloads' },
             { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/admin/bk' },
         ];
 
@@ -90,7 +92,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
             {/* Sidebar Container */}
             <div className={clsx(
-                "fixed inset-y-0 left-0 z-50 w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-screen flex flex-col shadow-xl shadow-slate-200/50",
+                "fixed inset-y-0 left-0 z-50 w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen flex flex-col shadow-xl shadow-slate-200/50",
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="p-6 flex items-center justify-between border-b border-slate-200">

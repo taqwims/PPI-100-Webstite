@@ -160,8 +160,8 @@ const UserManagement: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Manajemen User</h1>
-                    <p className="text-gray-400">Kelola akun pengguna sistem</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Manajemen User</h1>
+                    <p className="text-slate-300-400">Kelola akun pengguna sistem</p>
                 </div>
                 <ButtonGlass onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
                     <Plus size={18} /> Tambah User
@@ -188,23 +188,23 @@ const UserManagement: React.FC = () => {
                             filteredUsers?.map((user: User) => (
                                 <TableRowGlass key={user.id}>
                                     <TableCellGlass>
-                                        <span className="font-medium text-white">{user.name}</span>
+                                        <span className="font-medium text-slate-900">{user.name}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-300">{user.email}</span>
+                                        <span className="text-slate-300-300">{user.email}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <span className={`px-2 py-1 rounded-full text-xs font-semibold 
                                             ${user.role_id === 1 ? 'bg-purple-500/20 text-purple-400' :
                                                 user.role_id === 4 ? 'bg-blue-500/20 text-blue-400' :
                                                     user.role_id === 6 ? 'bg-green-500/20 text-green-400' :
-                                                        'bg-gray-500/20 text-gray-400'
+                                                        'bg-gray-500/20 text-slate-300-400'
                                             }`}>
                                             {getRoleName(user.role_id)}
                                         </span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-300">{getUnitName(user.unit_id)}</span>
+                                        <span className="text-slate-300-300">{getUnitName(user.unit_id)}</span>
                                     </TableCellGlass>
                                     <TableCellGlass className="text-right">
                                         <div className="flex justify-end gap-2">
@@ -259,11 +259,11 @@ const UserManagement: React.FC = () => {
                     />
 
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Role</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Role</label>
                         <div className="relative">
-                            <Shield className="absolute left-3 top-3 text-gray-400" size={18} />
+                            <Shield className="absolute left-3 top-3 text-slate-300-400" size={18} />
                             <select
-                                className="w-full glass-input pl-10 text-gray-900"
+                                className="w-full glass-input pl-10 text-slate-300-900"
                                 value={formData.role_id}
                                 onChange={(e) => setFormData({ ...formData, role_id: Number(e.target.value) })}
                             >
@@ -275,12 +275,12 @@ const UserManagement: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Unit</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Unit</label>
                         <div className="relative">
-                            <School className="absolute left-3 top-3 text-gray-400" size={18} />
+                            <School className="absolute left-3 top-3 text-slate-300-400" size={18} />
                             {user?.role_id === 1 ? (
                                 <select
-                                    className="w-full glass-input pl-10 text-gray-900"
+                                    className="w-full glass-input pl-10 text-slate-300-900"
                                     value={formData.unit_id}
                                     onChange={(e) => setFormData({ ...formData, unit_id: Number(e.target.value) })}
                                 >
@@ -289,7 +289,7 @@ const UserManagement: React.FC = () => {
                                     <option value={3}>Public</option>
                                 </select>
                             ) : (
-                                <div className="w-full glass-input pl-10 text-gray-300 flex items-center">
+                                <div className="w-full glass-input pl-10 text-slate-300-300 flex items-center">
                                     {getUnitName(formData.unit_id)}
                                 </div>
                             )}

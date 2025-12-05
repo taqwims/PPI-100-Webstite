@@ -116,7 +116,7 @@ const BK: React.FC = () => {
         return (
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-white">Daftar Jenis Pelanggaran</h2>
+                    <h2 className="text-xl font-semibold text-slate-900">Daftar Jenis Pelanggaran</h2>
                     <ButtonGlass onClick={() => setIsViolationModalOpen(true)} className="flex items-center gap-2">
                         <Plus size={18} /> Tambah Pelanggaran
                     </ButtonGlass>
@@ -133,13 +133,13 @@ const BK: React.FC = () => {
                         {violations?.map((v: Violation) => (
                             <TableRowGlass key={v.id}>
                                 <TableCellGlass>
-                                    <span className="font-medium text-white">{v.name}</span>
+                                    <span className="font-medium text-slate-900">{v.name}</span>
                                 </TableCellGlass>
                                 <TableCellGlass>
                                     <span className="text-red-400 font-bold">+{v.points}</span>
                                 </TableCellGlass>
                                 <TableCellGlass>
-                                    <span className="text-gray-400">{v.description || '-'}</span>
+                                    <span className="text-slate-300-400">{v.description || '-'}</span>
                                 </TableCellGlass>
                             </TableRowGlass>
                         ))}
@@ -158,7 +158,7 @@ const BK: React.FC = () => {
         return (
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-white">Riwayat Pemanggilan</h2>
+                    <h2 className="text-xl font-semibold text-slate-900">Riwayat Pemanggilan</h2>
                     <ButtonGlass onClick={() => setIsCallModalOpen(true)} className="flex items-center gap-2">
                         <Phone size={18} /> Buat Pemanggilan
                     </ButtonGlass>
@@ -177,16 +177,16 @@ const BK: React.FC = () => {
                         {calls?.map((c: BKCall) => (
                             <TableRowGlass key={c.id}>
                                 <TableCellGlass>
-                                    <span className="font-medium text-white">{c.student?.user?.name || 'Unknown'}</span>
+                                    <span className="font-medium text-slate-900">{c.student?.user?.name || 'Unknown'}</span>
                                 </TableCellGlass>
                                 <TableCellGlass>
-                                    <span className="text-gray-300">{c.teacher?.user?.name || 'Unknown'}</span>
+                                    <span className="text-slate-300-300">{c.teacher?.user?.name || 'Unknown'}</span>
                                 </TableCellGlass>
                                 <TableCellGlass>
-                                    <span className="text-gray-300">{c.reason}</span>
+                                    <span className="text-slate-300-300">{c.reason}</span>
                                 </TableCellGlass>
                                 <TableCellGlass>
-                                    <span className="text-gray-400">{new Date(c.date).toLocaleDateString('id-ID')}</span>
+                                    <span className="text-slate-300-400">{new Date(c.date).toLocaleDateString('id-ID')}</span>
                                 </TableCellGlass>
                                 <TableCellGlass>
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.status === 'Resolved' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
@@ -210,8 +210,8 @@ const BK: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Bimbingan Konseling</h1>
-                    <p className="text-gray-400">Manajemen pelanggaran dan pemanggilan siswa</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Bimbingan Konseling</h1>
+                    <p className="text-slate-300-400">Manajemen pelanggaran dan pemanggilan siswa</p>
                 </div>
                 {/* Unit Switcher for Admins */}
                 {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3) && (
@@ -219,7 +219,7 @@ const BK: React.FC = () => {
                         <select
                             value={unitID}
                             onChange={(e) => setUnitID(Number(e.target.value))}
-                            className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="bg-white/10 border border-white/20 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             disabled={user?.role_id !== 1} // Only Super Admin can switch
                         >
                             <option value={1} className="bg-gray-900">MTS</option>
@@ -232,14 +232,14 @@ const BK: React.FC = () => {
             <div className="flex space-x-4 border-b border-white/10 pb-4">
                 <button
                     onClick={() => setActiveTab('violations')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'violations' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'violations' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <AlertTriangle size={18} />
                     Jenis Pelanggaran
                 </button>
                 <button
                     onClick={() => setActiveTab('calls')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'calls' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'calls' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <Phone size={18} />
                     Pemanggilan BK
@@ -291,9 +291,9 @@ const BK: React.FC = () => {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Siswa</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Siswa</label>
                         <select
-                            className="w-full glass-input text-gray-900"
+                            className="w-full glass-input text-slate-300-900"
                             value={newCall.student_id}
                             onChange={(e) => setNewCall({ ...newCall, student_id: e.target.value })}
                         >
@@ -304,9 +304,9 @@ const BK: React.FC = () => {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Guru Pemanggil</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Guru Pemanggil</label>
                         <select
-                            className="w-full glass-input text-gray-900"
+                            className="w-full glass-input text-slate-300-900"
                             value={newCall.teacher_id}
                             onChange={(e) => setNewCall({ ...newCall, teacher_id: e.target.value })}
                         >

@@ -140,15 +140,15 @@ const HomeroomStudents: React.FC = () => {
     );
 
     if (!homeroomClass && !isLoading) {
-        return <div className="p-6 text-white">Anda belum ditugaskan sebagai wali kelas.</div>;
+        return <div className="p-6 text-slate-900">Anda belum ditugaskan sebagai wali kelas.</div>;
     }
 
     return (
         <div className="space-y-6 p-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Data Siswa Kelas {homeroomClass?.name}</h1>
-                    <p className="text-gray-400">Kelola data siswa di kelas Anda</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Data Siswa Kelas {homeroomClass?.name}</h1>
+                    <p className="text-slate-300-400">Kelola data siswa di kelas Anda</p>
                 </div>
             </div>
 
@@ -186,18 +186,18 @@ const HomeroomStudents: React.FC = () => {
                             filteredStudents?.map((student: Student) => (
                                 <TableRowGlass key={student.id}>
                                     <TableCellGlass>
-                                        <span className="font-mono text-gray-300">{student.nisn}</span>
+                                        <span className="font-mono text-slate-300-300">{student.nisn}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center text-green-400">
                                                 <User size={14} />
                                             </div>
-                                            <span className="font-medium text-white">{student.user.name}</span>
+                                            <span className="font-medium text-slate-900">{student.user.name}</span>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-white border border-white/10">
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-slate-900 border border-white/10">
                                             {student.class?.name || '-'}
                                         </span>
                                     </TableCellGlass>
@@ -244,7 +244,7 @@ const HomeroomStudents: React.FC = () => {
                         required
                     />
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1 ml-1">Kelas</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-1 ml-1">Kelas</label>
                         <select
                             value={formData.class_id}
                             onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
@@ -259,7 +259,7 @@ const HomeroomStudents: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1 ml-1">Unit</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-1 ml-1">Unit</label>
                         <select
                             value={formData.unit_id}
                             onChange={(e) => setFormData({ ...formData, unit_id: Number(e.target.value) })}
@@ -272,7 +272,7 @@ const HomeroomStudents: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1 ml-1">Orang Tua</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-1 ml-1">Orang Tua</label>
                         <select
                             value={formData.parent_id}
                             onChange={(e) => setFormData({ ...formData, parent_id: e.target.value })}

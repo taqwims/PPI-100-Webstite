@@ -69,8 +69,8 @@ const AdminPPDB: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Manajemen PPDB</h1>
-                    <p className="text-gray-400">Kelola pendaftaran peserta didik baru</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Manajemen PPDB</h1>
+                    <p className="text-slate-600">Kelola pendaftaran peserta didik baru</p>
                 </div>
             </div>
 
@@ -100,45 +100,45 @@ const AdminPPDB: React.FC = () => {
                     <TableBodyGlass>
                         {isLoading ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8">Loading...</TableCellGlass>
+                                <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
                         ) : filteredRegistrations?.length === 0 ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8">Tidak ada data pendaftaran</TableCellGlass>
+                                <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Tidak ada data pendaftaran</TableCellGlass>
                             </TableRowGlass>
                         ) : (
                             filteredRegistrations?.map((reg: PPDBRegistration) => (
                                 <TableRowGlass key={reg.id}>
                                     <TableCellGlass>
-                                        <span className="text-gray-400 text-sm">
+                                        <span className="text-slate-600 text-sm">
                                             {new Date(reg.created_at).toLocaleDateString('id-ID')}
                                         </span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex flex-col">
-                                            <span className="font-medium text-white">{reg.name}</span>
-                                            <span className="text-xs text-gray-400 font-mono">{reg.nisn}</span>
+                                            <span className="font-medium text-slate-900">{reg.name}</span>
+                                            <span className="text-xs text-slate-500 font-mono">{reg.nisn}</span>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <div className="flex items-center gap-2 text-gray-300">
+                                        <div className="flex items-center gap-2 text-slate-600">
                                             <School size={14} />
                                             <span>{reg.origin_school}</span>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex flex-col">
-                                            <span className="text-white">{reg.parent_name}</span>
-                                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                                            <span className="text-slate-900">{reg.parent_name}</span>
+                                            <div className="flex items-center gap-1 text-xs text-slate-500">
                                                 <Phone size={10} /> {reg.phone}
                                             </div>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <span className={`px-2 py-1 rounded-full text-xs font-semibold 
-                                            ${reg.status === 'Accepted' ? 'bg-green-500/20 text-green-400' :
-                                                reg.status === 'Rejected' ? 'bg-red-500/20 text-red-400' :
-                                                    'bg-yellow-500/20 text-yellow-400'}`}>
+                                            ${reg.status === 'Accepted' ? 'bg-green-100 text-green-600' :
+                                                reg.status === 'Rejected' ? 'bg-red-100 text-red-600' :
+                                                    'bg-yellow-100 text-yellow-600'}`}>
                                             {reg.status === 'Accepted' ? 'Diterima' :
                                                 reg.status === 'Rejected' ? 'Ditolak' : 'Menunggu'}
                                         </span>
@@ -150,7 +150,7 @@ const AdminPPDB: React.FC = () => {
                                                     <ButtonGlass
                                                         variant="primary"
                                                         onClick={() => handleStatusUpdate(reg.id, 'Accepted')}
-                                                        className="py-1 px-3 text-xs bg-green-600 hover:bg-green-700"
+                                                        className="py-1 px-3 text-xs bg-green-600 hover:bg-green-700 text-slate-900"
                                                     >
                                                         <CheckCircle size={14} /> Terima
                                                     </ButtonGlass>
@@ -164,7 +164,7 @@ const AdminPPDB: React.FC = () => {
                                                 </>
                                             )}
                                             {reg.status !== 'Pending' && (
-                                                <span className="text-gray-500 text-xs italic">Selesai</span>
+                                                <span className="text-slate-500 text-xs italic">Selesai</span>
                                             )}
                                             <ButtonGlass
                                                 variant="danger"

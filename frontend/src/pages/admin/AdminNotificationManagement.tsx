@@ -97,21 +97,21 @@ const AdminNotificationManagement: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Manajemen Notifikasi</h1>
-                    <p className="text-gray-400">Kirim dan pantau notifikasi pengguna</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Manajemen Notifikasi</h1>
+                    <p className="text-slate-600">Kirim dan pantau notifikasi pengguna</p>
                 </div>
             </div>
 
-            <div className="flex space-x-4 border-b border-white/10 pb-4">
+            <div className="flex space-x-4 border-b border-slate-200 pb-4">
                 <button
                     onClick={() => setActiveTab('send')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'send' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'send' ? 'bg-blue-600 text-slate-900 shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
                 >
                     <Send size={18} /> Kirim Notifikasi
                 </button>
                 <button
                     onClick={() => setActiveTab('history')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'history' ? 'bg-blue-600 text-slate-900 shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
                 >
                     <History size={18} /> Riwayat
                 </button>
@@ -121,17 +121,17 @@ const AdminNotificationManagement: React.FC = () => {
                 <CardGlass className="p-6 max-w-2xl mx-auto">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Penerima</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Penerima</label>
                             <div className="relative">
-                                <User className="absolute left-3 top-3 text-gray-400" size={18} />
+                                <User className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <select
-                                    className="w-full glass-input pl-10 text-gray-900"
+                                    className="w-full glass-input pl-10 text-slate-900 bg-white/50 border-slate-200 focus:border-purple-500"
                                     value={selectedUser}
                                     onChange={(e) => setSelectedUser(e.target.value)}
                                 >
-                                    <option value="">-- Pilih Pengguna --</option>
+                                    <option value="" className="bg-white">-- Pilih Pengguna --</option>
                                     {users?.map((u: User) => (
-                                        <option key={u.id} value={u.id}>
+                                        <option key={u.id} value={u.id} className="bg-white">
                                             {u.name} ({u.role_id === 6 ? 'Siswa' : u.role_id === 4 ? 'Guru' : 'User'})
                                         </option>
                                     ))}
@@ -148,23 +148,23 @@ const AdminNotificationManagement: React.FC = () => {
                         />
 
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Tipe</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Tipe</label>
                             <select
-                                className="w-full glass-input text-gray-900"
+                                className="w-full glass-input text-slate-900 bg-white/50 border-slate-200 focus:border-purple-500"
                                 value={type}
                                 onChange={(e) => setType(e.target.value)}
                             >
-                                <option value="Info">Info Umum</option>
-                                <option value="Bill">Tagihan</option>
-                                <option value="Academic">Akademik</option>
-                                <option value="Warning">Peringatan</option>
+                                <option value="Info" className="bg-white">Info Umum</option>
+                                <option value="Bill" className="bg-white">Tagihan</option>
+                                <option value="Academic" className="bg-white">Akademik</option>
+                                <option value="Warning" className="bg-white">Peringatan</option>
                             </select>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Pesan</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Pesan</label>
                             <textarea
-                                className="w-full glass-input min-h-[120px] text-gray-900 p-3"
+                                className="w-full glass-input min-h-[120px] text-slate-900 p-3 bg-white/50 border-slate-200 focus:border-purple-500"
                                 placeholder="Tulis pesan notifikasi di sini..."
                                 value={message}
                                 onChange={(e) => setMessage(e.target.value)}
@@ -196,32 +196,32 @@ const AdminNotificationManagement: React.FC = () => {
                             {notifications?.map((n: Notification) => (
                                 <TableRowGlass key={n.id}>
                                     <TableCellGlass>
-                                        <div className="flex items-center gap-2 text-gray-300">
+                                        <div className="flex items-center gap-2 text-slate-600">
                                             <Clock size={14} />
                                             {new Date(n.created_at).toLocaleString()}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="font-medium text-white">{n.user?.name || 'Unknown User'}</span>
+                                        <span className="font-medium text-slate-900">{n.user?.name || 'Unknown User'}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-white">{n.title}</span>
+                                        <span className="text-slate-900">{n.title}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-400 text-sm truncate max-w-xs">{n.message}</span>
+                                        <span className="text-slate-600 text-sm truncate max-w-xs">{n.message}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${n.type === 'Warning' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${n.type === 'Warning' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
                                             {n.type}
                                         </span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         {n.is_read ? (
-                                            <span className="flex items-center gap-1 text-green-400 text-sm">
+                                            <span className="flex items-center gap-1 text-green-600 text-sm">
                                                 <CheckCircle size={14} /> Dibaca
                                             </span>
                                         ) : (
-                                            <span className="text-gray-500 text-sm">Terkirim</span>
+                                            <span className="text-slate-500 text-sm">Terkirim</span>
                                         )}
                                     </TableCellGlass>
                                     <TableCellGlass className="text-right">

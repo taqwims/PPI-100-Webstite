@@ -151,15 +151,15 @@ const Finance: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Keuangan</h1>
-                    <p className="text-gray-400">Manajemen tagihan dan pembayaran siswa</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Keuangan</h1>
+                    <p className="text-slate-300-400">Manajemen tagihan dan pembayaran siswa</p>
                 </div>
                 <div className="flex space-x-3">
                     {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3) && (
                         <select
                             value={unitID}
                             onChange={(e) => setUnitID(Number(e.target.value))}
-                            className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="bg-white/10 border border-white/20 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             disabled={user?.role_id !== 1}
                         >
                             <option value={1} className="bg-gray-900">MTS</option>
@@ -175,7 +175,7 @@ const Finance: React.FC = () => {
             <CardGlass>
                 <div className="p-6">
                     {isLoading ? (
-                        <div className="text-center py-8 text-gray-400">Loading data...</div>
+                        <div className="text-center py-8 text-slate-300-400">Loading data...</div>
                     ) : (
                         <TableGlass>
                             <TableHeaderGlass>
@@ -192,16 +192,16 @@ const Finance: React.FC = () => {
                                 {bills?.map((bill: Bill) => (
                                     <TableRowGlass key={bill.id}>
                                         <TableCellGlass>
-                                            <span className="font-medium text-white">{bill.student.user.name}</span>
+                                            <span className="font-medium text-slate-900">{bill.student.user.name}</span>
                                         </TableCellGlass>
                                         <TableCellGlass>
-                                            <span className="text-gray-300">{bill.title}</span>
+                                            <span className="text-slate-300-300">{bill.title}</span>
                                         </TableCellGlass>
                                         <TableCellGlass>
-                                            <span className="font-mono text-gray-300">Rp {bill.amount.toLocaleString()}</span>
+                                            <span className="font-mono text-slate-300-300">Rp {bill.amount.toLocaleString()}</span>
                                         </TableCellGlass>
                                         <TableCellGlass>
-                                            <span className="text-gray-400">{new Date(bill.due_date).toLocaleDateString()}</span>
+                                            <span className="text-slate-300-400">{new Date(bill.due_date).toLocaleDateString()}</span>
                                         </TableCellGlass>
                                         <TableCellGlass>
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${bill.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
@@ -253,7 +253,7 @@ const Finance: React.FC = () => {
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-1 ml-1">Siswa</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-1 ml-1">Siswa</label>
                         <select
                             value={formData.student_id}
                             onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}

@@ -40,8 +40,8 @@ const StudentBills: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Tagihan Saya</h1>
-                <p className="text-gray-400">Riwayat pembayaran dan tagihan aktif</p>
+                <h1 className="text-2xl font-bold text-slate-900">Tagihan Saya</h1>
+                <p className="text-slate-600">Riwayat pembayaran dan tagihan aktif</p>
             </div>
 
             <CardGlass className="p-6">
@@ -58,35 +58,35 @@ const StudentBills: React.FC = () => {
                     <TableBodyGlass>
                         {isLoading ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={5} className="text-center py-8">Loading...</TableCellGlass>
+                                <TableCellGlass colSpan={5} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
                         ) : bills?.length === 0 ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={5} className="text-center py-8">Tidak ada tagihan.</TableCellGlass>
+                                <TableCellGlass colSpan={5} className="text-center py-8 text-slate-600">Tidak ada tagihan.</TableCellGlass>
                             </TableRowGlass>
                         ) : (
                             bills?.map((bill: Bill) => (
                                 <TableRowGlass key={bill.id}>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-white/5 rounded-lg text-green-400">
+                                            <div className="p-2 bg-slate-100 rounded-lg text-green-600">
                                                 <CreditCard size={18} />
                                             </div>
-                                            <span className="font-medium text-white">{bill.title}</span>
+                                            <span className="font-medium text-slate-900">{bill.title}</span>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        Rp {bill.amount.toLocaleString()}
+                                        <span className="text-slate-900">Rp {bill.amount.toLocaleString()}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        {new Date(bill.due_date).toLocaleDateString()}
+                                        <span className="text-slate-600">{new Date(bill.due_date).toLocaleDateString()}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${bill.status === 'Paid'
-                                            ? 'bg-green-500/20 text-green-400'
+                                            ? 'bg-green-100 text-green-600'
                                             : bill.status === 'Overdue'
-                                                ? 'bg-red-500/20 text-red-400'
-                                                : 'bg-yellow-500/20 text-yellow-400'
+                                                ? 'bg-red-100 text-red-600'
+                                                : 'bg-yellow-100 text-yellow-600'
                                             }`}>
                                             {bill.status}
                                         </span>
@@ -94,14 +94,14 @@ const StudentBills: React.FC = () => {
                                     <TableCellGlass className="text-right">
                                         {bill.status !== 'Paid' && (
                                             <button
-                                                className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+                                                className="text-sm text-blue-600 hover:text-blue-500 hover:underline"
                                                 onClick={() => handlePayClick(bill)}
                                             >
                                                 Bayar Sekarang
                                             </button>
                                         )}
                                         {bill.status === 'Paid' && (
-                                            <span className="text-green-400 flex items-center justify-end gap-1 text-sm">
+                                            <span className="text-green-600 flex items-center justify-end gap-1 text-sm">
                                                 <CheckCircle size={14} /> Lunas
                                             </span>
                                         )}
@@ -119,27 +119,27 @@ const StudentBills: React.FC = () => {
                 title="Instruksi Pembayaran"
             >
                 <div className="space-y-6">
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                        <p className="text-sm text-gray-400 mb-1">Total Pembayaran</p>
-                        <p className="text-2xl font-bold text-white">Rp {selectedBill?.amount.toLocaleString()}</p>
-                        <p className="text-sm text-green-400 mt-1">{selectedBill?.title}</p>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <p className="text-sm text-slate-600 mb-1">Total Pembayaran</p>
+                        <p className="text-2xl font-bold text-slate-900">Rp {selectedBill?.amount.toLocaleString()}</p>
+                        <p className="text-sm text-green-600 mt-1">{selectedBill?.title}</p>
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-white font-semibold">Transfer Bank</h3>
+                        <h3 className="text-slate-900 font-semibold">Transfer Bank</h3>
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10">
+                            <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">BSI</div>
+                                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-slate-900">BSI</div>
                                     <div>
-                                        <p className="text-white font-medium">Bank Syariah Indonesia</p>
-                                        <p className="text-sm text-gray-400">a.n. Yayasan PPI 100</p>
+                                        <p className="text-slate-900 font-medium">Bank Syariah Indonesia</p>
+                                        <p className="text-sm text-slate-600">a.n. Yayasan PPI 100</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-white font-mono">7123456789</p>
+                                    <p className="text-slate-900 font-mono">7123456789</p>
                                     <button
-                                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 justify-end mt-1"
+                                        className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1 justify-end mt-1"
                                         onClick={() => {
                                             navigator.clipboard.writeText('7123456789');
                                             alert('Nomor rekening berhasil disalin!');
@@ -152,8 +152,8 @@ const StudentBills: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20">
-                        <p className="text-sm text-yellow-200">
+                    <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                        <p className="text-sm text-yellow-800">
                             Mohon lakukan transfer sesuai nominal yang tertera. Simpan bukti transfer dan konfirmasi ke bagian keuangan jika status belum berubah dalam 1x24 jam.
                         </p>
                     </div>

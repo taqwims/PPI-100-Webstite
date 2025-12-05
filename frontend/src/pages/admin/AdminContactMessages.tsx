@@ -42,10 +42,10 @@ const AdminContactMessages: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Mail className="text-purple-400" /> Pesan Masuk
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <Mail className="text-purple-600" /> Pesan Masuk
                     </h1>
-                    <p className="text-gray-400">Pesan dari formulir kontak website</p>
+                    <p className="text-slate-600">Pesan dari formulir kontak website</p>
                 </div>
             </div>
 
@@ -64,17 +64,17 @@ const AdminContactMessages: React.FC = () => {
                     <TableBodyGlass>
                         {isLoading ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8">Loading...</TableCellGlass>
+                                <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
                         ) : messages?.length === 0 ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8">Belum ada pesan masuk.</TableCellGlass>
+                                <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Belum ada pesan masuk.</TableCellGlass>
                             </TableRowGlass>
                         ) : (
                             messages?.map((msg) => (
                                 <TableRowGlass key={msg.id}>
                                     <TableCellGlass>
-                                        <div className="flex items-center gap-2 text-gray-300">
+                                        <div className="flex items-center gap-2 text-slate-600">
                                             <Clock size={14} />
                                             {new Date(msg.created_at).toLocaleDateString('id-ID', {
                                                 day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -82,16 +82,16 @@ const AdminContactMessages: React.FC = () => {
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="font-medium text-white">{msg.name}</span>
+                                        <span className="font-medium text-slate-900">{msg.name}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-300">{msg.email}</span>
+                                        <span className="text-slate-600">{msg.email}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-white">{msg.subject}</span>
+                                        <span className="text-slate-900">{msg.subject}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <p className="text-gray-300 line-clamp-2 hover:line-clamp-none transition-all cursor-pointer" title={msg.message}>
+                                        <p className="text-slate-600 line-clamp-2 hover:line-clamp-none transition-all cursor-pointer" title={msg.message}>
                                             {msg.message}
                                         </p>
                                     </TableCellGlass>

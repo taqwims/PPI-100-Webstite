@@ -48,6 +48,8 @@ import AdminNotificationManagement from './pages/admin/AdminNotificationManageme
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import AdminPPDB from './pages/admin/AdminPPDB';
 import AdminAlumni from './pages/admin/AdminAlumni';
+import AdminPublicTeachers from './pages/admin/AdminPublicTeachers';
+import AdminDownloads from './pages/admin/AdminDownloads';
 import AdminPublicContent from './pages/admin/AdminPublicContent';
 
 function App() {
@@ -81,6 +83,8 @@ function App() {
                                     <Route path="admin/elearning" element={<Elearning />} />
                                     <Route path="admin/ppdb" element={<AdminPPDB />} />
                                     <Route path="admin/alumni" element={<AdminAlumni />} />
+                                    <Route path="admin/teachers" element={<AdminPublicTeachers />} />
+                                    <Route path="admin/downloads" element={<AdminDownloads />} />
                                     <Route path="admin/bk" element={<BK />} />
 
                                     {/* Teacher/Student Routes */}

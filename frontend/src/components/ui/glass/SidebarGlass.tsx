@@ -72,7 +72,7 @@ const SidebarGlass: React.FC = () => {
             <div className="h-full glass-panel rounded-3xl flex flex-col overflow-hidden">
                 {/* Logo */}
                 <div className="p-8 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-green-500/30">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center text-slate-900 font-bold text-xl shadow-lg shadow-green-500/30">
                         <img src="/logo.jpeg" alt="PPI" className="w-6 h-6 object-contain" onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             e.currentTarget.parentElement!.innerText = 'P';
@@ -93,11 +93,11 @@ const SidebarGlass: React.FC = () => {
                                     key={link.path}
                                     to={link.path}
                                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
-                                        ? 'bg-gradient-to-r from-green-600/90 to-emerald-600/90 text-white shadow-lg shadow-green-500/20'
+                                        ? 'bg-gradient-to-r from-green-600/90 to-emerald-600/90 text-slate-900 shadow-lg shadow-green-500/20'
                                         : 'text-slate-500 hover:bg-green-50 hover:text-green-700'
                                         }`}
                                 >
-                                    <Icon size={20} className={`transition-colors ${isActive ? 'text-white' : 'group-hover:text-green-600'}`} />
+                                    <Icon size={20} className={`transition-colors ${isActive ? 'text-slate-900' : 'group-hover:text-green-600'}`} />
                                     <span className="font-medium">{link.label}</span>
                                 </Link>
                             );

@@ -33,11 +33,11 @@ const Login: React.FC = () => {
 
             <CardGlass className="w-full max-w-md relative z-10 backdrop-blur-2xl bg-black/40 border-white/10">
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-purple-500/30 mb-6">
+                    <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-slate-900 font-bold text-3xl shadow-lg shadow-purple-500/30 mb-6">
                         P
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
-                    <p className="text-gray-400">Sign in to access your dashboard</p>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome Back</h1>
+                    <p className="text-slate-300-400">Sign in to access your dashboard</p>
                 </div>
 
                 {error && (
@@ -49,7 +49,7 @@ const Login: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-4">
                         <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300-400" size={20} />
                             <InputGlass
                                 type="email"
                                 placeholder="Email Address"
@@ -60,7 +60,7 @@ const Login: React.FC = () => {
                             />
                         </div>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300-400" size={20} />
                             <InputGlass
                                 type="password"
                                 placeholder="Password"
@@ -77,7 +77,7 @@ const Login: React.FC = () => {
                     </ButtonGlass>
                 </form>
 
-                <div className="mt-8 text-center text-sm text-gray-500">
+                <div className="mt-8 text-center text-sm text-slate-300-500">
                     <p>Don't have an account? Contact Administrator</p>
                 </div>
             </CardGlass>

@@ -58,7 +58,7 @@ const Header: React.FC = () => {
                             <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
                             <p className="text-xs text-slate-500">{user?.role_id === 1 ? 'Super Admin' : 'User'}</p>
                         </div>
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold shadow-lg shadow-green-500/20">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-grey font-bold shadow-lg shadow-green-500/20">
                             {user?.name?.charAt(0) || 'U'}
                         </div>
                     </div>

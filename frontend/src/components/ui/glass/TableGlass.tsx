@@ -12,7 +12,7 @@ export const TableGlass: React.FC<TableGlassProps> = ({ headers, data, children,
     if (headers && data) {
         return (
             <div className="w-full overflow-x-auto rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md">
-                <table className={cn("w-full text-left text-sm text-gray-300", className)} {...props}>
+                <table className={cn("w-full text-left text-sm text-slate-300-300", className)} {...props}>
                     <TableHeaderGlass>
                         <TableRowGlass>
                             {headers.map((header, index) => (
@@ -58,7 +58,7 @@ export const TableGlass: React.FC<TableGlassProps> = ({ headers, data, children,
 
     return (
         <div className="w-full overflow-x-auto rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md">
-            <table className={cn("w-full text-left text-sm text-gray-300", className)} {...props}>
+            <table className={cn("w-full text-left text-sm text-slate-300-300", className)} {...props}>
                 {children}
             </table>
         </div>
@@ -67,7 +67,7 @@ export const TableGlass: React.FC<TableGlassProps> = ({ headers, data, children,
 
 export const TableHeaderGlass: React.FC<React.HTMLAttributes<HTMLTableSectionElement>> = ({ children, className, ...props }) => {
     return (
-        <thead className={cn("bg-white/5 text-xs uppercase text-gray-200", className)} {...props}>
+        <thead className={cn("bg-white/5 text-xs uppercase text-slate-300-200", className)} {...props}>
             {children}
         </thead>
     );

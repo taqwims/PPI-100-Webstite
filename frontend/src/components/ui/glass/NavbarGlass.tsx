@@ -19,6 +19,10 @@ const NavbarGlass: React.FC = () => {
     const navLinks = [
         { name: 'Home', path: '/' },
         { name: 'Profil', path: '/profile' },
+        { name: 'Asatidz', path: '/teachers' },
+        { name: 'Alumni', path: '/alumni' },
+        { name: 'Unduhan', path: '/downloads' },
+        { name: 'Hubungi Kami', path: '/contact' },
         { name: 'PPDB', path: '/ppdb' },
     ];
 
@@ -29,15 +33,13 @@ const NavbarGlass: React.FC = () => {
         >
             <div className="container mx-auto px-6">
                 <div
-                    className={`backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl px-6 py-3 flex justify-between items-center shadow-lg transition-all duration-300 ${isScrolled ? 'bg-gray-900/60' : ''
+                    className={`backdrop-blur-l bg-white/30 border border-white/20 rounded-2xl px-6 py-3 flex justify-between items-center shadow-lg transition-all duration-300 ${isScrolled ? 'bg-white/80 shadow-slate-200/50' : ''
                         }`}
                 >
                     {/* Logo */}
                     <Link to="/" className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-purple-500/30">
-                            P
-                        </div>
-                        <span className="text-xl font-bold text-white tracking-tight">PPI 100</span>
+                        <img src="/images/logo.jpeg" alt="PPI 100 Logo" className="w-10 h-10 rounded-xl shadow-lg shadow-green-500/30" />
+                        <span className="text-xl font-bold text-slate-800 tracking-tight">PPI 100 Banjarsari</span>
                     </Link>
 
                     {/* Desktop Menu */}
@@ -46,7 +48,7 @@ const NavbarGlass: React.FC = () => {
                             <Link
                                 key={link.path}
                                 to={link.path}
-                                className={`text-sm font-medium transition-colors hover:text-purple-300 ${location.pathname === link.path ? 'text-white' : 'text-gray-300'
+                                className={`text-sm font-medium transition-colors hover:text-green-600 ${location.pathname === link.path ? 'text-green-700 font-bold' : 'text-slate-600'
                                     }`}
                             >
                                 {link.name}
@@ -65,7 +67,7 @@ const NavbarGlass: React.FC = () => {
 
                     {/* Mobile Menu Button */}
                     <button
-                        className="md:hidden text-white p-2"
+                        className="md:hidden text-slate-900 p-2"
                         onClick={() => setIsOpen(!isOpen)}
                     >
                         {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -74,13 +76,13 @@ const NavbarGlass: React.FC = () => {
 
                 {/* Mobile Menu */}
                 {isOpen && (
-                    <div className="md:hidden mt-4 backdrop-blur-xl bg-gray-900/90 border border-white/10 rounded-2xl p-6 shadow-2xl animate-in fade-in slide-in-from-top-5">
+                    <div className="md:hidden mt-4 backdrop-blur-xl bg-white/10 border border-white/10 rounded-2xl p-6 shadow-2xl animate-in fade-in slide-in-from-top-5">
                         <div className="flex flex-col gap-4">
                             {navLinks.map((link) => (
                                 <Link
                                     key={link.path}
                                     to={link.path}
-                                    className={`text-lg font-medium ${location.pathname === link.path ? 'text-purple-400' : 'text-gray-300'
+                                    className={`text-lg font-medium ${location.pathname === link.path ? 'text-green-400' : 'text-slate-300-300'
                                         }`}
                                     onClick={() => setIsOpen(false)}
                                 >

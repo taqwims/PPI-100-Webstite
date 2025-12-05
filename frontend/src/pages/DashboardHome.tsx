@@ -20,7 +20,7 @@ const DashboardHome: React.FC = () => {
     } else if (user.role_id === 6) {
         return <StudentDashboard />;
     } else {
-        return <div className="text-white">Dashboard for role {user.role_id} is under construction.</div>;
+        return <div className="text-slate-900">Dashboard for role {user.role_id} is under construction.</div>;
     }
 };
 
@@ -42,51 +42,51 @@ const AdminDashboard = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Dashboard Admin</h1>
-                <p className="text-gray-400">Overview sistem akademik</p>
+                <h1 className="text-2xl font-bold text-slate-900">Dashboard Admin</h1>
+                <p className="text-slate-600">Overview sistem akademik</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <CardGlass className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-blue-500/20 rounded-full text-blue-400">
+                    <div className="p-3 bg-blue-500/20 rounded-full text-blue-600">
                         <Users size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-400 text-sm">Total Pengguna</p>
-                        <h3 className="text-2xl font-bold text-white">{isLoading ? '...' : stats?.totalUsers || 0}</h3>
+                        <p className="text-slate-500 text-sm">Total Pengguna</p>
+                        <h3 className="text-2xl font-bold text-slate-900">{isLoading ? '...' : stats?.totalUsers || 0}</h3>
                     </div>
                 </CardGlass>
                 <CardGlass className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-purple-500/20 rounded-full text-purple-400">
+                    <div className="p-3 bg-purple-500/20 rounded-full text-purple-600">
                         <BookOpen size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-400 text-sm">Pendaftar PPDB</p>
-                        <h3 className="text-2xl font-bold text-white">{isLoading ? '...' : stats?.totalPPDB || 0}</h3>
+                        <p className="text-slate-500 text-sm">Pendaftar PPDB</p>
+                        <h3 className="text-2xl font-bold text-slate-900">{isLoading ? '...' : stats?.totalPPDB || 0}</h3>
                     </div>
                 </CardGlass>
                 <CardGlass className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-green-500/20 rounded-full text-green-400">
+                    <div className="p-3 bg-green-500/20 rounded-full text-green-600">
                         <DollarSign size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-400 text-sm">Keuangan</p>
-                        <h3 className="text-2xl font-bold text-white">Active</h3>
+                        <p className="text-slate-500 text-sm">Keuangan</p>
+                        <h3 className="text-2xl font-bold text-slate-900">Active</h3>
                     </div>
                 </CardGlass>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-white mb-4">Aksi Cepat</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">Aksi Cepat</h3>
                     <div className="grid grid-cols-2 gap-4">
-                        <Link to="/dashboard/ppdb" className="p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors text-center">
-                            <Users className="mx-auto mb-2 text-purple-400" />
-                            <span className="text-sm text-gray-300">Cek PPDB</span>
+                        <Link to="/dashboard/ppdb" className="p-4 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
+                            <Users className="mx-auto mb-2 text-purple-600" />
+                            <span className="text-sm text-slate-600">Cek PPDB</span>
                         </Link>
-                        <Link to="/dashboard/admin/notifications" className="p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors text-center">
-                            <AlertCircle className="mx-auto mb-2 text-yellow-400" />
-                            <span className="text-sm text-gray-300">Kirim Notif</span>
+                        <Link to="/dashboard/admin/notifications" className="p-4 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
+                            <AlertCircle className="mx-auto mb-2 text-yellow-600" />
+                            <span className="text-sm text-slate-600">Kirim Notif</span>
                         </Link>
                     </div>
                 </CardGlass>
@@ -129,22 +129,22 @@ const TeacherDashboard = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Selamat Datang, {user?.name}</h1>
-                <p className="text-gray-400">Dashboard Guru</p>
+                <h1 className="text-2xl font-bold text-slate-900">Selamat Datang, {user?.name}</h1>
+                <p className="text-slate-600">Dashboard Guru</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Clock className="text-yellow-400" size={20} />
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Clock className="text-yellow-600" size={20} />
                         Jadwal Hari Ini
                     </h3>
-                    <div className="text-center py-4 text-gray-400">
+                    <div className="text-center py-4 text-slate-600">
                         {nextClass ? (
-                            <div className="text-left bg-white/5 p-4 rounded-xl">
-                                <p className="text-white font-bold text-lg">{nextClass.subject.name}</p>
-                                <p className="text-purple-400">{nextClass.class.name}</p>
-                                <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+                            <div className="text-left bg-white/40 p-4 rounded-xl shadow-sm border border-white/20">
+                                <p className="text-slate-900 font-bold text-lg">{nextClass.subject.name}</p>
+                                <p className="text-purple-600">{nextClass.class.name}</p>
+                                <div className="flex items-center gap-2 mt-2 text-sm text-slate-500">
                                     <Clock size={14} />
                                     {nextClass.start_time} - {nextClass.end_time}
                                 </div>
@@ -152,42 +152,42 @@ const TeacherDashboard = () => {
                         ) : (
                             <p>Tidak ada jadwal mengajar hari ini.</p>
                         )}
-                        <Link to="/dashboard/schedule" className="text-blue-400 hover:underline mt-4 inline-block text-sm">
+                        <Link to="/dashboard/schedule" className="text-blue-600 hover:underline mt-4 inline-block text-sm">
                             Lihat Jadwal Lengkap
                         </Link>
                     </div>
                 </CardGlass>
 
                 <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <BookOpen className="text-purple-400" size={20} />
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <BookOpen className="text-purple-600" size={20} />
                         Aksi Cepat
                     </h3>
                     <div className="grid grid-cols-1 gap-3">
-                        <Link to="/dashboard/grades" className="p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-3">
-                            <div className="p-2 bg-green-500/20 rounded-lg text-green-400">
+                        <Link to="/dashboard/grades" className="p-3 bg-white/40 rounded-lg hover:bg-white/60 transition-colors flex items-center gap-3 shadow-sm border border-white/20">
+                            <div className="p-2 bg-green-500/20 rounded-lg text-green-600">
                                 <FileText size={18} />
                             </div>
-                            <span className="text-gray-300 text-sm">Input Nilai</span>
+                            <span className="text-slate-600 text-sm">Input Nilai</span>
                         </Link>
-                        <Link to="/dashboard/elearning" className="p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-3">
-                            <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                        <Link to="/dashboard/elearning" className="p-3 bg-white/40 rounded-lg hover:bg-white/60 transition-colors flex items-center gap-3 shadow-sm border border-white/20">
+                            <div className="p-2 bg-blue-500/20 rounded-lg text-blue-600">
                                 <BookOpen size={18} />
                             </div>
-                            <span className="text-gray-300 text-sm">Kelola E-Learning</span>
+                            <span className="text-slate-600 text-sm">Kelola E-Learning</span>
                         </Link>
                     </div>
                 </CardGlass>
 
                 {user?.role_id === 5 && (
                     <CardGlass className="p-6">
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <Users className="text-green-400" size={20} />
+                        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <Users className="text-green-600" size={20} />
                             Wali Kelas
                         </h3>
-                        <div className="text-center py-8 text-gray-400">
+                        <div className="text-center py-8 text-slate-600">
                             <p>Kelola data siswa kelas Anda.</p>
-                            <Link to="/dashboard/homeroom" className="text-blue-400 hover:underline mt-2 inline-block">
+                            <Link to="/dashboard/homeroom" className="text-blue-600 hover:underline mt-2 inline-block">
                                 Buka Kelas Wali
                             </Link>
                         </div>
@@ -252,62 +252,62 @@ const StudentDashboard = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Halo, {user?.name}</h1>
-                <p className="text-gray-400">Semangat belajar hari ini!</p>
+                <h1 className="text-2xl font-bold text-slate-900">Halo, {user?.name}</h1>
+                <p className="text-slate-600">Semangat belajar hari ini!</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Clock className="text-blue-400" size={20} />
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Clock className="text-blue-600" size={20} />
                         Jadwal Hari Ini
                     </h3>
-                    <div className="text-center py-4 text-gray-400">
+                    <div className="text-center py-4 text-slate-600">
                         {todaySchedule && todaySchedule.length > 0 ? (
                             <div className="space-y-3">
                                 {todaySchedule.slice(0, 2).map((s: any) => (
-                                    <div key={s.id} className="text-left bg-white/5 p-3 rounded-xl">
-                                        <p className="text-white font-bold">{s.subject.name}</p>
-                                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                                    <div key={s.id} className="text-left bg-white/40 p-3 rounded-xl shadow-sm border border-white/20">
+                                        <p className="text-slate-900 font-bold">{s.subject.name}</p>
+                                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                                             <Clock size={12} />
                                             {s.start_time} - {s.end_time}
                                         </div>
                                     </div>
                                 ))}
-                                {todaySchedule.length > 2 && <p className="text-xs text-gray-500">+{todaySchedule.length - 2} lainnya</p>}
+                                {todaySchedule.length > 2 && <p className="text-xs text-slate-500">+{todaySchedule.length - 2} lainnya</p>}
                             </div>
                         ) : (
                             <p>Tidak ada jadwal pelajaran hari ini.</p>
                         )}
-                        <Link to="/dashboard/student/schedule" className="text-blue-400 hover:underline mt-4 inline-block text-sm">
+                        <Link to="/dashboard/student/schedule" className="text-blue-600 hover:underline mt-4 inline-block text-sm">
                             Lihat Jadwal
                         </Link>
                     </div>
                 </CardGlass>
 
                 <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <AlertCircle className="text-red-400" size={20} />
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <AlertCircle className="text-red-600" size={20} />
                         Tugas & PR
                     </h3>
                     <div className="text-center py-4">
-                        <h4 className="text-3xl font-bold text-white mb-2">{tasks?.length || 0}</h4>
-                        <p className="text-gray-400 text-sm">Tugas di kelasmu</p>
-                        <Link to="/dashboard/student/elearning" className="text-blue-400 hover:underline mt-4 inline-block text-sm">
+                        <h4 className="text-3xl font-bold text-slate-900 mb-2">{tasks?.length || 0}</h4>
+                        <p className="text-slate-600 text-sm">Tugas di kelasmu</p>
+                        <Link to="/dashboard/student/elearning" className="text-blue-600 hover:underline mt-4 inline-block text-sm">
                             Lihat Tugas
                         </Link>
                     </div>
                 </CardGlass>
 
                 <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <DollarSign className="text-green-400" size={20} />
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <DollarSign className="text-green-600" size={20} />
                         Tagihan Belum Lunas
                     </h3>
                     <div className="text-center py-4">
-                        <h4 className="text-3xl font-bold text-white mb-2">{bills?.length || 0}</h4>
-                        <p className="text-gray-400 text-sm">Tagihan pending</p>
-                        <Link to="/dashboard/bills" className="text-blue-400 hover:underline mt-4 inline-block text-sm">
+                        <h4 className="text-3xl font-bold text-slate-900 mb-2">{bills?.length || 0}</h4>
+                        <p className="text-slate-600 text-sm">Tagihan pending</p>
+                        <Link to="/dashboard/bills" className="text-blue-600 hover:underline mt-4 inline-block text-sm">
                             Lihat Tagihan
                         </Link>
                     </div>

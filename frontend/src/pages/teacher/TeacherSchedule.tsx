@@ -63,8 +63,8 @@ const TeacherSchedule: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Jadwal Mengajar</h1>
-                <p className="text-gray-400">Jadwal pelajaran Anda minggu ini</p>
+                <h1 className="text-2xl font-bold text-slate-900">Jadwal Mengajar</h1>
+                <p className="text-slate-600">Jadwal pelajaran Anda minggu ini</p>
             </div>
 
             <div className="grid gap-6">
@@ -76,8 +76,8 @@ const TeacherSchedule: React.FC = () => {
 
                     return (
                         <CardGlass key={day} className="p-6">
-                            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                <Calendar className="text-purple-400" size={20} />
+                            <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <Calendar className="text-purple-600" size={20} />
                                 {dayNames[day]}
                             </h3>
                             <TableGlass>
@@ -93,25 +93,25 @@ const TeacherSchedule: React.FC = () => {
                                     {daySchedules.map((schedule: Schedule) => (
                                         <TableRowGlass key={schedule.id}>
                                             <TableCellGlass>
-                                                <div className="flex items-center gap-2 text-gray-300">
+                                                <div className="flex items-center gap-2 text-slate-600">
                                                     <Clock size={14} />
                                                     {schedule.start_time} - {schedule.end_time}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
-                                                <div className="flex items-center gap-2 font-medium text-white">
-                                                    <BookOpen size={14} className="text-indigo-400" />
+                                                <div className="flex items-center gap-2 font-medium text-slate-900">
+                                                    <BookOpen size={14} className="text-indigo-600" />
                                                     {schedule.subject.name}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
-                                                <div className="flex items-center gap-2 text-gray-300">
+                                                <div className="flex items-center gap-2 text-slate-600">
                                                     <Users size={14} />
                                                     {schedule.class.name}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
-                                                <a href={`/dashboard/teacher/attendance/${schedule.id}`} className="text-purple-400 hover:text-purple-300 text-sm font-medium">
+                                                <a href={`/dashboard/teacher/attendance/${schedule.id}`} className="text-purple-600 hover:text-purple-500 text-sm font-medium">
                                                     Absen
                                                 </a>
                                             </TableCellGlass>
@@ -124,7 +124,7 @@ const TeacherSchedule: React.FC = () => {
                 })}
 
                 {!isLoading && schedules?.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
+                    <div className="text-center py-12 text-slate-500">
                         Belum ada jadwal yang ditentukan.
                     </div>
                 )}

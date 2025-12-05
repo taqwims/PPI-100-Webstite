@@ -50,18 +50,18 @@ const HomeroomReportCards: React.FC = () => {
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate(-1)}
-                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white transition-colors"
+                        className="p-2 rounded-lg bg-white/5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
                     >
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Rapor Siswa</h1>
-                        <p className="text-gray-400">Laporan Hasil Belajar</p>
+                        <h1 className="text-2xl font-bold text-slate-900">Rapor Siswa</h1>
+                        <p className="text-slate-600">Laporan Hasil Belajar</p>
                     </div>
                 </div>
                 <button
                     onClick={handlePrint}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-slate-900 rounded-xl transition-colors"
                 >
                     <Printer size={20} />
                     <span>Cetak Rapor</span>
@@ -89,26 +89,26 @@ const HomeroomReportCards: React.FC = () => {
                         <TableBodyGlass>
                             {isLoading ? (
                                 <TableRowGlass>
-                                    <TableCellGlass colSpan={3} className="text-center py-8 print:text-black">Loading...</TableCellGlass>
+                                    <TableCellGlass colSpan={3} className="text-center py-8 text-slate-600 print:text-black">Loading...</TableCellGlass>
                                 </TableRowGlass>
                             ) : reportCard?.length === 0 ? (
                                 <TableRowGlass>
-                                    <TableCellGlass colSpan={3} className="text-center py-8 print:text-black">Belum ada data nilai.</TableCellGlass>
+                                    <TableCellGlass colSpan={3} className="text-center py-8 text-slate-600 print:text-black">Belum ada data nilai.</TableCellGlass>
                                 </TableRowGlass>
                             ) : (
                                 reportCard?.map((grade, index) => (
                                     <TableRowGlass key={index} className="print:border-b print:border-gray-200">
                                         <TableCellGlass>
-                                            <span className="font-medium text-white print:text-black">{grade.subject_name}</span>
+                                            <span className="font-medium text-slate-900 print:text-black">{grade.subject_name}</span>
                                         </TableCellGlass>
                                         <TableCellGlass>
-                                            <span className="text-white font-bold print:text-black">{grade.average.toFixed(2)}</span>
+                                            <span className="text-slate-900 font-bold print:text-black">{grade.average.toFixed(2)}</span>
                                         </TableCellGlass>
                                         <TableCellGlass>
-                                            <span className={`px-2 py-1 rounded text-xs font-bold print:border print:border-black print:bg-transparent print:text-black ${grade.average >= 90 ? 'bg-green-500/20 text-green-400' :
-                                                grade.average >= 80 ? 'bg-blue-500/20 text-blue-400' :
-                                                    grade.average >= 70 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                        'bg-red-500/20 text-red-400'
+                                            <span className={`px-2 py-1 rounded text-xs font-bold print:border print:border-black print:bg-transparent print:text-black ${grade.average >= 90 ? 'bg-green-100 text-green-600' :
+                                                grade.average >= 80 ? 'bg-blue-100 text-blue-600' :
+                                                    grade.average >= 70 ? 'bg-yellow-100 text-yellow-600' :
+                                                        'bg-red-100 text-red-600'
                                                 }`}>
                                                 {grade.average >= 90 ? 'A' :
                                                     grade.average >= 80 ? 'B' :

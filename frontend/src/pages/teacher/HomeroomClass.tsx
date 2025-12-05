@@ -55,18 +55,18 @@ const HomeroomClass: React.FC = () => {
     });
 
     if (!user?.teacher) {
-        return <div className="text-white p-6">Data Guru tidak ditemukan.</div>;
+        return <div className="text-slate-900 p-6">Data Guru tidak ditemukan.</div>;
     }
 
     if (isLoadingClass) {
-        return <div className="text-white p-6">Loading data kelas...</div>;
+        return <div className="text-slate-900 p-6">Loading data kelas...</div>;
     }
 
     if (!myClass) {
         return (
             <div className="text-center py-12">
-                <h2 className="text-xl text-white">Anda belum ditugaskan sebagai Wali Kelas.</h2>
-                <p className="text-gray-400">Hubungi admin jika ini kesalahan.</p>
+                <h2 className="text-xl text-slate-900">Anda belum ditugaskan sebagai Wali Kelas.</h2>
+                <p className="text-slate-300-400">Hubungi admin jika ini kesalahan.</p>
             </div>
         );
     }
@@ -74,25 +74,25 @@ const HomeroomClass: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Kelas Saya: {myClass.name}</h1>
-                <p className="text-gray-400">Daftar siswa di kelas perwalian Anda</p>
+                <h1 className="text-2xl font-bold text-slate-900">Kelas Saya: {myClass.name}</h1>
+                <p className="text-slate-600">Daftar siswa di kelas perwalian Anda</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <CardGlass className="p-6 flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-blue-500/20 text-blue-400">
+                    <div className="p-3 rounded-full bg-blue-100 text-blue-600">
                         <Users size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-400 text-sm">Total Siswa</p>
-                        <p className="text-2xl font-bold text-white">{students?.length || 0}</p>
+                        <p className="text-slate-600 text-sm">Total Siswa</p>
+                        <p className="text-2xl font-bold text-slate-900">{students?.length || 0}</p>
                     </div>
                 </CardGlass>
                 {/* Add more stats here if needed */}
             </div>
 
             <CardGlass className="p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Daftar Siswa</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Daftar Siswa</h3>
                 <TableGlass>
                     <TableHeaderGlass>
                         <TableRowGlass>
@@ -106,31 +106,31 @@ const HomeroomClass: React.FC = () => {
                     <TableBodyGlass>
                         {isLoadingStudents ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={4} className="text-center py-8">Loading...</TableCellGlass>
+                                <TableCellGlass colSpan={4} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
                         ) : students?.length === 0 ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={4} className="text-center py-8">Belum ada siswa di kelas ini.</TableCellGlass>
+                                <TableCellGlass colSpan={4} className="text-center py-8 text-slate-600">Belum ada siswa di kelas ini.</TableCellGlass>
                             </TableRowGlass>
                         ) : (
                             students?.map((student: Student) => (
                                 <TableRowGlass key={student.id}>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
                                                 {student.user.name.charAt(0)}
                                             </div>
-                                            <span className="font-medium text-white">{student.user.name}</span>
+                                            <span className="font-medium text-slate-900">{student.user.name}</span>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-300">{student.nisn}</span>
+                                        <span className="text-slate-600">{student.nisn}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-400">{student.user.email}</span>
+                                        <span className="text-slate-600">{student.user.email}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <div className="flex items-center gap-2 text-gray-300">
+                                        <div className="flex items-center gap-2 text-slate-600">
                                             <Phone size={14} />
                                             {student.parent?.phone || '-'}
                                         </div>
@@ -138,7 +138,7 @@ const HomeroomClass: React.FC = () => {
                                     <TableCellGlass>
                                         <a
                                             href={`/dashboard/homeroom/report-card/${student.id}`}
-                                            className="px-3 py-1 bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded-lg text-sm font-medium transition-colors"
+                                            className="px-3 py-1 bg-green-100 text-green-600 hover:bg-green-200 rounded-lg text-sm font-medium transition-colors"
                                         >
                                             Lihat Rapor
                                         </a>

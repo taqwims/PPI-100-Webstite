@@ -188,7 +188,7 @@ const Academic = () => {
     // --- Renderers ---
 
     const renderTabs = () => (
-        <div className="flex space-x-4 mb-6 border-b border-white/10">
+        <div className="flex space-x-4 mb-6 border-b border-slate-200">
             {[
                 { id: 'classes', label: 'Data Kelas' },
                 { id: 'subjects', label: 'Mata Pelajaran' },
@@ -198,13 +198,13 @@ const Academic = () => {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
                     className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === tab.id
-                        ? 'text-white'
-                        : 'text-white/60 hover:text-white'
+                        ? 'text-purple-600'
+                        : 'text-slate-500 hover:text-slate-900'
                         }`}
                 >
                     {tab.label}
                     {activeTab === tab.id && (
-                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-600 shadow-[0_0_10px_rgba(147,51,234,0.5)]" />
                     )}
                 </button>
             ))}
@@ -215,7 +215,7 @@ const Academic = () => {
         const isLoading = isLoadingClasses || isLoadingSubjects || isLoadingSchedules;
 
         if (isLoading) {
-            return <div className="text-white text-center py-8">Loading...</div>;
+            return <div className="text-slate-600 text-center py-8">Loading...</div>;
         }
 
         switch (activeTab) {
@@ -229,8 +229,8 @@ const Academic = () => {
                             unit: cls.unit_id,
                             actions: (
                                 <div className="flex space-x-2">
-                                    <button onClick={() => handleOpenModal(cls)} className="text-blue-400 hover:text-blue-300"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(cls.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                                    <button onClick={() => handleOpenModal(cls)} className="text-blue-600 hover:text-blue-500"><Edit size={16} /></button>
+                                    <button onClick={() => handleDelete(cls.id)} className="text-red-600 hover:text-red-500"><Trash2 size={16} /></button>
                                 </div>
                             )
                         })) || []}
@@ -246,8 +246,8 @@ const Academic = () => {
                             unit: subj.unit_id,
                             actions: (
                                 <div className="flex space-x-2">
-                                    <button onClick={() => handleOpenModal(subj)} className="text-blue-400 hover:text-blue-300"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(subj.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                                    <button onClick={() => handleOpenModal(subj)} className="text-blue-600 hover:text-blue-500"><Edit size={16} /></button>
+                                    <button onClick={() => handleDelete(subj.id)} className="text-red-600 hover:text-red-500"><Trash2 size={16} /></button>
                                 </div>
                             )
                         })) || []}
@@ -266,8 +266,8 @@ const Academic = () => {
                             time: `${sch.start_time} - ${sch.end_time}`,
                             actions: (
                                 <div className="flex space-x-2">
-                                    <button onClick={() => handleOpenModal(sch)} className="text-blue-400 hover:text-blue-300"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(sch.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                                    <button onClick={() => handleOpenModal(sch)} className="text-blue-600 hover:text-blue-500"><Edit size={16} /></button>
+                                    <button onClick={() => handleDelete(sch.id)} className="text-red-600 hover:text-red-500"><Trash2 size={16} /></button>
                                 </div>
                             )
                         })) || []}
@@ -308,46 +308,46 @@ const Academic = () => {
                 return (
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm text-white/60">Kelas</label>
+                            <label className="text-sm text-slate-600">Kelas</label>
                             <select
                                 name="class_id"
                                 value={formData.class_id || ''}
                                 onChange={handleInputChange}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
+                                className="w-full bg-white/40 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 focus:outline-none focus:border-blue-500/50"
                             >
-                                <option value="" className="bg-slate-800">Pilih Kelas</option>
+                                <option value="" className="bg-white text-slate-900">Pilih Kelas</option>
                                 {classes?.map((c: any) => (
-                                    <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
+                                    <option key={c.id} value={c.id} className="bg-white text-slate-900">{c.name}</option>
                                 ))}
                             </select>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm text-white/60">Mata Pelajaran</label>
+                            <label className="text-sm text-slate-600">Mata Pelajaran</label>
                             <select
                                 name="subject_id"
                                 value={formData.subject_id || ''}
                                 onChange={handleInputChange}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
+                                className="w-full bg-white/40 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 focus:outline-none focus:border-blue-500/50"
                             >
-                                <option value="" className="bg-slate-800">Pilih Mapel</option>
+                                <option value="" className="bg-white text-slate-900">Pilih Mapel</option>
                                 {subjects?.map((s: any) => (
-                                    <option key={s.id} value={s.id} className="bg-slate-800">{s.name}</option>
+                                    <option key={s.id} value={s.id} className="bg-white text-slate-900">{s.name}</option>
                                 ))}
                             </select>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm text-white/60">Guru</label>
+                            <label className="text-sm text-slate-600">Guru</label>
                             <select
                                 name="teacher_id"
                                 value={formData.teacher_id || ''}
                                 onChange={handleInputChange}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
+                                className="w-full bg-white/40 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 focus:outline-none focus:border-blue-500/50"
                             >
-                                <option value="" className="bg-slate-800">Pilih Guru</option>
+                                <option value="" className="bg-white text-slate-900">Pilih Guru</option>
                                 {teachers?.map((t: any) => (
-                                    <option key={t.id} value={t.id} className="bg-slate-800">{t.user?.name || t.name}</option>
+                                    <option key={t.id} value={t.id} className="bg-white text-slate-900">{t.user?.name || t.name}</option>
                                 ))}
                             </select>
                         </div>
@@ -386,8 +386,8 @@ const Academic = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Akademik</h1>
-                    <p className="text-white/60">Manajemen data akademik sekolah</p>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Akademik</h1>
+                    <p className="text-slate-600">Manajemen data akademik sekolah</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {/* Unit Switcher */}
@@ -395,11 +395,11 @@ const Academic = () => {
                         <select
                             value={unitID}
                             onChange={(e) => setUnitID(Number(e.target.value))}
-                            className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="bg-white/40 border border-slate-200 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             disabled={user?.role_id !== 1}
                         >
-                            <option value={1} className="bg-gray-900">MTS</option>
-                            <option value={2} className="bg-gray-900">MA</option>
+                            <option value={1} className="bg-white">MTS</option>
+                            <option value={2} className="bg-white">MA</option>
                         </select>
                     )}
                     <ButtonGlass onClick={() => handleOpenModal()} icon={Plus}>
@@ -413,11 +413,11 @@ const Academic = () => {
 
                 <div className="mb-6 flex gap-4">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" size={20} />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
                         <input
                             type="text"
                             placeholder="Cari data..."
-                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-white placeholder-white/40 focus:outline-none focus:border-white/30 transition-colors"
+                            className="w-full bg-white/40 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500/50 transition-colors"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -440,7 +440,7 @@ const Academic = () => {
                         <button
                             type="button"
                             onClick={handleCloseModal}
-                            className="px-4 py-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                            className="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                         >
                             Batal
                         </button>

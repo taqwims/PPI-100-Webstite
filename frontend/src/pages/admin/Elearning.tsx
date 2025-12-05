@@ -285,7 +285,7 @@ const Elearning: React.FC = () => {
         return (
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-white">Daftar Materi Pelajaran</h2>
+                    <h2 className="text-xl font-semibold text-slate-900">Daftar Materi Pelajaran</h2>
                     <ButtonGlass onClick={() => openMaterialModal()} className="flex items-center gap-2">
                         <Plus size={18} /> Tambah Materi
                     </ButtonGlass>
@@ -313,12 +313,12 @@ const Elearning: React.FC = () => {
                                 <TableRowGlass key={m.id}>
                                     <TableCellGlass>
                                         <div>
-                                            <div className="font-medium text-white">{m.title}</div>
-                                            <div className="text-xs text-gray-400">{m.description}</div>
+                                            <div className="font-medium text-slate-900">{m.title}</div>
+                                            <div className="text-xs text-slate-300-400">{m.description}</div>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-300">{m.subject?.name || '-'}</span>
+                                        <span className="text-slate-300-300">{m.subject?.name || '-'}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 flex items-center gap-1">
@@ -348,7 +348,7 @@ const Elearning: React.FC = () => {
         return (
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-white">Daftar Tugas & PR</h2>
+                    <h2 className="text-xl font-semibold text-slate-900">Daftar Tugas & PR</h2>
                     <ButtonGlass onClick={() => openTaskModal()} className="flex items-center gap-2">
                         <Plus size={18} /> Buat Tugas
                     </ButtonGlass>
@@ -377,15 +377,15 @@ const Elearning: React.FC = () => {
                                 <TableRowGlass key={t.id}>
                                     <TableCellGlass>
                                         <div>
-                                            <div className="font-medium text-white">{t.title}</div>
-                                            <div className="text-xs text-gray-400">{t.description}</div>
+                                            <div className="font-medium text-slate-900">{t.title}</div>
+                                            <div className="text-xs text-slate-300-400">{t.description}</div>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-300">{t.subject?.name || '-'}</span>
+                                        <span className="text-slate-300-300">{t.subject?.name || '-'}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-gray-400">
+                                        <span className="text-slate-300-400">
                                             {new Date(t.deadline).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                                         </span>
                                     </TableCellGlass>
@@ -415,8 +415,8 @@ const Elearning: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">E-Learning</h1>
-                    <p className="text-gray-400">Manajemen materi pelajaran dan tugas siswa</p>
+                    <h1 className="text-2xl font-bold text-slate-900">E-Learning</h1>
+                    <p className="text-slate-300-400">Manajemen materi pelajaran dan tugas siswa</p>
                 </div>
                 <div className="flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10">
                     {/* Unit Switcher */}
@@ -424,16 +424,16 @@ const Elearning: React.FC = () => {
                         <select
                             value={unitID}
                             onChange={(e) => setUnitID(Number(e.target.value))}
-                            className="bg-transparent text-white border-none focus:ring-0 text-sm border-r border-white/20 pr-2 mr-2"
+                            className="bg-transparent text-slate-900 border-none focus:ring-0 text-sm border-r border-white/20 pr-2 mr-2"
                             disabled={user?.role_id !== 1}
                         >
                             <option value={1} className="bg-gray-900">MTS</option>
                             <option value={2} className="bg-gray-900">MA</option>
                         </select>
                     )}
-                    <Filter size={18} className="text-gray-400" />
+                    <Filter size={18} className="text-slate-300-400" />
                     <select
-                        className="bg-transparent text-white border-none focus:ring-0 text-sm"
+                        className="bg-transparent text-slate-900 border-none focus:ring-0 text-sm"
                         value={selectedClassId}
                         onChange={(e) => setSelectedClassId(e.target.value)}
                     >
@@ -448,14 +448,14 @@ const Elearning: React.FC = () => {
             <div className="flex space-x-4 border-b border-white/10 pb-4">
                 <button
                     onClick={() => setActiveTab('materials')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'materials' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'materials' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <BookOpen size={18} />
                     Materi
                 </button>
                 <button
                     onClick={() => setActiveTab('tasks')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'tasks' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'tasks' ? 'bg-green-600 text-slate-900 shadow-lg shadow-green-500/20' : 'text-slate-300-400 hover:text-slate-900 hover:bg-white/5'}`}
                 >
                     <FileText size={18} />
                     Tugas
@@ -493,7 +493,7 @@ const Elearning: React.FC = () => {
                     />
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Kelas</label>
+                            <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Kelas</label>
                             <select
                                 className="w-full glass-input"
                                 value={newMaterial.class_id}
@@ -506,7 +506,7 @@ const Elearning: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Mata Pelajaran</label>
+                            <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Mata Pelajaran</label>
                             <select
                                 className="w-full glass-input"
                                 value={newMaterial.subject_id}
@@ -520,7 +520,7 @@ const Elearning: React.FC = () => {
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Guru Pengampu</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Guru Pengampu</label>
                         <select
                             className="w-full glass-input"
                             value={newMaterial.teacher_id}
@@ -567,7 +567,7 @@ const Elearning: React.FC = () => {
                     />
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Kelas</label>
+                            <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Kelas</label>
                             <select
                                 className="w-full glass-input"
                                 value={newTask.class_id}
@@ -580,7 +580,7 @@ const Elearning: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Mata Pelajaran</label>
+                            <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Mata Pelajaran</label>
                             <select
                                 className="w-full glass-input"
                                 value={newTask.subject_id}
@@ -594,7 +594,7 @@ const Elearning: React.FC = () => {
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">Guru Pengampu</label>
+                        <label className="block text-sm font-medium text-slate-900/80 mb-2 ml-1">Guru Pengampu</label>
                         <select
                             className="w-full glass-input"
                             value={newTask.teacher_id}

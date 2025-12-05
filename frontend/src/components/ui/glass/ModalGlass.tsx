@@ -46,13 +46,13 @@ const ModalGlass: React.FC<ModalGlassProps> = ({ isOpen, onClose, title, childre
                                 <div className="flex justify-between items-center mb-4">
                                     <Dialog.Title
                                         as="h3"
-                                        className="text-lg font-medium leading-6 text-white"
+                                        className="text-lg font-medium leading-6 text-slate-900"
                                     >
                                         {title}
                                     </Dialog.Title>
                                     <button
                                         onClick={onClose}
-                                        className="text-white/70 hover:text-white transition-colors"
+                                        className="text-slate-900/70 hover:text-slate-900 transition-colors"
                                     >
                                         <X size={20} />
                                     </button>

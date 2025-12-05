@@ -30,28 +30,28 @@ const Notifications: React.FC = () => {
             case 'Bill': return <CreditCard className="text-yellow-400" size={20} />;
             case 'BK': return <AlertTriangle className="text-red-400" size={20} />;
             case 'Task': return <FileText className="text-blue-400" size={20} />;
-            default: return <Info className="text-gray-400" size={20} />;
+            default: return <Info className="text-slate-300-400" size={20} />;
         }
     };
 
     if (isLoading) {
-        return <div className="p-6 text-white">Loading notifications...</div>;
+        return <div className="p-6 text-slate-900">Loading notifications...</div>;
     }
 
     return (
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <Bell className="text-yellow-400" /> Notifikasi
                     </h1>
-                    <p className="text-gray-400">Pemberitahuan terbaru untuk Anda</p>
+                    <p className="text-slate-300-400">Pemberitahuan terbaru untuk Anda</p>
                 </div>
             </div>
 
             <div className="space-y-4">
                 {notifications?.length === 0 ? (
-                    <CardGlass className="p-8 text-center text-gray-400">
+                    <CardGlass className="p-8 text-center text-slate-300-400">
                         Tidak ada notifikasi saat ini.
                     </CardGlass>
                 ) : (
@@ -65,16 +65,16 @@ const Notifications: React.FC = () => {
                             </div>
                             <div className="flex-1">
                                 <div className="flex justify-between items-start">
-                                    <h3 className={`font-semibold text-lg ${notif.is_read ? 'text-gray-300' : 'text-white'}`}>
+                                    <h3 className={`font-semibold text-lg ${notif.is_read ? 'text-slate-300-300' : 'text-slate-900'}`}>
                                         {notif.title}
                                     </h3>
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-slate-300-500">
                                         {new Date(notif.created_at).toLocaleDateString('id-ID', {
                                             day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
                                         })}
                                     </span>
                                 </div>
-                                <p className="text-gray-300 mt-1">{notif.message}</p>
+                                <p className="text-slate-300-300 mt-1">{notif.message}</p>
                             </div>
                             {!notif.is_read && (
                                 <ButtonGlass

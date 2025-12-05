@@ -95,7 +95,7 @@ const TeacherAttendance: React.FC = () => {
         return record ? record.status : null;
     };
 
-    if (!schedule) return <div className="p-6 text-white">Loading schedule...</div>;
+    if (!schedule) return <div className="p-6 text-slate-900">Loading schedule...</div>;
 
     return (
         <div className="space-y-6 p-6">
@@ -104,8 +104,8 @@ const TeacherAttendance: React.FC = () => {
                     <ArrowLeft size={20} />
                 </ButtonGlass>
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Absensi: {schedule.subject.name}</h1>
-                    <div className="flex items-center gap-4 text-gray-400 text-sm mt-1">
+                    <h1 className="text-2xl font-bold text-slate-900">Absensi: {schedule.subject.name}</h1>
+                    <div className="flex items-center gap-4 text-slate-600 text-sm mt-1">
                         <span className="flex items-center gap-1"><Users size={14} /> {schedule.class.name}</span>
                         <span className="flex items-center gap-1"><Calendar size={14} /> {schedule.day}</span>
                         <span className="flex items-center gap-1"><Clock size={14} /> {schedule.start_time} - {schedule.end_time}</span>
@@ -129,10 +129,10 @@ const TeacherAttendance: React.FC = () => {
                             return (
                                 <TableRowGlass key={student.id}>
                                     <TableCellGlass>
-                                        <span className="font-medium text-white">{student.user.name}</span>
+                                        <span className="font-medium text-slate-900">{student.user.name}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="font-mono text-gray-300">{student.nisn}</span>
+                                        <span className="font-mono text-slate-600">{student.nisn}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         {status ? (
@@ -140,7 +140,7 @@ const TeacherAttendance: React.FC = () => {
                                                 {status === 'Present' ? 'Hadir' : 'Tidak Hadir'}
                                             </span>
                                         ) : (
-                                            <span className="text-gray-400 text-sm italic">Belum absen</span>
+                                            <span className="text-slate-400 text-sm italic">Belum absen</span>
                                         )}
                                     </TableCellGlass>
                                     <TableCellGlass className="text-right">
@@ -148,7 +148,7 @@ const TeacherAttendance: React.FC = () => {
                                             <ButtonGlass
                                                 variant={status === 'Present' ? 'primary' : 'secondary'}
                                                 onClick={() => handleAttendance(student.id, 'Present')}
-                                                className={`py-1 px-3 text-xs ${status === 'Present' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                                className={`py-1 px-3 text-xs ${status === 'Present' ? 'bg-green-600 hover:bg-green-700 text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
                                                 disabled={status === 'Present'}
                                             >
                                                 <CheckCircle size={16} /> Hadir
@@ -156,7 +156,7 @@ const TeacherAttendance: React.FC = () => {
                                             <ButtonGlass
                                                 variant={status === 'Absent' ? 'danger' : 'secondary'}
                                                 onClick={() => handleAttendance(student.id, 'Absent')}
-                                                className="py-1 px-3 text-xs"
+                                                className={`py-1 px-3 text-xs ${status === 'Absent' ? 'bg-red-600 hover:bg-red-700 text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
                                                 disabled={status === 'Absent'}
                                             >
                                                 <XCircle size={16} /> Absen
@@ -168,7 +168,7 @@ const TeacherAttendance: React.FC = () => {
                         })}
                         {students?.length === 0 && (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={4} className="text-center py-8">Tidak ada siswa di kelas ini</TableCellGlass>
+                                <TableCellGlass colSpan={4} className="text-center py-8 text-slate-600">Tidak ada siswa di kelas ini</TableCellGlass>
                             </TableRowGlass>
                         )}
                     </TableBodyGlass>

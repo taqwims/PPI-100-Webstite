@@ -12,9 +12,9 @@ interface ButtonGlassProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
 const ButtonGlass: React.FC<ButtonGlassProps> = ({ children, variant = 'primary', className, icon: Icon, ...props }) => {
     const variants = {
         primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/20",
-        secondary: "bg-white/10 hover:bg-white/20 text-white border border-white/10",
+        secondary: "bg-white/10 hover:bg-white/20 text-slate-900 border border-white/10",
         danger: "bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white shadow-red-500/20",
-        ghost: "bg-transparent hover:bg-white/5 text-gray-300 hover:text-white",
+        ghost: "bg-transparent hover:bg-white/5 text-slate-300-300 hover:text-slate-900",
     };
 
     return (

@@ -92,15 +92,15 @@ const Attendance: React.FC = () => {
         <div className="space-y-6 p-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Absensi Siswa</h1>
-                    <p className="text-gray-400">Catat kehadiran siswa per jadwal pelajaran</p>
+                    <h1 className="text-2xl font-bold text-slate">Absensi Siswa</h1>
+                    <p className="text-slate-300-400">Catat kehadiran siswa per jadwal pelajaran</p>
                 </div>
             </div>
 
             <CardGlass className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">
+                        <label className="block text-sm font-medium text-slate/80 mb-2 ml-1">
                             <div className="flex items-center gap-2">
                                 <Users size={16} /> Pilih Kelas
                             </div>
@@ -111,7 +111,7 @@ const Attendance: React.FC = () => {
                                 setSelectedClassID(Number(e.target.value));
                                 setSelectedScheduleID(null); // Reset schedule when class changes
                             }}
-                            className="w-full glass-input text-gray-900"
+                            className="w-full glass-input text-slate-300-900"
                         >
                             <option value="">-- Pilih Kelas --</option>
                             {classes?.map((c: any) => (
@@ -120,7 +120,7 @@ const Attendance: React.FC = () => {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2 ml-1">
+                        <label className="block text-sm font-medium text-slate/80 mb-2 ml-1">
                             <div className="flex items-center gap-2">
                                 <Clock size={16} /> Pilih Jadwal
                             </div>
@@ -128,7 +128,7 @@ const Attendance: React.FC = () => {
                         <select
                             value={selectedScheduleID || ''}
                             onChange={(e) => setSelectedScheduleID(Number(e.target.value))}
-                            className="w-full glass-input text-gray-900"
+                            className="w-full glass-input text-slate-300-900"
                             disabled={!selectedClassID}
                         >
                             <option value="">-- Pilih Jadwal --</option>
@@ -144,7 +144,7 @@ const Attendance: React.FC = () => {
                 <CardGlass>
                     <div className="p-6">
                         {isLoadingAttendance ? (
-                            <div className="text-center py-8 text-gray-400">Loading data...</div>
+                            <div className="text-center py-8 text-slate-300-400">Loading data...</div>
                         ) : (
                             <TableGlass>
                                 <TableHeaderGlass>
@@ -161,10 +161,10 @@ const Attendance: React.FC = () => {
                                         return (
                                             <TableRowGlass key={student.id}>
                                                 <TableCellGlass>
-                                                    <span className="font-medium text-white">{student.user.name}</span>
+                                                    <span className="font-medium text-slate">{student.user.name}</span>
                                                 </TableCellGlass>
                                                 <TableCellGlass>
-                                                    <span className="font-mono text-gray-300">{student.nisn}</span>
+                                                    <span className="font-mono text-slate-300-300">{student.nisn}</span>
                                                 </TableCellGlass>
                                                 <TableCellGlass>
                                                     {status ? (
@@ -172,7 +172,7 @@ const Attendance: React.FC = () => {
                                                             {status === 'Present' ? 'Hadir' : 'Tidak Hadir'}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-gray-400 text-sm italic">Belum absen</span>
+                                                        <span className="text-slate-300-400 text-sm italic">Belum absen</span>
                                                     )}
                                                 </TableCellGlass>
                                                 <TableCellGlass className="text-right">
@@ -209,7 +209,7 @@ const Attendance: React.FC = () => {
                     </div>
                 </CardGlass>
             ) : (
-                <div className="text-center py-12 text-gray-500 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                <div className="text-center py-12 text-slate-300-500 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
                     <Calendar size={48} className="mx-auto mb-4 opacity-50" />
                     <p>Silakan pilih kelas dan jadwal terlebih dahulu untuk menampilkan daftar siswa.</p>
                 </div>

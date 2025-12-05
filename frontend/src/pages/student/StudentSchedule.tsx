@@ -37,14 +37,14 @@ const StudentSchedule: React.FC = () => {
     };
 
     if (!user?.student && !isLoading) {
-        return <div className="text-white p-6">Data siswa tidak ditemukan. Hubungi admin.</div>;
+        return <div className="text-slate-900 p-6">Data siswa tidak ditemukan. Hubungi admin.</div>;
     }
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Jadwal Pelajaran</h1>
-                <p className="text-gray-400">Jadwal kelas Anda minggu ini</p>
+                <h1 className="text-2xl font-bold text-slate-900">Jadwal Pelajaran</h1>
+                <p className="text-slate-600">Jadwal kelas Anda minggu ini</p>
             </div>
 
             <div className="grid gap-6">
@@ -56,8 +56,8 @@ const StudentSchedule: React.FC = () => {
 
                     return (
                         <CardGlass key={day} className="p-6">
-                            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                <Calendar className="text-purple-400" size={20} />
+                            <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <Calendar className="text-purple-600" size={20} />
                                 {dayNames[day]}
                             </h3>
                             <TableGlass>
@@ -72,19 +72,19 @@ const StudentSchedule: React.FC = () => {
                                     {daySchedules.map((schedule: Schedule) => (
                                         <TableRowGlass key={schedule.id}>
                                             <TableCellGlass>
-                                                <div className="flex items-center gap-2 text-gray-300">
+                                                <div className="flex items-center gap-2 text-slate-600">
                                                     <Clock size={14} />
                                                     {schedule.start_time} - {schedule.end_time}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
-                                                <div className="flex items-center gap-2 font-medium text-white">
-                                                    <BookOpen size={14} className="text-indigo-400" />
+                                                <div className="flex items-center gap-2 font-medium text-slate-900">
+                                                    <BookOpen size={14} className="text-indigo-600" />
                                                     {schedule.subject.name}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
-                                                <div className="flex items-center gap-2 text-gray-300">
+                                                <div className="flex items-center gap-2 text-slate-600">
                                                     <User size={14} />
                                                     {schedule.teacher?.user?.name || '-'}
                                                 </div>
@@ -98,7 +98,7 @@ const StudentSchedule: React.FC = () => {
                 })}
 
                 {!isLoading && schedules?.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
+                    <div className="text-center py-12 text-slate-500">
                         Belum ada jadwal yang ditentukan.
                     </div>
                 )}

@@ -87,30 +87,30 @@ const StudentElearning: React.FC = () => {
         }
     };
 
-    if (!currentStudent) return <div className="text-white p-6">Loading data siswa...</div>;
+    if (!currentStudent) return <div className="text-slate-900 p-6">Loading data siswa...</div>;
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">E-Learning</h1>
-                <p className="text-gray-400">Materi pelajaran dan tugas kelas {currentStudent?.class?.name}</p>
+                <h1 className="text-2xl font-bold text-slate-900">E-Learning</h1>
+                <p className="text-slate-600">Materi pelajaran dan tugas kelas {currentStudent?.class?.name}</p>
             </div>
 
             {/* Tabs */}
-            <div className="flex space-x-4 border-b border-white/10 pb-1">
+            <div className="flex space-x-4 border-b border-slate-200 pb-1">
                 <button
                     onClick={() => setActiveTab('materials')}
-                    className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'materials' ? 'text-purple-400' : 'text-gray-400 hover:text-white'}`}
+                    className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'materials' ? 'text-purple-600' : 'text-slate-500 hover:text-slate-900'}`}
                 >
                     Materi Pelajaran
-                    {activeTab === 'materials' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-400 rounded-t-full" />}
+                    {activeTab === 'materials' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-600 rounded-t-full" />}
                 </button>
                 <button
                     onClick={() => setActiveTab('tasks')}
-                    className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'tasks' ? 'text-purple-400' : 'text-gray-400 hover:text-white'}`}
+                    className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'tasks' ? 'text-purple-600' : 'text-slate-500 hover:text-slate-900'}`}
                 >
                     Tugas & PR
-                    {activeTab === 'tasks' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-400 rounded-t-full" />}
+                    {activeTab === 'tasks' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-600 rounded-t-full" />}
                 </button>
             </div>
 
@@ -118,22 +118,22 @@ const StudentElearning: React.FC = () => {
             {activeTab === 'materials' ? (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {isLoadingMaterials ? (
-                        <p className="text-gray-400">Loading materi...</p>
+                        <p className="text-slate-600">Loading materi...</p>
                     ) : materials?.length === 0 ? (
-                        <p className="text-gray-400">Belum ada materi.</p>
+                        <p className="text-slate-600">Belum ada materi.</p>
                     ) : (
                         materials?.map((material: Material) => (
                             <CardGlass key={material.id} className="p-6 flex flex-col h-full">
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400">
+                                    <div className="p-3 bg-blue-100 rounded-xl text-blue-600">
                                         <BookOpen size={24} />
                                     </div>
-                                    <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded">
+                                    <span className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
                                         {material.subject.name}
                                     </span>
                                 </div>
-                                <h3 className="text-lg font-bold text-white mb-2">{material.title}</h3>
-                                <p className="text-gray-400 text-sm mb-6 flex-1 line-clamp-3">{material.description}</p>
+                                <h3 className="text-lg font-bold text-slate-900 mb-2">{material.title}</h3>
+                                <p className="text-slate-600 text-sm mb-6 flex-1 line-clamp-3">{material.description}</p>
                                 <a href={material.file_url} target="_blank" rel="noopener noreferrer" className="mt-auto">
                                     <ButtonGlass variant="secondary" className="w-full flex items-center justify-center gap-2">
                                         <Download size={16} /> Download Materi
@@ -146,25 +146,25 @@ const StudentElearning: React.FC = () => {
             ) : (
                 <div className="space-y-4">
                     {isLoadingTasks ? (
-                        <p className="text-gray-400">Loading tugas...</p>
+                        <p className="text-slate-600">Loading tugas...</p>
                     ) : tasks?.length === 0 ? (
-                        <p className="text-gray-400">Belum ada tugas.</p>
+                        <p className="text-slate-600">Belum ada tugas.</p>
                     ) : (
                         tasks?.map((task: Task) => (
                             <CardGlass key={task.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-purple-500/20 rounded-xl text-purple-400 mt-1">
+                                    <div className="p-3 bg-purple-100 rounded-xl text-purple-600 mt-1">
                                         <FileText size={24} />
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-lg font-bold text-white">{task.title}</h3>
-                                            <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded">
+                                            <h3 className="text-lg font-bold text-slate-900">{task.title}</h3>
+                                            <span className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
                                                 {task.subject.name}
                                             </span>
                                         </div>
-                                        <p className="text-gray-400 text-sm mb-2">{task.description}</p>
-                                        <div className="flex items-center gap-2 text-sm text-red-400">
+                                        <p className="text-slate-600 text-sm mb-2">{task.description}</p>
+                                        <div className="flex items-center gap-2 text-sm text-red-600">
                                             <Clock size={14} />
                                             Deadline: {new Date(task.deadline).toLocaleDateString()}
                                         </div>
@@ -186,9 +186,9 @@ const StudentElearning: React.FC = () => {
                 title="Kumpulkan Tugas"
             >
                 <div className="space-y-4">
-                    <div className="bg-white/5 p-4 rounded-xl mb-4">
-                        <h4 className="font-bold text-white">{selectedTask?.title}</h4>
-                        <p className="text-sm text-gray-400 mt-1">{selectedTask?.description}</p>
+                    <div className="bg-slate-50 p-4 rounded-xl mb-4">
+                        <h4 className="font-bold text-slate-900">{selectedTask?.title}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{selectedTask?.description}</p>
                     </div>
 
                     <InputGlass

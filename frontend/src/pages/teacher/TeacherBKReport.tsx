@@ -4,7 +4,7 @@ import api from '../../services/api';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
-import { AlertTriangle, Save, Search } from 'lucide-react';
+import { AlertTriangle, Save } from 'lucide-react';
 
 interface Student {
     id: string;
@@ -23,7 +23,7 @@ const TeacherBKReport: React.FC = () => {
     const [type, setType] = useState<'call' | 'violation'>('call');
     const [points, setPoints] = useState(0); // Only for violations
 
-    const { data: students, isLoading: isLoadingStudents } = useQuery({
+    const { data: students } = useQuery({
         queryKey: ['students'],
         queryFn: async () => {
             const res = await api.get('/students/');
@@ -87,23 +87,23 @@ const TeacherBKReport: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <AlertTriangle className="text-yellow-400" /> Lapor BK
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <AlertTriangle className="text-yellow-600" /> Lapor BK
                 </h1>
-                <p className="text-gray-400">Laporkan pelanggaran atau buat panggilan BK untuk siswa</p>
+                <p className="text-slate-600">Laporkan pelanggaran atau buat panggilan BK untuk siswa</p>
             </div>
 
             <CardGlass className="p-6 max-w-2xl">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Jenis Laporan</label>
+                        <label className="text-sm text-slate-600">Jenis Laporan</label>
                         <div className="flex gap-4">
                             <button
                                 type="button"
                                 onClick={() => setType('call')}
                                 className={`flex-1 py-2 rounded-lg border transition-all ${type === 'call'
-                                    ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400'
-                                    : 'border-white/10 text-gray-400 hover:bg-white/5'
+                                    ? 'bg-yellow-100 border-yellow-200 text-yellow-600'
+                                    : 'border-slate-200 text-slate-600 hover:bg-slate-100'
                                     }`}
                             >
                                 Panggilan BK
@@ -112,8 +112,8 @@ const TeacherBKReport: React.FC = () => {
                                 type="button"
                                 onClick={() => setType('violation')}
                                 className={`flex-1 py-2 rounded-lg border transition-all ${type === 'violation'
-                                    ? 'bg-red-500/20 border-red-500 text-red-400'
-                                    : 'border-white/10 text-gray-400 hover:bg-white/5'
+                                    ? 'bg-red-100 border-red-200 text-red-600'
+                                    : 'border-slate-200 text-slate-600 hover:bg-slate-100'
                                     }`}
                             >
                                 Pelanggaran
@@ -122,16 +122,16 @@ const TeacherBKReport: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Pilih Siswa</label>
+                        <label className="text-sm text-slate-600">Pilih Siswa</label>
                         <select
-                            className="w-full glass-input text-gray-900"
+                            className="w-full glass-input text-slate-900 bg-white/50 border-slate-200 focus:border-purple-500"
                             value={selectedStudentId}
                             onChange={(e) => setSelectedStudentId(e.target.value)}
                             required
                         >
-                            <option value="">-- Cari Siswa --</option>
+                            <option value="" className="bg-white">-- Cari Siswa --</option>
                             {students?.map((student) => (
-                                <option key={student.id} value={student.id}>
+                                <option key={student.id} value={student.id} className="bg-white">
                                     {student.user.name} - {student.class?.name || 'Tanpa Kelas'}
                                 </option>
                             ))}
@@ -139,7 +139,7 @@ const TeacherBKReport: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Tanggal</label>
+                        <label className="text-sm text-slate-600">Tanggal</label>
                         <InputGlass
                             type="date"
                             value={date}
@@ -149,11 +149,11 @@ const TeacherBKReport: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">
+                        <label className="text-sm text-slate-600">
                             {type === 'call' ? 'Alasan Panggilan' : 'Nama Pelanggaran'}
                         </label>
                         <textarea
-                            className="w-full glass-input min-h-[100px] text-white bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-green-500/50"
+                            className="w-full glass-input min-h-[100px] text-slate-900 bg-white/50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-purple-500"
                             placeholder={type === 'call' ? 'Contoh: Sering terlambat masuk kelas...' : 'Contoh: Merokok di area sekolah...'}
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
@@ -163,7 +163,7 @@ const TeacherBKReport: React.FC = () => {
 
                     {type === 'violation' && (
                         <div className="space-y-2">
-                            <label className="text-sm text-gray-400">Poin Pelanggaran</label>
+                            <label className="text-sm text-slate-600">Poin Pelanggaran</label>
                             <InputGlass
                                 type="number"
                                 placeholder="Contoh: 10"

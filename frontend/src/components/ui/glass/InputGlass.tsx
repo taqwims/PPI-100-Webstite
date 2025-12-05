@@ -12,13 +12,13 @@ const InputGlass: React.FC<InputGlassProps> = ({ className, icon: Icon, label, .
     return (
         <div className="space-y-2">
             {label && (
-                <label className="text-sm font-medium text-white/80 ml-1">
+                <label className="text-sm font-medium text-slate-900/80 ml-1">
                     {label}
                 </label>
             )}
             <div className="relative">
                 {Icon && (
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300-400">
                         <Icon size={18} />
                     </div>
                 )}
