@@ -36,10 +36,28 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 }
 
 func (u *UserUsecase) UpdateUser(user *domain.User) error {
-	// If password is changed, hash it (logic needs to be handled carefully, for now assume simple update)
+	if user.PasswordHash != "" {
+		hashedPassword, err := utils.HashPassword(user.PasswordHash)
+		if err != nil {
+			return err
+		}
+		user.PasswordHash = hashedPassword
+	} else {
+		// Fetch existing user to keep old password if not provided
+		existingUser, err := u.userRepo.FindByID(user.ID.String())
+		if err != nil {
+			return err
+		}
+		user.PasswordHash = existingUser.PasswordHash
+	}
 	return u.userRepo.Update(user)
 }
 
 func (u *UserUsecase) DeleteUser(id string) error {
 	return u.userRepo.Delete(id)
 }
+
+func (u *UserUsecase) GetUserByID(id string) (*domain.User, error) {
+	return u.userRepo.FindByID(id)
+}
+

@@ -39,6 +39,12 @@ func (r *AcademicRepository) DeleteClass(id uint) error {
 	return r.db.Delete(&domain.Class{}, id).Error
 }
 
+func (r *AcademicRepository) GetClassByHomeroomTeacher(teacherID string) (*domain.Class, error) {
+	var class domain.Class
+	err := r.db.Where("homeroom_teacher_id = ?", teacherID).First(&class).Error
+	return &class, err
+}
+
 // Subject
 func (r *AcademicRepository) CreateSubject(subject *domain.Subject) error {
 	return r.db.Create(subject).Error
@@ -76,6 +82,16 @@ func (r *AcademicRepository) GetAllSchedules(classID uint, teacherID string) ([]
 
 	err := query.Find(&schedules).Error
 	return schedules, err
+}
+
+func (r *AcademicRepository) UpdateSchedule(schedule *domain.Schedule) error {
+	return r.db.Save(schedule).Error
+}
+
+func (r *AcademicRepository) GetScheduleByID(id uint) (*domain.Schedule, error) {
+	var schedule domain.Schedule
+	err := r.db.First(&schedule, id).Error
+	return &schedule, err
 }
 
 func (r *AcademicRepository) DeleteSchedule(id uint) error {

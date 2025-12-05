@@ -6,23 +6,23 @@ import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
-import { BookOpen, Calendar, User, CheckCircle } from 'lucide-react';
+import { Calendar, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface Task {
-    ID: number;
-    Title: string;
-    Deadline: string;
-    Class: { Name: string };
-    Subject: { Name: string };
+    id: number;
+    title: string;
+    deadline: string;
+    class: { name: string };
+    subject: { name: string };
 }
 
 interface Submission {
-    ID: string;
-    Student: { User: { Name: string }, NISN: string };
-    FileURL: string;
-    Grade: number;
-    CreatedAt: string;
+    id: string;
+    student: { user: { name: string }, nisn: string };
+    file_url: string;
+    grade: number;
+    created_at: string;
 }
 
 const TeacherGrades: React.FC = () => {
@@ -40,7 +40,7 @@ const TeacherGrades: React.FC = () => {
             return response.data;
         }
     });
-    const currentTeacher = teachers?.find((t: any) => t.User.ID === user?.id);
+    const currentTeacher = teachers?.find((t: any) => t.user.id === user?.id);
 
     // Fetch Tasks created by this teacher
     // Note: Backend GetTasks currently filters by ClassID. 
@@ -49,7 +49,7 @@ const TeacherGrades: React.FC = () => {
     // For now, let's assume we select a class first? 
     // Or simpler: Fetch tasks for a default class (e.g. 1) for MVP, or iterate all classes.
     // Let's stick to Class ID 1 for now as per previous implementation, but ideally we should let teacher select class.
-    const [selectedClassId, setSelectedClassId] = useState(1);
+    const [selectedClassId] = useState(1);
 
     const { data: tasks, isLoading: isLoadingTasks } = useQuery({
         queryKey: ['tasks', selectedClassId],
@@ -60,7 +60,7 @@ const TeacherGrades: React.FC = () => {
     });
 
     // Filter tasks by current teacher
-    const myTasks = tasks?.filter((t: any) => t.TeacherID === currentTeacher?.ID);
+    const myTasks = tasks?.filter((t: any) => t.teacher_id === currentTeacher?.id);
 
     // Fetch Submissions for selected task
     // We need a new endpoint for this: GET /elearning/tasks/:id/submissions
@@ -75,11 +75,11 @@ const TeacherGrades: React.FC = () => {
 
     // Assuming the endpoint exists for now to structure the code:
     const { data: submissions, isLoading: isLoadingSubmissions } = useQuery({
-        queryKey: ['submissions', selectedTask?.ID],
+        queryKey: ['submissions', selectedTask?.id],
         queryFn: async () => {
             if (!selectedTask) return [];
             // We need to implement this endpoint
-            const response = await api.get(`/elearning/tasks/${selectedTask.ID}/submissions`);
+            const response = await api.get(`/elearning/tasks/${selectedTask.id}/submissions`);
             return response.data;
         },
         enabled: !!selectedTask
@@ -89,7 +89,7 @@ const TeacherGrades: React.FC = () => {
         mutationFn: ({ id, grade }: { id: string, grade: number }) =>
             api.put(`/elearning/submissions/${id}/grade`, { grade }),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions', selectedTask?.ID] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', selectedTask?.id] });
             setGradingSubmission(null);
             setGradeInput('');
         }
@@ -97,7 +97,7 @@ const TeacherGrades: React.FC = () => {
 
     const handleGrade = () => {
         if (gradingSubmission && gradeInput) {
-            gradeMutation.mutate({ id: gradingSubmission.ID, grade: parseFloat(gradeInput) });
+            gradeMutation.mutate({ id: gradingSubmission.id, grade: parseFloat(gradeInput) });
         }
     };
 
@@ -121,17 +121,17 @@ const TeacherGrades: React.FC = () => {
                             ) : (
                                 myTasks?.map((task: Task) => (
                                     <div
-                                        key={task.ID}
+                                        key={task.id}
                                         onClick={() => setSelectedTask(task)}
-                                        className={`p-3 rounded-xl cursor-pointer transition-colors ${selectedTask?.ID === task.ID
+                                        className={`p-3 rounded-xl cursor-pointer transition-colors ${selectedTask?.id === task.id
                                             ? 'bg-purple-500/20 border border-purple-500/30'
                                             : 'bg-white/5 hover:bg-white/10 border border-transparent'
                                             }`}
                                     >
-                                        <h4 className="font-medium text-white">{task.Title}</h4>
+                                        <h4 className="font-medium text-white">{task.title}</h4>
                                         <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
                                             <Calendar size={12} />
-                                            {new Date(task.Deadline).toLocaleDateString()}
+                                            {new Date(task.deadline).toLocaleDateString()}
                                         </div>
                                     </div>
                                 ))
@@ -146,7 +146,7 @@ const TeacherGrades: React.FC = () => {
                         <CardGlass className="p-6">
                             <div className="flex justify-between items-start mb-6">
                                 <div>
-                                    <h3 className="text-xl font-bold text-white">{selectedTask.Title}</h3>
+                                    <h3 className="text-xl font-bold text-white">{selectedTask.title}</h3>
                                     <p className="text-gray-400 text-sm mt-1">Submissions</p>
                                 </div>
                             </div>
@@ -171,26 +171,26 @@ const TeacherGrades: React.FC = () => {
                                         </TableRowGlass>
                                     ) : (
                                         submissions?.map((sub: Submission) => (
-                                            <TableRowGlass key={sub.ID}>
+                                            <TableRowGlass key={sub.id}>
                                                 <TableCellGlass>
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center text-blue-400">
                                                             <User size={14} />
                                                         </div>
                                                         <div>
-                                                            <div className="font-medium text-white">{sub.Student.User.Name}</div>
-                                                            <div className="text-xs text-gray-400">{sub.Student.NISN}</div>
+                                                            <div className="font-medium text-white">{sub.student.user.name}</div>
+                                                            <div className="text-xs text-gray-400">{sub.student.nisn}</div>
                                                         </div>
                                                     </div>
                                                 </TableCellGlass>
                                                 <TableCellGlass>
-                                                    <a href={sub.FileURL} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline text-sm">
+                                                    <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline text-sm">
                                                         Lihat File
                                                     </a>
                                                 </TableCellGlass>
                                                 <TableCellGlass>
-                                                    {sub.Grade > 0 ? (
-                                                        <span className="text-green-400 font-bold">{sub.Grade}</span>
+                                                    {sub.grade > 0 ? (
+                                                        <span className="text-green-400 font-bold">{sub.grade}</span>
                                                     ) : (
                                                         <span className="text-gray-500">-</span>
                                                     )}
@@ -200,7 +200,7 @@ const TeacherGrades: React.FC = () => {
                                                         className="py-1 px-3 text-xs"
                                                         onClick={() => {
                                                             setGradingSubmission(sub);
-                                                            setGradeInput(sub.Grade.toString());
+                                                            setGradeInput(sub.grade.toString());
                                                         }}
                                                     >
                                                         Nilai
@@ -228,7 +228,7 @@ const TeacherGrades: React.FC = () => {
             >
                 <div className="space-y-4">
                     <p className="text-gray-300">
-                        Input nilai untuk <span className="font-bold text-white">{gradingSubmission?.Student.User.Name}</span>
+                        Input nilai untuk <span className="font-bold text-white">{gradingSubmission?.student.user.name}</span>
                     </p>
                     <InputGlass
                         type="number"

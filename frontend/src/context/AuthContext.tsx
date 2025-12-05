@@ -1,8 +1,30 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 
+interface User {
+    id: string;
+    name: string;
+    email: string;
+    role_id: number;
+    unit_id: number;
+    photo_url?: string;
+    student?: {
+        id: string;
+        nisn: string;
+        class_id: number;
+    };
+    teacher?: {
+        id: string;
+        nip: string;
+    };
+    parent?: {
+        id: string;
+        phone: string;
+    };
+}
+
 interface AuthContextType {
-    user: any;
+    user: User | null;
     token: string | null;
     login: (token: string) => void;
     logout: () => void;
@@ -12,7 +34,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
 
     useEffect(() => {

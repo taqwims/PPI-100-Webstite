@@ -22,6 +22,10 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	if err := postgres.AutoMigrate(db); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
 	// Seed Roles
 	roles := []domain.Role{
 		{ID: 1, Name: "Super Admin"},
@@ -64,13 +68,14 @@ func main() {
 	seedUser(db, superAdmin)
 
 	// Seed Teachers
-	teachers := []domain.User{
+	teachersData := []domain.User{
 		{Name: "Ustadz Ahmad", Email: "ahmad@example.com", RoleID: 4, UnitID: 1},
 		{Name: "Ustadzah Siti", Email: "siti@example.com", RoleID: 4, UnitID: 1},
 		{Name: "Ustadz Budi", Email: "budi@example.com", RoleID: 4, UnitID: 2},
 	}
 
-	for _, t := range teachers {
+	var createdTeachers []domain.Teacher
+	for _, t := range teachersData {
 		t.PasswordHash = string(hashedPassword)
 		user := seedUser(db, t)
 		
@@ -83,6 +88,7 @@ func main() {
 		if err := db.FirstOrCreate(&teacherProfile, domain.Teacher{UserID: user.ID}).Error; err != nil {
 			log.Printf("Failed to seed teacher profile for %s: %v", user.Name, err)
 		}
+		createdTeachers = append(createdTeachers, teacherProfile)
 	}
 
 	// Seed Classes
@@ -95,6 +101,11 @@ func main() {
 		if err := db.FirstOrCreate(&c, domain.Class{ID: c.ID}).Error; err != nil {
 			log.Printf("Failed to seed class %s: %v", c.Name, err)
 		}
+	}
+
+	// Assign Homeroom Teacher (Ustadz Ahmad to 7A)
+	if len(createdTeachers) > 0 {
+		db.Model(&domain.Class{}).Where("id = ?", 1).Update("homeroom_teacher_id", createdTeachers[0].ID)
 	}
 
 	// Seed Subjects
@@ -110,8 +121,20 @@ func main() {
 		}
 	}
 
+	// Seed Schedules for 7A
+	if len(createdTeachers) > 0 {
+		schedules := []domain.Schedule{
+			{ClassID: 1, SubjectID: 1, TeacherID: createdTeachers[0].ID, Day: "Monday", StartTime: "07:00", EndTime: "08:30"},
+			{ClassID: 1, SubjectID: 2, TeacherID: createdTeachers[1].ID, Day: "Monday", StartTime: "08:30", EndTime: "10:00"},
+			{ClassID: 1, SubjectID: 3, TeacherID: createdTeachers[0].ID, Day: "Tuesday", StartTime: "07:00", EndTime: "08:30"},
+		}
+		for _, sch := range schedules {
+			db.FirstOrCreate(&sch, domain.Schedule{ClassID: sch.ClassID, SubjectID: sch.SubjectID, Day: sch.Day, StartTime: sch.StartTime})
+		}
+	}
+
 	// Seed Students & Parents
-	students := []struct {
+	studentsData := []struct {
 		Name      string
 		Email     string
 		ClassID   uint
@@ -124,7 +147,9 @@ func main() {
 		{"Santri Tiga", "santri3@example.com", 3, 2, "Ayah Tiga", "ayah3@example.com"},
 	}
 
-	for _, s := range students {
+	var createdStudents []domain.Student
+
+	for _, s := range studentsData {
 		// Parent
 		parentUser := domain.User{
 			Name:         s.ParentName,
@@ -154,9 +179,10 @@ func main() {
 			NISN:     "NISN" + sUser.ID.String()[:8],
 			ClassID:  s.ClassID,
 			UnitID:   s.UnitID,
-			ParentID: parentProfile.ID,
+			ParentID: &parentProfile.ID,
 		}
 		db.FirstOrCreate(&studentProfile, domain.Student{UserID: sUser.ID})
+		createdStudents = append(createdStudents, studentProfile)
 
 		// Seed Bill
 		bill := domain.Bill{
@@ -167,6 +193,56 @@ func main() {
 			Status:    "Unpaid",
 		}
 		db.Create(&bill)
+	}
+
+	// Seed E-Learning Materials & Tasks
+	if len(createdTeachers) > 0 {
+		materials := []domain.Material{
+			{Title: "Pengenalan Aljabar", Description: "Dasar-dasar Aljabar", FileURL: "https://example.com/aljabar.pdf", ClassID: 1, SubjectID: 1, TeacherID: createdTeachers[0].ID},
+			{Title: "Nahwu Dasar", Description: "Pengenalan Isim, Fi'il, Huruf", FileURL: "https://example.com/nahwu.pdf", ClassID: 1, SubjectID: 2, TeacherID: createdTeachers[1].ID},
+		}
+		for _, m := range materials {
+			db.FirstOrCreate(&m, domain.Material{Title: m.Title, ClassID: m.ClassID})
+		}
+
+		tasks := []domain.Task{
+			{Title: "Latihan Soal Aljabar", Description: "Kerjakan halaman 10-12", Deadline: time.Now().AddDate(0, 0, 7), ClassID: 1, SubjectID: 1, TeacherID: createdTeachers[0].ID},
+		}
+		for _, t := range tasks {
+			db.FirstOrCreate(&t, domain.Task{Title: t.Title, ClassID: t.ClassID})
+		}
+	}
+
+	// Seed BK Violations & Calls
+	if len(createdStudents) > 0 && len(createdTeachers) > 0 {
+		violations := []domain.Violation{
+			{Name: "Terlambat", Points: 5, Description: "Datang terlambat lebih dari 15 menit"},
+			{Name: "Tidak Membawa Buku", Points: 2, Description: "Tidak membawa buku pelajaran"},
+			{Name: "Merokok", Points: 50, Description: "Merokok di lingkungan sekolah"},
+		}
+		for _, v := range violations {
+			db.FirstOrCreate(&v, domain.Violation{Name: v.Name})
+		}
+
+		bkCall := domain.BKCall{
+			StudentID: createdStudents[0].ID,
+			TeacherID: createdTeachers[0].ID,
+			Reason:    "Sering terlambat masuk kelas",
+			Date:      time.Now(),
+			Status:    "Pending",
+		}
+		db.Create(&bkCall)
+	}
+
+	// Seed Notifications
+	if len(createdStudents) > 0 {
+		notif := domain.Notification{
+			UserID:  createdStudents[0].UserID,
+			Title:   "Tagihan Baru",
+			Message: "Tagihan SPP November 2025 telah terbit.",
+			Type:    "Bill",
+		}
+		db.Create(&notif)
 	}
 
 	log.Println("Seeding completed successfully")
@@ -180,6 +256,12 @@ func seedUser(db *gorm.DB, user domain.User) domain.User {
 				log.Printf("Failed to create user %s: %v", user.Name, err)
 			}
 			return user
+		}
+	} else {
+		// Update password if user exists
+		existingUser.PasswordHash = user.PasswordHash
+		if err := db.Save(&existingUser).Error; err != nil {
+			log.Printf("Failed to update password for %s: %v", user.Name, err)
 		}
 	}
 	return existingUser

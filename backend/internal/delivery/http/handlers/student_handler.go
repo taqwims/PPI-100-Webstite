@@ -64,3 +64,111 @@ func (h *StudentHandler) GetScheduleAttendance(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, attendances)
 }
+
+func (h *StudentHandler) GetChildren(c *gin.Context) {
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var userID string
+	if id, ok := userIDVal.(string); ok {
+		userID = id
+	} else if id, ok := userIDVal.(uuid.UUID); ok {
+		userID = id.String()
+	} else {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+		return
+	}
+
+	children, err := h.studentUsecase.GetChildrenByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, children)
+}
+
+type CreateStudentRequest struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+	NISN     string `json:"nisn" binding:"required"`
+	ClassID  uint   `json:"class_id" binding:"required"`
+	UnitID   uint   `json:"unit_id" binding:"required"`
+	ParentID string `json:"parent_id"`
+}
+
+func (h *StudentHandler) CreateStudent(c *gin.Context) {
+	var req CreateStudentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var parentUUID *uuid.UUID
+	if req.ParentID != "" {
+		parsedUUID, err := uuid.Parse(req.ParentID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parent ID"})
+			return
+		}
+		parentUUID = &parsedUUID
+	}
+
+	if err := h.studentUsecase.CreateStudent(req.Name, req.Email, req.Password, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Student created successfully"})
+}
+
+type UpdateStudentRequest struct {
+	Name    string `json:"name" binding:"required"`
+	Email   string `json:"email" binding:"required,email"`
+	NISN    string `json:"nisn" binding:"required"`
+	ClassID uint   `json:"class_id" binding:"required"`
+}
+
+func (h *StudentHandler) UpdateStudent(c *gin.Context) {
+	id := c.Param("id")
+	var req UpdateStudentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.NISN, req.ClassID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Student updated successfully"})
+}
+
+func (h *StudentHandler) DeleteStudent(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.studentUsecase.DeleteStudent(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
+}
+
+func (h *StudentHandler) GetStudentAttendance(c *gin.Context) {
+	studentID := c.Query("student_id")
+	if studentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "student_id is required"})
+		return
+	}
+
+	attendances, err := h.studentUsecase.GetStudentAttendance(studentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, attendances)
+}

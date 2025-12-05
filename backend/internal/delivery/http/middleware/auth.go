@@ -27,7 +27,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		claims, err := utils.ValidateToken(parts[1], cfg)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: " + err.Error()})
 			c.Abort()
 			return
 		}

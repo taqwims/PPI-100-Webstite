@@ -42,3 +42,22 @@ func (r *FinanceRepository) CreatePayment(payment *domain.Payment) error {
 func (r *FinanceRepository) UpdateBillStatus(billID string, status string) error {
 	return r.db.Model(&domain.Bill{}).Where("id = ?", billID).Update("status", status).Error
 }
+
+// Full Update/Delete for Bill
+func (r *FinanceRepository) UpdateBill(bill *domain.Bill) error {
+	return r.db.Save(bill).Error
+}
+
+func (r *FinanceRepository) DeleteBill(id string) error {
+	return r.db.Delete(&domain.Bill{}, "id = ?", id).Error
+}
+
+// Update/Delete for Payment
+func (r *FinanceRepository) UpdatePayment(payment *domain.Payment) error {
+	return r.db.Save(payment).Error
+}
+
+func (r *FinanceRepository) DeletePayment(id string) error {
+	return r.db.Delete(&domain.Payment{}, "id = ?", id).Error
+}
+

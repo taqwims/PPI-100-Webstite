@@ -4,10 +4,63 @@ import CardGlass from '../components/ui/glass/CardGlass';
 import InputGlass from '../components/ui/glass/InputGlass';
 import ButtonGlass from '../components/ui/glass/ButtonGlass';
 import { User, Lock, Save, Camera } from 'lucide-react';
+import api from '../services/api';
+import { useMutation } from '@tanstack/react-query';
 
 const Settings: React.FC = () => {
-    const { user } = useAuth();
+    const { user } = useAuth(); // login is used to refresh token if needed, but here we might just need to refetch profile
     const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
+
+    // Profile State
+    const [name, setName] = useState(user?.name || '');
+    const [email, setEmail] = useState(user?.email || '');
+
+    // Password State
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const updateProfileMutation = useMutation({
+        mutationFn: async (data: { name: string; email: string }) => {
+            return await api.put('/profile', data);
+        },
+        onSuccess: () => {
+            alert('Profil berhasil diperbarui. Silakan login ulang untuk melihat perubahan.');
+            // In a real app, we would refetch the user profile here
+        },
+        onError: (error: any) => {
+            alert(error.response?.data?.error || 'Gagal memperbarui profil');
+        }
+    });
+
+    const changePasswordMutation = useMutation({
+        mutationFn: async (data: any) => {
+            return await api.put('/profile/password', data);
+        },
+        onSuccess: () => {
+            alert('Password berhasil diubah.');
+            setOldPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        },
+        onError: (error: any) => {
+            alert(error.response?.data?.error || 'Gagal mengubah password');
+        }
+    });
+
+    const handleUpdateProfile = (e: React.FormEvent) => {
+        e.preventDefault();
+        updateProfileMutation.mutate({ name, email });
+    };
+
+    const handleChangePassword = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword !== confirmPassword) {
+            alert('Konfirmasi password tidak cocok');
+            return;
+        }
+        changePasswordMutation.mutate({ old_password: oldPassword, new_password: newPassword });
+    };
 
     return (
         <div className="space-y-6">
@@ -50,9 +103,29 @@ const Settings: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-                            <button className="absolute bottom-0 right-0 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 transition-colors">
+                            <label className="absolute bottom-0 right-0 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 transition-colors cursor-pointer">
                                 <Camera size={16} className="text-white" />
-                            </button>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const formData = new FormData();
+                                            formData.append('file', file);
+                                            api.post('/profile/photo', formData, {
+                                                headers: { 'Content-Type': 'multipart/form-data' }
+                                            }).then(() => {
+                                                alert('Foto profil berhasil diperbarui. Silakan refresh halaman.');
+                                                // In a real app, we would invalidate the user query here
+                                            }).catch((err) => {
+                                                alert('Gagal mengupload foto: ' + (err.response?.data?.error || err.message));
+                                            });
+                                        }
+                                    }}
+                                />
+                            </label>
                         </div>
 
                         <div>
@@ -69,50 +142,75 @@ const Settings: React.FC = () => {
                 <div className="lg:col-span-2">
                     <CardGlass className="p-8">
                         {activeTab === 'profile' ? (
-                            <form className="space-y-6">
+                            <form onSubmit={handleUpdateProfile} className="space-y-6">
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-sm text-gray-400">Nama Lengkap</label>
-                                        <InputGlass defaultValue={user?.name} icon={User} />
+                                        <InputGlass
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            icon={User}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-gray-400">Email</label>
-                                        <InputGlass defaultValue={user?.email} disabled className="opacity-50 cursor-not-allowed" />
+                                        <InputGlass
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            icon={User} // Should be Mail icon but User is fine for now
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-gray-400">Nomor Telepon</label>
-                                        <InputGlass placeholder="0812..." />
+                                        <InputGlass placeholder="0812..." disabled className="opacity-50 cursor-not-allowed" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-gray-400">Alamat</label>
-                                        <InputGlass placeholder="Jl. ..." />
+                                        <InputGlass placeholder="Jl. ..." disabled className="opacity-50 cursor-not-allowed" />
                                     </div>
                                 </div>
 
                                 <div className="pt-4 flex justify-end">
-                                    <ButtonGlass className="flex items-center gap-2">
-                                        <Save size={18} /> Simpan Perubahan
+                                    <ButtonGlass type="submit" className="flex items-center gap-2" disabled={updateProfileMutation.isPending}>
+                                        <Save size={18} />
+                                        {updateProfileMutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
                                     </ButtonGlass>
                                 </div>
                             </form>
                         ) : (
-                            <form className="space-y-6 max-w-md">
+                            <form onSubmit={handleChangePassword} className="space-y-6 max-w-md">
                                 <div className="space-y-2">
                                     <label className="text-sm text-gray-400">Password Saat Ini</label>
-                                    <InputGlass type="password" icon={Lock} />
+                                    <InputGlass
+                                        type="password"
+                                        icon={Lock}
+                                        value={oldPassword}
+                                        onChange={(e) => setOldPassword(e.target.value)}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm text-gray-400">Password Baru</label>
-                                    <InputGlass type="password" icon={Lock} />
+                                    <InputGlass
+                                        type="password"
+                                        icon={Lock}
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm text-gray-400">Konfirmasi Password Baru</label>
-                                    <InputGlass type="password" icon={Lock} />
+                                    <InputGlass
+                                        type="password"
+                                        icon={Lock}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                    />
                                 </div>
 
                                 <div className="pt-4">
-                                    <ButtonGlass className="flex items-center gap-2">
-                                        <Save size={18} /> Update Password
+                                    <ButtonGlass type="submit" className="flex items-center gap-2" disabled={changePasswordMutation.isPending}>
+                                        <Save size={18} />
+                                        {changePasswordMutation.isPending ? 'Mengubah...' : 'Update Password'}
                                     </ButtonGlass>
                                 </div>
                             </form>

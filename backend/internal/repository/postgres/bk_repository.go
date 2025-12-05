@@ -46,3 +46,22 @@ func (r *BKRepository) GetAllBKCalls(unitID uint) ([]domain.BKCall, error) {
 		Find(&calls).Error
 	return calls, err
 }
+
+// Update/Delete for Violation
+func (r *BKRepository) UpdateViolation(violation *domain.Violation) error {
+	return r.db.Save(violation).Error
+}
+
+func (r *BKRepository) DeleteViolation(id uint) error {
+	return r.db.Delete(&domain.Violation{}, id).Error
+}
+
+// Update/Delete for BKCall
+func (r *BKRepository) UpdateBKCall(call *domain.BKCall) error {
+	return r.db.Save(call).Error
+}
+
+func (r *BKRepository) DeleteBKCall(id string) error {
+	return r.db.Delete(&domain.BKCall{}, "id = ?", id).Error
+}
+

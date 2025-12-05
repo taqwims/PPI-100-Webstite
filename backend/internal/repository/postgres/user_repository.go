@@ -20,7 +20,7 @@ func (r *UserRepository) Create(user *domain.User) error {
 
 func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Where("email = ?", email).First(&user).Error; err != nil {
+	if err := r.db.Where("email = ?", email).Preload("Teacher").Preload("Parent").Preload("Student").First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -28,7 +28,7 @@ func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
 
 func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Where("id = ?", id).First(&user).Error; err != nil {
+	if err := r.db.Where("id = ?", id).Preload("Teacher").Preload("Parent").Preload("Student").First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

@@ -7,12 +7,12 @@ import { Calendar, Clock, BookOpen, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface Schedule {
-    ID: number;
-    Class: { Name: string };
-    Subject: { Name: string };
-    Day: string;
-    StartTime: string;
-    EndTime: string;
+    id: number;
+    class: { name: string };
+    subject: { name: string };
+    day: string;
+    start_time: string;
+    end_time: string;
 }
 
 const TeacherSchedule: React.FC = () => {
@@ -35,17 +35,7 @@ const TeacherSchedule: React.FC = () => {
     // Let's assume for now we are testing with a specific teacher or we need to fetch the teacher ID.
 
     // Let's fetch the current user's teacher profile to get the ID.
-    const { data: profile } = useQuery({
-        queryKey: ['profile'],
-        queryFn: async () => {
-            const response = await api.get('/teachers/');
-            // This returns ALL teachers. Not efficient to find "me".
-            // Alternative: GET /profile should return teacher info if user is a teacher.
-            // Let's check GET /profile response in a separate step if needed.
-            // For now, let's hardcode a known teacher ID for testing or try to find it.
-            return response.data;
-        }
-    });
+
 
     // Strategy: We will fetch all schedules and filter by the current user's name or ID if possible.
     // OR, since we implemented `teacher_id` filter in backend, we need that ID.
@@ -64,16 +54,16 @@ const TeacherSchedule: React.FC = () => {
         }
     });
 
-    const currentTeacher = teachers?.find((t: any) => t.User.ID === user?.id);
+    const currentTeacher = teachers?.find((t: any) => t.user.id === user?.id);
 
     const { data: schedules, isLoading } = useQuery({
-        queryKey: ['schedules', currentTeacher?.ID],
+        queryKey: ['schedules', currentTeacher?.id],
         queryFn: async () => {
-            if (!currentTeacher?.ID) return [];
-            const response = await api.get(`/academic/schedules?teacher_id=${currentTeacher.ID}`);
+            if (!currentTeacher?.id) return [];
+            const response = await api.get(`/academic/schedules?teacher_id=${currentTeacher.id}`);
             return response.data;
         },
-        enabled: !!currentTeacher?.ID
+        enabled: !!currentTeacher?.id
     });
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -91,8 +81,8 @@ const TeacherSchedule: React.FC = () => {
 
             <div className="grid gap-6">
                 {days.map(day => {
-                    const daySchedules = schedules?.filter((s: Schedule) => s.Day === day)
-                        .sort((a: Schedule, b: Schedule) => a.StartTime.localeCompare(b.StartTime));
+                    const daySchedules = schedules?.filter((s: Schedule) => s.day === day)
+                        .sort((a: Schedule, b: Schedule) => a.start_time.localeCompare(b.start_time));
 
                     if (!daySchedules || daySchedules.length === 0) return null;
 
@@ -108,28 +98,34 @@ const TeacherSchedule: React.FC = () => {
                                         <TableHeadGlass>Waktu</TableHeadGlass>
                                         <TableHeadGlass>Mata Pelajaran</TableHeadGlass>
                                         <TableHeadGlass>Kelas</TableHeadGlass>
+                                        <TableHeadGlass>Aksi</TableHeadGlass>
                                     </TableRowGlass>
                                 </TableHeaderGlass>
                                 <TableBodyGlass>
                                     {daySchedules.map((schedule: Schedule) => (
-                                        <TableRowGlass key={schedule.ID}>
+                                        <TableRowGlass key={schedule.id}>
                                             <TableCellGlass>
                                                 <div className="flex items-center gap-2 text-gray-300">
                                                     <Clock size={14} />
-                                                    {schedule.StartTime} - {schedule.EndTime}
+                                                    {schedule.start_time} - {schedule.end_time}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
                                                 <div className="flex items-center gap-2 font-medium text-white">
                                                     <BookOpen size={14} className="text-indigo-400" />
-                                                    {schedule.Subject.Name}
+                                                    {schedule.subject.name}
                                                 </div>
                                             </TableCellGlass>
                                             <TableCellGlass>
                                                 <div className="flex items-center gap-2 text-gray-300">
                                                     <Users size={14} />
-                                                    {schedule.Class.Name}
+                                                    {schedule.class.name}
                                                 </div>
+                                            </TableCellGlass>
+                                            <TableCellGlass>
+                                                <a href={`/dashboard/teacher/attendance/${schedule.id}`} className="text-purple-400 hover:text-purple-300 text-sm font-medium">
+                                                    Absen
+                                                </a>
                                             </TableCellGlass>
                                         </TableRowGlass>
                                     ))}

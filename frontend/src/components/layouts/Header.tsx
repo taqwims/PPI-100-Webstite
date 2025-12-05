@@ -1,9 +1,25 @@
 import React from 'react';
 import { Bell, Search, Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import api from '../../services/api';
 
 const Header: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const { data: notifications } = useQuery({
+        queryKey: ['notifications'],
+        queryFn: async () => {
+            const res = await api.get('/notifications/');
+            return res.data;
+        },
+        // Refetch every minute to keep count updated
+        refetchInterval: 60000,
+    });
+
+    const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
 
     return (
         <header className="sticky top-0 z-30 px-6 py-4 lg:px-8">
@@ -27,18 +43,23 @@ const Header: React.FC = () => {
 
                 {/* Right Actions */}
                 <div className="flex items-center gap-4 ml-auto">
-                    <button className="relative p-2 text-slate-500 hover:text-slate-900 transition-colors">
+                    <button
+                        className="relative p-2 text-slate-500 hover:text-slate-900 transition-colors"
+                        onClick={() => navigate('/dashboard/notifications')}
+                    >
                         <Bell size={20} />
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                        {unreadCount > 0 && (
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                        )}
                     </button>
 
                     <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
                         <div className="text-right hidden sm:block">
-                            <p className="text-sm font-medium text-slate-900">{user?.Name || 'User'}</p>
-                            <p className="text-xs text-slate-500">{user?.RoleID === 1 ? 'Super Admin' : 'User'}</p>
+                            <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
+                            <p className="text-xs text-slate-500">{user?.role_id === 1 ? 'Super Admin' : 'User'}</p>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold shadow-lg shadow-green-500/20">
-                            {user?.Name?.charAt(0) || 'U'}
+                            {user?.name?.charAt(0) || 'U'}
                         </div>
                     </div>
                 </div>

@@ -68,3 +68,21 @@ func (h *NotificationHandler) SendNotification(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Notification sent successfully"})
 }
+
+func (h *NotificationHandler) GetAllNotifications(c *gin.Context) {
+	notifications, err := h.notificationUsecase.GetAllNotifications()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, notifications)
+}
+
+func (h *NotificationHandler) DeleteNotification(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.notificationUsecase.DeleteNotification(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted successfully"})
+}

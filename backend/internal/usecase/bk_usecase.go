@@ -43,3 +43,26 @@ func (u *BKUsecase) CreateBKCall(studentID, teacherID uuid.UUID, reason string, 
 func (u *BKUsecase) GetAllBKCalls(unitID uint) ([]domain.BKCall, error) {
 	return u.bkRepo.GetAllBKCalls(unitID)
 }
+
+func (u *BKUsecase) GetStudentBKCalls(studentID string) ([]domain.BKCall, error) {
+	return u.bkRepo.GetBKCallsByStudent(studentID)
+}
+
+// Update/Delete Violation
+func (u *BKUsecase) UpdateViolation(violation *domain.Violation) error {
+	return u.bkRepo.UpdateViolation(violation)
+}
+
+func (u *BKUsecase) DeleteViolation(id uint) error {
+	return u.bkRepo.DeleteViolation(id)
+}
+
+// Update/Delete BKCall
+func (u *BKUsecase) UpdateBKCall(call *domain.BKCall) error {
+	return u.bkRepo.UpdateBKCall(call)
+}
+
+func (u *BKUsecase) DeleteBKCall(id string) error {
+	return u.bkRepo.DeleteBKCall(id)
+}
+

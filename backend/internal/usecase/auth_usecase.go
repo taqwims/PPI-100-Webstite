@@ -63,3 +63,51 @@ func (u *AuthUsecase) Login(email, password string) (string, error) {
 func (u *AuthUsecase) GetProfile(userID string) (*domain.User, error) {
 	return u.userRepo.FindByID(userID)
 }
+
+func (u *AuthUsecase) UpdateProfile(userID string, name, email string) error {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil {
+		return err
+	}
+
+	user.Name = name
+	// Only update email if changed and not taken
+	if user.Email != email {
+		existing, _ := u.userRepo.FindByEmail(email)
+		if existing != nil {
+			return errors.New("email already taken")
+		}
+		user.Email = email
+	}
+
+	return u.userRepo.Update(user)
+}
+
+func (u *AuthUsecase) ChangePassword(userID, oldPassword, newPassword string) error {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil {
+		return err
+	}
+
+	if !utils.CheckPasswordHash(oldPassword, user.PasswordHash) {
+		return errors.New("invalid old password")
+	}
+
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	user.PasswordHash = hashedPassword
+	return u.userRepo.Update(user)
+}
+
+func (u *AuthUsecase) UpdateProfilePicture(userID, photoURL string) error {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil {
+		return err
+	}
+
+	user.PhotoURL = photoURL
+	return u.userRepo.Update(user)
+}

@@ -1,8 +1,8 @@
 import React from 'react';
-import { ArrowRight, BookOpen, Users, Trophy, Calendar, Star, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, BookOpen, Users, Trophy, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CardGlass from '../../components/ui/glass/CardGlass';
-import ButtonGlass from '../../components/ui/glass/ButtonGlass';
+
 
 const Home: React.FC = () => {
     return (

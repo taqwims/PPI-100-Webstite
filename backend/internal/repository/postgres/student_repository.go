@@ -29,3 +29,17 @@ func (r *StudentRepository) GetByID(id string) (*domain.Student, error) {
 	err := r.db.Where("id = ?", id).Preload("User").Preload("Class").First(&student).Error
 	return &student, err
 }
+
+func (r *StudentRepository) GetByParent(parentID string) ([]domain.Student, error) {
+	var students []domain.Student
+	err := r.db.Where("parent_id = ?", parentID).Preload("User").Preload("Class").Find(&students).Error
+	return students, err
+}
+
+func (r *StudentRepository) Update(student *domain.Student) error {
+	return r.db.Save(student).Error
+}
+
+func (r *StudentRepository) Delete(id string) error {
+	return r.db.Delete(&domain.Student{}, "id = ?", id).Error
+}

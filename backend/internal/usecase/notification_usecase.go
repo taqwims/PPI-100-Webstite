@@ -34,3 +34,11 @@ func (u *NotificationUsecase) GetUserNotifications(userID string) ([]domain.Noti
 func (u *NotificationUsecase) MarkAsRead(id string) error {
 	return u.notificationRepo.MarkAsRead(id)
 }
+
+func (u *NotificationUsecase) GetAllNotifications() ([]domain.Notification, error) {
+	return u.notificationRepo.GetAll()
+}
+
+func (u *NotificationUsecase) DeleteNotification(id string) error {
+	return u.notificationRepo.Delete(id)
+}

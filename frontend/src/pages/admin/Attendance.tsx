@@ -4,21 +4,22 @@ import api from '../../services/api';
 import { CheckCircle, XCircle, Calendar, Users, Clock } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
-import { TableGlass } from '../../components/ui/glass/TableGlass';
+import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 
 interface Student {
-    ID: string;
-    User: {
-        Name: string;
+    id: string;
+    user: {
+        name: string;
     };
-    NISN: string;
+    nisn: string;
+    class_id: number;
 }
 
 interface Attendance {
-    ID: string;
-    StudentID: string;
-    Status: string;
-    Method: string;
+    id: string;
+    student_id: string;
+    status: string;
+    method: string;
 }
 
 const Attendance: React.FC = () => {
@@ -55,7 +56,7 @@ const Attendance: React.FC = () => {
         },
     });
 
-    const students = allStudents?.filter((s: any) => s.ClassID === selectedClassID);
+    const students = allStudents?.filter((s: Student) => s.class_id === selectedClassID);
 
     // Fetch Attendance for selected schedule
     const { data: attendances, isLoading: isLoadingAttendance } = useQuery({
@@ -83,47 +84,9 @@ const Attendance: React.FC = () => {
     };
 
     const getStatus = (studentID: string) => {
-        const record = attendances?.find((a: Attendance) => a.StudentID === studentID);
-        return record ? record.Status : null;
+        const record = attendances?.find((a: Attendance) => a.student_id === studentID);
+        return record ? record.status : null;
     };
-
-    const tableHeaders = ['Nama Siswa', 'NISN', 'Status', 'Aksi'];
-    const tableData = students?.map((student: Student) => {
-        const status = getStatus(student.ID);
-        return {
-            id: student.ID,
-            name: student.User.Name,
-            nisn: student.NISN,
-            status: status ? (
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                    {status === 'Present' ? 'Hadir' : 'Tidak Hadir'}
-                </span>
-            ) : (
-                <span className="text-gray-400 text-sm italic">Belum absen</span>
-            ),
-            actions: (
-                <div className="flex justify-end gap-2">
-                    <ButtonGlass
-                        variant={status === 'Present' ? 'primary' : 'secondary'}
-                        onClick={() => handleAttendance(student.ID, 'Present')}
-                        className={`py-1 px-3 text-xs ${status === 'Present' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                        disabled={status === 'Present'}
-                    >
-                        <CheckCircle size={16} /> Hadir
-                    </ButtonGlass>
-                    <ButtonGlass
-                        variant={status === 'Absent' ? 'danger' : 'secondary'}
-                        onClick={() => handleAttendance(student.ID, 'Absent')}
-                        className="py-1 px-3 text-xs"
-                        disabled={status === 'Absent'}
-                    >
-                        <XCircle size={16} /> Absen
-                    </ButtonGlass>
-                </div>
-            )
-        };
-    }) || [];
 
     return (
         <div className="space-y-6 p-6">
@@ -144,12 +107,15 @@ const Attendance: React.FC = () => {
                         </label>
                         <select
                             value={selectedClassID || ''}
-                            onChange={(e) => setSelectedClassID(Number(e.target.value))}
+                            onChange={(e) => {
+                                setSelectedClassID(Number(e.target.value));
+                                setSelectedScheduleID(null); // Reset schedule when class changes
+                            }}
                             className="w-full glass-input text-gray-900"
                         >
                             <option value="">-- Pilih Kelas --</option>
                             {classes?.map((c: any) => (
-                                <option key={c.ID} value={c.ID}>{c.Name}</option>
+                                <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
                     </div>
@@ -167,7 +133,7 @@ const Attendance: React.FC = () => {
                         >
                             <option value="">-- Pilih Jadwal --</option>
                             {schedules?.map((s: any) => (
-                                <option key={s.ID} value={s.ID}>{s.Day} - {s.Subject.Name} ({s.StartTime})</option>
+                                <option key={s.id} value={s.id}>{s.day} - {s.subject.name} ({s.start_time})</option>
                             ))}
                         </select>
                     </div>
@@ -180,7 +146,65 @@ const Attendance: React.FC = () => {
                         {isLoadingAttendance ? (
                             <div className="text-center py-8 text-gray-400">Loading data...</div>
                         ) : (
-                            <TableGlass headers={tableHeaders} data={tableData} />
+                            <TableGlass>
+                                <TableHeaderGlass>
+                                    <TableRowGlass>
+                                        <TableHeadGlass>Nama Siswa</TableHeadGlass>
+                                        <TableHeadGlass>NISN</TableHeadGlass>
+                                        <TableHeadGlass>Status</TableHeadGlass>
+                                        <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
+                                    </TableRowGlass>
+                                </TableHeaderGlass>
+                                <TableBodyGlass>
+                                    {students?.map((student: Student) => {
+                                        const status = getStatus(student.id);
+                                        return (
+                                            <TableRowGlass key={student.id}>
+                                                <TableCellGlass>
+                                                    <span className="font-medium text-white">{student.user.name}</span>
+                                                </TableCellGlass>
+                                                <TableCellGlass>
+                                                    <span className="font-mono text-gray-300">{student.nisn}</span>
+                                                </TableCellGlass>
+                                                <TableCellGlass>
+                                                    {status ? (
+                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                            {status === 'Present' ? 'Hadir' : 'Tidak Hadir'}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-sm italic">Belum absen</span>
+                                                    )}
+                                                </TableCellGlass>
+                                                <TableCellGlass className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <ButtonGlass
+                                                            variant={status === 'Present' ? 'primary' : 'secondary'}
+                                                            onClick={() => handleAttendance(student.id, 'Present')}
+                                                            className={`py-1 px-3 text-xs ${status === 'Present' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                                            disabled={status === 'Present'}
+                                                        >
+                                                            <CheckCircle size={16} /> Hadir
+                                                        </ButtonGlass>
+                                                        <ButtonGlass
+                                                            variant={status === 'Absent' ? 'danger' : 'secondary'}
+                                                            onClick={() => handleAttendance(student.id, 'Absent')}
+                                                            className="py-1 px-3 text-xs"
+                                                            disabled={status === 'Absent'}
+                                                        >
+                                                            <XCircle size={16} /> Absen
+                                                        </ButtonGlass>
+                                                    </div>
+                                                </TableCellGlass>
+                                            </TableRowGlass>
+                                        );
+                                    })}
+                                    {students?.length === 0 && (
+                                        <TableRowGlass>
+                                            <TableCellGlass colSpan={4} className="text-center py-8">Tidak ada siswa di kelas ini</TableCellGlass>
+                                        </TableRowGlass>
+                                    )}
+                                </TableBodyGlass>
+                            </TableGlass>
                         )}
                     </div>
                 </CardGlass>

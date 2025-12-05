@@ -23,7 +23,7 @@ export const TableGlass: React.FC<TableGlassProps> = ({ headers, data, children,
                     <TableBodyGlass>
                         {data.map((row, rowIndex) => (
                             <TableRowGlass key={row.id || rowIndex}>
-                                {headers.map((header, colIndex) => {
+                                {headers.map((_header, colIndex) => {
                                     // Map header to data key (lowercase, replace spaces with underscores if needed)
                                     // This is a simple mapping, might need adjustment based on data structure
                                     // For now, assuming data keys match header names or we iterate values

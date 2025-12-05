@@ -31,3 +31,13 @@ func (r *NotificationRepository) MarkAsRead(id string) error {
 func (r *NotificationRepository) SaveToken(token *domain.NotificationToken) error {
 	return r.db.Create(token).Error
 }
+
+func (r *NotificationRepository) GetAll() ([]domain.Notification, error) {
+	var notifications []domain.Notification
+	err := r.db.Preload("User").Order("created_at desc").Find(&notifications).Error
+	return notifications, err
+}
+
+func (r *NotificationRepository) Delete(id string) error {
+	return r.db.Delete(&domain.Notification{}, "id = ?", id).Error
+}

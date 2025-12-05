@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, Calendar, CreditCard, Bell, Settings, LogOut, AlertTriangle, FileText, GraduationCap, X } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, Calendar, CreditCard, Bell, Settings, LogOut, AlertTriangle, FileText, GraduationCap, X, Mail, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
 
@@ -25,19 +26,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             { icon: CreditCard, label: 'Keuangan', path: '/dashboard/finance' },
             { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
             { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
+            { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
+            { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
         ];
 
         const teacher = [
             { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/schedule' },
             { icon: FileText, label: 'Input Nilai', path: '/dashboard/grades' },
             { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
-            { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/bk-report' },
+            { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
         ];
 
         const student = [
-            { icon: Calendar, label: 'Jadwal Pelajaran', path: '/dashboard/schedule' },
-            { icon: GraduationCap, label: 'Nilai Akademik', path: '/dashboard/grades' },
-            { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
+            { icon: Calendar, label: 'Jadwal Pelajaran', path: '/dashboard/student/schedule' },
+            { icon: GraduationCap, label: 'Nilai Akademik', path: '/dashboard/student/grades' },
+            { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
+            { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk' },
             { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
         ];
 
@@ -57,6 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             case 5: // Wali Kelas
                 return [...common, ...teacher];
             case 6: // Siswa
+                return [...common, ...student];
             case 7: // Orang Tua
                 return [...common, ...parent];
             default:

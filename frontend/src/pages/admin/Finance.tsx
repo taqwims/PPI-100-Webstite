@@ -1,30 +1,54 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, DollarSign, CheckCircle, Calendar, CreditCard, User } from 'lucide-react';
+import { Plus, DollarSign, CheckCircle, Calendar, CreditCard, Edit, Trash2 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
-import { TableGlass } from '../../components/ui/glass/TableGlass';
+import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
+import { useAuth } from '../../context/AuthContext';
+
+interface Student {
+    id: string;
+    user: {
+        name: string;
+    };
+}
 
 interface Bill {
-    ID: string;
-    Title: string;
-    Amount: number;
-    DueDate: string;
-    Status: string;
-    Student: {
-        User: {
-            Name: string;
+    id: string;
+    title: string;
+    amount: number;
+    due_date: string;
+    status: string;
+    student_id: number;
+    student: {
+        user: {
+            name: string;
         };
     };
 }
 
+interface BillFormData {
+    student_id: string;
+    title: string;
+    amount: string;
+    due_date: string;
+}
+
 const Finance: React.FC = () => {
-    const [unitID, setUnitID] = useState(1);
+    const { user } = useAuth();
+    const [unitID, setUnitID] = useState(user?.unit_id || 1);
     const queryClient = useQueryClient();
     const [showForm, setShowForm] = useState(false);
+    const [editingBill, setEditingBill] = useState<Bill | null>(null);
+    const [formData, setFormData] = useState<BillFormData>({
+        student_id: '',
+        title: '',
+        amount: '',
+        due_date: '',
+    });
 
     const { data: bills, isLoading } = useQuery({
         queryKey: ['bills', unitID],
@@ -45,17 +69,30 @@ const Finance: React.FC = () => {
     });
 
     const createBillMutation = useMutation({
-        mutationFn: (data: any) => api.post('/finance/bills', data),
+        mutationFn: (data: BillFormData) => api.post('/finance/bills', {
+            ...data,
+            amount: Number(data.amount),
+        }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['bills'] });
-            setShowForm(false);
-            setFormData({
-                student_id: '',
-                title: '',
-                amount: '',
-                due_date: '',
-            });
+            handleCloseModal();
         },
+    });
+
+    const updateBillMutation = useMutation({
+        mutationFn: (data: any) => api.put(`/finance/bills/${editingBill?.id}`, {
+            ...data,
+            amount: Number(data.amount),
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['bills'] });
+            handleCloseModal();
+        },
+    });
+
+    const deleteBillMutation = useMutation({
+        mutationFn: (id: string) => api.delete(`/finance/bills/${id}`),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bills'] }),
     });
 
     const recordPaymentMutation = useMutation({
@@ -63,63 +100,52 @@ const Finance: React.FC = () => {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bills'] }),
     });
 
-    const [formData, setFormData] = useState({
-        student_id: '',
-        title: '',
-        amount: '',
-        due_date: '',
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        createBillMutation.mutate({
-            ...formData,
-            amount: Number(formData.amount),
+    const handleCloseModal = () => {
+        setShowForm(false);
+        setEditingBill(null);
+        setFormData({
+            student_id: '',
+            title: '',
+            amount: '',
+            due_date: '',
         });
     };
 
+    const handleEdit = (bill: Bill) => {
+        setEditingBill(bill);
+        setFormData({
+            student_id: bill.student_id.toString(),
+            title: bill.title,
+            amount: bill.amount.toString(),
+            due_date: bill.due_date.split('T')[0], // Format date for input
+        });
+        setShowForm(true);
+    };
+
+    const handleDelete = (id: string) => {
+        if (confirm('Apakah Anda yakin ingin menghapus tagihan ini?')) {
+            deleteBillMutation.mutate(id);
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingBill) {
+            updateBillMutation.mutate(formData);
+        } else {
+            createBillMutation.mutate(formData);
+        }
+    };
+
     const handlePayment = (bill: Bill) => {
-        if (confirm(`Catat pembayaran untuk ${bill.Title}?`)) {
+        if (confirm(`Catat pembayaran untuk ${bill.title}?`)) {
             recordPaymentMutation.mutate({
-                bill_id: bill.ID,
-                amount: bill.Amount,
+                bill_id: bill.id,
+                amount: bill.amount,
                 method: 'Cash', // Default to Cash for manual entry
             });
         }
     };
-
-    const tableHeaders = ['Siswa', 'Tagihan', 'Jumlah', 'Jatuh Tempo', 'Status', 'Aksi'];
-    const tableData = bills?.map((bill: Bill) => ({
-        id: bill.ID,
-        student: bill.Student.User.Name,
-        title: bill.Title,
-        amount: `Rp ${bill.Amount.toLocaleString()}`,
-        dueDate: new Date(bill.DueDate).toLocaleDateString(),
-        status: (
-            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${bill.Status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                {bill.Status}
-            </span>
-        ),
-        actions: (
-            <div className="flex justify-end gap-2">
-                {bill.Status !== 'Paid' ? (
-                    <ButtonGlass
-                        variant="primary"
-                        onClick={() => handlePayment(bill)}
-                        className="py-1 px-3 text-xs"
-                        icon={DollarSign}
-                    >
-                        Bayar
-                    </ButtonGlass>
-                ) : (
-                    <span className="text-green-400 flex items-center gap-1 text-sm">
-                        <CheckCircle size={16} /> Lunas
-                    </span>
-                )}
-            </div>
-        )
-    })) || [];
 
     return (
         <div className="space-y-6 p-6">
@@ -129,16 +155,19 @@ const Finance: React.FC = () => {
                     <p className="text-gray-400">Manajemen tagihan dan pembayaran siswa</p>
                 </div>
                 <div className="flex space-x-3">
-                    <select
-                        value={unitID}
-                        onChange={(e) => setUnitID(Number(e.target.value))}
-                        className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                        <option value={1} className="text-gray-900">MTS</option>
-                        <option value={2} className="text-gray-900">MA</option>
-                    </select>
-                    <ButtonGlass onClick={() => setShowForm(true)} icon={Plus}>
-                        Buat Tagihan
+                    {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3) && (
+                        <select
+                            value={unitID}
+                            onChange={(e) => setUnitID(Number(e.target.value))}
+                            className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            disabled={user?.role_id !== 1}
+                        >
+                            <option value={1} className="bg-gray-900">MTS</option>
+                            <option value={2} className="bg-gray-900">MA</option>
+                        </select>
+                    )}
+                    <ButtonGlass onClick={() => setShowForm(true)} className="flex items-center gap-2">
+                        <Plus size={18} /> Buat Tagihan
                     </ButtonGlass>
                 </div>
             </div>
@@ -148,15 +177,79 @@ const Finance: React.FC = () => {
                     {isLoading ? (
                         <div className="text-center py-8 text-gray-400">Loading data...</div>
                     ) : (
-                        <TableGlass headers={tableHeaders} data={tableData} />
+                        <TableGlass>
+                            <TableHeaderGlass>
+                                <TableRowGlass>
+                                    <TableHeadGlass>Siswa</TableHeadGlass>
+                                    <TableHeadGlass>Tagihan</TableHeadGlass>
+                                    <TableHeadGlass>Jumlah</TableHeadGlass>
+                                    <TableHeadGlass>Jatuh Tempo</TableHeadGlass>
+                                    <TableHeadGlass>Status</TableHeadGlass>
+                                    <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
+                                </TableRowGlass>
+                            </TableHeaderGlass>
+                            <TableBodyGlass>
+                                {bills?.map((bill: Bill) => (
+                                    <TableRowGlass key={bill.id}>
+                                        <TableCellGlass>
+                                            <span className="font-medium text-white">{bill.student.user.name}</span>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <span className="text-gray-300">{bill.title}</span>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <span className="font-mono text-gray-300">Rp {bill.amount.toLocaleString()}</span>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <span className="text-gray-400">{new Date(bill.due_date).toLocaleDateString()}</span>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${bill.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                {bill.status}
+                                            </span>
+                                        </TableCellGlass>
+                                        <TableCellGlass className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                {bill.status !== 'Paid' ? (
+                                                    <>
+                                                        <ButtonGlass
+                                                            variant="primary"
+                                                            onClick={() => handlePayment(bill)}
+                                                            className="py-1 px-3 text-xs flex items-center gap-1"
+                                                        >
+                                                            <DollarSign size={14} /> Bayar
+                                                        </ButtonGlass>
+                                                        <button onClick={() => handleEdit(bill)} className="p-2 hover:bg-white/10 rounded-lg text-indigo-400 transition-colors">
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(bill.id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400 transition-colors">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-green-400 flex items-center gap-1 text-sm">
+                                                        <CheckCircle size={16} /> Lunas
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCellGlass>
+                                    </TableRowGlass>
+                                ))}
+                                {bills?.length === 0 && (
+                                    <TableRowGlass>
+                                        <TableCellGlass colSpan={6} className="text-center py-8">Tidak ada data tagihan</TableCellGlass>
+                                    </TableRowGlass>
+                                )}
+                            </TableBodyGlass>
+                        </TableGlass>
                     )}
                 </div>
             </CardGlass>
 
             <ModalGlass
                 isOpen={showForm}
-                onClose={() => setShowForm(false)}
-                title="Buat Tagihan Baru"
+                onClose={handleCloseModal}
+                title={editingBill ? "Edit Tagihan" : "Buat Tagihan Baru"}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -167,9 +260,9 @@ const Finance: React.FC = () => {
                             className="w-full glass-input"
                             required
                         >
-                            <option value="" className="text-gray-900">Pilih Siswa</option>
-                            {students?.map((s: any) => (
-                                <option key={s.ID} value={s.ID} className="text-gray-900">{s.User.Name}</option>
+                            <option value="" className="bg-gray-900">Pilih Siswa</option>
+                            {students?.map((s: Student) => (
+                                <option key={s.id} value={s.id} className="bg-gray-900">{s.user.name}</option>
                             ))}
                         </select>
                     </div>
@@ -203,7 +296,7 @@ const Finance: React.FC = () => {
                     />
 
                     <div className="flex justify-end gap-3 pt-4">
-                        <ButtonGlass type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                        <ButtonGlass type="button" variant="ghost" onClick={handleCloseModal}>
                             Batal
                         </ButtonGlass>
                         <ButtonGlass type="submit">

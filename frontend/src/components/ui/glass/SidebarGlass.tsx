@@ -6,7 +6,6 @@ import {
     BookOpen,
     Calendar,
     CreditCard,
-    Settings,
     LogOut,
     AlertTriangle,
     Bell
@@ -15,29 +14,71 @@ import { useAuth } from '../../../context/AuthContext';
 
 const SidebarGlass: React.FC = () => {
     const location = useLocation();
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
+    const roleId = user?.role_id || 0;
 
-    const links = [
+    // Define links based on role
+    let links = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-        { icon: Users, label: 'Siswa', path: '/dashboard/students' },
-        { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
-        { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
-        { icon: Calendar, label: 'Absensi', path: '/dashboard/attendance' },
-        { icon: CreditCard, label: 'Keuangan', path: '/dashboard/finance' },
-        { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
-        { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
-        { icon: Users, label: 'User Mgmt', path: '/dashboard/users' },
     ];
+
+    if (roleId <= 3) { // Admin
+        links = [
+            ...links,
+            { icon: Users, label: 'Siswa', path: '/dashboard/students' },
+            { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
+            { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
+            { icon: Calendar, label: 'Absensi', path: '/dashboard/attendance' },
+            { icon: CreditCard, label: 'Keuangan', path: '/dashboard/finance' },
+            { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
+            { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
+            { icon: Users, label: 'User Mgmt', path: '/dashboard/users' },
+            { icon: Users, label: 'PPDB', path: '/dashboard/ppdb' },
+            { icon: BookOpen, label: 'Konten Publik', path: '/dashboard/public-content' },
+            { icon: Bell, label: 'Kirim Notif', path: '/dashboard/admin/notifications' },
+        ];
+    } else if (roleId === 4) { // Guru
+        links = [
+            ...links,
+            { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/schedule' },
+            { icon: BookOpen, label: 'Penilaian', path: '/dashboard/grades' },
+            // { icon: Calendar, label: 'Absensi', path: '/dashboard/attendance' }, // Linked from schedule
+        ];
+    } else if (roleId === 5) { // Wali Kelas
+        links = [
+            ...links,
+            { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/schedule' },
+            { icon: BookOpen, label: 'Penilaian', path: '/dashboard/grades' },
+            { icon: Users, label: 'Kelas Wali', path: '/dashboard/homeroom' },
+        ];
+    } else if (roleId === 6) { // Siswa
+        links = [
+            ...links,
+            { icon: Calendar, label: 'Jadwal', path: '/dashboard/student/schedule' },
+            { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
+            { icon: BookOpen, label: 'Nilai', path: '/dashboard/student/grades' },
+            { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+            { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/bk-report' },
+        ];
+    } else if (roleId === 7) { // Orang Tua
+        links = [
+            ...links,
+            { icon: Users, label: 'Anak Saya', path: '/dashboard/children' },
+        ];
+    }
 
     return (
         <aside className="fixed left-0 top-0 h-screen w-72 p-6 hidden lg:block z-40">
             <div className="h-full glass-panel rounded-3xl flex flex-col overflow-hidden">
                 {/* Logo */}
                 <div className="p-8 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-purple-500/30">
-                        P
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-green-500/30">
+                        <img src="/logo.jpeg" alt="PPI" className="w-6 h-6 object-contain" onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement!.innerText = 'P';
+                        }} />
                     </div>
-                    <span className="text-xl font-bold text-white tracking-tight">PPI 100</span>
+                    <span className="text-xl font-bold text-slate-800 tracking-tight">PPI 100</span>
                 </div>
 
                 {/* Navigation */}
@@ -52,11 +93,11 @@ const SidebarGlass: React.FC = () => {
                                     key={link.path}
                                     to={link.path}
                                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
-                                            ? 'bg-gradient-to-r from-purple-600/80 to-indigo-600/80 text-white shadow-lg shadow-purple-500/20'
-                                            : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                        ? 'bg-gradient-to-r from-green-600/90 to-emerald-600/90 text-white shadow-lg shadow-green-500/20'
+                                        : 'text-slate-500 hover:bg-green-50 hover:text-green-700'
                                         }`}
                                 >
-                                    <Icon size={20} className={`transition-colors ${isActive ? 'text-white' : 'group-hover:text-purple-400'}`} />
+                                    <Icon size={20} className={`transition-colors ${isActive ? 'text-white' : 'group-hover:text-green-600'}`} />
                                     <span className="font-medium">{link.label}</span>
                                 </Link>
                             );

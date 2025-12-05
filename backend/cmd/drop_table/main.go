@@ -4,19 +4,23 @@ import (
 	"log"
 	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/domain"
-	"ppi-100-sis/pkg/database"
+	"ppi-100-sis/internal/repository/postgres"
 )
 
 func main() {
-	cfg := config.LoadConfig()
-	db, err := database.Connect(cfg)
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	db, err := postgres.NewPostgresDB(cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	log.Println("Dropping table schedules...")
-	if err := db.Migrator().DropTable(&domain.Schedule{}); err != nil {
+	log.Println("Dropping table ppdb_registrations...")
+	if err := db.Migrator().DropTable(&domain.PPDBRegistration{}); err != nil {
 		log.Fatalf("Failed to drop table: %v", err)
 	}
-	log.Println("Table schedules dropped successfully.")
+	log.Println("Table ppdb_registrations dropped successfully.")
 }

@@ -1,23 +1,53 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Trash2, User, Save, Edit2 } from 'lucide-react';
+import CardGlass from '../../components/ui/glass/CardGlass';
+import ButtonGlass from '../../components/ui/glass/ButtonGlass';
+import InputGlass from '../../components/ui/glass/InputGlass';
+import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
+import ModalGlass from '../../components/ui/glass/ModalGlass';
+import { useAuth } from '../../context/AuthContext';
 
 interface Student {
-    ID: string;
-    User: {
-        Name: string;
-        Email: string;
+    id: string;
+    user: {
+        name: string;
+        email: string;
     };
-    NISN: string;
-    Class: {
-        Name: string;
+    nisn: string;
+    class: {
+        id: number;
+        name: string;
     };
+    unit_id: number;
 }
 
 const Students: React.FC = () => {
-    const [unitID, setUnitID] = useState(1);
+    const { user } = useAuth();
+    // Initialize unitID based on user role. Super Admin (role_id 1) defaults to 1, others use their assigned unit_id.
+    const [unitID, setUnitID] = useState(user?.role_id === 1 ? 1 : user?.unit_id || 1);
+    const [search, setSearch] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+    const queryClient = useQueryClient();
 
+    // Form State
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        nisn: '',
+        class_id: '',
+        unit_id: unitID,
+    });
+
+    // Update formData.unit_id when unitID changes
+    React.useEffect(() => {
+        setFormData(prev => ({ ...prev, unit_id: unitID }));
+    }, [unitID]);
+
+    // Fetch Students
     const { data: students, isLoading } = useQuery({
         queryKey: ['students', unitID],
         queryFn: async () => {
@@ -26,53 +56,253 @@ const Students: React.FC = () => {
         },
     });
 
+    // Fetch Classes
+    const { data: classes } = useQuery({
+        queryKey: ['classes', unitID],
+        queryFn: async () => {
+            const res = await api.get(`/academic/classes?unit_id=${unitID}`);
+            return res.data;
+        },
+    });
+
+    // Mutations
+    const createMutation = useMutation({
+        mutationFn: (data: any) => api.post('/students/', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            setIsModalOpen(false);
+            resetForm();
+        },
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: (data: any) => api.put(`/students/${editingStudent?.id}`, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            setIsModalOpen(false);
+            resetForm();
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => api.delete(`/students/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+        },
+    });
+
+    const resetForm = () => {
+        setFormData({
+            name: '',
+            email: '',
+            password: '',
+            nisn: '',
+            class_id: '',
+            unit_id: unitID,
+        });
+        setEditingStudent(null);
+    };
+
+    const handleEdit = (student: Student) => {
+        setEditingStudent(student);
+        setFormData({
+            name: student.user.name,
+            email: student.user.email,
+            password: '', // Password not filled for edit
+            nisn: student.nisn,
+            class_id: student.class?.id.toString() || '',
+            unit_id: student.unit_id,
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = (id: string) => {
+        if (confirm('Apakah Anda yakin ingin menghapus siswa ini?')) {
+            deleteMutation.mutate(id);
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = {
+            ...formData,
+            class_id: Number(formData.class_id),
+            unit_id: unitID,
+        };
+
+        if (editingStudent) {
+            // Remove password if empty during edit
+            if (!payload.password) delete (payload as any).password;
+            updateMutation.mutate(payload);
+        } else {
+            createMutation.mutate(payload);
+        }
+    };
+
+    const filteredStudents = students?.filter((student: Student) =>
+        student.user.name.toLowerCase().includes(search.toLowerCase()) ||
+        student.nisn.includes(search)
+    );
+
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-800">Data Siswa</h1>
-                <div className="flex space-x-2">
-                    <select
-                        value={unitID}
-                        onChange={(e) => setUnitID(Number(e.target.value))}
-                        className="border rounded-lg px-3 py-2 bg-white"
-                    >
-                        <option value={1}>MTS</option>
-                        <option value={2}>MA</option>
-                    </select>
+        <div className="space-y-6 p-6">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-white">Data Siswa</h1>
+                    <p className="text-gray-400">Kelola data siswa per unit</p>
                 </div>
+                <ButtonGlass onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2">
+                    <Plus size={18} /> Tambah Siswa
+                </ButtonGlass>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NISN</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {isLoading ? (
-                                <tr><td colSpan={4} className="text-center py-4">Loading...</td></tr>
-                            ) : (
-                                students?.map((student: Student) => (
-                                    <tr key={student.ID}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.NISN}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.User.Name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.Class?.Name || '-'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit size={18} /></button>
-                                            <button className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+            <CardGlass className="p-6 space-y-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1">
+                        <InputGlass
+                            placeholder="Cari nama atau NISN..."
+                            icon={Search}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        {user?.role_id === 1 ? (
+                            <select
+                                className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                value={unitID}
+                                onChange={(e) => setUnitID(Number(e.target.value))}
+                            >
+                                <option value={1} className="bg-gray-900">MTS</option>
+                                <option value={2} className="bg-gray-900">MA</option>
+                            </select>
+                        ) : (
+                            <div className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white">
+                                {unitID === 1 ? 'MTS' : 'MA'}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+
+                <TableGlass>
+                    <TableHeaderGlass>
+                        <TableRowGlass>
+                            <TableHeadGlass>NISN</TableHeadGlass>
+                            <TableHeadGlass>Nama</TableHeadGlass>
+                            <TableHeadGlass>Kelas</TableHeadGlass>
+                            <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
+                        </TableRowGlass>
+                    </TableHeaderGlass>
+                    <TableBodyGlass>
+                        {isLoading ? (
+                            <TableRowGlass>
+                                <TableCellGlass colSpan={4} className="text-center py-8">Loading...</TableCellGlass>
+                            </TableRowGlass>
+                        ) : filteredStudents?.length === 0 ? (
+                            <TableRowGlass>
+                                <TableCellGlass colSpan={4} className="text-center py-8">Tidak ada data siswa</TableCellGlass>
+                            </TableRowGlass>
+                        ) : (
+                            filteredStudents?.map((student: Student) => (
+                                <TableRowGlass key={student.id}>
+                                    <TableCellGlass>
+                                        <span className="font-mono text-gray-300">{student.nisn}</span>
+                                    </TableCellGlass>
+                                    <TableCellGlass>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center text-green-400">
+                                                <User size={14} />
+                                            </div>
+                                            <span className="font-medium text-white">{student.user.name}</span>
+                                        </div>
+                                    </TableCellGlass>
+                                    <TableCellGlass>
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-white border border-white/10">
+                                            {student.class?.name || '-'}
+                                        </span>
+                                    </TableCellGlass>
+                                    <TableCellGlass className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => handleEdit(student)}
+                                                className="p-2 hover:bg-white/10 rounded-lg text-indigo-400 transition-colors"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(student.id)}
+                                                className="p-2 hover:bg-white/10 rounded-lg text-red-400 transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </TableCellGlass>
+                                </TableRowGlass>
+                            ))
+                        )}
+                    </TableBodyGlass>
+                </TableGlass>
+            </CardGlass>
+
+            <ModalGlass
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                title={editingStudent ? "Edit Siswa" : "Tambah Siswa Baru"}
+            >
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <InputGlass
+                        label="Nama Lengkap"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                    />
+                    <InputGlass
+                        label="Email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                    />
+                    {!editingStudent && (
+                        <InputGlass
+                            label="Password"
+                            type="password"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            required={!editingStudent}
+                        />
+                    )}
+                    <InputGlass
+                        label="NISN"
+                        value={formData.nisn}
+                        onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
+                        required
+                    />
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1 ml-1">Kelas</label>
+                        <select
+                            value={formData.class_id}
+                            onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                            className="w-full glass-input"
+                            required
+                        >
+                            <option value="" className="bg-gray-900">-- Pilih Kelas --</option>
+                            {classes?.map((c: any) => (
+                                <option key={c.id} value={c.id} className="bg-gray-900">{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <ButtonGlass type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+                            Batal
+                        </ButtonGlass>
+                        <ButtonGlass type="submit" icon={Save}>
+                            Simpan
+                        </ButtonGlass>
+                    </div>
+                </form>
+            </ModalGlass>
         </div>
     );
 };

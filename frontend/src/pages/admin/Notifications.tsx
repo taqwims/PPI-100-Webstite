@@ -57,30 +57,29 @@ const Notifications: React.FC = () => {
                 ) : (
                     notifications?.map((notif: any) => (
                         <CardGlass
-                            key={notif.ID}
-                            className={`p-4 flex items-start gap-4 transition-all ${notif.IsRead ? 'opacity-60' : 'border-l-4 border-l-green-500'}`}
+                            key={notif.id}
+                            className={`p-4 flex items-start gap-4 transition-all ${notif.is_read ? 'opacity-60' : 'border-l-4 border-l-green-500'}`}
                         >
                             <div className="p-2 bg-white/5 rounded-full">
-                                {getIcon(notif.Type)}
+                                {getIcon(notif.type)}
                             </div>
                             <div className="flex-1">
                                 <div className="flex justify-between items-start">
-                                    <h3 className={`font-semibold text-lg ${notif.IsRead ? 'text-gray-300' : 'text-white'}`}>
-                                        {notif.Title}
+                                    <h3 className={`font-semibold text-lg ${notif.is_read ? 'text-gray-300' : 'text-white'}`}>
+                                        {notif.title}
                                     </h3>
                                     <span className="text-xs text-gray-500">
-                                        {new Date(notif.CreatedAt).toLocaleDateString('id-ID', {
+                                        {new Date(notif.created_at).toLocaleDateString('id-ID', {
                                             day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
                                         })}
                                     </span>
                                 </div>
-                                <p className="text-gray-300 mt-1">{notif.Message}</p>
+                                <p className="text-gray-300 mt-1">{notif.message}</p>
                             </div>
-                            {!notif.IsRead && (
+                            {!notif.is_read && (
                                 <ButtonGlass
-                                    size="sm"
                                     variant="secondary"
-                                    onClick={() => markAsReadMutation.mutate(notif.ID)}
+                                    onClick={() => markAsReadMutation.mutate(notif.id)}
                                     title="Tandai sudah dibaca"
                                 >
                                     <Check size={16} />
