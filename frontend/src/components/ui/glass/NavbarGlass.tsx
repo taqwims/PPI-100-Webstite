@@ -33,7 +33,7 @@ const NavbarGlass: React.FC = () => {
         >
             <div className="container mx-auto px-6">
                 <div
-                    className={`backdrop-blur-l bg-white/30 border border-white/20 rounded-2xl px-6 py-3 flex justify-between items-center shadow-lg transition-all duration-300 ${isScrolled ? 'bg-white/80 shadow-slate-200/50' : ''
+                    className={`backdrop-blur-sm bg-white/30 border border-white/20 rounded-2xl px-6 py-3 flex justify-between items-center shadow-lg transition-all duration-300 ${isScrolled ? 'bg-white/30 shadow-slate-200/50' : ''
                         }`}
                 >
                     {/* Logo */}
@@ -76,7 +76,7 @@ const NavbarGlass: React.FC = () => {
 
                 {/* Mobile Menu */}
                 {isOpen && (
-                    <div className="md:hidden mt-4 backdrop-blur-xl bg-white/10 border border-white/10 rounded-2xl p-6 shadow-2xl animate-in fade-in slide-in-from-top-5">
+                    <div className="md:hidden mt-4 backdrop-blur-sm bg-white/30 border border-white/10 rounded-2xl p-6 shadow-2xl animate-in fade-in slide-in-from-top-5">
                         <div className="flex flex-col gap-4">
                             {navLinks.map((link) => (
                                 <Link

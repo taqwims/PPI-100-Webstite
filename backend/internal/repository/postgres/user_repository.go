@@ -36,7 +36,7 @@ func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 
 func (r *UserRepository) GetAll() ([]domain.User, error) {
 	var users []domain.User
-	err := r.db.Find(&users).Error
+	err := r.db.Preload("Teacher").Preload("Parent").Preload("Student").Preload("Student.Class").Find(&users).Error
 	return users, err
 }
 

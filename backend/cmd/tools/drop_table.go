@@ -14,8 +14,7 @@ func main() {
 
 	db, err := postgres.NewPostgresDB(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
+		log.Fatalf("Failed to connect to database: %v", err) 
 
 	if err := db.Migrator().DropTable("schedules"); err != nil {
 		log.Fatalf("Failed to drop schedules table: %v", err)
