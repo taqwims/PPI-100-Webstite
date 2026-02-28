@@ -47,5 +47,11 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.Alumni{},
 		&domain.PPDBRegistration{},
 		&domain.ContactMessage{},
+		&domain.AcademicYear{},
+		&domain.Payroll{},
+		&domain.SavingAccount{},
+		&domain.SavingTransaction{},
+		&domain.CashLedger{},
+		&domain.DailyInfaq{},
 	)
 }

@@ -3,6 +3,7 @@ package postgres
 import (
 	"ppi-100-sis/internal/domain"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -31,6 +32,22 @@ func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 	err := r.db.Joins("JOIN students ON students.id = bills.student_id").
 		Where("students.unit_id = ?", unitID).
 		Preload("Student.User").
+		Preload("Student.Class").
+		Preload("AcademicYear").
+		Find(&bills).Error
+	return bills, err
+}
+
+func (r *FinanceRepository) GetBillsByStudentIDs(studentIDs []uuid.UUID) ([]domain.Bill, error) {
+	var bills []domain.Bill
+	if len(studentIDs) == 0 {
+		return bills, nil
+	}
+	err := r.db.Where("student_id IN ?", studentIDs).
+		Preload("Student.User").
+		Preload("Student.Class").
+		Preload("AcademicYear").
+		Order("created_at desc").
 		Find(&bills).Error
 	return bills, err
 }

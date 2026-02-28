@@ -32,7 +32,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	studentRepo := postgres.NewStudentRepository(db)
 	attendanceRepo := postgres.NewAttendanceRepository(db)
 	studentUsecase := usecase.NewStudentUsecase(studentRepo, attendanceRepo, userRepo)
-	studentHandler := handlers.NewStudentHandler(studentUsecase)
+	studentHandler := handlers.NewStudentHandler(studentUsecase, userRepo)
 
 	publicRepo := postgres.NewPublicRepository(db)
 	publicUsecase := usecase.NewPublicUsecase(publicRepo)
@@ -55,8 +55,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	elearningHandler := handlers.NewElearningHandler(elearningUsecase)
 
 	financeRepo := postgres.NewFinanceRepository(db)
-	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo)
+	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo, studentRepo)
 	financeHandler := handlers.NewFinanceHandler(financeUsecase)
+
+	financeExtendedRepo := postgres.NewFinanceExtendedRepository(db)
+	financeExtendedUsecase := usecase.NewFinanceExtendedUsecase(financeExtendedRepo)
+	financeExtendedHandler := handlers.NewFinanceExtendedHandler(financeExtendedUsecase)
 
 	// Profile Handler
 	profileHandler := handlers.NewProfileHandler(userUsecase)
@@ -134,6 +138,32 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.POST("/payments", financeHandler.RecordPayment)
 			finance.PUT("/payments/:id", financeHandler.UpdatePayment)
 			finance.DELETE("/payments/:id", financeHandler.DeletePayment)
+
+			// Extended Financial Features
+			finance.POST("/academic-years", middleware.RoleMiddleware(1, 2, 3, 9), financeExtendedHandler.CreateAcademicYear)
+			finance.GET("/academic-years", financeExtendedHandler.GetAllAcademicYears)
+
+			finance.GET("/savings", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetAllSavingAccounts)
+			finance.POST("/savings/transactions", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.ProcessSavingTransaction)
+			finance.GET("/savings/transactions/:account_id", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingTransactions)
+			finance.GET("/savings/:student_id", middleware.RoleMiddleware(1, 6, 7, 9, 10), financeExtendedHandler.GetStudentSavings)
+
+			finance.POST("/payroll", middleware.RoleMiddleware(1, 9), financeExtendedHandler.CreatePayroll)
+			finance.GET("/payroll", middleware.RoleMiddleware(1, 4, 9), financeExtendedHandler.GetPayrolls) // Gurus can fetch their own, need usecase to filter later
+			finance.PUT("/payroll/:id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.UpdatePayroll)
+			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.DeletePayroll)
+
+			finance.POST("/cash-ledger", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.AddCashLedgerEntry)
+			finance.GET("/cash-ledger", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetCashLedger)
+			finance.PUT("/cash-ledger/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.UpdateCashLedgerEntry)
+			finance.DELETE("/cash-ledger/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.DeleteCashLedgerEntry)
+
+			finance.POST("/daily-infaq", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.AddDailyInfaqEntry)
+			finance.GET("/daily-infaq", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetDailyInfaq)
+			finance.PUT("/daily-infaq/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.UpdateDailyInfaqEntry)
+			finance.DELETE("/daily-infaq/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.DeleteDailyInfaqEntry)
+
+			finance.GET("/dashboard", middleware.RoleMiddleware(1, 8, 9), financeExtendedHandler.GetDashboardAnalytics)
 		}
 
 		users := protected.Group("/users")

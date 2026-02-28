@@ -35,6 +35,10 @@ func main() {
 		{ID: 5, Name: "Wali Kelas"},
 		{ID: 6, Name: "Siswa"},
 		{ID: 7, Name: "Orang Tua"},
+		{ID: 8, Name: "Pimpinan"},
+		{ID: 9, Name: "Bendahara Umum"},
+		{ID: 10, Name: "Teller Tabungan"},
+		{ID: 11, Name: "Teller Infaq"},
 	}
 
 	for _, role := range roles {
@@ -243,6 +247,76 @@ func main() {
 			Type:    "Bill",
 		}
 		db.Create(&notif)
+	}
+
+	// Seed Admin Finance & Others
+	financeUsers := []domain.User{
+		{Name: "Pimpinan Sekolah", Email: "pimpinan@example.com", RoleID: 8, UnitID: 3},
+		{Name: "Bendahara Umum", Email: "bendahara@example.com", RoleID: 9, UnitID: 3},
+		{Name: "Teller Tabungan", Email: "teller.tabungan@example.com", RoleID: 10, UnitID: 3},
+		{Name: "Teller Infaq", Email: "teller.infaq@example.com", RoleID: 11, UnitID: 3},
+	}
+	var createdFinanceUsers []domain.User
+	for _, u := range financeUsers {
+		u.PasswordHash = string(hashedPassword)
+		createdFinanceUsers = append(createdFinanceUsers, seedUser(db, u))
+	}
+
+	if len(createdFinanceUsers) == 4 {
+		bendahara := createdFinanceUsers[1]
+		tellerTabungan := createdFinanceUsers[2]
+		tellerInfaq := createdFinanceUsers[3]
+
+		// Seed Cash Ledger (Bendahara)
+		ledger := []domain.CashLedger{
+			{Date: time.Now(), Source: "PT. ATK Maju", ItemName: "Pembelian ATK", Type: "Expense", Amount: 500000, Category: "Operasional", CreatedBy: bendahara.ID},
+			{Date: time.Now(), Source: "Bank Syariah", ItemName: "Pencairan Pinjaman", Type: "Income", Amount: 20000000, Category: "Hutang Pihak ke 3", CreatedBy: bendahara.ID},
+		}
+		for _, l := range ledger {
+			db.Create(&l)
+		}
+
+		// Seed Daily Infaq (Teller Infaq)
+		infaq := []domain.DailyInfaq{
+			{Date: time.Now(), Source: "Hamba Allah", Type: "Income", Amount: 100000, HandledByID: tellerInfaq.ID, Notes: "Infaq Jumat"},
+			{Date: time.Now(), Source: "Siswa Kelas 7A", Type: "Income", Amount: 50000, HandledByID: tellerInfaq.ID, Notes: "Infaq Harian"},
+		}
+		for _, i := range infaq {
+			db.Create(&i)
+		}
+
+		// Seed Savings (Teller Tabungan) for first student if exists
+		if len(createdStudents) > 0 {
+			studentAcc := domain.SavingAccount{
+				StudentID: createdStudents[0].ID,
+				Balance:   150000,
+			}
+			db.FirstOrCreate(&studentAcc, domain.SavingAccount{StudentID: studentAcc.StudentID})
+
+			savingTrx := []domain.SavingTransaction{
+				{AccountID: studentAcc.ID, Type: "deposit", Amount: 200000, Date: time.Now().AddDate(0, 0, -5), HandledByID: tellerTabungan.ID, Notes: "Setoran awal"},
+				{AccountID: studentAcc.ID, Type: "withdrawal", Amount: 50000, Date: time.Now(), HandledByID: tellerTabungan.ID, Notes: "Beli buku cetak"},
+			}
+			for _, t := range savingTrx {
+				db.Create(&t)
+			}
+		}
+
+		// Seed Payroll (Bendahara / SuperAdmin) for first teacher
+		if len(createdTeachers) > 0 {
+			payroll := domain.Payroll{
+				UserID:        createdTeachers[0].UserID,
+				MonthYear:     time.Now().Format("01-2006"),
+				BasicSalary:   3000000,
+				Allowances:    500000,
+				Deductions:    100000,
+				Total:         3400000,
+				Status:        "Paid",
+				PaymentDate:   time.Now(),
+				ProcessedByID: bendahara.ID,
+			}
+			db.Create(&payroll)
+		}
 	}
 
 	log.Println("Seeding completed successfully")

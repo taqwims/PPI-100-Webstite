@@ -23,7 +23,13 @@ func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 		return
 	}
 
-	notifications, err := h.notificationUsecase.GetUserNotifications(userID.(uuid.UUID).String())
+	userIDStr, ok := userID.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type in context"})
+		return
+	}
+
+	notifications, err := h.notificationUsecase.GetUserNotifications(userIDStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

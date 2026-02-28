@@ -43,3 +43,9 @@ func (r *StudentRepository) Update(student *domain.Student) error {
 func (r *StudentRepository) Delete(id string) error {
 	return r.db.Delete(&domain.Student{}, "id = ?", id).Error
 }
+
+func (r *StudentRepository) GetParentByID(parentID string) (*domain.Parent, error) {
+	var parent domain.Parent
+	err := r.db.Where("id = ?", parentID).First(&parent).Error
+	return &parent, err
+}

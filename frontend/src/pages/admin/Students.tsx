@@ -318,7 +318,7 @@ const Students: React.FC = () => {
                         >
                             <option value="" className="bg-gray-900">-- Pilih Orang Tua (Opsional) --</option>
                             {parents?.map((p: any) => (
-                                <option key={p.id} value={p.parent?.id} className="bg-gray-900">{p.name}</option>
+                                <option key={p.id} value={p.parent?.id || ''} className="bg-gray-900">{p.name}</option>
                             ))}
                         </select>
                     </div>

@@ -20,10 +20,12 @@ func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase) *FinanceHandler {
 }
 
 type CreateBillRequest struct {
-	StudentID string  `json:"student_id" binding:"required"`
-	Title     string  `json:"title" binding:"required"`
-	Amount    float64 `json:"amount" binding:"required"`
-	DueDate   string  `json:"due_date" binding:"required"`
+	StudentID      string  `json:"student_id" binding:"required"`
+	Title          string  `json:"title" binding:"required"`
+	Amount         float64 `json:"amount" binding:"required"`
+	DueDate        string  `json:"due_date" binding:"required"`
+	BillType       string  `json:"bill_type"`
+	AcademicYearID *uint   `json:"academic_year_id"`
 }
 
 func (h *FinanceHandler) CreateBill(c *gin.Context) {
@@ -45,7 +47,7 @@ func (h *FinanceHandler) CreateBill(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeUsecase.CreateBill(studentUUID, req.Title, req.Amount, dueDate); err != nil {
+	if err := h.financeUsecase.CreateBill(studentUUID, req.Title, req.Amount, dueDate, req.BillType, req.AcademicYearID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -77,30 +79,57 @@ func (h *FinanceHandler) GetAllBills(c *gin.Context) {
 		return
 	}
 
-	// Implicit Student
+	// Check user role for implicit fetching
 	userIDVal, exists := c.Get("userID")
-	if exists {
-		var userID string
-		if id, ok := userIDVal.(string); ok {
-			userID = id
-		} else if id, ok := userIDVal.(uuid.UUID); ok {
-			userID = id.String()
-		}
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unit_id or student_id is required"})
+		return
+	}
 
-		if userID != "" {
-			bills, err := h.financeUsecase.GetStudentBillsByUserID(userID)
-			if err == nil {
-				c.JSON(http.StatusOK, bills)
-				return
-			}
-			// If error (e.g. not a student), we might want to return it or fall through
-			// But since no other params matched, returning error is appropriate if we assume this endpoint is for bills.
-			// However, if the user is Admin and just calls /bills without unit_id, maybe they expect all bills?
-			// But GetAllBills usecase requires unitID.
-			// So let's return the error from GetStudentBillsByUserID if it fails.
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	var userID string
+	if id, ok := userIDVal.(string); ok {
+		userID = id
+	} else if id, ok := userIDVal.(uuid.UUID); ok {
+		userID = id.String()
+	}
+
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unit_id or student_id is required"})
+		return
+	}
+
+	// Check role from context
+	roleIDVal, _ := c.Get("roleID")
+	var roleID uint
+	switch v := roleIDVal.(type) {
+	case float64:
+		roleID = uint(v)
+	case uint:
+		roleID = v
+	case int:
+		roleID = uint(v)
+	}
+
+	// Parent role = 7
+	if roleID == 7 {
+		bills, err := h.financeUsecase.GetParentBills(userID)
+		if err != nil {
+			c.JSON(http.StatusOK, []domain.Bill{}) // Return empty if no children linked
 			return
 		}
+		c.JSON(http.StatusOK, bills)
+		return
+	}
+
+	// Student role = 6
+	if roleID == 6 {
+		bills, err := h.financeUsecase.GetStudentBillsByUserID(userID)
+		if err != nil {
+			c.JSON(http.StatusOK, []domain.Bill{})
+			return
+		}
+		c.JSON(http.StatusOK, bills)
+		return
 	}
 
 	c.JSON(http.StatusBadRequest, gin.H{"error": "unit_id or student_id is required"})

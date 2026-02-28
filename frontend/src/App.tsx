@@ -52,6 +52,13 @@ import AdminPublicTeachers from './pages/admin/AdminPublicTeachers';
 import AdminDownloads from './pages/admin/AdminDownloads';
 import AdminPublicContent from './pages/admin/AdminPublicContent';
 
+// Finance Pages
+import PrincipalDashboard from './pages/finance/PrincipalDashboard';
+import Savings from './pages/finance/Savings';
+import DailyInfaq from './pages/finance/DailyInfaq';
+import CashLedger from './pages/finance/CashLedger';
+import Payroll from './pages/finance/Payroll';
+
 function App() {
     return (
         <AuthProvider>
@@ -87,6 +94,15 @@ function App() {
                                     <Route path="admin/downloads" element={<AdminDownloads />} />
                                     <Route path="admin/bk" element={<BK />} />
 
+                                    {/* Extended Finance Routes */}
+                                    <Route path="principal/finance-summary" element={<PrincipalDashboard />} />
+                                    <Route path="finance/savings" element={<Savings />} />
+                                    <Route path="student/savings" element={<Savings />} />
+                                    <Route path="parent/savings" element={<Savings />} />
+                                    <Route path="finance/cash-ledger" element={<CashLedger />} />
+                                    <Route path="finance/daily-infaq" element={<DailyInfaq />} />
+                                    <Route path="finance/payroll" element={<Payroll />} />
+
                                     {/* Teacher/Student Routes */}
                                     <Route path="teacher/schedule" element={<TeacherSchedule />} />
                                     <Route path="teacher/students" element={<HomeroomStudents />} />
@@ -97,10 +113,8 @@ function App() {
                                     <Route path="student/schedule" element={<StudentSchedule />} />
                                     <Route path="student/elearning" element={<StudentElearning />} />
                                     <Route path="student/grades" element={<StudentGrades />} />
-                                    <Route path="student/grades" element={<StudentGrades />} />
                                     <Route path="teacher/bk-report" element={<TeacherBKReport />} />
                                     <Route path="student/bk" element={<StudentBK />} />
-                                    <Route path="bills" element={<StudentBills />} />
                                     <Route path="bills" element={<StudentBills />} />
                                     <Route path="children" element={<ParentChildren />} />
                                     <Route path="parent/children/:studentId/attendance" element={<ParentChildAttendance />} />

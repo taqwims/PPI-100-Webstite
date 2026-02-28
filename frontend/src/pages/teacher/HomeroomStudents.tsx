@@ -7,7 +7,6 @@ import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
-import { useAuth } from '../../context/AuthContext';
 
 interface Student {
     id: string;
@@ -24,7 +23,6 @@ interface Student {
 }
 
 const HomeroomStudents: React.FC = () => {
-    const { user } = useAuth();
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);

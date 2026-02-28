@@ -20,6 +20,6 @@ func main() {
 	if err := db.Migrator().DropTable("schedules"); err != nil {
 		log.Fatalf("Failed to drop schedules table: %v", err)
 	}
-    
-    log.Println("Successfully dropped schedules table")
+
+	log.Println("Successfully dropped schedules table")
 }

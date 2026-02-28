@@ -40,6 +40,7 @@ func (u *StudentUsecase) CreateStudent(name, email, password, nisn string, class
 		Email:    email,
 		PasswordHash: string(hashedPassword),
 		RoleID:   6, // Student
+		UnitID:   unitID,
 	}
 
 	if err := u.userRepo.Create(user); err != nil {

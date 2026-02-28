@@ -26,7 +26,7 @@ func LoadConfig() (*Config, error) {
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", "180903"),
-		DBName:     getEnv("DB_NAME", "ppi_sis"),
+		DBName:     getEnv("DB_NAME", "sdit_management"),
 		DBPort:     getEnv("DB_PORT", "5432"),
 		JWTSecret:  getEnv("JWT_SECRET", "secret"),
 	}, nil

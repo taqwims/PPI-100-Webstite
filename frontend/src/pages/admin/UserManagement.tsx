@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, BookOpen } from 'lucide-react';
+import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, BookOpen, Users } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
@@ -15,6 +15,12 @@ interface User {
     email: string;
     role_id: number;
     unit_id: number;
+    student?: {
+        id: string;
+        nisn: string;
+        class_id: number;
+        parent_id?: string;
+    };
 }
 
 interface Class {
@@ -22,11 +28,22 @@ interface Class {
     name: string;
 }
 
+interface StudentRecord {
+    id: string;
+    user_id: string;
+    nisn: string;
+    class_id: number;
+    parent_id?: string;
+    unit_id: number;
+    user: { name: string; email: string };
+}
+
 const UserManagement: React.FC = () => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [editingStudentRecord, setEditingStudentRecord] = useState<StudentRecord | null>(null);
 
     // Initialize unit_id based on user role
     const initialUnitId = user?.role_id === 1 ? 1 : user?.unit_id || 1;
@@ -43,7 +60,7 @@ const UserManagement: React.FC = () => {
     });
 
     // Update formData.unit_id when modal opens or user changes
-    React.useEffect(() => {
+    useEffect(() => {
         setFormData(prev => ({ ...prev, unit_id: initialUnitId }));
     }, [initialUnitId]);
 
@@ -64,6 +81,35 @@ const UserManagement: React.FC = () => {
         },
         enabled: formData.role_id === 6 && isModalOpen
     });
+
+    // Fetch students list (for finding student record when editing)
+    const { data: allStudents } = useQuery({
+        queryKey: ['all-students'],
+        queryFn: async () => {
+            const res = await api.get('/students/');
+            return res.data as StudentRecord[];
+        },
+        enabled: isModalOpen && !!editingUser && editingUser.role_id === 6
+    });
+
+    // Parents list (users with role_id=7) for parent assignment dropdown
+    const parentUsers = users?.filter((u: User) => u.role_id === 7) || [];
+
+    // When editing a student user, find the student record
+    useEffect(() => {
+        if (editingUser && editingUser.role_id === 6 && allStudents) {
+            const studentRec = allStudents.find((s: StudentRecord) => s.user_id === editingUser.id);
+            if (studentRec) {
+                setEditingStudentRecord(studentRec);
+                setFormData(prev => ({
+                    ...prev,
+                    nisn: studentRec.nisn || '',
+                    class_id: studentRec.class_id || 0,
+                    parent_id: studentRec.parent_id || '',
+                }));
+            }
+        }
+    }, [editingUser, allStudents]);
 
     // Filter users based on role
     const filteredUsers = users?.filter((u: User) => {
@@ -96,9 +142,9 @@ const UserManagement: React.FC = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
-            // Also invalidate students if we created one
             if (formData.role_id === 6) {
                 queryClient.invalidateQueries({ queryKey: ['students'] });
+                queryClient.invalidateQueries({ queryKey: ['all-students'] });
             }
             handleCloseModal();
         },
@@ -108,15 +154,31 @@ const UserManagement: React.FC = () => {
     });
 
     const updateUserMutation = useMutation({
-        mutationFn: (data: any) => api.put(`/users/${editingUser?.id}`, {
-            name: data.name,
-            email: data.email,
-            password: data.password,
-            role_id: Number(data.role_id),
-            unit_id: Number(data.unit_id),
-        }),
+        mutationFn: (data: any) => {
+            // If editing a student, use the student endpoint to update student-specific fields
+            if (editingUser?.role_id === 6 && editingStudentRecord) {
+                return api.put(`/students/${editingStudentRecord.id}`, {
+                    name: data.name,
+                    email: data.email,
+                    nisn: data.nisn || editingStudentRecord.nisn,
+                    class_id: Number(data.class_id) || editingStudentRecord.class_id,
+                    unit_id: Number(data.unit_id) || editingStudentRecord.unit_id,
+                    parent_id: data.parent_id || undefined,
+                });
+            }
+            // Standard user update
+            return api.put(`/users/${editingUser?.id}`, {
+                name: data.name,
+                email: data.email,
+                password: data.password,
+                role_id: Number(data.role_id),
+                unit_id: Number(data.unit_id),
+            });
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['all-students'] });
             handleCloseModal();
         },
         onError: (error: any) => {
@@ -132,6 +194,7 @@ const UserManagement: React.FC = () => {
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingUser(null);
+        setEditingStudentRecord(null);
         setFormData({
             name: '',
             email: '',
@@ -146,13 +209,14 @@ const UserManagement: React.FC = () => {
 
     const handleEdit = (user: User) => {
         setEditingUser(user);
+        setEditingStudentRecord(null);
         setFormData({
             name: user.name,
             email: user.email,
-            password: '', // Leave empty to keep unchanged
+            password: '',
             role_id: user.role_id,
             unit_id: user.unit_id,
-            nisn: '', // Reset student specific fields as we only edit User details here
+            nisn: '',
             class_id: 0,
             parent_id: ''
         });
@@ -184,6 +248,9 @@ const UserManagement: React.FC = () => {
             case 5: return 'Wali Kelas';
             case 6: return 'Siswa';
             case 7: return 'Orang Tua';
+            case 8: return 'BK';
+            case 9: return 'Bendahara';
+            case 10: return 'Teller';
             default: return 'Unknown';
         }
     };
@@ -207,12 +274,15 @@ const UserManagement: React.FC = () => {
             { id: 5, name: 'Wali Kelas' },
             { id: 6, name: 'Siswa' },
             { id: 7, name: 'Orang Tua' },
+            { id: 8, name: 'BK' },
+            { id: 9, name: 'Bendahara' },
+            { id: 10, name: 'Teller' },
         ];
 
         if (user?.role_id === 1) return allRoles;
 
         // Admin MTS/MA can only create operational roles
-        return allRoles.filter(r => [4, 5, 6, 7].includes(r.id));
+        return allRoles.filter(r => [4, 5, 6, 7, 8, 9, 10].includes(r.id));
     };
 
     return (
@@ -257,7 +327,8 @@ const UserManagement: React.FC = () => {
                                             ${user.role_id === 1 ? 'bg-purple-500/20 text-purple-600' :
                                                 user.role_id === 4 ? 'bg-blue-500/20 text-blue-600' :
                                                     user.role_id === 6 ? 'bg-green-500/20 text-green-600' :
-                                                        'bg-gray-500/20 text-slate-600'
+                                                        user.role_id === 7 ? 'bg-amber-500/20 text-amber-600' :
+                                                            'bg-gray-500/20 text-slate-600'
                                             }`}>
                                             {getRoleName(user.role_id)}
                                         </span>
@@ -356,10 +427,12 @@ const UserManagement: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Student Specific Fields */}
-                    {!editingUser && formData.role_id === 6 && (
+                    {/* Student Specific Fields - shown for create and edit */}
+                    {formData.role_id === 6 && (
                         <div className="space-y-4 pt-4 border-t border-slate-200">
-                            <h4 className="font-semibold text-slate-900">Data Siswa</h4>
+                            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                                <CreditCard size={16} /> Data Siswa
+                            </h4>
                             <InputGlass
                                 label="NISN"
                                 value={formData.nisn}
@@ -382,6 +455,34 @@ const UserManagement: React.FC = () => {
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+
+                            {/* Parent Assignment */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Orang Tua</label>
+                                <div className="relative">
+                                    <Users className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <select
+                                        className="w-full glass-input pl-10 text-slate-900"
+                                        value={formData.parent_id}
+                                        onChange={(e) => setFormData({ ...formData, parent_id: e.target.value })}
+                                    >
+                                        <option value="">-- Belum Ada Orang Tua --</option>
+                                        {parentUsers.map((p: User) => (
+                                            <option key={p.id} value={p.id}>{p.name} ({p.email})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {editingUser && !formData.parent_id && (
+                                    <p className="text-xs text-amber-600 mt-1 ml-1">
+                                        Siswa belum terhubung dengan orang tua. Pilih orang tua untuk menghubungkan.
+                                    </p>
+                                )}
+                                {editingUser && formData.parent_id && (
+                                    <p className="text-xs text-emerald-600 mt-1 ml-1">
+                                        ✓ Siswa terhubung dengan orang tua. Notifikasi tagihan akan dikirim ke orang tua.
+                                    </p>
+                                )}
                             </div>
                         </div>
                     )}

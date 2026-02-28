@@ -2,8 +2,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Users, BookOpen, Calendar, FileText,
-    Settings, LogOut, Bell, Menu, X, GraduationCap,
-    DollarSign, AlertTriangle, MessageSquare, CreditCard, Mail, Send
+    Settings, LogOut, Bell, X, GraduationCap,
+    AlertTriangle, CreditCard, Mail, Send, Activity, Wallet, Inbox, PieChart
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
@@ -26,7 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const admin = [
             { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
             { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
-            { icon: CreditCard, label: 'Keuangan', path: '/dashboard/finance' },
+            { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
             { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
             { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
             { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
@@ -44,6 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             { icon: FileText, label: 'Input Nilai', path: '/dashboard/teacher/grades' },
             { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
             { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
+            { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll' }, // Teachers can view their payroll
         ];
 
         const student = [
@@ -52,17 +53,43 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
             { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk' },
             { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+            { icon: Wallet, label: 'Tabungan', path: '/dashboard/student/savings' }, // Students view own savings
         ];
 
         const parent = [
             { icon: Users, label: 'Data Anak', path: '/dashboard/children' },
             { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+            { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings' },
             { icon: GraduationCap, label: 'Laporan Nilai', path: '/dashboard/grades' },
         ];
 
-        // Role ID mapping: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua
+        const principal = [
+            { icon: PieChart, label: 'Rekap Finansial', path: '/dashboard/principal/finance-summary' },
+            { icon: Wallet, label: 'Tabungan', path: '/dashboard/finance/savings' },
+            { icon: Inbox, label: 'Kas Umum', path: '/dashboard/finance/cash-ledger' },
+        ];
+
+        const bendahara = [
+            { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
+            { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
+            { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger' },
+            { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
+            { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll' },
+        ];
+
+        const tellerTabungan = [
+            { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
+        ];
+
+        const tellerInfaq = [
+            { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
+            { icon: Inbox, label: 'Kas Infaq', path: '/dashboard/finance/cash-ledger' },
+        ];
+
+        // Role ID mapping: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara Umum, 10=Teller Tabungan, 11=Teller Infaq
         switch (user?.role_id) {
             case 1: // Super Admin
+                return [...common, ...admin, ...bendahara]; // Super Admin has access to all admin and bendahara tools
             case 2: // Admin MTS
             case 3: // Admin MA
                 return [...common, ...admin];
@@ -73,12 +100,37 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 return [...common, ...student];
             case 7: // Orang Tua
                 return [...common, ...parent];
+            case 8: // Pimpinan
+                return [...common, ...principal];
+            case 9: // Bendahara Umum
+                return [...common, ...bendahara];
+            case 10: // Teller Tabungan
+                return [...common, ...tellerTabungan];
+            case 11: // Teller Infaq
+                return [...common, ...tellerInfaq];
             default:
                 return common;
         }
     };
 
+    const getRoleName = (roleId?: number) => {
+        const roles: Record<number, string> = {
+            1: 'Super Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
+            5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
+            9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Teller Infaq'
+        };
+        return roleId && roles[roleId] ? roles[roleId] : 'User';
+    };
+
     const menuItems = [...getMenus(), { icon: Settings, label: 'Pengaturan', path: '/dashboard/settings' }];
+
+    // Deduplicate menus by path since super admin has merged arrays
+    const uniqueMenuPaths = new Set();
+    const finalMenuItems = menuItems.filter(item => {
+        if (uniqueMenuPaths.has(item.path)) return false;
+        uniqueMenuPaths.add(item.path);
+        return true;
+    });
 
     return (
         <>
@@ -96,16 +148,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="p-6 flex items-center justify-between border-b border-slate-200">
-                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-500">SIS PPI 100</h1>
+                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-500">SDIT Management</h1>
                     <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-slate-600">
                         <X size={24} />
                     </button>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    {menuItems.map((item) => {
+                    {finalMenuItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
+                        const isActive = location.pathname.startsWith(item.path) && (item.path !== '/dashboard' || location.pathname === '/dashboard');
                         return (
                             <Link
                                 key={item.path}
@@ -130,7 +182,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <div className="p-4 border-t border-slate-200">
                     <div className="mb-4 px-4">
                         <p className="text-sm font-medium text-slate-900">{user?.name}</p>
-                        <p className="text-xs text-slate-500 capitalize">{user?.role_id === 1 ? 'Super Admin' : user?.role_id === 4 ? 'Guru' : user?.role_id === 6 ? 'Siswa' : 'User'}</p>
+                        <p className="text-xs text-slate-500 capitalize">{getRoleName(user?.role_id)}</p>
                     </div>
                     <button
                         onClick={logout}

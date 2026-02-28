@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/internal/usecase"
 	"strconv"
 
@@ -11,10 +12,11 @@ import (
 
 type StudentHandler struct {
 	studentUsecase *usecase.StudentUsecase
+	userRepo       *postgres.UserRepository
 }
 
-func NewStudentHandler(studentUsecase *usecase.StudentUsecase) *StudentHandler {
-	return &StudentHandler{studentUsecase: studentUsecase}
+func NewStudentHandler(studentUsecase *usecase.StudentUsecase, userRepo *postgres.UserRepository) *StudentHandler {
+	return &StudentHandler{studentUsecase: studentUsecase, userRepo: userRepo}
 }
 
 func (h *StudentHandler) GetAllStudents(c *gin.Context) {
@@ -97,7 +99,27 @@ type CreateStudentRequest struct {
 	NISN     string `json:"nisn" binding:"required"`
 	ClassID  uint   `json:"class_id" binding:"required"`
 	UnitID   uint   `json:"unit_id" binding:"required"`
-	ParentID string `json:"parent_id"`
+	ParentID string `json:"parent_id"` // Can be parent_user_id (user.id) — will be resolved
+}
+
+// resolveParentID takes a user ID (from the parent user) and finds the parent table ID
+func (h *StudentHandler) resolveParentID(parentUserID string) (*uuid.UUID, error) {
+	if parentUserID == "" {
+		return nil, nil
+	}
+	parentUser, err := h.userRepo.FindByID(parentUserID)
+	if err != nil {
+		return nil, err
+	}
+	if parentUser.Parent != nil {
+		return &parentUser.Parent.ID, nil
+	}
+	// If user doesn't have a Parent record yet, try parsing as direct parent.id
+	parsedUUID, err := uuid.Parse(parentUserID)
+	if err != nil {
+		return nil, err
+	}
+	return &parsedUUID, nil
 }
 
 func (h *StudentHandler) CreateStudent(c *gin.Context) {
@@ -107,14 +129,10 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 		return
 	}
 
-	var parentUUID *uuid.UUID
-	if req.ParentID != "" {
-		parsedUUID, err := uuid.Parse(req.ParentID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parent ID"})
-			return
-		}
-		parentUUID = &parsedUUID
+	parentUUID, err := h.resolveParentID(req.ParentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parent ID: " + err.Error()})
+		return
 	}
 
 	if err := h.studentUsecase.CreateStudent(req.Name, req.Email, req.Password, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
@@ -131,7 +149,7 @@ type UpdateStudentRequest struct {
 	NISN     string `json:"nisn" binding:"required"`
 	ClassID  uint   `json:"class_id" binding:"required"`
 	UnitID   uint   `json:"unit_id" binding:"required"`
-	ParentID string `json:"parent_id"`
+	ParentID string `json:"parent_id"` // Can be parent_user_id (user.id) — will be resolved
 }
 
 func (h *StudentHandler) UpdateStudent(c *gin.Context) {
@@ -142,14 +160,10 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		return
 	}
 
-	var parentUUID *uuid.UUID
-	if req.ParentID != "" {
-		parsedUUID, err := uuid.Parse(req.ParentID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parent ID"})
-			return
-		}
-		parentUUID = &parsedUUID
+	parentUUID, err := h.resolveParentID(req.ParentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parent ID: " + err.Error()})
+		return
 	}
 
 	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
