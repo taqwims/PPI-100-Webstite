@@ -58,6 +58,8 @@ import Savings from './pages/finance/Savings';
 import DailyInfaq from './pages/finance/DailyInfaq';
 import CashLedger from './pages/finance/CashLedger';
 import Payroll from './pages/finance/Payroll';
+import StudentSavings from './pages/finance/StudentSavings';
+import ParentSavings from './pages/finance/ParentSavings';
 
 function App() {
     return (
@@ -97,8 +99,8 @@ function App() {
                                     {/* Extended Finance Routes */}
                                     <Route path="principal/finance-summary" element={<PrincipalDashboard />} />
                                     <Route path="finance/savings" element={<Savings />} />
-                                    <Route path="student/savings" element={<Savings />} />
-                                    <Route path="parent/savings" element={<Savings />} />
+                                    <Route path="student/savings" element={<StudentSavings />} />
+                                    <Route path="parent/savings" element={<ParentSavings />} />
                                     <Route path="finance/cash-ledger" element={<CashLedger />} />
                                     <Route path="finance/daily-infaq" element={<DailyInfaq />} />
                                     <Route path="finance/payroll" element={<Payroll />} />

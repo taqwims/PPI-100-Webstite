@@ -47,6 +47,14 @@ func (u *FinanceExtendedUsecase) GetSavingTransactions(accountID uuid.UUID) ([]d
 
 // ------------------- Payroll -------------------
 
+func (u *FinanceExtendedUsecase) GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error) {
+	return u.financeRepo.GetSavingAccountByUserID(userID)
+}
+
+func (u *FinanceExtendedUsecase) GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error) {
+	return u.financeRepo.GetSavingAccountsByParentID(parentID)
+}
+
 func (u *FinanceExtendedUsecase) CreatePayroll(req *domain.Payroll) error {
 	req.PaymentDate = time.Now()
 	return u.financeRepo.CreatePayroll(req)

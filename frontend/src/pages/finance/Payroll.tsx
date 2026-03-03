@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Download, Printer, Search, Building2, Banknote, Calendar, CheckCircle, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Download, Printer, Search, Building2, Banknote, Calendar, CheckCircle, Pencil, Trash2, CreditCard, Wallet, Landmark, Copy, X } from 'lucide-react';
 import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
+import { generatePayrollReceipt } from '../../utils/pdfUtils';
 
 interface UserData {
     id: string;
     name: string;
     email: string;
     role_id: number;
+    bank_name?: string;
+    bank_account_number?: string;
+    bank_account_holder?: string;
 }
 
 interface PayrollRecord {
     id: string;
     month_year: string;
     user_id: string;
-    user: { name: string; email: string };
+    user: { name: string; email: string; bank_name?: string; bank_account_number?: string; bank_account_holder?: string };
     basic_salary: number;
     allowances: number;
     deductions: number;
@@ -36,12 +40,12 @@ const formatCurrency = (amount: number) => {
 
 const Payroll = () => {
     const { user } = useAuth();
-    // 1: SuperAdmin, 9: Bendahara
     const canManage = [1, 9].includes(user?.role_id || 0);
 
     const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
     const [users, setUsers] = useState<UserData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const [showModal, setShowModal] = useState(false);
     const [editingPayroll, setEditingPayroll] = useState<PayrollRecord | null>(null);
@@ -51,9 +55,14 @@ const Payroll = () => {
         basic_salary: '',
         allowances: '',
         deductions: '',
-        status: 'Paid'
+        status: 'Paid',
+        payment_method: 'Cash'
     });
     const [submitting, setSubmitting] = useState(false);
+
+    // Transfer confirmation modal
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [transferTarget, setTransferTarget] = useState<UserData | null>(null);
 
     useEffect(() => {
         fetchPayrolls();
@@ -89,7 +98,7 @@ const Payroll = () => {
 
     const openCreateModal = () => {
         setEditingPayroll(null);
-        setFormData({ user_id: '', month_year: '', basic_salary: '', allowances: '', deductions: '', status: 'Paid' });
+        setFormData({ user_id: '', month_year: '', basic_salary: '', allowances: '', deductions: '', status: 'Paid', payment_method: 'Cash' });
         setShowModal(true);
     };
 
@@ -101,7 +110,8 @@ const Payroll = () => {
             basic_salary: String(payroll.basic_salary),
             allowances: String(payroll.allowances),
             deductions: String(payroll.deductions),
-            status: payroll.status
+            status: payroll.status,
+            payment_method: 'Cash'
         });
         setShowModal(true);
     };
@@ -124,10 +134,35 @@ const Payroll = () => {
             } else {
                 await api.post('/finance/payroll', payload);
             }
+
             setShowModal(false);
             setEditingPayroll(null);
-            setFormData({ user_id: '', month_year: '', basic_salary: '', allowances: '', deductions: '', status: 'Paid' });
-            fetchPayrolls();
+            setFormData({ user_id: '', month_year: '', basic_salary: '', allowances: '', deductions: '', status: 'Paid', payment_method: 'Cash' });
+            await fetchPayrolls();
+
+            // After submit, handle payment method
+            if (formData.payment_method === 'Cash' && formData.status === 'Paid') {
+                // For cash: generate receipt from the latest payrolls
+                const res = await api.get('/finance/payroll');
+                const latestPayrolls = res.data as PayrollRecord[];
+                const targetUser = users.find(u => u.id === formData.user_id);
+                if (latestPayrolls.length > 0 && targetUser) {
+                    // Find the matching payroll
+                    const matched = latestPayrolls.find((p: PayrollRecord) =>
+                        p.user_id === formData.user_id && p.month_year === payload.month_year
+                    );
+                    if (matched) {
+                        generatePayrollReceipt(matched);
+                    }
+                }
+            } else if (formData.payment_method === 'Transfer') {
+                // Show transfer details modal
+                const targetUser = users.find(u => u.id === formData.user_id);
+                if (targetUser) {
+                    setTransferTarget(targetUser);
+                    setShowTransferModal(true);
+                }
+            }
         } catch (error: any) {
             alert(error.response?.data?.error || "Gagal membuat slip gaji");
         } finally {
@@ -145,7 +180,21 @@ const Payroll = () => {
         }
     };
 
-    // Calculate total if managing
+    const handlePrintReceipt = (payroll: PayrollRecord) => {
+        generatePayrollReceipt(payroll);
+    };
+
+    // Filter payrolls by search query
+    const filteredPayrolls = payrolls.filter(p => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            p.user?.name?.toLowerCase().includes(q) ||
+            p.month_year?.toLowerCase().includes(q) ||
+            p.user?.email?.toLowerCase().includes(q)
+        );
+    });
+
     const totalPayrollPaid = payrolls.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
@@ -216,6 +265,8 @@ const Payroll = () => {
                             <input
                                 type="text"
                                 placeholder={canManage ? "Cari nama pegawai..." : "Cari periode bulan..."}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-slate-900 text-sm"
                             />
                         </div>
@@ -244,15 +295,17 @@ const Payroll = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : payrolls.length === 0 ? (
+                                ) : filteredPayrolls.length === 0 ? (
                                     <tr>
                                         <td colSpan={canManage ? 8 : 7} className="p-12 text-center text-slate-500">
                                             <Banknote size={40} className="mx-auto text-slate-300 mb-3" />
-                                            <p className="text-lg font-medium text-slate-700">Belum Ada Data Gaji</p>
+                                            <p className="text-lg font-medium text-slate-700">
+                                                {searchQuery ? 'Tidak ditemukan hasil pencarian' : 'Belum Ada Data Gaji'}
+                                            </p>
                                         </td>
                                     </tr>
                                 ) : (
-                                    payrolls.map((payroll) => (
+                                    filteredPayrolls.map((payroll) => (
                                         <tr key={payroll.id} className="hover:bg-slate-50 transition-colors group">
                                             <td className="p-4">
                                                 <div className="flex items-center text-slate-700 font-medium whitespace-nowrap">
@@ -281,7 +334,11 @@ const Payroll = () => {
                                             </td>
                                             <td className="p-4 text-center">
                                                 <div className="flex items-center justify-center space-x-1">
-                                                    <button className="text-slate-400 hover:text-blue-600 transition p-1.5" title="Cetak Slip">
+                                                    <button
+                                                        onClick={() => handlePrintReceipt(payroll)}
+                                                        className="text-slate-400 hover:text-blue-600 transition p-1.5"
+                                                        title="Cetak Slip"
+                                                    >
                                                         <Printer size={16} />
                                                     </button>
                                                     {canManage && (
@@ -391,6 +448,52 @@ const Payroll = () => {
                                     </div>
                                 </div>
 
+                                {/* Payment Method Toggle */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
+                                    <div className="flex bg-slate-100 p-1 rounded-xl w-full max-w-sm">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, payment_method: 'Cash' })}
+                                            className={clsx(
+                                                "flex-1 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                                formData.payment_method === 'Cash' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <Wallet size={14} />
+                                            Cash
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, payment_method: 'Transfer' })}
+                                            className={clsx(
+                                                "flex-1 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                                formData.payment_method === 'Transfer' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <CreditCard size={14} />
+                                            Transfer
+                                        </button>
+                                    </div>
+                                    {formData.payment_method === 'Transfer' && formData.user_id && (
+                                        <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                            <p className="text-xs text-blue-600 font-medium mb-1">Rekening Tujuan Pegawai:</p>
+                                            {(() => {
+                                                const selectedUser = users.find(u => u.id === formData.user_id);
+                                                if (selectedUser?.bank_name && selectedUser?.bank_account_number) {
+                                                    return (
+                                                        <div className="text-sm text-slate-700">
+                                                            <p className="font-semibold">{selectedUser.bank_name} — {selectedUser.bank_account_number}</p>
+                                                            <p className="text-xs text-slate-500">a.n. {selectedUser.bank_account_holder || selectedUser.name}</p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <p className="text-xs text-amber-600">⚠ Pegawai ini belum mengisi data rekening di profil.</p>;
+                                            })()}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Status Pembayaran</label>
                                     <div className="flex bg-slate-100 p-1 rounded-xl w-full max-w-xs">
@@ -438,6 +541,66 @@ const Payroll = () => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Transfer Confirmation Modal */}
+                {showTransferModal && transferTarget && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-50">
+                                <h2 className="text-lg font-bold flex items-center text-slate-800">
+                                    <CreditCard className="text-blue-600 mr-2" size={22} /> Transfer Gaji
+                                </h2>
+                                <button onClick={() => setShowTransferModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <p className="text-sm text-slate-600">Silakan transfer gaji ke rekening berikut:</p>
+                                {transferTarget.bank_name && transferTarget.bank_account_number ? (
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                                                    <Landmark size={20} className="text-white" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-800">{transferTarget.bank_name}</p>
+                                                    <p className="text-xs text-slate-500">a.n. {transferTarget.bank_account_holder || transferTarget.name}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-mono text-slate-800">{transferTarget.bank_account_number}</p>
+                                                <button
+                                                    className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1 justify-end mt-1"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(transferTarget.bank_account_number || '');
+                                                        alert('Nomor rekening berhasil disalin!');
+                                                    }}
+                                                >
+                                                    <Copy size={12} /> Salin
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                        <p className="text-sm text-amber-800">
+                                            ⚠ Pegawai <strong>{transferTarget.name}</strong> belum mengisi informasi rekening bank di profilnya. Silakan minta yang bersangkutan melengkapi data rekening di halaman Pengaturan.
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        onClick={() => setShowTransferModal(false)}
+                                        className="px-5 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition"
+                                    >
+                                        Tutup
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

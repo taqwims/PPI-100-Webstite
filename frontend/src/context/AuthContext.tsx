@@ -8,6 +8,9 @@ interface User {
     role_id: number;
     unit_id: number;
     photo_url?: string;
+    bank_name?: string;
+    bank_account_number?: string;
+    bank_account_holder?: string;
     student?: {
         id: string;
         nisn: string;

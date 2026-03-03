@@ -142,6 +142,52 @@ func (h *FinanceExtendedHandler) GetSavingTransactions(c *gin.Context) {
 	c.JSON(http.StatusOK, txns)
 }
 
+// ------------------- My Savings (Student / Parent) -------------------
+
+func (h *FinanceExtendedHandler) GetMySavings(c *gin.Context) {
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	account, err := h.financeExtendedUsecase.GetSavingAccountByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusOK, nil) // No account yet, return null
+		return
+	}
+
+	txns, _ := h.financeExtendedUsecase.GetSavingTransactions(account.ID)
+	c.JSON(http.StatusOK, gin.H{
+		"account":      account,
+		"transactions": txns,
+	})
+}
+
+func (h *FinanceExtendedHandler) GetMyChildrenSavings(c *gin.Context) {
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	accounts, err := h.financeExtendedUsecase.GetSavingAccountsByParentID(userID)
+	if err != nil {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+
+	var result []gin.H
+	for _, acc := range accounts {
+		txns, _ := h.financeExtendedUsecase.GetSavingTransactions(acc.ID)
+		result = append(result, gin.H{
+			"account":      acc,
+			"transactions": txns,
+		})
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // ------------------- Payroll -------------------
 
 func (h *FinanceExtendedHandler) CreatePayroll(c *gin.Context) {

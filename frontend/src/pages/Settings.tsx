@@ -3,30 +3,37 @@ import { useAuth } from '../context/AuthContext';
 import CardGlass from '../components/ui/glass/CardGlass';
 import InputGlass from '../components/ui/glass/InputGlass';
 import ButtonGlass from '../components/ui/glass/ButtonGlass';
-import { User, Lock, Save, Camera } from 'lucide-react';
+import { User, Lock, Save, Camera, Landmark } from 'lucide-react';
 import api from '../services/api';
 import { useMutation } from '@tanstack/react-query';
 
 const Settings: React.FC = () => {
-    const { user } = useAuth(); // login is used to refresh token if needed, but here we might just need to refetch profile
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
 
     // Profile State
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
 
+    // Bank Account State
+    const [bankName, setBankName] = useState(user?.bank_name || '');
+    const [bankAccountNumber, setBankAccountNumber] = useState(user?.bank_account_number || '');
+    const [bankAccountHolder, setBankAccountHolder] = useState(user?.bank_account_holder || '');
+
     // Password State
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
+    // Staff roles (not student=6, not parent=7)
+    const isStaff = user?.role_id !== 6 && user?.role_id !== 7;
+
     const updateProfileMutation = useMutation({
-        mutationFn: async (data: { name: string; email: string }) => {
+        mutationFn: async (data: { name: string; email: string; bank_name: string; bank_account_number: string; bank_account_holder: string }) => {
             return await api.put('/profile', data);
         },
         onSuccess: () => {
             alert('Profil berhasil diperbarui. Silakan login ulang untuk melihat perubahan.');
-            // In a real app, we would refetch the user profile here
         },
         onError: (error: any) => {
             alert(error.response?.data?.error || 'Gagal memperbarui profil');
@@ -50,7 +57,13 @@ const Settings: React.FC = () => {
 
     const handleUpdateProfile = (e: React.FormEvent) => {
         e.preventDefault();
-        updateProfileMutation.mutate({ name, email });
+        updateProfileMutation.mutate({
+            name,
+            email,
+            bank_name: bankName,
+            bank_account_number: bankAccountNumber,
+            bank_account_holder: bankAccountHolder
+        });
     };
 
     const handleChangePassword = (e: React.FormEvent) => {
@@ -118,7 +131,6 @@ const Settings: React.FC = () => {
                                                 headers: { 'Content-Type': 'multipart/form-data' }
                                             }).then(() => {
                                                 alert('Foto profil berhasil diperbarui. Silakan refresh halaman.');
-                                                // In a real app, we would invalidate the user query here
                                             }).catch((err) => {
                                                 alert('Gagal mengupload foto: ' + (err.response?.data?.error || err.message));
                                             });
@@ -157,7 +169,7 @@ const Settings: React.FC = () => {
                                         <InputGlass
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            icon={User} // Should be Mail icon but User is fine for now
+                                            icon={User}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -169,6 +181,44 @@ const Settings: React.FC = () => {
                                         <InputGlass placeholder="Jl. ..." disabled className="opacity-50 cursor-not-allowed" />
                                     </div>
                                 </div>
+
+                                {/* Bank Account Section - Only for Staff */}
+                                {isStaff && (
+                                    <div className="mt-6 pt-6 border-t border-slate-200">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <Landmark size={20} className="text-blue-600" />
+                                            <h3 className="text-lg font-semibold text-slate-800">Informasi Rekening Bank</h3>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mb-4">Digunakan untuk penerimaan gaji dan tunjangan melalui transfer.</p>
+                                        <div className="grid md:grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm text-slate-600">Nama Bank</label>
+                                                <InputGlass
+                                                    value={bankName}
+                                                    onChange={(e) => setBankName(e.target.value)}
+                                                    placeholder="BSI / BCA / Mandiri ..."
+                                                    icon={Landmark}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm text-slate-600">Nomor Rekening</label>
+                                                <InputGlass
+                                                    value={bankAccountNumber}
+                                                    onChange={(e) => setBankAccountNumber(e.target.value)}
+                                                    placeholder="1234567890"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm text-slate-600">Atas Nama</label>
+                                                <InputGlass
+                                                    value={bankAccountHolder}
+                                                    onChange={(e) => setBankAccountHolder(e.target.value)}
+                                                    placeholder="Nama pemilik rekening"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="pt-4 flex justify-end">
                                     <ButtonGlass type="submit" className="flex items-center gap-2" disabled={updateProfileMutation.isPending}>

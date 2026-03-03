@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/internal/usecase"
 	"strconv"
@@ -114,12 +116,28 @@ func (h *StudentHandler) resolveParentID(parentUserID string) (*uuid.UUID, error
 	if parentUser.Parent != nil {
 		return &parentUser.Parent.ID, nil
 	}
-	// If user doesn't have a Parent record yet, try parsing as direct parent.id
+	// If user doesn't have a Parent record yet, create one
 	parsedUUID, err := uuid.Parse(parentUserID)
 	if err != nil {
 		return nil, err
 	}
-	return &parsedUUID, nil
+	
+	newParent := domain.Parent{
+		UserID: parsedUUID,
+	}
+	// We need to create it using userRepo.Update, which saves the User and its associations,
+	// or create the parent record. We'll assign it to parentUser and save.
+	parentUser.Parent = &newParent
+	if err := h.userRepo.Update(parentUser); err != nil {
+		return nil, err
+	}
+	
+	// parentUser.Parent should now have the generated ID
+	if parentUser.Parent.ID != uuid.Nil {
+		return &parentUser.Parent.ID, nil
+	}
+
+	return nil, errors.New("failed to create parent record")
 }
 
 func (h *StudentHandler) CreateStudent(c *gin.Context) {

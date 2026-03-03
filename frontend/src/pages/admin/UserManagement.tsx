@@ -84,9 +84,9 @@ const UserManagement: React.FC = () => {
 
     // Fetch students list (for finding student record when editing)
     const { data: allStudents } = useQuery({
-        queryKey: ['all-students'],
+        queryKey: ['all-students', formData.unit_id],
         queryFn: async () => {
-            const res = await api.get('/students/');
+            const res = await api.get(`/students/?unit_id=${formData.unit_id}`);
             return res.data as StudentRecord[];
         },
         enabled: isModalOpen && !!editingUser && editingUser.role_id === 6

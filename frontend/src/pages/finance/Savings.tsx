@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Wallet, ArrowUpRight, ArrowDownRight, Users, Search, Plus, Eye, X, History, Banknote } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, Users, Search, Plus, Eye, X, History, Banknote, Download } from 'lucide-react';
 import clsx from 'clsx';
+import { generateSavingsReport } from '../../utils/pdfUtils';
+
+interface ClassData {
+    id: number;
+    name: string;
+}
 
 interface Student {
     id: string;
     user: { name: string; email: string };
     nisn: string;
-    class: { name: string };
+    class: { id: number; name: string };
+    class_id: number;
 }
 
 interface SavingAccount {
@@ -42,10 +49,19 @@ const Savings = () => {
     const { user } = useAuth();
     const canManage = [1, 9, 10].includes(user?.role_id || 0);
 
+    const getDefaultUnitID = () => {
+        if (user?.role_id === 2 || user?.role_id === 4 || user?.role_id === 6 || user?.role_id === 13) return 2; // MA
+        if (user?.role_id === 3 || user?.role_id === 5 || user?.role_id === 7 || user?.role_id === 12) return 1; // MTS
+        return 1; // Default
+    };
+    const [unitID, setUnitID] = useState<number>(getDefaultUnitID());
+
     const [accounts, setAccounts] = useState<SavingAccount[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
+    const [classList, setClassList] = useState<ClassData[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [classFilter, setClassFilter] = useState('');
 
     // Transaction Modal
     const [showTrxModal, setShowTrxModal] = useState(false);
@@ -53,6 +69,7 @@ const Savings = () => {
     const [trxStudentId, setTrxStudentId] = useState('');
     const [trxAmount, setTrxAmount] = useState('');
     const [trxNotes, setTrxNotes] = useState('');
+    const [trxClassFilter, setTrxClassFilter] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     // History Modal
@@ -75,29 +92,45 @@ const Savings = () => {
 
     const fetchStudents = useCallback(async () => {
         try {
-            const res = await api.get('/students/');
+            const res = await api.get(`/students/?unit_id=${unitID}`);
             setStudents(res.data || []);
         } catch (error) {
             console.error("Failed to fetch students", error);
         }
-    }, []);
+    }, [unitID]);
+
+    const fetchClasses = useCallback(async () => {
+        try {
+            const res = await api.get(`/academic/classes?unit_id=${unitID}`);
+            setClassList(res.data || []);
+        } catch (error) {
+            console.error("Failed to fetch classes", error);
+        }
+    }, [unitID]);
 
     useEffect(() => {
         if (canManage) {
             fetchAccounts();
             fetchStudents();
+            fetchClasses();
         }
-    }, [canManage, fetchAccounts, fetchStudents]);
+    }, [canManage, fetchAccounts, fetchStudents, fetchClasses, unitID]);
+
+    // Filter accounts by unit (only accounts for students in this unit), search, and class
+    const unitAccounts = accounts.filter(acc => students.some(s => s.id === acc.student_id));
 
     // Overview stats
-    const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-    const totalAccounts = accounts.length;
+    const totalBalance = unitAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+    const totalAccounts = unitAccounts.length;
     const studentsWithoutAccount = students.filter(
-        s => !accounts.find(a => a.student_id === s.id)
+        s => !unitAccounts.find(a => a.student_id === s.id)
     );
 
-    // Filter accounts by search
-    const filtered = accounts.filter(acc => {
+    // Filter accounts for table
+    const filtered = unitAccounts.filter(acc => {
+        // Class filter
+        if (classFilter && acc.student?.class?.id?.toString() !== classFilter) return false;
+        // Search
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
         return (
@@ -107,12 +140,18 @@ const Savings = () => {
         );
     });
 
+    // Filter students in modal by class
+    const filteredStudents = trxClassFilter
+        ? students.filter(s => s.class_id?.toString() === trxClassFilter || s.class?.id?.toString() === trxClassFilter)
+        : students;
+
     // Transaction handlers
     const openDepositModal = (studentId?: string) => {
         setTrxType('Deposit');
         setTrxStudentId(studentId || '');
         setTrxAmount('');
         setTrxNotes('');
+        setTrxClassFilter('');
         setShowTrxModal(true);
     };
 
@@ -159,6 +198,11 @@ const Savings = () => {
         }
     };
 
+    const handleExportPDF = () => {
+        if (!historyAccount) return;
+        generateSavingsReport(historyAccount, transactions);
+    };
+
     if (!canManage) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -178,13 +222,43 @@ const Savings = () => {
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Kelola Tabungan Siswa</h1>
                     <p className="text-slate-500 mt-1">Input setoran, tarik dana, dan pantau saldo tabungan seluruh siswa.</p>
                 </div>
-                <button
-                    onClick={() => openDepositModal()}
-                    className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl hover:bg-emerald-700 shadow-sm transition"
-                >
-                    <Plus size={18} />
-                    <span>Setor Tabungan</span>
-                </button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                    {[1, 9, 10].includes(user?.role_id || 0) && (
+                        <div className="p-1 bg-slate-100 rounded-lg flex shadow-sm border border-slate-200">
+                            <button
+                                onClick={() => {
+                                    setUnitID(1);
+                                    setClassFilter('');
+                                }}
+                                className={clsx(
+                                    "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                    unitID === 1 ? "bg-white text-emerald-700 shadow flex items-center" : "text-slate-500 hover:text-slate-700"
+                                )}
+                            >
+                                MTS
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setUnitID(2);
+                                    setClassFilter('');
+                                }}
+                                className={clsx(
+                                    "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                    unitID === 2 ? "bg-white text-emerald-700 shadow flex items-center" : "text-slate-500 hover:text-slate-700"
+                                )}
+                            >
+                                MA
+                            </button>
+                        </div>
+                    )}
+                    <button
+                        onClick={() => openDepositModal()}
+                        className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl hover:bg-emerald-700 shadow-sm transition"
+                    >
+                        <Plus size={18} />
+                        <span>Setor Tabungan</span>
+                    </button>
+                </div>
             </div>
 
             {/* Overview Cards */}
@@ -225,15 +299,27 @@ const Savings = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-slate-50">
                     <h2 className="text-lg font-bold text-slate-800">Daftar Rekening Tabungan Siswa</h2>
-                    <div className="relative w-full max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Cari nama, NISN, atau kelas..."
-                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                        />
+                    <div className="flex flex-wrap gap-3 items-center">
+                        <div className="relative w-full max-w-xs">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Cari nama, NISN, atau kelas..."
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <select
+                            value={classFilter}
+                            onChange={e => setClassFilter(e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value="">Semua Kelas</option>
+                            {classList.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -323,198 +409,228 @@ const Savings = () => {
             </div>
 
             {/* Transaction Modal */}
-            {showTrxModal && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h2 className="text-xl font-bold flex items-center text-slate-800">
-                                {trxType === 'Deposit' ? (
-                                    <><ArrowUpRight className="text-emerald-500 mr-2" size={24} /> Setor Tabungan</>
-                                ) : (
-                                    <><ArrowDownRight className="text-red-500 mr-2" size={24} /> Tarik Tabungan</>
-                                )}
-                            </h2>
-                            <button onClick={() => setShowTrxModal(false)} className="text-slate-400 hover:text-slate-600 transition">
-                                <X size={20} />
-                            </button>
-                        </div>
+            {
+                showTrxModal && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <h2 className="text-xl font-bold flex items-center text-slate-800">
+                                    {trxType === 'Deposit' ? (
+                                        <><ArrowUpRight className="text-emerald-500 mr-2" size={24} /> Setor Tabungan</>
+                                    ) : (
+                                        <><ArrowDownRight className="text-red-500 mr-2" size={24} /> Tarik Tabungan</>
+                                    )}
+                                </h2>
+                                <button onClick={() => setShowTrxModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                                    <X size={20} />
+                                </button>
+                            </div>
 
-                        <form onSubmit={handleTransactionSubmit} className="p-6 space-y-5">
-                            {/* Type Toggle */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Jenis Transaksi</label>
-                                <div className="flex bg-slate-100 p-1 rounded-xl">
+                            <form onSubmit={handleTransactionSubmit} className="p-6 space-y-5">
+                                {/* Type Toggle */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Jenis Transaksi</label>
+                                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTrxType('Deposit')}
+                                            className={clsx(
+                                                "flex-1 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-1",
+                                                trxType === 'Deposit' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <ArrowUpRight size={14} />
+                                            <span>Setor (Deposit)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTrxType('Withdrawal')}
+                                            className={clsx(
+                                                "flex-1 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-1",
+                                                trxType === 'Withdrawal' ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <ArrowDownRight size={14} />
+                                            <span>Tarik (Withdraw)</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Class Filter for student selection */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Filter Kelas</label>
+                                    <select
+                                        value={trxClassFilter}
+                                        onChange={e => { setTrxClassFilter(e.target.value); setTrxStudentId(''); }}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                                    >
+                                        <option value="">Semua Kelas</option>
+                                        {classList.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Student Select */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Siswa</label>
+                                    <select
+                                        required
+                                        value={trxStudentId}
+                                        onChange={e => setTrxStudentId(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                                    >
+                                        <option value="">-- Pilih Siswa --</option>
+                                        {filteredStudents.map(s => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.nisn} — {s.user?.name} ({s.class?.name || '-'})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {trxStudentId && (() => {
+                                        const acc = accounts.find(a => a.student_id === trxStudentId);
+                                        return acc ? (
+                                            <p className="text-xs text-slate-500 mt-1.5">Saldo saat ini: <span className="font-semibold text-emerald-600">{formatCurrency(acc.balance)}</span></p>
+                                        ) : (
+                                            <p className="text-xs text-amber-600 mt-1.5">Siswa belum punya akun — akan otomatis dibuat saat setor pertama.</p>
+                                        );
+                                    })()}
+                                </div>
+
+                                {/* Amount */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nominal (Rp)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1000"
+                                        placeholder="50000"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 font-medium text-sm"
+                                        value={trxAmount}
+                                        onChange={e => setTrxAmount(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Notes */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Catatan (Opsional)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Contoh: Setoran bulanan"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 text-sm"
+                                        value={trxNotes}
+                                        onChange={e => setTrxNotes(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="pt-4 flex justify-end space-x-3 border-t border-slate-100">
                                     <button
                                         type="button"
-                                        onClick={() => setTrxType('Deposit')}
-                                        className={clsx(
-                                            "flex-1 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-1",
-                                            trxType === 'Deposit' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                                        )}
+                                        onClick={() => setShowTrxModal(false)}
+                                        className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition"
                                     >
-                                        <ArrowUpRight size={14} />
-                                        <span>Setor (Deposit)</span>
+                                        Batal
                                     </button>
                                     <button
-                                        type="button"
-                                        onClick={() => setTrxType('Withdrawal')}
+                                        type="submit"
+                                        disabled={submitting}
                                         className={clsx(
-                                            "flex-1 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-1",
-                                            trxType === 'Withdrawal' ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            "px-6 py-2.5 rounded-xl text-white font-medium transition flex items-center space-x-2 min-w-[140px] justify-center",
+                                            trxType === 'Deposit' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700",
+                                            submitting && "opacity-50 cursor-not-allowed"
                                         )}
                                     >
-                                        <ArrowDownRight size={14} />
-                                        <span>Tarik (Withdraw)</span>
+                                        {submitting ? 'Memproses...' : (trxType === 'Deposit' ? 'Setor Dana' : 'Tarik Dana')}
                                     </button>
                                 </div>
-                            </div>
-
-                            {/* Student Select */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Siswa</label>
-                                <select
-                                    required
-                                    value={trxStudentId}
-                                    onChange={e => setTrxStudentId(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
-                                >
-                                    <option value="">-- Pilih Siswa --</option>
-                                    {students.map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.nisn} — {s.user?.name} ({s.class?.name || '-'})
-                                        </option>
-                                    ))}
-                                </select>
-                                {trxStudentId && (() => {
-                                    const acc = accounts.find(a => a.student_id === trxStudentId);
-                                    return acc ? (
-                                        <p className="text-xs text-slate-500 mt-1.5">Saldo saat ini: <span className="font-semibold text-emerald-600">{formatCurrency(acc.balance)}</span></p>
-                                    ) : (
-                                        <p className="text-xs text-amber-600 mt-1.5">Siswa belum punya akun — akan otomatis dibuat saat setor pertama.</p>
-                                    );
-                                })()}
-                            </div>
-
-                            {/* Amount */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Nominal (Rp)</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="1000"
-                                    placeholder="50000"
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 font-medium text-sm"
-                                    value={trxAmount}
-                                    onChange={e => setTrxAmount(e.target.value)}
-                                />
-                            </div>
-
-                            {/* Notes */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Catatan (Opsional)</label>
-                                <input
-                                    type="text"
-                                    placeholder="Contoh: Setoran bulanan"
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 text-sm"
-                                    value={trxNotes}
-                                    onChange={e => setTrxNotes(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="pt-4 flex justify-end space-x-3 border-t border-slate-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowTrxModal(false)}
-                                    className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className={clsx(
-                                        "px-6 py-2.5 rounded-xl text-white font-medium transition flex items-center space-x-2 min-w-[140px] justify-center",
-                                        trxType === 'Deposit' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700",
-                                        submitting && "opacity-50 cursor-not-allowed"
-                                    )}
-                                >
-                                    {submitting ? 'Memproses...' : (trxType === 'Deposit' ? 'Setor Dana' : 'Tarik Dana')}
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Transaction History Modal */}
-            {showHistoryModal && historyAccount && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[85vh] flex flex-col">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                                    <Eye className="text-blue-600 mr-2" size={24} /> Riwayat Transaksi
-                                </h2>
-                                <p className="text-sm text-slate-500 mt-1">
-                                    {historyAccount.student?.user?.name} — Saldo: <span className="font-semibold text-emerald-600">{formatCurrency(historyAccount.balance)}</span>
-                                </p>
+            {
+                showHistoryModal && historyAccount && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[85vh] flex flex-col">
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                                        <Eye className="text-blue-600 mr-2" size={24} /> Riwayat Transaksi
+                                    </h2>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        {historyAccount.student?.user?.name} — Saldo: <span className="font-semibold text-emerald-600">{formatCurrency(historyAccount.balance)}</span>
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {transactions.length > 0 && (
+                                        <button
+                                            onClick={handleExportPDF}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition"
+                                        >
+                                            <Download size={14} />
+                                            Export PDF
+                                        </button>
+                                    )}
+                                    <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                                        <X size={20} />
+                                    </button>
+                                </div>
                             </div>
-                            <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-slate-600 transition">
-                                <X size={20} />
-                            </button>
-                        </div>
 
-                        <div className="overflow-y-auto flex-1 p-6">
-                            {loadingHistory ? (
-                                <div className="flex justify-center py-12">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                </div>
-                            ) : transactions.length === 0 ? (
-                                <div className="text-center py-12 text-slate-500">
-                                    <History size={40} className="mx-auto text-slate-300 mb-3" />
-                                    <p className="font-medium">Belum ada riwayat transaksi</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {transactions.map(txn => {
-                                        const isDeposit = txn.type === 'Deposit' || txn.type === 'deposit';
-                                        return (
-                                            <div key={txn.id} className={clsx(
-                                                "flex items-center justify-between p-4 rounded-xl border",
-                                                isDeposit ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100"
-                                            )}>
-                                                <div className="flex items-center space-x-4">
-                                                    <div className={clsx(
-                                                        "w-10 h-10 rounded-full flex items-center justify-center",
-                                                        isDeposit ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"
-                                                    )}>
-                                                        {isDeposit ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-slate-800 text-sm">{isDeposit ? 'Setoran' : 'Penarikan'}</p>
-                                                        <p className="text-xs text-slate-500">
-                                                            {new Date(txn.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                                            {txn.handled_by && ` · ${txn.handled_by.name}`}
-                                                        </p>
-                                                        {txn.notes && <p className="text-xs text-slate-400 mt-0.5">{txn.notes}</p>}
-                                                    </div>
-                                                </div>
-                                                <span className={clsx(
-                                                    "font-bold text-sm whitespace-nowrap",
-                                                    isDeposit ? "text-emerald-600" : "text-red-600"
+                            <div className="overflow-y-auto flex-1 p-6">
+                                {loadingHistory ? (
+                                    <div className="flex justify-center py-12">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                    </div>
+                                ) : transactions.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-500">
+                                        <History size={40} className="mx-auto text-slate-300 mb-3" />
+                                        <p className="font-medium">Belum ada riwayat transaksi</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {transactions.map(txn => {
+                                            const isDeposit = txn.type === 'Deposit' || txn.type === 'deposit';
+                                            return (
+                                                <div key={txn.id} className={clsx(
+                                                    "flex items-center justify-between p-4 rounded-xl border",
+                                                    isDeposit ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100"
                                                 )}>
-                                                    {isDeposit ? '+' : '-'}{formatCurrency(txn.amount)}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                                    <div className="flex items-center space-x-4">
+                                                        <div className={clsx(
+                                                            "w-10 h-10 rounded-full flex items-center justify-center",
+                                                            isDeposit ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"
+                                                        )}>
+                                                            {isDeposit ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-slate-800 text-sm">{isDeposit ? 'Setoran' : 'Penarikan'}</p>
+                                                            <p className="text-xs text-slate-500">
+                                                                {new Date(txn.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                                {txn.handled_by && ` · ${txn.handled_by.name}`}
+                                                            </p>
+                                                            {txn.notes && <p className="text-xs text-slate-400 mt-0.5">{txn.notes}</p>}
+                                                        </div>
+                                                    </div>
+                                                    <span className={clsx(
+                                                        "font-bold text-sm whitespace-nowrap",
+                                                        isDeposit ? "text-emerald-600" : "text-red-600"
+                                                    )}>
+                                                        {isDeposit ? '+' : '-'}{formatCurrency(txn.amount)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

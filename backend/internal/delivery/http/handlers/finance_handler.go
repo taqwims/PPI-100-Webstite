@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
 	"strconv"
@@ -259,4 +262,79 @@ func (h *FinanceHandler) DeletePayment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Payment deleted successfully"})
+}
+
+// POST /finance/payment-proof - Upload payment proof and record payment
+func (h *FinanceHandler) UploadPaymentProof(c *gin.Context) {
+	billID := c.PostForm("bill_id")
+	amountStr := c.PostForm("amount")
+	method := c.PostForm("method")
+
+	if billID == "" || amountStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bill_id and amount are required"})
+		return
+	}
+
+	billUUID, err := uuid.Parse(billID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid bill ID"})
+		return
+	}
+
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid amount"})
+		return
+	}
+
+	if method == "" {
+		method = "Transfer"
+	}
+
+	// Handle file upload
+	file, err := c.FormFile("file")
+	proofURL := ""
+	if err == nil && file != nil {
+		// Ensure upload directory exists
+		uploadDir := "./uploads/payment_proofs"
+		os.MkdirAll(uploadDir, os.ModePerm)
+
+		ext := filepath.Ext(file.Filename)
+		filename := fmt.Sprintf("%s_%d%s", billID, time.Now().Unix(), ext)
+		savePath := filepath.Join(uploadDir, filename)
+
+		if err := c.SaveUploadedFile(file, savePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save proof file"})
+			return
+		}
+		proofURL = "/uploads/payment_proofs/" + filename
+	}
+
+	// Record payment
+	if err := h.financeUsecase.RecordPayment(billUUID, amount, method); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Send notification to bendahara
+	userIDVal, _ := c.Get("userID")
+	var senderName string
+	if userID, ok := userIDVal.(string); ok {
+		senderName = userID
+	} else if userID, ok := userIDVal.(uuid.UUID); ok {
+		senderName = userID.String()
+	}
+
+	// Notify bendahara (role_id 9) about the payment proof
+	h.financeUsecase.NotifyBendahara(
+		"Pembayaran Baru Diterima",
+		fmt.Sprintf("Siswa telah melakukan pembayaran sebesar Rp %.0f untuk tagihan (ID: %s) via %s. Bukti: %s. Pengirim: %s",
+			amount, billID[:8], method, proofURL, senderName),
+		billID,
+	)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":   "Payment proof uploaded and payment recorded",
+		"proof_url": proofURL,
+	})
 }

@@ -115,7 +115,7 @@ func (r *financeExtendedRepository) AddCashLedgerEntry(req *domain.CashLedger) e
 
 func (r *financeExtendedRepository) GetCashLedger() ([]domain.CashLedger, error) {
 	var entries []domain.CashLedger
-	if err := r.db.Order("date desc").Find(&entries).Error; err != nil {
+	if err := r.db.Preload("Responsible").Order("date desc").Find(&entries).Error; err != nil {
 		return nil, err
 	}
 	return entries, nil
@@ -142,7 +142,7 @@ func (r *financeExtendedRepository) AddDailyInfaqEntry(req *domain.DailyInfaq) e
 
 func (r *financeExtendedRepository) GetDailyInfaq() ([]domain.DailyInfaq, error) {
 	var entries []domain.DailyInfaq
-	if err := r.db.Preload("HandledBy").Order("date desc").Find(&entries).Error; err != nil {
+	if err := r.db.Preload("HandledBy").Preload("Responsible").Order("date desc").Find(&entries).Error; err != nil {
 		return nil, err
 	}
 	return entries, nil
@@ -194,6 +194,44 @@ func (r *financeExtendedRepository) GetSavingTransactions(accountID uuid.UUID) (
 	return txns, nil
 }
 
+func (r *financeExtendedRepository) GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error) {
+	// Find student by user ID first
+	var student domain.Student
+	if err := r.db.Where("user_id = ?", userID).First(&student).Error; err != nil {
+		return nil, err
+	}
+
+	var account domain.SavingAccount
+	if err := r.db.Preload("Student").Preload("Student.User").Preload("Student.Class").
+		Where("student_id = ?", student.ID).First(&account).Error; err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
+func (r *financeExtendedRepository) GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error) {
+	// Find all students belonging to this parent
+	var students []domain.Student
+	if err := r.db.Where("parent_id = ?", parentID).Find(&students).Error; err != nil {
+		return nil, err
+	}
+
+	if len(students) == 0 {
+		return []domain.SavingAccount{}, nil
+	}
+
+	var studentIDs []uuid.UUID
+	for _, s := range students {
+		studentIDs = append(studentIDs, s.ID)
+	}
+
+	var accounts []domain.SavingAccount
+	if err := r.db.Preload("Student").Preload("Student.User").Preload("Student.Class").
+		Where("student_id IN ?", studentIDs).Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	return accounts, nil
+}
 
 // ------------------- Analytics Dashboard -------------------
 

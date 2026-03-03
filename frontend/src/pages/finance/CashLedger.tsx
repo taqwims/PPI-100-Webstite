@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Download, Search, BookOpen, ArrowUpRight, ArrowDownRight, Briefcase, FileText, AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Download, Search, BookOpen, ArrowUpRight, ArrowDownRight, Briefcase, FileText, AlertCircle, Pencil, Trash2, Printer, Calendar, X, UserCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
+import { generateCashLedgerReceipt, generateCashLedgerReport } from '../../utils/pdfUtils';
+
+interface StaffUser {
+    id: string;
+    name: string;
+    role_id: number;
+}
 
 interface CashLedgerEntry {
     id: string;
@@ -14,6 +21,8 @@ interface CashLedgerEntry {
     amount: number;
     category: string;
     notes: string;
+    responsible_id?: string;
+    responsible?: { id: string; name: string };
 }
 
 const formatCurrency = (amount: number) => {
@@ -26,11 +35,12 @@ const formatCurrency = (amount: number) => {
 
 const CashLedger = () => {
     const { user } = useAuth();
-    // 1: SuperAdmin, 8: Pimpinan (View Only), 9: Bendahara
     const canManage = [1, 9].includes(user?.role_id || 0);
 
     const [entries, setEntries] = useState<CashLedgerEntry[]>([]);
+    const [staffList, setStaffList] = useState<StaffUser[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const [showModal, setShowModal] = useState(false);
     const [editingEntry, setEditingEntry] = useState<CashLedgerEntry | null>(null);
@@ -40,12 +50,20 @@ const CashLedger = () => {
         type: 'Expense',
         amount: '',
         category: 'Operasional',
-        notes: ''
+        notes: '',
+        responsible_id: ''
     });
     const [submitting, setSubmitting] = useState(false);
 
+    // Export modal state
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportStartDate, setExportStartDate] = useState('');
+    const [exportEndDate, setExportEndDate] = useState('');
+    const [exportFormat, setExportFormat] = useState<'pdf' | 'csv'>('pdf');
+
     useEffect(() => {
         fetchLedger();
+        fetchStaff();
     }, []);
 
     const fetchLedger = async () => {
@@ -60,13 +78,24 @@ const CashLedger = () => {
         }
     };
 
+    const fetchStaff = async () => {
+        try {
+            const res = await api.get('/users');
+            const allUsers = res.data || [];
+            // Filter to only staff roles (not students/parents): roles 1-11 excluding 6(siswa), 7(ortu)
+            setStaffList(allUsers.filter((u: StaffUser) => ![6, 7].includes(u.role_id)));
+        } catch (error) {
+            console.error("Failed to fetch staff", error);
+        }
+    };
+
     const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const openCreateModal = () => {
         setEditingEntry(null);
-        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', notes: '' });
+        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', notes: '', responsible_id: '' });
         setShowModal(true);
     };
 
@@ -78,7 +107,8 @@ const CashLedger = () => {
             type: entry.type,
             amount: String(entry.amount),
             category: entry.category,
-            notes: entry.notes || ''
+            notes: entry.notes || '',
+            responsible_id: entry.responsible_id || ''
         });
         setShowModal(true);
     };
@@ -87,7 +117,7 @@ const CashLedger = () => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            const payload = {
+            const payload: any = {
                 source: formData.source,
                 item_name: formData.item_name,
                 type: formData.type,
@@ -96,6 +126,11 @@ const CashLedger = () => {
                 notes: formData.notes
             };
 
+            // Only include responsible_id for Expense
+            if (formData.type === 'Expense' && formData.responsible_id) {
+                payload.responsible_id = formData.responsible_id;
+            }
+
             if (editingEntry) {
                 await api.put(`/finance/cash-ledger/${editingEntry.id}`, payload);
             } else {
@@ -103,7 +138,7 @@ const CashLedger = () => {
             }
             setShowModal(false);
             setEditingEntry(null);
-            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', notes: '' });
+            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', notes: '', responsible_id: '' });
             fetchLedger();
         } catch (error: any) {
             alert(error.response?.data?.error || "Gagal menyimpan data kas");
@@ -122,9 +157,53 @@ const CashLedger = () => {
         }
     };
 
+    const handlePrintReceipt = (entry: CashLedgerEntry) => {
+        generateCashLedgerReceipt(entry);
+    };
+
+    const handleExport = () => {
+        let filtered = entries;
+        if (exportStartDate && exportEndDate) {
+            filtered = entries.filter(e => {
+                const d = new Date(e.date).toISOString().split('T')[0];
+                return d >= exportStartDate && d <= exportEndDate;
+            });
+        } else if (exportStartDate) {
+            filtered = entries.filter(e => new Date(e.date).toISOString().split('T')[0] >= exportStartDate);
+        } else if (exportEndDate) {
+            filtered = entries.filter(e => new Date(e.date).toISOString().split('T')[0] <= exportEndDate);
+        }
+
+        if (filtered.length === 0) {
+            alert('Tidak ada data pada periode yang dipilih.');
+            return;
+        }
+
+        if (exportFormat === 'pdf') {
+            generateCashLedgerReport(filtered, exportStartDate || 'Awal', exportEndDate || 'Akhir');
+        } else {
+            exportToCSV(filtered, `Cash_Ledger_${exportStartDate || 'all'}_${exportEndDate || 'all'}`);
+        }
+        setShowExportModal(false);
+    };
+
+    // Filter entries by search query
+    const filteredEntries = entries.filter(e => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            e.item_name?.toLowerCase().includes(q) ||
+            e.source?.toLowerCase().includes(q) ||
+            e.notes?.toLowerCase().includes(q) ||
+            e.category?.toLowerCase().includes(q) ||
+            e.responsible?.name?.toLowerCase().includes(q)
+        );
+    });
+
     const totalIncome = entries.filter(e => e.type === 'Income').reduce((acc, curr) => acc + curr.amount, 0);
     const totalExpense = entries.filter(e => e.type === 'Expense').reduce((acc, curr) => acc + curr.amount, 0);
     const currentSaldo = entries.reduce((acc, curr) => curr.type === 'Income' ? acc + curr.amount : acc - curr.amount, 0);
+
     return (
         <div className="space-y-6">
             <div className="space-y-6">
@@ -136,11 +215,11 @@ const CashLedger = () => {
 
                     <div className="flex space-x-3">
                         <button
-                            onClick={() => exportToCSV(entries, 'Cash_Ledger')}
+                            onClick={() => setShowExportModal(true)}
                             className="flex items-center space-x-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl hover:bg-slate-50 transition"
                         >
                             <Download size={18} />
-                            <span>Export Excel</span>
+                            <span>Export Data</span>
                         </button>
                         {canManage && (
                             <button
@@ -202,6 +281,8 @@ const CashLedger = () => {
                             <input
                                 type="text"
                                 placeholder="Cari item, sumber, atau keterangan transaksi..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                             />
                         </div>
@@ -215,6 +296,7 @@ const CashLedger = () => {
                                     <th className="p-4 font-medium">Nama Item / Keperluan</th>
                                     <th className="p-4 font-medium">Sumber/Tujuan</th>
                                     <th className="p-4 font-medium">Kategori</th>
+                                    <th className="p-4 font-medium">Penanggung Jawab</th>
                                     <th className="p-4 font-medium text-right">Pemasukan</th>
                                     <th className="p-4 font-medium text-right">Pengeluaran</th>
                                     {canManage && <th className="p-4 font-medium text-center">Aksi</th>}
@@ -223,22 +305,24 @@ const CashLedger = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={canManage ? 7 : 6} className="p-8 text-center">
+                                        <td colSpan={canManage ? 8 : 7} className="p-8 text-center">
                                             <div className="flex justify-center">
                                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                                             </div>
                                         </td>
                                     </tr>
-                                ) : entries.length === 0 ? (
+                                ) : filteredEntries.length === 0 ? (
                                     <tr>
-                                        <td colSpan={canManage ? 7 : 6} className="p-12 text-center text-slate-500">
+                                        <td colSpan={canManage ? 8 : 7} className="p-12 text-center text-slate-500">
                                             <AlertCircle size={40} className="mx-auto text-slate-300 mb-3" />
-                                            <p className="text-lg font-medium text-slate-700">Buku Kas Kosong</p>
-                                            <p className="text-sm">Belum ada pencatatan operasional sekolah.</p>
+                                            <p className="text-lg font-medium text-slate-700">
+                                                {searchQuery ? 'Tidak ditemukan hasil pencarian' : 'Buku Kas Kosong'}
+                                            </p>
+                                            {!searchQuery && <p className="text-sm">Belum ada pencatatan operasional sekolah.</p>}
                                         </td>
                                     </tr>
                                 ) : (
-                                    entries.map((entry) => (
+                                    filteredEntries.map((entry) => (
                                         <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                                             <td className="p-4 text-slate-600 text-sm whitespace-nowrap">
                                                 {new Date(entry.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })}
@@ -253,6 +337,16 @@ const CashLedger = () => {
                                                     {entry.category}
                                                 </span>
                                             </td>
+                                            <td className="p-4 text-sm">
+                                                {entry.type === 'Expense' && entry.responsible ? (
+                                                    <span className="flex items-center gap-1.5 text-slate-700">
+                                                        <UserCheck size={14} className="text-blue-500" />
+                                                        {entry.responsible.name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </td>
                                             <td className="p-4 text-right font-semibold text-emerald-600 whitespace-nowrap">
                                                 {entry.type === 'Income' ? formatCurrency(entry.amount) : '-'}
                                             </td>
@@ -261,7 +355,14 @@ const CashLedger = () => {
                                             </td>
                                             {canManage && (
                                                 <td className="p-4 text-center">
-                                                    <div className="flex items-center justify-center space-x-2">
+                                                    <div className="flex items-center justify-center space-x-1">
+                                                        <button
+                                                            onClick={() => handlePrintReceipt(entry)}
+                                                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                            title="Cetak Struk"
+                                                        >
+                                                            <Printer size={16} />
+                                                        </button>
                                                         <button
                                                             onClick={() => openEditModal(entry)}
                                                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -305,7 +406,7 @@ const CashLedger = () => {
                                         <div className="flex bg-slate-100 p-1 rounded-xl">
                                             <button
                                                 type="button"
-                                                onClick={() => setFormData({ ...formData, type: 'Income' })}
+                                                onClick={() => setFormData({ ...formData, type: 'Income', responsible_id: '' })}
                                                 className={clsx(
                                                     "flex-1 py-1.5 text-sm font-medium rounded-lg transition",
                                                     formData.type === 'Income' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
@@ -384,6 +485,29 @@ const CashLedger = () => {
                                     />
                                 </div>
 
+                                {/* Penanggung Jawab - hanya untuk Pengeluaran */}
+                                {formData.type === 'Expense' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            <span className="flex items-center gap-1.5">
+                                                <UserCheck size={14} className="text-blue-500" />
+                                                Penanggung Jawab (Staff)
+                                            </span>
+                                        </label>
+                                        <select
+                                            name="responsible_id"
+                                            value={formData.responsible_id}
+                                            onChange={handleInput}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
+                                        >
+                                            <option value="">-- Pilih Penanggung Jawab --</option>
+                                            {staffList.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Catatan Tambahan</label>
                                     <div className="relative">
@@ -420,6 +544,98 @@ const CashLedger = () => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Modal */}
+                {showExportModal && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <h2 className="text-lg font-bold flex items-center text-slate-800">
+                                    <Download className="text-blue-600 mr-2" size={22} /> Export Data Kas
+                                </h2>
+                                <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Periode Waktu</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs text-slate-500 mb-1 block">Dari</label>
+                                            <div className="relative">
+                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input
+                                                    type="date"
+                                                    value={exportStartDate}
+                                                    onChange={(e) => setExportStartDate(e.target.value)}
+                                                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-500 mb-1 block">Sampai</label>
+                                            <div className="relative">
+                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input
+                                                    type="date"
+                                                    value={exportEndDate}
+                                                    onChange={(e) => setExportEndDate(e.target.value)}
+                                                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">Kosongkan untuk export semua data.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Format Export</label>
+                                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setExportFormat('pdf')}
+                                            className={clsx(
+                                                "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                                exportFormat === 'pdf' ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <FileText size={16} />
+                                            PDF
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setExportFormat('csv')}
+                                            className={clsx(
+                                                "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                                exportFormat === 'csv' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <Download size={16} />
+                                            Excel (CSV)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+                                    <button
+                                        onClick={() => setShowExportModal(false)}
+                                        className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition text-sm"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        onClick={handleExport}
+                                        className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm flex items-center gap-1.5"
+                                    >
+                                        <Download size={16} />
+                                        Export Sekarang
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

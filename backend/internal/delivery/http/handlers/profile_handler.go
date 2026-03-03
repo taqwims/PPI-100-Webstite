@@ -45,11 +45,14 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 }
 
 type ProfileUpdateRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name              string `json:"name"`
+	Email             string `json:"email"`
+	BankName          string `json:"bank_name"`
+	BankAccountNumber string `json:"bank_account_number"`
+	BankAccountHolder string `json:"bank_account_holder"`
 }
 
-// PUT /profile - Update name and email
+// PUT /profile - Update name, email, and bank details
 func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -90,6 +93,9 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	user.ID = uuid
 	user.Name = req.Name
 	user.Email = req.Email
+	user.BankName = req.BankName
+	user.BankAccountNumber = req.BankAccountNumber
+	user.BankAccountHolder = req.BankAccountHolder
 
 	if err := h.userUsecase.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

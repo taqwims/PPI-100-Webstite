@@ -138,6 +138,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.POST("/payments", financeHandler.RecordPayment)
 			finance.PUT("/payments/:id", financeHandler.UpdatePayment)
 			finance.DELETE("/payments/:id", financeHandler.DeletePayment)
+			finance.POST("/payment-proof", financeHandler.UploadPaymentProof)
 
 			// Extended Financial Features
 			finance.POST("/academic-years", middleware.RoleMiddleware(1, 2, 3, 9), financeExtendedHandler.CreateAcademicYear)
@@ -146,7 +147,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.GET("/savings", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetAllSavingAccounts)
 			finance.POST("/savings/transactions", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.ProcessSavingTransaction)
 			finance.GET("/savings/transactions/:account_id", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingTransactions)
-			finance.GET("/savings/:student_id", middleware.RoleMiddleware(1, 6, 7, 9, 10), financeExtendedHandler.GetStudentSavings)
+			finance.GET("/savings/my", middleware.RoleMiddleware(6, 7), financeExtendedHandler.GetMySavings)
+			finance.GET("/savings/my-children", middleware.RoleMiddleware(7), financeExtendedHandler.GetMyChildrenSavings)
+			finance.GET("/savings/student/:student_id", middleware.RoleMiddleware(1, 6, 7, 9, 10), financeExtendedHandler.GetStudentSavings)
 
 			finance.POST("/payroll", middleware.RoleMiddleware(1, 9), financeExtendedHandler.CreatePayroll)
 			finance.GET("/payroll", middleware.RoleMiddleware(1, 4, 9), financeExtendedHandler.GetPayrolls) // Gurus can fetch their own, need usecase to filter later

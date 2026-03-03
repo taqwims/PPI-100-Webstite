@@ -1,20 +1,41 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, DollarSign, CheckCircle, Edit, Trash2, Filter } from 'lucide-react';
+import { Plus, DollarSign, CheckCircle, Edit, Trash2, Filter, GraduationCap, Eye, ShieldCheck, X, Image } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import clsx from 'clsx';
 
 interface Student {
     id: string;
+    class_id: number;
+    class?: {
+        id: number;
+        name: string;
+    };
     user: {
         name: string;
     };
+}
+
+interface ClassData {
+    id: number;
+    name: string;
+    unit_id: number;
 }
 
 interface AcademicYear {
     id: number;
     name: string;
     is_active: boolean;
+}
+
+interface Payment {
+    id: string;
+    amount: number;
+    payment_method: string;
+    status: string;
+    proof_url?: string;
+    paid_at: string;
 }
 
 interface Bill {
@@ -30,7 +51,12 @@ interface Bill {
         user: {
             name: string;
         };
+        class?: {
+            name: string;
+        };
+        class_id?: number;
     };
+    payments?: Payment[];
 }
 
 interface BillFormData {
@@ -42,9 +68,18 @@ interface BillFormData {
     academic_year_id: string;
 }
 
+// Determine default unit_id based on role
+function getDefaultUnitID(roleId?: number, unitId?: number): number {
+    if (unitId) return unitId;
+    // role 2 = Bendahara MTS → unit 1, role 3 = Bendahara MA → unit 2
+    if (roleId === 2) return 1;
+    if (roleId === 3) return 2;
+    return 1; // default MTS
+}
+
 const Finance: React.FC = () => {
     const { user } = useAuth();
-    const [unitID, setUnitID] = useState(user?.unit_id || 1);
+    const [unitID, setUnitID] = useState(getDefaultUnitID(user?.role_id, user?.unit_id));
     const queryClient = useQueryClient();
     const [showForm, setShowForm] = useState(false);
     const [editingBill, setEditingBill] = useState<Bill | null>(null);
@@ -52,6 +87,12 @@ const Finance: React.FC = () => {
     // Filters
     const [filterYear, setFilterYear] = useState<string>('');
     const [filterType, setFilterType] = useState<string>('');
+    const [filterClass, setFilterClass] = useState<string>('');
+
+    // Payment proof viewer
+    const [showProofModal, setShowProofModal] = useState(false);
+    const [proofUrl, setProofUrl] = useState('');
+    const [proofBill, setProofBill] = useState<Bill | null>(null);
 
     const [formData, setFormData] = useState<BillFormData>({
         student_id: '',
@@ -68,6 +109,7 @@ const Finance: React.FC = () => {
             const res = await api.get(`/finance/bills?unit_id=${unitID}`);
             return res.data;
         },
+        enabled: !!unitID,
     });
 
     // Fetch Academic Years
@@ -87,6 +129,15 @@ const Finance: React.FC = () => {
             return res.data;
         },
         enabled: showForm,
+    });
+
+    // Fetch Classes for filter
+    const { data: classes } = useQuery({
+        queryKey: ['classes', unitID],
+        queryFn: async () => {
+            const res = await api.get(`/academic/classes?unit_id=${unitID}`);
+            return res.data;
+        },
     });
 
     const createBillMutation = useMutation({
@@ -142,7 +193,7 @@ const Finance: React.FC = () => {
             student_id: bill.student_id.toString(),
             title: bill.title,
             amount: bill.amount.toString(),
-            due_date: bill.due_date.split('T')[0], // Format date for input
+            due_date: bill.due_date.split('T')[0],
             bill_type: bill.bill_type || 'SPP',
             academic_year_id: bill.academic_year_id ? bill.academic_year_id.toString() : '',
         });
@@ -169,16 +220,44 @@ const Finance: React.FC = () => {
             recordPaymentMutation.mutate({
                 bill_id: bill.id,
                 amount: bill.amount,
-                method: 'Cash', // Default to Cash for manual entry
+                method: 'Cash',
             });
         }
+    };
+
+    const handleVerifyPayment = (bill: Bill) => {
+        if (confirm(`Verifikasi pembayaran transfer untuk ${bill.title}?`)) {
+            recordPaymentMutation.mutate({
+                bill_id: bill.id,
+                amount: bill.amount,
+                method: 'Transfer',
+            });
+        }
+    };
+
+    const handleViewProof = (bill: Bill) => {
+        // Find the transfer payment proof
+        const transferPayment = bill.payments?.find(p => p.payment_method === 'Transfer' && p.proof_url);
+        setProofUrl(transferPayment?.proof_url || '');
+        setProofBill(bill);
+        setShowProofModal(true);
+    };
+
+    // Detect if bill has a pending transfer proof
+    const hasTransferProof = (bill: Bill): boolean => {
+        return !!bill.payments?.some(p => p.payment_method === 'Transfer' && p.proof_url);
+    };
+
+    const isPendingTransfer = (bill: Bill): boolean => {
+        return bill.status !== 'Paid' && hasTransferProof(bill);
     };
 
     // Filter Logic
     const filteredBills = bills?.filter((bill: Bill) => {
         const matchYear = filterYear ? bill.academic_year_id?.toString() === filterYear : true;
         const matchType = filterType ? bill.bill_type === filterType || (!bill.bill_type && filterType === 'SPP') : true;
-        return matchYear && matchType;
+        const matchClass = filterClass ? bill.student?.class_id?.toString() === filterClass : true;
+        return matchYear && matchType && matchClass;
     });
 
     return (
@@ -214,18 +293,41 @@ const Finance: React.FC = () => {
                             <option value="Uang Kegiatan">Uang Kegiatan</option>
                             <option value="Tunggakan Alumni">Tunggakan Alumni</option>
                         </select>
+                        <div className="h-4 w-px bg-slate-200"></div>
+                        <select
+                            value={filterClass}
+                            onChange={(e) => setFilterClass(e.target.value)}
+                            className="bg-transparent border-none text-sm text-slate-700 focus:ring-0 cursor-pointer pl-1 pr-6"
+                        >
+                            <option value="">Semua Kelas</option>
+                            {classes?.map((c: ClassData) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
                     </div>
 
-                    {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3) && (
-                        <select
-                            value={unitID}
-                            onChange={(e) => setUnitID(Number(e.target.value))}
-                            className="bg-white border border-slate-200 text-slate-700 text-sm shadow-sm rounded-xl px-4 py-2 cursor-pointer focus:ring-2 focus:ring-indigo-500"
-                            disabled={user?.role_id !== 1}
-                        >
-                            <option value={1}>MTS</option>
-                            <option value={2}>MA</option>
-                        </select>
+                    {/* Unit Toggle - always show for admin + bendahara roles */}
+                    {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3 || user?.role_id === 9) && (
+                        <div className="flex items-center bg-white rounded-xl shadow-sm border border-slate-200 p-1">
+                            <button
+                                onClick={() => setUnitID(1)}
+                                className={clsx(
+                                    "px-4 py-1.5 text-sm font-medium rounded-lg transition",
+                                    unitID === 1 ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                                )}
+                            >
+                                MTS
+                            </button>
+                            <button
+                                onClick={() => setUnitID(2)}
+                                className={clsx(
+                                    "px-4 py-1.5 text-sm font-medium rounded-lg transition",
+                                    unitID === 2 ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                                )}
+                            >
+                                MA
+                            </button>
+                        </div>
                     )}
 
                     <button onClick={() => setShowForm(true)} className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition">
@@ -255,7 +357,12 @@ const Finance: React.FC = () => {
                                 {filteredBills?.map((bill: Bill) => (
                                     <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="p-4">
-                                            <span className="font-semibold text-slate-800">{bill.student.user.name}</span>
+                                            <span className="font-semibold text-slate-800">{bill.student?.user?.name}</span>
+                                            {bill.student?.class?.name && (
+                                                <span className="block text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                                    <GraduationCap size={12} /> {bill.student.class.name}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-4">
                                             <div className="flex flex-col">
@@ -274,13 +381,38 @@ const Finance: React.FC = () => {
                                             <span className="text-slate-500 text-sm">{new Date(bill.due_date).toLocaleDateString('id-ID')}</span>
                                         </td>
                                         <td className="p-4 text-center">
-                                            <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${bill.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                {bill.status === 'Paid' ? 'Lunas' : 'Belum Lunas'}
-                                            </span>
+                                            {isPendingTransfer(bill) ? (
+                                                <span className="px-2.5 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800 gap-1 items-center">
+                                                    <Image size={12} /> Menunggu Verifikasi
+                                                </span>
+                                            ) : (
+                                                <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${bill.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                    {bill.status === 'Paid' ? 'Lunas' : 'Belum Lunas'}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-4 text-right">
-                                            <div className="flex justify-end gap-2 items-center">
-                                                {bill.status !== 'Paid' ? (
+                                            <div className="flex justify-end gap-1.5 items-center">
+                                                {bill.status === 'Paid' ? (
+                                                    <span className="text-emerald-500 flex items-center justify-end gap-1 text-sm font-medium mr-2">
+                                                        <CheckCircle size={16} /> Selesai
+                                                    </span>
+                                                ) : isPendingTransfer(bill) ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleViewProof(bill)}
+                                                            className="flex items-center text-xs px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg font-medium transition gap-1"
+                                                        >
+                                                            <Eye size={14} /> Bukti
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleVerifyPayment(bill)}
+                                                            className="flex items-center text-xs px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-medium transition gap-1"
+                                                        >
+                                                            <ShieldCheck size={14} /> Verifikasi
+                                                        </button>
+                                                    </>
+                                                ) : (
                                                     <>
                                                         <button
                                                             onClick={() => handlePayment(bill)}
@@ -295,10 +427,6 @@ const Finance: React.FC = () => {
                                                             <Trash2 size={16} />
                                                         </button>
                                                     </>
-                                                ) : (
-                                                    <span className="text-emerald-500 flex items-center justify-end gap-1 text-sm font-medium mr-2">
-                                                        <CheckCircle size={16} /> Selesai
-                                                    </span>
                                                 )}
                                             </div>
                                         </td>
@@ -369,7 +497,7 @@ const Finance: React.FC = () => {
                                 >
                                     <option value="">Pilih Siswa</option>
                                     {students?.map((s: Student) => (
-                                        <option key={s.id} value={s.id}>{s.user.name}</option>
+                                        <option key={s.id} value={s.id}>{s.user.name}{s.class ? ` (${s.class.name})` : ''}</option>
                                     ))}
                                 </select>
                             </div>
@@ -420,6 +548,56 @@ const Finance: React.FC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Proof Viewer Modal */}
+            {showProofModal && proofBill && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-50">
+                            <h2 className="text-lg font-bold flex items-center text-slate-800">
+                                <Image className="text-blue-600 mr-2" size={22} /> Bukti Pembayaran
+                            </h2>
+                            <button onClick={() => setShowProofModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <p className="text-sm text-slate-500">{proofBill.title}</p>
+                                <p className="text-xl font-bold text-slate-800">{proofBill.amount.toLocaleString('id-ID')}</p>
+                                <p className="text-xs text-slate-400 mt-1">Siswa: {proofBill.student?.user?.name}</p>
+                            </div>
+                            {proofUrl ? (
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                    <img src={proofUrl} alt="Bukti Pembayaran" className="w-full max-h-[400px] object-contain bg-slate-100" />
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-500">
+                                    <Image size={40} className="mx-auto text-slate-300 mb-3" />
+                                    <p>Bukti pembayaran belum tersedia</p>
+                                </div>
+                            )}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        handleVerifyPayment(proofBill);
+                                        setShowProofModal(false);
+                                    }}
+                                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition flex items-center justify-center gap-2"
+                                >
+                                    <ShieldCheck size={16} /> Verifikasi Lunas
+                                </button>
+                                <button
+                                    onClick={() => setShowProofModal(false)}
+                                    className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition"
+                                >
+                                    Tutup
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

@@ -47,3 +47,9 @@ func (r *UserRepository) Update(user *domain.User) error {
 func (r *UserRepository) Delete(id string) error {
 	return r.db.Delete(&domain.User{}, "id = ?", id).Error
 }
+
+func (r *UserRepository) GetUsersByRole(roleID uint) ([]domain.User, error) {
+	var users []domain.User
+	err := r.db.Where("role_id = ?", roleID).Find(&users).Error
+	return users, err
+}

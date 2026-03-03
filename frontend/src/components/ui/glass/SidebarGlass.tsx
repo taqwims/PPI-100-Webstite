@@ -25,17 +25,24 @@ const SidebarGlass: React.FC = () => {
     if (roleId <= 3) { // Admin
         links = [
             ...links,
-            { icon: Users, label: 'Siswa', path: '/dashboard/students' },
+            // Akademik
             { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
             { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
             { icon: Calendar, label: 'Absensi', path: '/dashboard/attendance' },
-            { icon: CreditCard, label: 'Keuangan', path: '/dashboard/finance' },
             { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
-            { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
-            { icon: Users, label: 'User Mgmt', path: '/dashboard/users' },
+
+            // Administrasi Siswa & Keuangan
             { icon: Users, label: 'PPDB', path: '/dashboard/ppdb' },
-            { icon: BookOpen, label: 'Konten Publik', path: '/dashboard/public-content' },
+            { icon: Users, label: 'Siswa', path: '/dashboard/students' },
+            { icon: CreditCard, label: 'Keuangan', path: '/dashboard/finance' },
+
+            // Komunikasi & Konten
             { icon: Bell, label: 'Kirim Notif', path: '/dashboard/admin/notifications' },
+            { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
+            { icon: BookOpen, label: 'Konten Publik', path: '/dashboard/public-content' },
+
+            // Pengaturan
+            { icon: Users, label: 'User Mgmt', path: '/dashboard/users' },
         ];
     } else if (roleId === 4) { // Guru
         links = [

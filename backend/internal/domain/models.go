@@ -10,19 +10,22 @@ import (
 // Core Tables
 
 type User struct {
-	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name         string    `gorm:"not null" json:"name"`
-	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash string    `gorm:"not null" json:"-"`
-	PhotoURL     string    `json:"photo_url"`
-	RoleID       uint      `gorm:"not null" json:"role_id"`
-	UnitID       uint      `gorm:"not null" json:"unit_id"`
-	Teacher      *Teacher  `gorm:"foreignKey:UserID" json:"teacher,omitempty"`
-	Parent       *Parent   `gorm:"foreignKey:UserID" json:"parent,omitempty"`
-	Student      *Student  `gorm:"foreignKey:UserID" json:"student,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name              string    `gorm:"not null" json:"name"`
+	Email             string    `gorm:"uniqueIndex;not null" json:"email"`
+	PasswordHash      string    `gorm:"not null" json:"-"`
+	PhotoURL          string    `json:"photo_url"`
+	RoleID            uint      `gorm:"not null" json:"role_id"`
+	UnitID            uint      `gorm:"not null" json:"unit_id"`
+	BankName          string    `json:"bank_name"`
+	BankAccountNumber string    `json:"bank_account_number"`
+	BankAccountHolder string    `json:"bank_account_holder"`
+	Teacher           *Teacher  `gorm:"foreignKey:UserID" json:"teacher,omitempty"`
+	Parent            *Parent   `gorm:"foreignKey:UserID" json:"parent,omitempty"`
+	Student           *Student  `gorm:"foreignKey:UserID" json:"student,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Role struct {
@@ -137,6 +140,7 @@ type Payment struct {
 	PaymentMethod string    `gorm:"not null" json:"payment_method"` // Transfer, Cash, Midtrans
 	Status        string    `gorm:"not null" json:"status"` // Pending, Success, Failed
 	TransactionID string    `json:"transaction_id"` // From Payment Gateway
+	ProofURL      string    `json:"proof_url"`      // File path for transfer proof
 	PaidAt        time.Time `json:"paid_at"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
@@ -328,28 +332,33 @@ type SavingTransaction struct {
 }
 
 type CashLedger struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Date        time.Time `gorm:"not null" json:"date"`
-	Source      string    `gorm:"not null" json:"source"` // From who, to who
-	ItemName    string    `gorm:"not null" json:"item_name"`
-	Type        string    `gorm:"not null" json:"type"` // Income, Expense
-	Amount      float64   `gorm:"not null" json:"amount"`
-	Category    string    `gorm:"not null" json:"category"` // Operasional, Hutang Pihak ke 3, dll
-	Notes       string    `json:"notes"`
-	CreatedBy   uuid.UUID `gorm:"type:uuid" json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Date           time.Time  `gorm:"not null" json:"date"`
+	Source         string     `gorm:"not null" json:"source"` // From who, to who
+	ItemName       string     `gorm:"not null" json:"item_name"`
+	Type           string     `gorm:"not null" json:"type"` // Income, Expense
+	Amount         float64    `gorm:"not null" json:"amount"`
+	Category       string     `gorm:"not null" json:"category"` // Operasional, Hutang Pihak ke 3, dll
+	Notes          string     `json:"notes"`
+	CreatedBy      uuid.UUID  `gorm:"type:uuid" json:"created_by"`
+	ResponsibleID  *uuid.UUID `gorm:"type:uuid" json:"responsible_id"`
+	Responsible    *User      `gorm:"foreignKey:ResponsibleID" json:"responsible"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 type DailyInfaq struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Date        time.Time `gorm:"not null" json:"date"`
-	Source      string    `gorm:"not null" json:"source"` // Student ID, external donatur
-	Type        string    `gorm:"not null" json:"type"` // Income, Expense (if any uses)
-	Amount      float64   `gorm:"not null" json:"amount"`
-	HandledByID uuid.UUID `gorm:"type:uuid;not null" json:"handled_by_id"`
-	HandledBy   User      `gorm:"foreignKey:HandledByID" json:"handled_by"`
-	Notes       string    `json:"notes"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Date           time.Time  `gorm:"not null" json:"date"`
+	Source         string     `gorm:"not null" json:"source"` // Student ID, external donatur
+	Type           string     `gorm:"not null" json:"type"` // Income, Expense
+	Amount         float64    `gorm:"not null" json:"amount"`
+	ClassName      string     `json:"class_name"` // Optional class name for per-class infaq
+	HandledByID    uuid.UUID  `gorm:"type:uuid;not null" json:"handled_by_id"`
+	HandledBy      User       `gorm:"foreignKey:HandledByID" json:"handled_by"`
+	ResponsibleID  *uuid.UUID `gorm:"type:uuid" json:"responsible_id"`
+	Responsible    *User      `gorm:"foreignKey:ResponsibleID" json:"responsible"`
+	Notes          string     `json:"notes"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }

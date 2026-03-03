@@ -158,3 +158,21 @@ func (u *FinanceUsecase) UpdatePayment(payment *domain.Payment) error {
 func (u *FinanceUsecase) DeletePayment(id string) error {
 	return u.financeRepo.DeletePayment(id)
 }
+
+// NotifyBendahara sends a notification to all users with role_id 9 (Bendahara)
+func (u *FinanceUsecase) NotifyBendahara(title string, message string, referenceID string) {
+	// Get all bendahara users (role_id=9)
+	users, err := u.userRepo.GetUsersByRole(9)
+	if err != nil {
+		return
+	}
+	for _, bendahara := range users {
+		_ = u.notificationUsecase.SendNotification(
+			bendahara.ID,
+			title,
+			message,
+			"payment",
+			referenceID,
+		)
+	}
+}

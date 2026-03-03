@@ -13,6 +13,8 @@ type FinanceExtendedRepository interface {
 	GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error)
 	GetAllSavingAccounts() ([]domain.SavingAccount, error)
 	GetSavingTransactions(accountID uuid.UUID) ([]domain.SavingTransaction, error)
+	GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error)
+	GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error)
 
 	CreatePayroll(req *domain.Payroll) error
 	GetPayrolls(monthYear string) ([]domain.Payroll, error)
