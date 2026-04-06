@@ -8,6 +8,9 @@ import (
 type FinanceExtendedRepository interface {
 	CreateAcademicYear(year *domain.AcademicYear) error
 	GetAllAcademicYears() ([]domain.AcademicYear, error)
+	UpdateAcademicYear(year *domain.AcademicYear) error
+	DeleteAcademicYear(id uint) error
+	SetActiveAcademicYear(id uint) error
 
 	ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error
 	GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error)
@@ -16,8 +19,6 @@ type FinanceExtendedRepository interface {
 	GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error)
 	GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error)
 
-	CreatePayroll(req *domain.Payroll) error
-	GetPayrolls(monthYear string) ([]domain.Payroll, error)
 
 	AddCashLedgerEntry(req *domain.CashLedger) error
 	GetCashLedger() ([]domain.CashLedger, error)
@@ -29,8 +30,6 @@ type FinanceExtendedRepository interface {
 	UpdateDailyInfaqEntry(req *domain.DailyInfaq) error
 	DeleteDailyInfaqEntry(id string) error
 
-	UpdatePayroll(req *domain.Payroll) error
-	DeletePayroll(id string) error
 
 	GetDashboardAnalytics() (map[string]interface{}, error)
 }

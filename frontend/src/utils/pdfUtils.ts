@@ -3,16 +3,34 @@ import autoTable from 'jspdf-autotable';
 
 interface PayrollData {
     id: string;
-    month_year: string;
+    period_month: number;
+    period_year: number;
+    employee_name: string;
+    employee_nik: string;
+    position: string;
     user?: { name: string; email: string };
-    basic_salary: number;
-    allowances: number;
-    deductions: number;
-    total: number;
+    
+    base_salary: number;
+    functional_allowance: number;
+    transport_allowance: number;
+    additional_task: number;
+    total_income: number;
+    
+    lateness_penalty: number;
+    infaq_deduction: number;
+    cash_advance: number;
+    total_deduction: number;
+    
+    net_salary: number;
     status: string;
-    payment_date: string;
-    processed_by?: { name: string };
+    paid_at?: string;
 }
+
+const getMonthName = (monthNumber: number) => {
+    const date = new Date();
+    date.setMonth(monthNumber - 1);
+    return date.toLocaleString('id-ID', { month: 'long' });
+};
 
 interface CashLedgerData {
     id: string;
@@ -23,6 +41,18 @@ interface CashLedgerData {
     amount: number;
     category: string;
     notes: string;
+}
+
+export interface GlobalTransactionData {
+    date: string;
+    source: string;
+    description: string;
+    type: string;
+    amount: number;
+    category: string;
+    code: string;
+    code_name: string;
+    module: string;
 }
 
 const formatCurrency = (amount: number) => {
@@ -67,6 +97,7 @@ export const generatePayrollReceipt = (payroll: PayrollData) => {
     const labelX = 20;
     const valueX = 80;
 
+    const name = payroll.employee_name || payroll.user?.name || '-';
     // Employee info
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -74,13 +105,13 @@ export const generatePayrollReceipt = (payroll: PayrollData) => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text('Nama', labelX, startY + 10);
-    doc.text(`: ${payroll.user?.name || '-'}`, valueX, startY + 10);
-    doc.text('Email', labelX, startY + 17);
-    doc.text(`: ${payroll.user?.email || '-'}`, valueX, startY + 17);
+    doc.text(`: ${name}`, valueX, startY + 10);
+    doc.text('Jabatan', labelX, startY + 17);
+    doc.text(`: ${payroll.position || '-'}`, valueX, startY + 17);
     doc.text('Periode', labelX, startY + 24);
-    doc.text(`: ${payroll.month_year}`, valueX, startY + 24);
+    doc.text(`: ${getMonthName(payroll.period_month)} ${payroll.period_year}`, valueX, startY + 24);
     doc.text('Tanggal Bayar', labelX, startY + 31);
-    doc.text(`: ${formatDate(payroll.payment_date)}`, valueX, startY + 31);
+    doc.text(`: ${formatDate(payroll.paid_at || new Date().toISOString())}`, valueX, startY + 31);
 
     // Divider
     doc.setDrawColor(203, 213, 225);
@@ -91,26 +122,79 @@ export const generatePayrollReceipt = (payroll: PayrollData) => {
     doc.setFontSize(11);
     doc.text('Rincian Gaji', labelX, startY + 45);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(9);
 
-    const detailY = startY + 55;
-    doc.text('Gaji Pokok', labelX, detailY);
-    doc.text(formatCurrency(payroll.basic_salary), pageWidth - 20, detailY, { align: 'right' });
-    doc.text('Tunjangan', labelX, detailY + 8);
-    doc.setTextColor(16, 185, 129);
-    doc.text(`+ ${formatCurrency(payroll.allowances)}`, pageWidth - 20, detailY + 8, { align: 'right' });
-    doc.setTextColor(239, 68, 68);
-    doc.text('Potongan', labelX, detailY + 16);
-    doc.text(`- ${formatCurrency(payroll.deductions)}`, pageWidth - 20, detailY + 16, { align: 'right' });
+    let detailY = startY + 52;
+    // Pendapatan
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pendapatan', labelX, detailY);
+    doc.setFont('helvetica', 'normal');
+    
+    if (payroll.base_salary > 0) {
+        detailY += 6;
+        doc.text('Gaji Pokok', labelX, detailY);
+        doc.text(formatCurrency(payroll.base_salary), pageWidth - 20, detailY, { align: 'right' });
+    }
+    if (payroll.functional_allowance > 0) {
+        detailY += 6;
+        doc.text('Tunjangan Fungsional', labelX, detailY);
+        doc.text(formatCurrency(payroll.functional_allowance), pageWidth - 20, detailY, { align: 'right' });
+    }
+    if (payroll.transport_allowance > 0) {
+        detailY += 6;
+        doc.text('Tunjangan Transport', labelX, detailY);
+        doc.text(formatCurrency(payroll.transport_allowance), pageWidth - 20, detailY, { align: 'right' });
+    }
+    if (payroll.additional_task > 0) {
+        detailY += 6;
+        doc.text('Tugas Tambahan', labelX, detailY);
+        doc.text(formatCurrency(payroll.additional_task), pageWidth - 20, detailY, { align: 'right' });
+    }
+    
+    detailY += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129); // emerald
+    doc.text('Total Pendapatan', labelX, detailY);
+    doc.text(`+ ${formatCurrency(payroll.total_income)}`, pageWidth - 20, detailY, { align: 'right' });
+    
+    // Potongan
+    detailY += 10;
+    doc.setTextColor(30, 41, 59);
+    doc.text('Potongan', labelX, detailY);
+    doc.setFont('helvetica', 'normal');
+    
+    if (payroll.lateness_penalty > 0) {
+        detailY += 6;
+        doc.text('Keterlambatan', labelX, detailY);
+        doc.text(formatCurrency(payroll.lateness_penalty), pageWidth - 20, detailY, { align: 'right' });
+    }
+    if (payroll.infaq_deduction > 0) {
+        detailY += 6;
+        doc.text('Infaq', labelX, detailY);
+        doc.text(formatCurrency(payroll.infaq_deduction), pageWidth - 20, detailY, { align: 'right' });
+    }
+    if (payroll.cash_advance > 0) {
+        detailY += 6;
+        doc.text('Kasbon', labelX, detailY);
+        doc.text(formatCurrency(payroll.cash_advance), pageWidth - 20, detailY, { align: 'right' });
+    }
+    
+    detailY += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(239, 68, 68); // red
+    doc.text('Total Potongan', labelX, detailY);
+    doc.text(`- ${formatCurrency(payroll.total_deduction)}`, pageWidth - 20, detailY, { align: 'right' });
 
-    // Total
+    // Total Netto
+    detailY += 6;
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, detailY + 22, pageWidth - 20, detailY + 22);
-    doc.setTextColor(15, 23, 42);
+    doc.line(labelX, detailY + 2, pageWidth - 20, detailY + 2);
+    doc.setTextColor(15, 23, 42); // slate 900
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text('TOTAL DITERIMA', labelX, detailY + 30);
-    doc.text(formatCurrency(payroll.total), pageWidth - 20, detailY + 30, { align: 'right' });
+    doc.text('GAJI BERSIH', labelX, detailY + 10);
+    doc.text(formatCurrency(payroll.net_salary), pageWidth - 20, detailY + 10, { align: 'right' });
 
     // Status badge
     const statusY = detailY + 42;
@@ -126,10 +210,12 @@ export const generatePayrollReceipt = (payroll: PayrollData) => {
     doc.setTextColor(148, 163, 184);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Diproses oleh: ${payroll.processed_by?.name || 'Sistem'}`, labelX, statusY + 20);
-    doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit' })}`, labelX, statusY + 26);
+    const printedDate = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    doc.text(`Dicetak secara otomatis oleh sistem pada: ${printedDate}`, labelX, statusY + 20);
+    doc.text('Validasi dilakukan oleh sistem keuangan SDIT PPI 100.', labelX, statusY + 25);
 
-    doc.save(`Slip_Gaji_${payroll.user?.name?.replace(/\s+/g, '_') || 'Unknown'}_${payroll.month_year}.pdf`);
+    const fileNameName = name.replace(/\s+/g, '_');
+    doc.save(`Slip_Gaji_${fileNameName}_${payroll.period_month}_${payroll.period_year}.pdf`);
 };
 
 // ===================== CASH LEDGER RECEIPT =====================
@@ -190,6 +276,72 @@ export const generateCashLedgerReceipt = (entry: CashLedgerData) => {
     doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID')}`, labelX, startY + 65);
 
     doc.save(`Bukti_Kas_${entry.item_name.replace(/\s+/g, '_')}_${new Date(entry.date).toISOString().split('T')[0]}.pdf`);
+};
+
+// ===================== FINANCIAL REPORT (GLOBAL) =====================
+
+export const generateFinancialReportPDF = (
+    transactions: GlobalTransactionData[],
+    reportTitle: string,
+    periodStr: string,
+    action: 'preview' | 'download' = 'download'
+): string | void => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(reportTitle.toUpperCase(), pageWidth / 2, 14, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periode: ${periodStr}`, pageWidth / 2, 22, { align: 'center' });
+
+    // Summary
+    const totalIncome = transactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+    const totalExpense = transactions.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
+    const netto = totalIncome - totalExpense;
+
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total Pendapatan: ${formatCurrency(totalIncome)}`, 14, 40);
+    doc.text(`Total Pengeluaran: ${formatCurrency(totalExpense)}`, 120, 40);
+    doc.text(`Netto: ${formatCurrency(netto)}`, 226, 40);
+
+    // Table
+    autoTable(doc, {
+        startY: 48,
+        head: [['No', 'Tanggal', 'Modul', 'Deskripsi/Sumber', 'Kode', 'Ket', 'Kategori', 'Pemasukan', 'Pengeluaran']],
+        body: transactions.map((t, i) => [
+            i + 1,
+            formatDate(t.date),
+            t.module,
+            `${t.description} / ${t.source}`,
+            t.code || '-',
+            t.code_name || '-',
+            t.category || '-',
+            t.type === 'Income' ? formatCurrency(t.amount) : '-',
+            t.type === 'Expense' ? formatCurrency(t.amount) : '-'
+        ]),
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    // Footer
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID')} - Yayasan PPI 100`, 14, doc.internal.pageSize.getHeight() - 10);
+
+    if (action === 'preview') {
+        return doc.output('bloburl').toString();
+    } else {
+        doc.save(`${reportTitle.replace(/\s+/g, '_')}_${periodStr.replace(/\s+/g, '_')}.pdf`);
+    }
 };
 
 // ===================== CASH LEDGER REPORT =====================
@@ -354,4 +506,393 @@ export const generateSavingsReport = (
     doc.text(`Laporan Tabungan — ${studentName}`, 14, doc.internal.pageSize.getHeight() - 10);
 
     doc.save(`Tabungan_${studentName.replace(/\s+/g, '_')}.pdf`);
+};
+
+// ===================== BILL PAYMENT RECEIPT =====================
+
+interface BillReceiptData {
+    id: string;
+    title: string;
+    amount: number;
+    due_date: string;
+    status: string;
+    bill_type: string;
+    student?: {
+        user: { name: string };
+        class?: { name: string };
+    };
+    paid_at?: string;
+}
+
+export const generateBillReceipt = (bill: BillReceiptData, studentName?: string) => {
+    const doc = new jsPDF({
+        format: [148, 210], // A5 format for receipt feel
+    });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header bar
+    doc.setFillColor(16, 185, 129); // emerald-500
+    doc.rect(0, 0, pageWidth, 36, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KUITANSI PEMBAYARAN', pageWidth / 2, 15, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Yayasan PPI 100 — Pondok Pesantren Islam', pageWidth / 2, 23, { align: 'center' });
+    doc.text(`No: KP-${bill.id.slice(0, 8).toUpperCase()}`, pageWidth / 2, 30, { align: 'center' });
+
+    // Body
+    doc.setTextColor(30, 41, 59);
+    const startY = 46;
+    const labelX = 14;
+    const valueX = 60;
+
+    // Student info
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Informasi Siswa', labelX, startY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    const name = studentName || bill.student?.user?.name || '-';
+    const className = bill.student?.class?.name || '-';
+    doc.text('Nama', labelX, startY + 9);
+    doc.text(`: ${name}`, valueX, startY + 9);
+    doc.text('Kelas', labelX, startY + 16);
+    doc.text(`: ${className}`, valueX, startY + 16);
+
+    // Divider
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, startY + 22, pageWidth - 14, startY + 22);
+
+    // Bill info
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Detail Tagihan', labelX, startY + 30);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    doc.text('Jenis', labelX, startY + 39);
+    doc.text(`: ${bill.bill_type || 'SPP'}`, valueX, startY + 39);
+    doc.text('Keterangan', labelX, startY + 46);
+    doc.text(`: ${bill.title}`, valueX, startY + 46);
+    doc.text('Jatuh Tempo', labelX, startY + 53);
+    doc.text(`: ${formatDate(bill.due_date)}`, valueX, startY + 53);
+
+    // Divider
+    doc.line(labelX, startY + 59, pageWidth - 14, startY + 59);
+
+    // Amount box
+    doc.setFillColor(240, 253, 244); // emerald-50
+    doc.roundedRect(labelX, startY + 64, pageWidth - 28, 22, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Total Dibayar', labelX + 6, startY + 74);
+    doc.setFontSize(14);
+    doc.setTextColor(5, 150, 105); // emerald-600
+    doc.text(formatCurrency(bill.amount), pageWidth - 20, startY + 77, { align: 'right' });
+
+    // Status
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('✓ LUNAS', pageWidth / 2, startY + 100, { align: 'center' });
+
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    const paidDate = bill.paid_at ? formatDate(bill.paid_at) : formatDate(new Date().toISOString());
+    doc.text(`Dibayar pada: ${paidDate}`, pageWidth / 2, startY + 108, { align: 'center' });
+
+    // Footer
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, startY + 120, pageWidth - 14, startY + 120);
+
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.text('Dokumen ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, startY + 128, { align: 'center' });
+    doc.text('Kuitansi ini sah tanpa tanda tangan.', pageWidth / 2, startY + 133, { align: 'center' });
+
+    doc.save(`Kuitansi_${bill.title.replace(/\s+/g, '_')}_${name.replace(/\s+/g, '_')}.pdf`);
+};
+
+// ===================== ACTIVITY REPORT =====================
+
+interface ActivityReportOptions {
+    activity: { name: string; target_amount: number; academic_year?: { name: string } };
+    obligationsCount: number;
+    summary: { total_income: number; total_expense: number; balance: number } | null;
+    transactions: { date: string; description: string; transaction_type: string; amount: number }[];
+}
+
+export const generateActivityReportPDF = (data: ActivityReportOptions) => {
+    const { activity, obligationsCount, summary, transactions } = data;
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('Laporan Rekapitulasi Keuangan Kegiatan', 14, 22);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    // @ts-ignore
+    doc.text(`${activity.name} • Tahun Ajaran ${activity.academic_year?.name || '-'}`, 14, 30);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(20);
+    doc.text('1. Ringkasan Keuangan', 14, 45);
+    
+    const totalTargetAmt = obligationsCount * activity.target_amount;
+
+    autoTable(doc, {
+        startY: 50,
+        head: [['Keterangan', 'Nominal']],
+        body: [
+            ['Total Target Pendapatan (Peserta x Tagihan)', formatCurrency(totalTargetAmt)],
+            ['Proyeksi Sisa Belum Tertagih', formatCurrency(totalTargetAmt - (summary?.total_income || 0))],
+            ['Total Dana Masuk dari Siswa', formatCurrency(summary?.total_income || 0)],
+            ['Total Pengeluaran Panitia', formatCurrency(summary?.total_expense || 0)],
+            ['Saldo Akhir Kegiatan', formatCurrency(summary?.balance || 0)],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 50;
+
+    doc.setFontSize(14);
+    doc.text('2. Riwayat Transaksi', 14, finalY + 15);
+
+    const txData = transactions.map(tx => [
+        new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(tx.date)),
+        tx.description,
+        tx.transaction_type === 'Income' ? formatCurrency(tx.amount) : '-',
+        tx.transaction_type === 'Expense' ? formatCurrency(tx.amount) : '-'
+    ]);
+
+    autoTable(doc, {
+        startY: finalY + 20,
+        head: [['Tanggal', 'Uraian / Keterangan', 'Pemasukan', 'Pengeluaran']],
+        body: txData,
+        theme: 'striped',
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    doc.save(`Laporan_Kegiatan_${activity.name.replace(/\s+/g, '_')}.pdf`);
+};
+
+// ===================== OBLIGATION RECEIPT (Kwitansi Tanggungan/Kegiatan) =====================
+
+interface ObligationReceiptData {
+    id: string;
+    studentName: string;
+    className: string;
+    activityName?: string;
+    amount: number;
+    paidAt?: string;
+}
+
+export const generateObligationReceipt = (data: ObligationReceiptData) => {
+    const doc = new jsPDF({ format: [148, 210] }); // A5
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(59, 130, 246); // blue-500
+    doc.rect(0, 0, pageWidth, 34, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KWITANSI PEMBAYARAN', pageWidth / 2, 14, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Yayasan PPI 100 — Pondok Pesantren Islam', pageWidth / 2, 22, { align: 'center' });
+    doc.text(`No: KW-${data.id.slice(0, 8).toUpperCase()}`, pageWidth / 2, 28, { align: 'center' });
+
+    // Body
+    doc.setTextColor(30, 41, 59);
+    const startY = 44;
+    const labelX = 12;
+    const valueX = 55;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Informasi Siswa', labelX, startY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Nama', labelX, startY + 9);
+    doc.text(`: ${data.studentName}`, valueX, startY + 9);
+    doc.text('Kelas', labelX, startY + 16);
+    doc.text(`: ${data.className}`, valueX, startY + 16);
+
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, startY + 22, pageWidth - 12, startY + 22);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Detail Pembayaran', labelX, startY + 30);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    if (data.activityName) {
+        doc.text('Kegiatan', labelX, startY + 39);
+        doc.text(`: ${data.activityName}`, valueX, startY + 39);
+    }
+
+    const dateLabel = data.activityName ? startY + 46 : startY + 39;
+    doc.text('Tanggal Bayar', labelX, dateLabel);
+    doc.text(`: ${data.paidAt ? formatDate(data.paidAt) : formatDate(new Date().toISOString())}`, valueX, dateLabel);
+
+    // Amount box
+    const boxY = dateLabel + 10;
+    doc.setFillColor(239, 246, 255); // blue-50
+    doc.roundedRect(labelX, boxY, pageWidth - 24, 20, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text('TOTAL DIBAYAR', labelX + 6, boxY + 10);
+    doc.setFontSize(14);
+    doc.setTextColor(37, 99, 235); // blue-600
+    doc.text(formatCurrency(data.amount), pageWidth - 18, boxY + 13, { align: 'right' });
+
+    // Status
+    doc.setTextColor(16, 185, 129);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('✓ LUNAS', pageWidth / 2, boxY + 34, { align: 'center' });
+
+    // Footer
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, boxY + 48, pageWidth - 12, boxY + 48);
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Dokumen ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, boxY + 55, { align: 'center' });
+    doc.text('Kwitansi ini sah tanpa tanda tangan.', pageWidth / 2, boxY + 60, { align: 'center' });
+
+    doc.save(`Kwitansi_${data.studentName.replace(/\s+/g, '_')}_${data.id.slice(0, 8)}.pdf`);
+};
+
+// ===================== STUDENT BILL SUMMARY (Surat Tagihan Per Siswa) =====================
+
+interface StudentBillItem {
+    name: string;
+    amount: number;
+    paid_amount: number;
+    status: string;
+    billing_month?: number;
+    due_date?: string;
+}
+
+interface StudentBillPDFData {
+    studentName: string;
+    className: string;
+    nisn?: string;
+    academicYear: string;
+    obligations: StudentBillItem[];
+}
+
+export const generateStudentBillPDF = (data: StudentBillPDFData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Header
+    doc.setFillColor(220, 38, 38); // red-600 (urgent letter feel)
+    doc.rect(0, 0, pageWidth, 38, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SURAT TAGIHAN SISWA', pageWidth / 2, 16, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Yayasan PPI 100 — Pondok Pesantren Islam', pageWidth / 2, 25, { align: 'center' });
+    doc.text(`Tahun Ajaran: ${data.academicYear}`, pageWidth / 2, 32, { align: 'center' });
+
+    // Student info
+    doc.setTextColor(30, 41, 59);
+    const startY = 50;
+    const labelX = 14;
+    const valueX = 60;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Data Siswa', labelX, startY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Nama', labelX, startY + 9);
+    doc.text(`: ${data.studentName}`, valueX, startY + 9);
+    doc.text('Kelas', labelX, startY + 16);
+    doc.text(`: ${data.className}`, valueX, startY + 16);
+    if (data.nisn) {
+        doc.text('NISN', labelX, startY + 23);
+        doc.text(`: ${data.nisn}`, valueX, startY + 23);
+    }
+    doc.text('Tanggal Cetak', labelX, data.nisn ? startY + 30 : startY + 23);
+    doc.text(`: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, valueX, data.nisn ? startY + 30 : startY + 23);
+
+    // Divider
+    const divY = data.nisn ? startY + 36 : startY + 29;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, divY, pageWidth - 14, divY);
+
+    // Unpaid items
+    const unpaid = data.obligations.filter(o => o.status !== 'Paid');
+    const totalUnpaid = unpaid.reduce((s, o) => s + (o.amount - o.paid_amount), 0);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Rincian Tunggakan', labelX, divY + 8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`${unpaid.length} item belum lunas — Total: ${formatCurrency(totalUnpaid)}`, labelX, divY + 15);
+
+    // Table
+    autoTable(doc, {
+        startY: divY + 20,
+        head: [['No', 'Jenis Pembayaran', 'Bulan', 'Tagihan', 'Terbayar', 'Sisa', 'Status', 'Jatuh Tempo']],
+        body: unpaid.map((o, i) => [
+            i + 1,
+            o.name,
+            o.billing_month && o.billing_month > 0 ? monthNames[o.billing_month] : '-',
+            formatCurrency(o.amount),
+            formatCurrency(o.paid_amount),
+            formatCurrency(o.amount - o.paid_amount),
+            o.status === 'Partial' ? 'Cicil' : 'Belum',
+            o.due_date ? formatDate(o.due_date) : '-'
+        ]),
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [254, 242, 242] },
+    });
+
+    const finalY = (doc as any).lastAutoTable?.finalY || divY + 60;
+
+    // Total box
+    doc.setFillColor(254, 226, 226); // red-100
+    doc.roundedRect(labelX, finalY + 5, pageWidth - 28, 18, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(185, 28, 28); // red-700
+    doc.text('TOTAL SISA TUNGGAKAN', labelX + 6, finalY + 16);
+    doc.setFontSize(14);
+    doc.text(formatCurrency(totalUnpaid), pageWidth - 20, finalY + 17, { align: 'right' });
+
+    // Closing message
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Mohon segera melakukan pembayaran atas tunggakan di atas.', labelX, finalY + 32);
+    doc.text('Apabila sudah melakukan pembayaran, mohon abaikan surat ini.', labelX, finalY + 38);
+
+    // Footer
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.text('Surat tagihan ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, finalY + 52, { align: 'center' });
+
+    doc.save(`Surat_Tagihan_${data.studentName.replace(/\s+/g, '_')}.pdf`);
 };

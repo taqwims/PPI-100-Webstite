@@ -3,6 +3,7 @@
 .vscode/
 .idea/
 *.log
+*.swp
 tmp/
 
 # Environment variables
@@ -10,21 +11,28 @@ tmp/
 .env.local
 .env.*.local
 
-# Node.js / Frontend
+# Node.js / Frontend (Vite & React)
 node_modules/
 dist/
 build/
+dist-ssr/
 coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 .npm/
 
 # Go / Backend
 /backend/bin/
 /backend/vendor/
+/backend/tmp/
 /backend/api
 *.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 *.test
 *.out
 go.work

@@ -23,12 +23,14 @@ func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase) *FinanceHandler {
 }
 
 type CreateBillRequest struct {
-	StudentID      string  `json:"student_id" binding:"required"`
-	Title          string  `json:"title" binding:"required"`
-	Amount         float64 `json:"amount" binding:"required"`
-	DueDate        string  `json:"due_date" binding:"required"`
-	BillType       string  `json:"bill_type"`
-	AcademicYearID *uint   `json:"academic_year_id"`
+	StudentID         string  `json:"student_id" binding:"required"`
+	Title             string  `json:"title" binding:"required"`
+	Amount            float64 `json:"amount" binding:"required"`
+	DueDate           string  `json:"due_date" binding:"required"`
+	BillType          string  `json:"bill_type"`
+	AcademicYearID    *uint   `json:"academic_year_id"`
+	TransactionCodeID *uint   `json:"transaction_code_id"`
+	IsInstallment     bool    `json:"is_installment"`
 }
 
 func (h *FinanceHandler) CreateBill(c *gin.Context) {
@@ -50,7 +52,7 @@ func (h *FinanceHandler) CreateBill(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeUsecase.CreateBill(studentUUID, req.Title, req.Amount, dueDate, req.BillType, req.AcademicYearID); err != nil {
+	if err := h.financeUsecase.CreateBill(studentUUID, req.Title, req.Amount, dueDate, req.BillType, req.AcademicYearID, req.TransactionCodeID, req.IsInstallment, nil, nil); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -337,4 +339,129 @@ func (h *FinanceHandler) UploadPaymentProof(c *gin.Context) {
 		"message":   "Payment proof uploaded and payment recorded",
 		"proof_url": proofURL,
 	})
+}
+
+// Batch create bills for multiple students
+type BatchBillRequest struct {
+	StudentIDs        []string `json:"student_ids" binding:"required"`
+	Title             string   `json:"title" binding:"required"`
+	Amount            float64  `json:"amount" binding:"required"`
+	DueDate           string   `json:"due_date" binding:"required"`
+	BillType          string   `json:"bill_type"`
+	AcademicYearID    *uint    `json:"academic_year_id"`
+	TransactionCodeID *uint    `json:"transaction_code_id"`
+	IsInstallment     bool     `json:"is_installment"`
+}
+
+func (h *FinanceHandler) CreateBillBatch(c *gin.Context) {
+	var req BatchBillRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dueDate, err := time.Parse("2006-01-02", req.DueDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format (YYYY-MM-DD)"})
+		return
+	}
+
+	created := 0
+	errors := []string{}
+	for _, sid := range req.StudentIDs {
+		studentUUID, err := uuid.Parse(sid)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Invalid student ID: %s", sid))
+			continue
+		}
+		if err := h.financeUsecase.CreateBill(studentUUID, req.Title, req.Amount, dueDate, req.BillType, req.AcademicYearID, req.TransactionCodeID, req.IsInstallment, nil, nil); err != nil {
+			errors = append(errors, fmt.Sprintf("Failed for student %s: %s", sid[:8], err.Error()))
+			continue
+		}
+		created++
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": fmt.Sprintf("%d tagihan berhasil dibuat", created),
+		"created": created,
+		"errors":  errors,
+	})
+}
+
+// Get single bill by ID
+func (h *FinanceHandler) GetBillByID(c *gin.Context) {
+	id := c.Param("id")
+	bill, err := h.financeUsecase.GetBillByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bill not found"})
+		return
+	}
+	c.JSON(http.StatusOK, bill)
+}
+
+// ---------------- BILL TEMPLATES ----------------
+
+type BillTemplateRequest struct {
+	TemplateName      string  `json:"template_name" binding:"required"`
+	Title             string  `json:"title" binding:"required"`
+	Amount            float64 `json:"amount" binding:"required"`
+	BillType          string  `json:"bill_type" binding:"required"`
+	TransactionCodeID *uint   `json:"transaction_code_id"`
+	IsInstallment     bool    `json:"is_installment"`
+	UnitID            uint    `json:"unit_id" binding:"required"`
+}
+
+func (h *FinanceHandler) CreateBillTemplate(c *gin.Context) {
+	var req BillTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	template := &domain.BillTemplate{
+		TemplateName:      req.TemplateName,
+		Title:             req.Title,
+		Amount:            req.Amount,
+		BillType:          req.BillType,
+		TransactionCodeID: req.TransactionCodeID,
+		IsInstallment:     req.IsInstallment,
+		UnitID:            req.UnitID,
+	}
+
+	if err := h.financeUsecase.CreateBillTemplate(template); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Bill template created successfully", "data": template})
+}
+
+func (h *FinanceHandler) GetBillTemplates(c *gin.Context) {
+	unitIDStr := c.Query("unit_id")
+	if unitIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unit_id is required"})
+		return
+	}
+	unitID, err := strconv.Atoi(unitIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid unit_id"})
+		return
+	}
+
+	templates, err := h.financeUsecase.GetBillTemplates(uint(unitID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, templates)
+}
+
+func (h *FinanceHandler) DeleteBillTemplate(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.financeUsecase.DeleteBillTemplate(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Bill template deleted successfully"})
 }

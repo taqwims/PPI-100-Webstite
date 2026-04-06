@@ -126,10 +126,32 @@ type Bill struct {
 	BillType       string        `gorm:"not null;default:'SPP'" json:"bill_type"` // SPP, Uang Pangkal, Uang Kegiatan, Tunggakan Alumni
 	Amount         float64       `gorm:"not null" json:"amount"`
 	DueDate        time.Time     `gorm:"not null" json:"due_date"`
-	Status      string    `gorm:"not null" json:"status"` // Unpaid, Paid, Overdue
+	Status      string    `gorm:"not null" json:"status"` // Unpaid, Paid, Partial, Overdue
 	PaymentLink string    `json:"payment_link"`
+	InvoiceNumber     string           `gorm:"unique" json:"invoice_number"`
+	IsInstallment        bool             `gorm:"default:false" json:"is_installment"`
+	TransactionCodeID    *uint            `json:"transaction_code_id"`
+	TransactionCode      *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
+	ObligationID         *uuid.UUID       `gorm:"type:uuid" json:"obligation_id"`
+	ActivityObligationID *uuid.UUID       `gorm:"type:uuid" json:"activity_obligation_id"`
+	Items                []BillItem       `gorm:"foreignKey:BillID" json:"items,omitempty"`
+	Payments             []Payment        `gorm:"foreignKey:BillID" json:"payments,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type BillTemplate struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	UnitID            uint      `gorm:"not null" json:"unit_id"` // 1: MTS, 2: MA, etc.
+	TemplateName      string    `gorm:"not null" json:"template_name"` // e.g. "Template SPP 12"
+	Title             string    `gorm:"not null" json:"title"` // "SPP Bulan Juli"
+	Amount            float64   `gorm:"not null" json:"amount"`
+	BillType          string    `gorm:"not null;default:'SPP'" json:"bill_type"`
+	TransactionCodeID *uint     `json:"transaction_code_id"`
+	TransactionCode   *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
+	IsInstallment     bool      `gorm:"default:false" json:"is_installment"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type Payment struct {
@@ -144,6 +166,44 @@ type Payment struct {
 	PaidAt        time.Time `json:"paid_at"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// Payroll (Penggajian)
+type Payroll struct {
+	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID              uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	User                User      `gorm:"foreignKey:UserID" json:"user"`
+	EmployeeName        string    `json:"employee_name"` // Snapshot name
+	EmployeeNIK         string    `json:"employee_nik"`  // Snapshot NIK/NIP
+	Position            string    `json:"position"`      // Snapshot Jabatan
+	PeriodMonth         int       `json:"period_month"`  // e.g. 3
+	PeriodYear          int       `json:"period_year"`   // e.g. 2026
+
+	// Pendapatan
+	BaseSalary          float64   `json:"base_salary"`
+	FunctionalAllowance float64   `json:"functional_allowance"`
+	TransportAllowance  float64   `json:"transport_allowance"`
+	AdditionalTask      float64   `json:"additional_task"`
+	TotalIncome         float64   `json:"total_income"`
+
+	// Potongan
+	LatenessPenalty     float64   `json:"lateness_penalty"`
+	InfaqDeduction      float64   `json:"infaq_deduction"`
+	CashAdvance         float64   `json:"cash_advance"`
+	TotalDeduction      float64   `json:"total_deduction"`
+
+	NetSalary           float64   `json:"net_salary"`
+	Notes               string    `json:"notes"`
+	Status              string    `gorm:"default:'Draft'" json:"status"` // Draft, Paid
+	PaidAt              *time.Time `json:"paid_at"`
+
+	PaymentMethod       string    `json:"payment_method"` // e.g. "Transfer", "Cash"
+	BankName            string    `json:"bank_name"`
+	BankAccountNumber   string    `json:"bank_account_number"`
+	BankAccountHolder   string    `json:"bank_account_holder"`
+
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // BK
@@ -292,22 +352,7 @@ type AcademicYear struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type Payroll struct {
-	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID         uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	User           User      `gorm:"foreignKey:UserID" json:"user"`
-	MonthYear      string    `gorm:"not null" json:"month_year"` // e.g. "11-2023"
-	BasicSalary    float64   `gorm:"not null;default:0" json:"basic_salary"`
-	Allowances     float64   `gorm:"not null;default:0" json:"allowances"`
-	Deductions     float64   `gorm:"not null;default:0" json:"deductions"`
-	Total          float64   `gorm:"not null;default:0" json:"total"`
-	Status         string    `gorm:"not null" json:"status"` // Pending, Paid
-	PaymentDate    time.Time `json:"payment_date"`
-	ProcessedByID  uuid.UUID `gorm:"type:uuid;not null" json:"processed_by_id"`
-	ProcessedBy    User      `gorm:"foreignKey:ProcessedByID" json:"processed_by"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
+
 
 type SavingAccount struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
@@ -332,33 +377,172 @@ type SavingTransaction struct {
 }
 
 type CashLedger struct {
-	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Date           time.Time  `gorm:"not null" json:"date"`
-	Source         string     `gorm:"not null" json:"source"` // From who, to who
-	ItemName       string     `gorm:"not null" json:"item_name"`
-	Type           string     `gorm:"not null" json:"type"` // Income, Expense
-	Amount         float64    `gorm:"not null" json:"amount"`
-	Category       string     `gorm:"not null" json:"category"` // Operasional, Hutang Pihak ke 3, dll
-	Notes          string     `json:"notes"`
-	CreatedBy      uuid.UUID  `gorm:"type:uuid" json:"created_by"`
-	ResponsibleID  *uuid.UUID `gorm:"type:uuid" json:"responsible_id"`
-	Responsible    *User      `gorm:"foreignKey:ResponsibleID" json:"responsible"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID                uuid.UUID        `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Date              time.Time        `gorm:"not null" json:"date"`
+	Source            string           `gorm:"not null" json:"source"` // From who, to who
+	ItemName          string           `gorm:"not null" json:"item_name"`
+	Type              string           `gorm:"not null" json:"type"` // Income, Expense
+	Amount            float64          `gorm:"not null" json:"amount"`
+	Category          string           `gorm:"not null" json:"category"` // Operasional, Hutang Pihak ke 3, dll
+	FundSource        string           `gorm:"default:'Kas Umum'" json:"fund_source"` // Kas Umum, Infaq, Tabungan Siswa
+	Notes             string           `json:"notes"`
+	CreatedBy         uuid.UUID        `gorm:"type:uuid" json:"created_by"`
+	ResponsibleID     *uuid.UUID       `gorm:"type:uuid" json:"responsible_id"`
+	Responsible       *User            `gorm:"foreignKey:ResponsibleID" json:"responsible"`
+	TransactionCodeID *uint            `json:"transaction_code_id"`
+	TransactionCode   *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
+	AutoGenerated     bool             `gorm:"default:false" json:"auto_generated"` // true = auto dari tanggungan siswa
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
 }
 
 type DailyInfaq struct {
-	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Date           time.Time  `gorm:"not null" json:"date"`
-	Source         string     `gorm:"not null" json:"source"` // Student ID, external donatur
-	Type           string     `gorm:"not null" json:"type"` // Income, Expense
-	Amount         float64    `gorm:"not null" json:"amount"`
-	ClassName      string     `json:"class_name"` // Optional class name for per-class infaq
-	HandledByID    uuid.UUID  `gorm:"type:uuid;not null" json:"handled_by_id"`
-	HandledBy      User       `gorm:"foreignKey:HandledByID" json:"handled_by"`
-	ResponsibleID  *uuid.UUID `gorm:"type:uuid" json:"responsible_id"`
-	Responsible    *User      `gorm:"foreignKey:ResponsibleID" json:"responsible"`
-	Notes          string     `json:"notes"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID                uuid.UUID        `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Date              time.Time        `gorm:"not null" json:"date"`
+	Source            string           `gorm:"not null" json:"source"` // Student ID, external donatur
+	Type              string           `gorm:"not null" json:"type"` // Income, Expense
+	Amount            float64          `gorm:"not null" json:"amount"`
+	ClassName         string           `json:"class_name"` // Optional class name for per-class infaq
+	HandledByID       uuid.UUID        `gorm:"type:uuid;not null" json:"handled_by_id"`
+	HandledBy         User             `gorm:"foreignKey:HandledByID" json:"handled_by"`
+	ResponsibleID     *uuid.UUID       `gorm:"type:uuid" json:"responsible_id"`
+	Responsible       *User            `gorm:"foreignKey:ResponsibleID" json:"responsible"`
+	TransactionCodeID *uint            `json:"transaction_code_id"`
+	TransactionCode   *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
+	InfaqTypeID       *uint            `json:"infaq_type_id"`
+	InfaqType         *InfaqType       `gorm:"foreignKey:InfaqTypeID" json:"infaq_type,omitempty"`
+	ProofURL          string           `json:"proof_url"`                               // Upload bukti file
+	FundSource        string           `gorm:"default:'Infaq'" json:"fund_source"`      // Infaq, Kas Umum, Tabungan Siswa
+	Notes             string           `json:"notes"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
 }
+
+// ------------------- Jenis Infaq -------------------
+
+type InfaqType struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"unique;not null" json:"name"` // "Infaq Jumat", "Infaq Ramadhan", etc.
+	Description string    `json:"description"`
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ------------------- WhatsApp Template -------------------
+
+type WATemplate struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"not null" json:"name"`                  // "Template Tagihan", "Template Reminder"
+	BodyTemplate string    `gorm:"type:text;not null" json:"body_template"` // Template with {nama_siswa}, {total_tagihan}, {rincian}
+	IsDefault    bool      `gorm:"default:false" json:"is_default"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// ------------------- Transaction Code & Categorization -------------------
+
+type TransactionCode struct {
+	ID            uint              `gorm:"primaryKey" json:"id"`
+	Code          string            `gorm:"unique;not null" json:"code"`        // A1, B1, C1, etc.
+	Name          string            `gorm:"not null" json:"name"`               // "Pendapatan SPP"
+	Type          string            `gorm:"not null" json:"type"`               // "Income", "Expense"
+	Category      string            `gorm:"not null" json:"category"`           // "SPP", "Gaji", "Infaq", "Operasional"
+	Description   string            `json:"description"`
+	ParentCodeID  *uint             `json:"parent_code_id"`                     // NULL = master/induk, non-NULL = anak
+	ParentCode    *TransactionCode  `gorm:"foreignKey:ParentCodeID" json:"parent_code,omitempty"`
+	Children      []TransactionCode `gorm:"foreignKey:ParentCodeID" json:"children,omitempty"`
+	IsActive      bool              `gorm:"default:true" json:"is_active"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+}
+
+// ------------------- Bill Item (Itemized Billing) -------------------
+
+type BillItem struct {
+	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	BillID    uuid.UUID `gorm:"type:uuid;not null" json:"bill_id"`
+	ItemName  string    `gorm:"not null" json:"item_name"` // "SPP", "Uang Makan", "Kegiatan"
+	Amount    float64   `gorm:"not null" json:"amount"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ------------------- RAB / RKAS (Budget) -------------------
+
+type BudgetCategory struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"not null" json:"name"`
+	Description string    `json:"description"`
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Budget struct {
+	ID             uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	AcademicYearID uint           `gorm:"not null" json:"academic_year_id"`
+	AcademicYear   AcademicYear   `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
+	CategoryID     uint           `gorm:"not null" json:"category_id"`
+	Category       BudgetCategory `gorm:"foreignKey:CategoryID" json:"category"`
+	BudgetType     string         `gorm:"default:'Pengeluaran'" json:"budget_type"` // Penerimaan, Pengeluaran
+	ItemName       string         `gorm:"not null" json:"item_name"`
+	Period         string         `gorm:"default:'Tahunan'" json:"period"` // Tahunan, Semester 1, Semester 2, Bulanan
+	Month          int            `gorm:"default:0" json:"month"`  // 1-12 for monthly, 0 for non-monthly
+	Quantity       int            `gorm:"default:1" json:"quantity"`        // Jumlah item
+	UnitPrice      float64        `gorm:"default:0" json:"unit_price"`     // Harga per item
+	PlannedAmount  float64        `gorm:"not null" json:"planned_amount"`  // = quantity * unit_price
+	RealizedAmount float64        `gorm:"default:0" json:"realized_amount"`
+	Status         string         `gorm:"not null;default:'Draft'" json:"status"` // Draft, Pending, Approved, Rejected
+	ApprovedByID   *uuid.UUID       `gorm:"type:uuid" json:"approved_by_id"`
+	ApprovedBy     *User            `gorm:"foreignKey:ApprovedByID" json:"approved_by,omitempty"`
+	ApprovedAt     *time.Time       `json:"approved_at"`
+	TransactionCodeID *uint         `json:"transaction_code_id"`
+	TransactionCode   *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
+	Notes          string           `json:"notes"`
+	CreatedByID    uuid.UUID      `gorm:"type:uuid;not null" json:"created_by_id"`
+	CreatedBy      User           `gorm:"foreignKey:CreatedByID" json:"created_by"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+// ------------------- Jenis Pembayaran -------------------
+
+type PaymentType struct {
+	ID                uint             `gorm:"primaryKey" json:"id"`
+	Code              string           `gorm:"unique;not null" json:"code"`             // SPP-01
+	Name              string           `gorm:"not null" json:"name"`                    // SPP
+	ClassID           *uint            `json:"class_id"`                                // null = semua kelas
+	Class             *Class           `gorm:"foreignKey:ClassID" json:"class,omitempty"`
+	PaymentSchedule   string           `gorm:"not null" json:"payment_schedule"`        // Bulanan, Tahunan, Semesteran, Bertahap
+	Amount            float64          `gorm:"not null" json:"amount"`
+	AcademicYearID    uint             `gorm:"not null" json:"academic_year_id"`
+	AcademicYear      AcademicYear     `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
+	TransactionCodeID *uint            `json:"transaction_code_id"`
+	TransactionCode   *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
+	IsActive          bool             `gorm:"default:true" json:"is_active"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
+}
+
+// ------------------- Tanggungan Siswa -------------------
+
+type StudentObligation struct {
+	ID                uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	StudentID         uuid.UUID      `gorm:"type:uuid;not null" json:"student_id"`
+	Student           Student        `gorm:"foreignKey:StudentID" json:"student"`
+	PaymentTypeID     uint           `gorm:"not null" json:"payment_type_id"`
+	PaymentType       PaymentType    `gorm:"foreignKey:PaymentTypeID" json:"payment_type"`
+	AcademicYearID    uint           `gorm:"not null" json:"academic_year_id"`
+	AcademicYear      AcademicYear   `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
+	Amount            float64        `gorm:"not null" json:"amount"`
+	PaidAmount        float64        `gorm:"default:0" json:"paid_amount"`
+	Status            string         `gorm:"not null;default:'Unpaid'" json:"status"` // Unpaid, Partial, Paid
+	BillingMonth      int            `json:"billing_month"`                           // 1-12 untuk pembayaran bulanan (0 = non-bulanan)
+	DueDate           *time.Time     `json:"due_date"`                                // Tanggal jatuh tempo
+	InstallmentNumber int            `json:"installment_number"`                      // Nomor cicilan (1, 2, 3...) untuk tahunan dicicil
+	TotalInstallments int            `json:"total_installments"`                      // Total cicilan (mis: 4x cicilan tahunan)
+	Notes             string         `json:"notes"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+}
+

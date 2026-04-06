@@ -35,6 +35,21 @@ func (r *financeExtendedRepository) GetAllAcademicYears() ([]domain.AcademicYear
 	return years, nil
 }
 
+func (r *financeExtendedRepository) UpdateAcademicYear(year *domain.AcademicYear) error {
+	return r.db.Save(year).Error
+}
+
+func (r *financeExtendedRepository) DeleteAcademicYear(id uint) error {
+	return r.db.Delete(&domain.AcademicYear{}, id).Error
+}
+
+func (r *financeExtendedRepository) SetActiveAcademicYear(id uint) error {
+	// Deactivate all first
+	r.db.Model(&domain.AcademicYear{}).Where("is_active = ?", true).Update("is_active", false)
+	// Activate the specified one
+	return r.db.Model(&domain.AcademicYear{}).Where("id = ?", id).Update("is_active", true).Error
+}
+
 // ------------------- Savings -------------------
 
 func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error {
@@ -89,23 +104,6 @@ func (r *financeExtendedRepository) GetStudentSavingAccount(studentID uuid.UUID)
 	return &account, nil
 }
 
-// ------------------- Payroll -------------------
-
-func (r *financeExtendedRepository) CreatePayroll(req *domain.Payroll) error {
-	return r.db.Create(req).Error
-}
-
-func (r *financeExtendedRepository) GetPayrolls(monthYear string) ([]domain.Payroll, error) {
-	var payrolls []domain.Payroll
-	query := r.db.Preload("User").Preload("ProcessedBy")
-	if monthYear != "" {
-		query = query.Where("month_year = ?", monthYear)
-	}
-	if err := query.Order("created_at desc").Find(&payrolls).Error; err != nil {
-		return nil, err
-	}
-	return payrolls, nil
-}
 
 // ------------------- Cash Ledger & Daily Infaq -------------------
 
@@ -160,21 +158,6 @@ func (r *financeExtendedRepository) DeleteDailyInfaqEntry(id string) error {
 	return r.db.Delete(&domain.DailyInfaq{}, "id = ?", id).Error
 }
 
-func (r *financeExtendedRepository) UpdatePayroll(req *domain.Payroll) error {
-	return r.db.Model(&domain.Payroll{}).Where("id = ?", req.ID).Updates(map[string]interface{}{
-		"user_id":      req.UserID,
-		"month_year":   req.MonthYear,
-		"basic_salary": req.BasicSalary,
-		"allowances":   req.Allowances,
-		"deductions":   req.Deductions,
-		"total":        req.Total,
-		"status":       req.Status,
-	}).Error
-}
-
-func (r *financeExtendedRepository) DeletePayroll(id string) error {
-	return r.db.Delete(&domain.Payroll{}, "id = ?", id).Error
-}
 
 // ------------------- Savings (Extended) -------------------
 
@@ -209,10 +192,16 @@ func (r *financeExtendedRepository) GetSavingAccountByUserID(userID uuid.UUID) (
 	return &account, nil
 }
 
-func (r *financeExtendedRepository) GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error) {
-	// Find all students belonging to this parent
+func (r *financeExtendedRepository) GetSavingAccountsByParentID(userID uuid.UUID) ([]domain.SavingAccount, error) {
+	// First, find the Parent record from the user ID
+	var parent domain.Parent
+	if err := r.db.Where("user_id = ?", userID).First(&parent).Error; err != nil {
+		return nil, err
+	}
+
+	// Find all students belonging to this parent (using Parent table ID)
 	var students []domain.Student
-	if err := r.db.Where("parent_id = ?", parentID).Find(&students).Error; err != nil {
+	if err := r.db.Where("parent_id = ?", parent.ID).Find(&students).Error; err != nil {
 		return nil, err
 	}
 

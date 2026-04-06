@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,7 +19,15 @@ func NewUserHandler(userUsecase *usecase.UserUsecase) *UserHandler {
 }
 
 func (h *UserHandler) GetAllUsers(c *gin.Context) {
-	users, err := h.userUsecase.GetAllUsers()
+	roleStr := c.Query("role")
+	var roleID uint
+	if roleStr != "" {
+		if r, err := strconv.ParseUint(roleStr, 10, 32); err == nil {
+			roleID = uint(r)
+		}
+	}
+
+	users, err := h.userUsecase.GetAllUsers(roleID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

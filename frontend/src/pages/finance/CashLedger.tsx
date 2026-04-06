@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Download, Search, BookOpen, ArrowUpRight, ArrowDownRight, Briefcase, FileText, AlertCircle, Pencil, Trash2, Printer, Calendar, X, UserCheck } from 'lucide-react';
+import { Plus, Download, Search, BookOpen, ArrowUpRight, ArrowDownRight, Briefcase, FileText, AlertCircle, Pencil, Trash2, Printer, Calendar, X, UserCheck, Tag } from 'lucide-react';
 import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
 import { generateCashLedgerReceipt, generateCashLedgerReport } from '../../utils/pdfUtils';
+import toast from 'react-hot-toast';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface StaffUser {
     id: string;
@@ -20,10 +22,15 @@ interface CashLedgerEntry {
     type: 'Income' | 'Expense';
     amount: number;
     category: string;
+    fund_source: string;
+    auto_generated: boolean;
     notes: string;
     responsible_id?: string;
     responsible?: { id: string; name: string };
+    transaction_code_id?: number;
 }
+
+interface TransactionCode { id: number; code: string; name: string; type: string; category: string; is_active: boolean; parent_code_id?: number | null; }
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -50,10 +57,14 @@ const CashLedger = () => {
         type: 'Expense',
         amount: '',
         category: 'Operasional',
+        fund_source: 'Kas Umum',
         notes: '',
-        responsible_id: ''
+        responsible_id: '',
+        transaction_code_id: ''
     });
     const [submitting, setSubmitting] = useState(false);
+    const [transactionCodes, setTransactionCodes] = useState<TransactionCode[]>([]);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
     // Export modal state
     const [showExportModal, setShowExportModal] = useState(false);
@@ -64,7 +75,15 @@ const CashLedger = () => {
     useEffect(() => {
         fetchLedger();
         fetchStaff();
+        fetchTransactionCodes();
     }, []);
+
+    const fetchTransactionCodes = async () => {
+        try {
+            const res = await api.get('/finance/transaction-codes');
+            setTransactionCodes(res.data || []);
+        } catch (error) { console.error('Failed to fetch codes', error); }
+    };
 
     const fetchLedger = async () => {
         setLoading(true);
@@ -93,9 +112,19 @@ const CashLedger = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleTransactionCodeChange = (codeId: string) => {
+        const tc = transactionCodes.find(c => c.id === Number(codeId));
+        setFormData({
+            ...formData,
+            transaction_code_id: codeId,
+            category: tc ? tc.category : formData.category,
+            type: tc ? (tc.type as 'Income' | 'Expense') : formData.type,
+        });
+    };
+
     const openCreateModal = () => {
         setEditingEntry(null);
-        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', notes: '', responsible_id: '' });
+        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '' });
         setShowModal(true);
     };
 
@@ -107,8 +136,10 @@ const CashLedger = () => {
             type: entry.type,
             amount: String(entry.amount),
             category: entry.category,
+            fund_source: entry.fund_source || 'Kas Umum',
             notes: entry.notes || '',
-            responsible_id: entry.responsible_id || ''
+            responsible_id: entry.responsible_id || '',
+            transaction_code_id: entry.transaction_code_id ? String(entry.transaction_code_id) : ''
         });
         setShowModal(true);
     };
@@ -123,12 +154,15 @@ const CashLedger = () => {
                 type: formData.type,
                 amount: parseFloat(formData.amount),
                 category: formData.category,
+                fund_source: formData.fund_source,
                 notes: formData.notes
             };
 
-            // Only include responsible_id for Expense
             if (formData.type === 'Expense' && formData.responsible_id) {
                 payload.responsible_id = formData.responsible_id;
+            }
+            if (formData.transaction_code_id) {
+                payload.transaction_code_id = Number(formData.transaction_code_id);
             }
 
             if (editingEntry) {
@@ -138,22 +172,23 @@ const CashLedger = () => {
             }
             setShowModal(false);
             setEditingEntry(null);
-            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', notes: '', responsible_id: '' });
+            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '' });
             fetchLedger();
+            toast.success(editingEntry ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil disimpan');
         } catch (error: any) {
-            alert(error.response?.data?.error || "Gagal menyimpan data kas");
+            toast.error(error.response?.data?.error || 'Gagal menyimpan data kas');
         } finally {
             setSubmitting(false);
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Yakin ingin menghapus entri ini?')) return;
         try {
             await api.delete(`/finance/cash-ledger/${id}`);
             fetchLedger();
+            toast.success('Data berhasil dihapus');
         } catch (error: any) {
-            alert(error.response?.data?.error || "Gagal menghapus data kas");
+            toast.error(error.response?.data?.error || 'Gagal menghapus data kas');
         }
     };
 
@@ -175,7 +210,7 @@ const CashLedger = () => {
         }
 
         if (filtered.length === 0) {
-            alert('Tidak ada data pada periode yang dipilih.');
+            toast.error('Tidak ada data pada periode yang dipilih.');
             return;
         }
 
@@ -328,7 +363,12 @@ const CashLedger = () => {
                                                 {new Date(entry.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })}
                                             </td>
                                             <td className="p-4">
-                                                <p className="font-medium text-slate-800">{entry.item_name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium text-slate-800">{entry.item_name}</p>
+                                                    {entry.auto_generated && (
+                                                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded font-semibold uppercase tracking-wide">Auto</span>
+                                                    )}
+                                                </div>
                                                 {entry.notes && <p className="text-xs text-slate-500 mt-1 line-clamp-1" title={entry.notes}>{entry.notes}</p>}
                                             </td>
                                             <td className="p-4 text-slate-600 text-sm">{entry.source}</td>
@@ -371,7 +411,7 @@ const CashLedger = () => {
                                                             <Pencil size={16} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDelete(entry.id)}
+                                                            onClick={() => setConfirmDelete(entry.id)}
                                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                                             title="Hapus"
                                                         >
@@ -427,20 +467,28 @@ const CashLedger = () => {
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            <span className="flex items-center gap-1.5"><Tag size={14} className="text-green-500" /> Kode Transaksi</span>
+                                        </label>
                                         <select
-                                            name="category"
-                                            required
-                                            value={formData.category}
-                                            onChange={handleInput}
+                                            name="transaction_code_id"
+                                            value={formData.transaction_code_id}
+                                            onChange={e => handleTransactionCodeChange(e.target.value)}
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
                                         >
-                                            <option value="Operasional">Operasional (ATK, Listrik, dll)</option>
-                                            <option value="Hutang">Hutang Pihak ke 3</option>
-                                            <option value="Kegiatan Sekolah">Uang Kegiatan Sekolah</option>
-                                            <option value="Perbaikan Sarpras">Perbaikan Sarpras</option>
-                                            <option value="Lainnya">Lainnya</option>
+                                            <option value="">-- Pilih Kode Transaksi --</option>
+                                            {transactionCodes.filter(tc => tc.is_active && !tc.parent_code_id).map(master => (
+                                                <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
+                                                    <option value={master.id}>{master.code} — {master.name}</option>
+                                                    {transactionCodes.filter(c => c.parent_code_id === master.id && c.is_active).map(child => (
+                                                        <option key={child.id} value={child.id}>&nbsp;&nbsp;↳ {child.code} — {child.name}</option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
                                         </select>
+                                        {formData.transaction_code_id && (
+                                            <p className="text-xs text-slate-500 mt-1">Kategori: <span className="font-medium text-slate-700">{formData.category}</span> | Tipe: <span className="font-medium text-slate-700">{formData.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}</span></p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -485,6 +533,24 @@ const CashLedger = () => {
                                     />
                                 </div>
 
+                                {/* Sumber Dana */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <span className="flex items-center gap-1.5">💰 Sumber Dana</span>
+                                    </label>
+                                    <select
+                                        name="fund_source"
+                                        value={formData.fund_source}
+                                        onChange={handleInput}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
+                                    >
+                                        <option value="Kas Umum">Kas Umum</option>
+                                        <option value="Infaq">Infaq</option>
+                                        <option value="Tabungan Siswa">Tabungan Siswa</option>
+                                    </select>
+                                    <p className="text-xs text-slate-400 mt-1">Alokasi dana yang digunakan untuk transaksi ini</p>
+                                </div>
+
                                 {/* Penanggung Jawab - hanya untuk Pengeluaran */}
                                 {formData.type === 'Expense' && (
                                     <div>
@@ -521,6 +587,27 @@ const CashLedger = () => {
                                             onChange={handleInput}
                                         ></textarea>
                                     </div>
+                                </div>
+
+                                {/* Kode Transaksi */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <span className="flex items-center gap-1.5">
+                                            <Tag size={14} className="text-green-500" />
+                                            Kode Transaksi
+                                        </span>
+                                    </label>
+                                    <select
+                                        name="transaction_code_id"
+                                        value={formData.transaction_code_id}
+                                        onChange={handleInput}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
+                                    >
+                                        <option value="">-- Pilih Kode Transaksi --</option>
+                                        {transactionCodes.filter(tc => tc.is_active).map(tc => (
+                                            <option key={tc.id} value={tc.id}>[{tc.code}] {tc.name} ({tc.type})</option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 <div className="pt-4 flex justify-end space-x-3 border-t border-slate-100">
@@ -640,6 +727,14 @@ const CashLedger = () => {
                     </div>
                 )}
             </div>
+
+            <ConfirmDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}
+                title="Hapus Transaksi"
+                message="Yakin ingin menghapus entri ini? Tindakan ini tidak bisa dibatalkan."
+            />
         </div>
     );
 };

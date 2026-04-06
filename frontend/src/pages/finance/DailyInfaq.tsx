@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Download, Search, Calendar, Heart, ArrowUpRight, ArrowDownRight, AlertCircle, Pencil, Trash2, Filter, X, FileText, UserCheck } from 'lucide-react';
+import { Plus, Download, Search, Calendar, Heart, ArrowUpRight, ArrowDownRight, AlertCircle, Pencil, Trash2, Filter, X, FileText, UserCheck, Tag } from 'lucide-react';
 import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
 import { generateCashLedgerReport } from '../../utils/pdfUtils';
+import toast from 'react-hot-toast';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface StaffUser {
     id: string;
@@ -29,7 +31,15 @@ interface DailyInfaqEntry {
     responsible?: { id: string; name: string };
     notes: string;
     created_at: string;
+    transaction_code_id?: number;
+    infaq_type_id?: number;
+    infaq_type?: { id: number; name: string };
+    proof_url?: string;
+    fund_source?: string;
 }
+
+interface InfaqType { id: number; name: string; description: string; is_active: boolean; }
+interface TransactionCode { id: number; code: string; name: string; type: string; category: string; is_active: boolean; parent_code_id?: number | null; }
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -66,9 +76,16 @@ const DailyInfaq = () => {
         amount: '',
         class_name: '',
         notes: '',
-        responsible_id: ''
+        responsible_id: '',
+        transaction_code_id: '',
+        infaq_type_id: '',
+        fund_source: 'Infaq',
+        proof_url: ''
     });
     const [submitting, setSubmitting] = useState(false);
+    const [transactionCodes, setTransactionCodes] = useState<TransactionCode[]>([]);
+    const [infaqTypes, setInfaqTypes] = useState<InfaqType[]>([]);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
     // Export modal
     const [showExportModal, setShowExportModal] = useState(false);
@@ -85,7 +102,23 @@ const DailyInfaq = () => {
         fetchInfaq();
         fetchStaff();
         fetchClasses();
+        fetchTransactionCodes();
+        fetchInfaqTypes();
     }, [unitID]);
+
+    const fetchTransactionCodes = async () => {
+        try {
+            const res = await api.get('/finance/transaction-codes');
+            setTransactionCodes(res.data || []);
+        } catch (error) { console.error('Failed to fetch codes', error); }
+    };
+
+    const fetchInfaqTypes = async () => {
+        try {
+            const res = await api.get('/finance/infaq-types');
+            setInfaqTypes((res.data || []).filter((t: InfaqType) => t.is_active));
+        } catch (error) { console.error('Failed to fetch infaq types', error); }
+    };
 
     const fetchInfaq = async () => {
         setLoading(true);
@@ -124,7 +157,7 @@ const DailyInfaq = () => {
 
     const openCreateModal = (type: 'Income' | 'Expense' = 'Income') => {
         setEditingEntry(null);
-        setFormData({ source: '', type, amount: '', class_name: '', notes: '', responsible_id: '' });
+        setFormData({ source: '', type, amount: '', class_name: '', notes: '', responsible_id: '', transaction_code_id: '', infaq_type_id: '', fund_source: 'Infaq', proof_url: '' });
         setShowModal(true);
     };
 
@@ -136,7 +169,11 @@ const DailyInfaq = () => {
             amount: String(entry.amount),
             class_name: entry.class_name || '',
             notes: entry.notes || '',
-            responsible_id: entry.responsible_id || ''
+            responsible_id: entry.responsible_id || '',
+            transaction_code_id: entry.transaction_code_id ? String(entry.transaction_code_id) : '',
+            infaq_type_id: entry.infaq_type_id ? String(entry.infaq_type_id) : '',
+            fund_source: entry.fund_source || 'Infaq',
+            proof_url: entry.proof_url || ''
         });
         setShowModal(true);
     };
@@ -156,6 +193,14 @@ const DailyInfaq = () => {
             if (formData.type === 'Expense' && formData.responsible_id) {
                 payload.responsible_id = formData.responsible_id;
             }
+            if (formData.transaction_code_id) {
+                payload.transaction_code_id = Number(formData.transaction_code_id);
+            }
+            if (formData.infaq_type_id) {
+                payload.infaq_type_id = Number(formData.infaq_type_id);
+            }
+            payload.fund_source = formData.fund_source;
+            if (formData.proof_url) payload.proof_url = formData.proof_url;
 
             if (editingEntry) {
                 await api.put(`/finance/daily-infaq/${editingEntry.id}`, payload);
@@ -164,22 +209,23 @@ const DailyInfaq = () => {
             }
             setShowModal(false);
             setEditingEntry(null);
-            setFormData({ source: '', type: 'Income', amount: '', class_name: '', notes: '', responsible_id: '' });
+            setFormData({ source: '', type: 'Income', amount: '', class_name: '', notes: '', responsible_id: '', transaction_code_id: '', infaq_type_id: '', fund_source: 'Infaq', proof_url: '' });
             fetchInfaq();
+            toast.success(editingEntry ? 'Data infaq berhasil diperbarui' : 'Data infaq berhasil disimpan');
         } catch (error: any) {
-            alert(error.response?.data?.error || "Gagal menyimpan data infaq");
+            toast.error(error.response?.data?.error || 'Gagal menyimpan data infaq');
         } finally {
             setSubmitting(false);
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Yakin ingin menghapus data infaq ini?')) return;
         try {
             await api.delete(`/finance/daily-infaq/${id}`);
             fetchInfaq();
+            toast.success('Data infaq berhasil dihapus');
         } catch (error: any) {
-            alert(error.response?.data?.error || "Gagal menghapus data infaq");
+            toast.error(error.response?.data?.error || 'Gagal menghapus data infaq');
         }
     };
 
@@ -197,7 +243,7 @@ const DailyInfaq = () => {
         }
 
         if (filtered.length === 0) {
-            alert('Tidak ada data pada periode yang dipilih.');
+            toast.error('Tidak ada data pada periode yang dipilih.');
             return;
         }
 
@@ -492,7 +538,7 @@ const DailyInfaq = () => {
                                                             <Pencil size={16} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDelete(entry.id)}
+                                                            onClick={() => setConfirmDelete(entry.id)}
                                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                                             title="Hapus"
                                                         >
@@ -633,6 +679,77 @@ const DailyInfaq = () => {
                                     ></textarea>
                                 </div>
 
+                                {/* Kode Transaksi (Master/Child) */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <span className="flex items-center gap-1.5">
+                                            <Tag size={14} className="text-green-500" />
+                                            Kode Transaksi
+                                        </span>
+                                    </label>
+                                    <select
+                                        name="transaction_code_id"
+                                        value={formData.transaction_code_id}
+                                        onChange={handleInput}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                                    >
+                                        <option value="">-- Pilih Kode Transaksi --</option>
+                                        {transactionCodes.filter(tc => tc.is_active && !tc.parent_code_id).map(master => (
+                                            <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
+                                                <option value={master.id}>{master.code} — {master.name}</option>
+                                                {transactionCodes.filter(c => c.parent_code_id === master.id && c.is_active).map(child => (
+                                                    <option key={child.id} value={child.id}>&nbsp;&nbsp;↳ {child.code} — {child.name}</option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Jenis Infaq */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Jenis Infaq</label>
+                                    <select
+                                        name="infaq_type_id"
+                                        value={formData.infaq_type_id}
+                                        onChange={handleInput}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                                    >
+                                        <option value="">-- Semua / Umum --</option>
+                                        {infaqTypes.map(it => (
+                                            <option key={it.id} value={it.id}>{it.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Sumber Dana */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">💰 Sumber Dana</label>
+                                    <select
+                                        name="fund_source"
+                                        value={formData.fund_source}
+                                        onChange={handleInput}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                                    >
+                                        <option value="Infaq">Infaq</option>
+                                        <option value="Kas Umum">Kas Umum</option>
+                                        <option value="Tabungan Siswa">Tabungan Siswa</option>
+                                    </select>
+                                </div>
+
+                                {/* Upload Bukti */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">📂 Upload Bukti (Link)</label>
+                                    <input
+                                        type="url"
+                                        name="proof_url"
+                                        value={formData.proof_url}
+                                        onChange={handleInput}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm placeholder-slate-400"
+                                        placeholder="https://drive.google.com/... (opsional)"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">Link file bukti transaksi (Google Drive, dll)</p>
+                                </div>
+
                                 <div className="pt-4 flex justify-end space-x-3">
                                     <button
                                         type="button"
@@ -715,6 +832,14 @@ const DailyInfaq = () => {
                     </div>
                 )}
             </div>
+
+            <ConfirmDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}
+                title="Hapus Data Infaq"
+                message="Yakin ingin menghapus data infaq ini? Tindakan ini tidak bisa dibatalkan."
+            />
         </div>
     );
 };

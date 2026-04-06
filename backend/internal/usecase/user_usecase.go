@@ -14,8 +14,8 @@ func NewUserUsecase(userRepo *postgres.UserRepository) *UserUsecase {
 	return &UserUsecase{userRepo: userRepo}
 }
 
-func (u *UserUsecase) GetAllUsers() ([]domain.User, error) {
-	return u.userRepo.GetAll()
+func (u *UserUsecase) GetAllUsers(roleID uint) ([]domain.User, error) {
+	return u.userRepo.GetAll(roleID)
 }
 
 func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID uint) error {

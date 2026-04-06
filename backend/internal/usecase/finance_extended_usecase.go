@@ -3,17 +3,17 @@ package usecase
 import (
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository"
-	"time"
-
+	"ppi-100-sis/internal/repository/postgres"
 	"github.com/google/uuid"
 )
 
 type FinanceExtendedUsecase struct {
 	financeRepo repository.FinanceExtendedRepository
+	budgetRepo  *postgres.BudgetRepository
 }
 
-func NewFinanceExtendedUsecase(financeRepo repository.FinanceExtendedRepository) *FinanceExtendedUsecase {
-	return &FinanceExtendedUsecase{financeRepo: financeRepo}
+func NewFinanceExtendedUsecase(financeRepo repository.FinanceExtendedRepository, budgetRepo *postgres.BudgetRepository) *FinanceExtendedUsecase {
+	return &FinanceExtendedUsecase{financeRepo: financeRepo, budgetRepo: budgetRepo}
 }
 
 // ------------------- Academic Year -------------------
@@ -25,6 +25,18 @@ func (u *FinanceExtendedUsecase) CreateAcademicYear(req *domain.AcademicYear) er
 
 func (u *FinanceExtendedUsecase) GetAllAcademicYears() ([]domain.AcademicYear, error) {
 	return u.financeRepo.GetAllAcademicYears()
+}
+
+func (u *FinanceExtendedUsecase) UpdateAcademicYear(year *domain.AcademicYear) error {
+	return u.financeRepo.UpdateAcademicYear(year)
+}
+
+func (u *FinanceExtendedUsecase) DeleteAcademicYear(id uint) error {
+	return u.financeRepo.DeleteAcademicYear(id)
+}
+
+func (u *FinanceExtendedUsecase) SetActiveAcademicYear(id uint) error {
+	return u.financeRepo.SetActiveAcademicYear(id)
 }
 
 // ------------------- Savings -------------------
@@ -55,28 +67,18 @@ func (u *FinanceExtendedUsecase) GetSavingAccountsByParentID(parentID uuid.UUID)
 	return u.financeRepo.GetSavingAccountsByParentID(parentID)
 }
 
-func (u *FinanceExtendedUsecase) CreatePayroll(req *domain.Payroll) error {
-	req.PaymentDate = time.Now()
-	return u.financeRepo.CreatePayroll(req)
-}
-
-func (u *FinanceExtendedUsecase) GetPayrolls(monthYear string) ([]domain.Payroll, error) {
-	return u.financeRepo.GetPayrolls(monthYear)
-}
-
-func (u *FinanceExtendedUsecase) UpdatePayroll(req *domain.Payroll) error {
-	req.Total = req.BasicSalary + req.Allowances - req.Deductions
-	return u.financeRepo.UpdatePayroll(req)
-}
-
-func (u *FinanceExtendedUsecase) DeletePayroll(id string) error {
-	return u.financeRepo.DeletePayroll(id)
-}
 
 // ------------------- Cash Ledger & Daily Infaq -------------------
 
 func (u *FinanceExtendedUsecase) AddCashLedgerEntry(req *domain.CashLedger) error {
-	return u.financeRepo.AddCashLedgerEntry(req)
+	if err := u.financeRepo.AddCashLedgerEntry(req); err != nil {
+		return err
+	}
+	// Auto-realize RKAS if transaction code is linked to a budget
+	if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 {
+		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount)
+	}
+	return nil
 }
 
 func (u *FinanceExtendedUsecase) GetCashLedger() ([]domain.CashLedger, error) {
@@ -92,7 +94,14 @@ func (u *FinanceExtendedUsecase) DeleteCashLedgerEntry(id string) error {
 }
 
 func (u *FinanceExtendedUsecase) AddDailyInfaqEntry(req *domain.DailyInfaq) error {
-	return u.financeRepo.AddDailyInfaqEntry(req)
+	if err := u.financeRepo.AddDailyInfaqEntry(req); err != nil {
+		return err
+	}
+	// Auto-realize RKAS if transaction code is linked to a budget
+	if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 {
+		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount)
+	}
+	return nil
 }
 
 func (u *FinanceExtendedUsecase) GetDailyInfaq() ([]domain.DailyInfaq, error) {

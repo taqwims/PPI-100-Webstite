@@ -1,0 +1,148 @@
+﻿Update pengerjaan SDIT management keuangan
+
+Fitur pertanyaan dan bug?
+=========================================================
+							FInance
+=========================================================
+Fitur baru:
+Alumni
+	1. Data alumni 
+	2. Data catatan hutan alumni (tunggakan uang)
+	3. Buatkan searchnya berdasarkan Nama/NISN
+—————————————————————————————————
+	
+Infaq Harian
+
+	fitur
+	1. tambah ketika create infaq ada tambahan opsii per kelas  yang sifatnya opsional (done)
+	2. Export laporan ada filter dulu (done)
+	3. Tambahkan pengeluaran dari infak saja (done)
+	4. Setiap pengeluaran seperti di buku kas umum bagian pengeluaran tanggung jawab (pilihan staf), sudah ada di tabel tapi penanggung jawabnya belum muncul di tabel dan reicipt (done)
+
+	Feature Update
+	1. Rekap per yang bisa di kostomisasi periode waktu di infak harian dan 	kas infaq (done)
+	 
+Penggajian
+	1. Struk belum bisa di gunakan (done)
+	2. Cari nama pegawai belum aktif (done)
+
+Meet 1
+	5. input data dari excel untuk data penggajian atau masukkan satu satu
+	6. Tambah kolom seperti di wa ridwan (reff)
+	7. Tambah kolom parameter di penggajian oleh bendahara yang merubah langsung ke db dan fitur lain yang mereffer ke penggajian
+	
+	Feature update:
+	integrasi payment gateaway
+	buatkan flow payment ada 2 opsi pembayaran manual dan otomatis, jika manual (cash) maka akan keluar payment receipt, jika otomatis maka akan ada rekening tujuan dll 	
+
+Buku kas umum
+	1. Buatkan struk untuk setiap transaksi (pdf) (done)
+	2. Export datanya ada pilihan dulu export periode waktunya (done)
+	3. Search item, sumber, keterangan transasksi belum aktif (Done)
+
+	4. di pengeluaran tambahkan penganggung jawab dari staff, sudah ada tapi belum tampil ada di tabel dan di print recipt (done)
+
+Spp & Tagihan (partial done)
+	1. fetch data siswa dengan benar (masih ada bug, harus di klik dulu unit mts/ma baru keluar datanya) di akun bendahara unit mts/ma itu tidak ada, tambahkan kelas juga disana (done)
+	2. Ketika buat tagihan otomatis buat notifikasi ke orang tua siswa & s	iswa yang bersangkutan (done)
+	3. 
+
+	Feature update:
+	1. Buatkan payment method di aksi bayar di orang tua (done)
+
+Tabungan
+	1. Fetch data siswanya nya belum benar, di drop down masih kosong (done)
+	2. Di setor tabungan. Tambahkan opsi kelas untuk melihat siswa yang ada di kelas itu untuk dimasukkan datanya ambil datanya dengan benar (done)
+	3. Belum ada akses untuk melihat tabungan di akun orang tua dan anak (done)
+	4. buatkan export pdf untuk report riwayat per siswa (done)
+
+========================================================
+						Akademik
+========================================================
+Data kelas | Mata Pelajaran | Jadwal Pelajaran
+
+	1. Pastikan di semua role dapat diakses dan dapat di fetch datanya dengan benar
+
+Manajemen user
+	1. Buatkan fitur filter per kelas, per role,
+	2. Jika per kelas ada fitur untuk update kelas, sehingga siswa akan naik kelas
+
+Attendance
+	1. Tampilan menu attendance di side bar atau sesuai dengan jam pelajaran di guru (role access guru dan admin)
+	2. Di role guru jadwal mengajar ada akses untuk attendace siswa
+	2. Buatkan report attendace Per periode waktu 
+	3. Fetch data dengan benar (gunakan state management dan hook agar mudah didevelop)
+
+
+===========================================================
+					profile	
+===========================================================
+Semua role kecuali siswa dan orang tua
+	1. Ada nik dan no rekening
+
+
+
+
+
+
+———————————————————
+tambahan fitur Meet 1
+
+1. Kode kegiatan untuk transaksi di pengeluaran & kategori contoh A pendapatan
+ 
+2. RAB/RKAS (opsional) (data nanti dilampirkan di wa ridwan)
+Rkas di bandingkan dengan data real nya (pendapatan infak, pengeluaran infak, tagihan dan pengeluaran spp & tagihan)
+Ada pendaftaran
+Ada persetujuan
+
+3. Page transaksi untuk semua transaksi yang ada di aplikasi ini
+
+4. Neraca diagram balok per kategori pembaratan
+
+5. Page hutang (logic ada status bayar dan belum bayar, jika bayar maka ada penarikan datanya dari mana)
+
+6. Dashboard piutang, hutang, pendapatan per hari ini, belanja per hari ini
+Data kas keuangan seluruhnya (infak, spp & tagihan)
+Persentase realisasi pendapatan, grafik
+
+7. POS bayar (kode pembayaran untuk transaksi) per unit (sd/mts) bisa di buat oleh bendahara, admin
+
+8. Buat pengaturan tagihan dan spp untuk template jenis pembayaran apa saja jadi bisa per item
+
+9. Page laporan dan dropdown nya
+
+10. ada opsi cicilan untuk tagihan siswa dan orang tua
+	
+Keuangan
+	filter tahun ajaran siswa masuk (data pembayaran spp dan tagihan lainnya) apakah ada tunggakan, semua siswa
+
+Role teller umum
+Semua fitur seperti admin kecuali penggajian dan dashboard semua, 
+Dashboard pemasukan pengeluaran hari ini dan target reff rkas, tanpa diagram
+
+
+	
+=======================================
+
+Yang harus dikerjakan di website edit keuangan
+Akun
+
+Santri  
+	1. tagihan di dashboard sinkronkan dengan 	page tagihan
+	2. E-learning (masih belum sinkron dengan data guru masih loading d	ata siswa
+	3. Nilai akademik masih belum sinkron
+	4. Jadwal pelajaran masih belum sinkron
+	5. Catatan bk masih belum sinkron
+	6. Gajian sudah berjalan dengan lancar, tinggal struknya saja yang b	elum selesai fiturnya
+
+Pimpinan
+	1. Dashboard = underconstruction
+	2. Rekap finansial belum lengkap (pemasukan dan pengeluaran per b	ulan)
+	3. Di kas umum tambahkan filter untuk melihat periode waktu
+
+Orang tua
+	1. Tabungan anak dapat dilihat oleh orang tua dan orang tua bisa 
+	2. Tagihan masih belum sinkron datanya dengan admin dan bendahara (	done)
+	3. tagihan tidak ada aksi untituk bayar (done)
+	4. catatan bk masih belum sinkron
+	5. Lihat nilai masih belum sinkron

@@ -3,9 +3,11 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Users, BookOpen, Calendar, FileText,
     Settings, LogOut, Bell, X, GraduationCap,
-    AlertTriangle, CreditCard, Mail, Send, Activity, Wallet, Inbox, PieChart
+    AlertTriangle, CreditCard, Mail, Send, Activity, Wallet, Inbox, PieChart,
+    Tag, Table2, ClipboardList, BarChart2, FileStack, LucideIcon, Heart, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAcademicYear } from '../../context/AcademicYearContext';
 import clsx from 'clsx';
 
 interface SidebarProps {
@@ -13,103 +15,190 @@ interface SidebarProps {
     onClose: () => void;
 }
 
+interface MenuItem {
+    icon: LucideIcon;
+    label: string;
+    path: string;
+}
+
+interface MenuGroup {
+    title?: string; // undefined = no header (e.g. Dashboard)
+    items: MenuItem[];
+}
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     const location = useLocation();
     const { logout, user } = useAuth();
+    const { academicYears, selectedYear, setSelectedYear } = useAcademicYear();
 
-    // Define menus based on roles
-    const getMenus = () => {
-        const common = [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-        ];
+    const getMenuGroups = (): MenuGroup[] => {
+        // ── Common (always first) ──
+        const dashboardGroup: MenuGroup = {
+            items: [{ icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' }]
+        };
 
-        const admin = [
-            { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
-            { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
-            { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
-            { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
-            { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
-            { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
-            { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
-            { icon: Users, label: 'Data PPDB', path: '/dashboard/admin/ppdb' },
-            { icon: GraduationCap, label: 'Data Alumni', path: '/dashboard/admin/alumni' },
-            { icon: Users, label: 'Dewan Asatidz', path: '/dashboard/admin/teachers' },
-            { icon: FileText, label: 'Pusat Unduhan', path: '/dashboard/admin/downloads' },
-            { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/admin/bk' },
-        ];
+        // ── Admin groups ──
+        const adminManagement: MenuGroup = {
+            title: 'Manajemen',
+            items: [
+                { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
+                { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
+                { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
+            ]
+        };
+        const adminContent: MenuGroup = {
+            title: 'Konten & Komunikasi',
+            items: [
+                { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
+                { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
+                { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
+            ]
+        };
+        const adminData: MenuGroup = {
+            title: 'Data Publik',
+            items: [
+                { icon: Users, label: 'Data PPDB', path: '/dashboard/admin/ppdb' },
+                { icon: GraduationCap, label: 'Data Alumni', path: '/dashboard/admin/alumni' },
+                { icon: Users, label: 'Dewan Asatidz', path: '/dashboard/admin/teachers' },
+                { icon: FileText, label: 'Pusat Unduhan', path: '/dashboard/admin/downloads' },
+                { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/admin/bk' },
+            ]
+        };
+        const adminFinance: MenuGroup = {
+            title: 'Keuangan',
+            items: [
+                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
+            ]
+        };
 
-        const teacher = [
-            { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/teacher/schedule' },
-            { icon: Users, label: 'Data Siswa', path: '/dashboard/teacher/students' },
-            { icon: FileText, label: 'Input Nilai', path: '/dashboard/teacher/grades' },
-            { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
-            { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
-            { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll' }, // Teachers can view their payroll
-        ];
+        // ── Bendahara groups ──
+        const finTransaksi: MenuGroup = {
+            title: 'Transaksi',
+            items: [
+                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
+                { icon: FileStack, label: 'Template Tagihan', path: '/dashboard/finance/bill-templates' },
+                { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities' },
+                { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations' },
+                { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary' },
+                { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger' },
+                { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
+                { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll' },
+            ]
+        };
+        const finAnggaran: MenuGroup = {
+            title: 'Anggaran & Analisis',
+            items: [
+                { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas' },
+                { icon: Table2, label: 'Transaksi Global', path: '/dashboard/finance/global-transactions' },
+                { icon: BarChart2, label: 'Dashboard Eksekutif', path: '/dashboard/finance/executive-dashboard' },
+            ]
+        };
+        const finPengaturan: MenuGroup = {
+            title: 'Pengaturan Keuangan',
+            items: [
+                { icon: Tag, label: 'Kode Transaksi', path: '/dashboard/finance/transaction-codes' },
+                { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types' },
+                { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types' },
+                { icon: MessageCircle, label: 'Template WA', path: '/dashboard/finance/wa-templates' },
+                { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
+                { icon: Calendar, label: 'Tahun Ajaran', path: '/dashboard/finance/academic-years' },
+                { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
+            ]
+        };
 
-        const student = [
-            { icon: Calendar, label: 'Jadwal Pelajaran', path: '/dashboard/student/schedule' },
-            { icon: GraduationCap, label: 'Nilai Akademik', path: '/dashboard/student/grades' },
-            { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
-            { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk' },
-            { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
-            { icon: Wallet, label: 'Tabungan', path: '/dashboard/student/savings' }, // Students view own savings
-        ];
+        // ── Teacher ──
+        const teacherGroup: MenuGroup = {
+            title: 'Pengajaran',
+            items: [
+                { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/teacher/schedule' },
+                { icon: Users, label: 'Data Siswa', path: '/dashboard/teacher/students' },
+                { icon: FileText, label: 'Input Nilai', path: '/dashboard/teacher/grades' },
+                { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
+                { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
+                { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll' },
+            ]
+        };
 
-        const parent = [
-            { icon: Users, label: 'Data Anak', path: '/dashboard/children' },
-            { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
-            { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings' },
-            { icon: GraduationCap, label: 'Laporan Nilai', path: '/dashboard/grades' },
-        ];
+        // ── Student ──
+        const studentGroup: MenuGroup = {
+            title: 'Akademik & Keuangan',
+            items: [
+                { icon: Calendar, label: 'Jadwal Pelajaran', path: '/dashboard/student/schedule' },
+                { icon: GraduationCap, label: 'Nilai Akademik', path: '/dashboard/student/grades' },
+                { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
+                { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk' },
+                { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+                { icon: Wallet, label: 'Tabungan', path: '/dashboard/student/savings' },
+            ]
+        };
 
-        const principal = [
-            { icon: PieChart, label: 'Rekap Finansial', path: '/dashboard/principal/finance-summary' },
-            { icon: Wallet, label: 'Tabungan', path: '/dashboard/finance/savings' },
-            { icon: Inbox, label: 'Kas Umum', path: '/dashboard/finance/cash-ledger' },
-        ];
+        // ── Parent ──
+        const parentGroup: MenuGroup = {
+            title: 'Anak Saya',
+            items: [
+                { icon: Users, label: 'Data Anak', path: '/dashboard/children' },
+                { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+                { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings' },
+                { icon: GraduationCap, label: 'Laporan Nilai', path: '/dashboard/grades' },
+            ]
+        };
 
-        const bendahara = [
-            { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
-            { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
-            { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger' },
-            { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
-            { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll' },
-        ];
+        // ── Principal ──
+        const principalOverview: MenuGroup = {
+            title: 'Overview',
+            items: [
+                { icon: PieChart, label: 'Rekap Finansial', path: '/dashboard/principal/finance-summary' },
+                { icon: BarChart2, label: 'Dashboard Eksekutif', path: '/dashboard/finance/executive-dashboard' },
+            ]
+        };
+        const principalDetail: MenuGroup = {
+            title: 'Detail Keuangan',
+            items: [
+                { icon: Wallet, label: 'Tabungan', path: '/dashboard/finance/savings' },
+                { icon: Inbox, label: 'Kas Umum', path: '/dashboard/finance/cash-ledger' },
+                { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas' },
+                { icon: Table2, label: 'Transaksi Global', path: '/dashboard/finance/global-transactions' },
+                { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
+            ]
+        };
 
-        const tellerTabungan = [
-            { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
-        ];
-
-        const tellerInfaq = [
-            { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
-            { icon: Inbox, label: 'Kas Infaq', path: '/dashboard/finance/cash-ledger' },
-        ];
+        // ── Teller ──
+        const tellerTabungan: MenuGroup = {
+            title: 'Tabungan',
+            items: [{ icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' }]
+        };
+        const tellerInfaq: MenuGroup = {
+            title: 'Infaq',
+            items: [
+                { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
+                { icon: Inbox, label: 'Kas Infaq', path: '/dashboard/finance/cash-ledger' },
+            ]
+        };
 
         // Role ID mapping: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara Umum, 10=Teller Tabungan, 11=Teller Infaq
         switch (user?.role_id) {
             case 1: // Super Admin
-                return [...common, ...admin, ...bendahara]; // Super Admin has access to all admin and bendahara tools
+                return [dashboardGroup, adminManagement, adminContent, adminData, finTransaksi, finAnggaran, finPengaturan];
             case 2: // Admin MTS
             case 3: // Admin MA
-                return [...common, ...admin];
+                return [dashboardGroup, adminManagement, adminContent, adminData, adminFinance];
             case 4: // Guru
             case 5: // Wali Kelas
-                return [...common, ...teacher];
+                return [dashboardGroup, teacherGroup];
             case 6: // Siswa
-                return [...common, ...student];
+                return [dashboardGroup, studentGroup];
             case 7: // Orang Tua
-                return [...common, ...parent];
+                return [dashboardGroup, parentGroup];
             case 8: // Pimpinan
-                return [...common, ...principal];
+                return [dashboardGroup, principalOverview, principalDetail];
             case 9: // Bendahara Umum
-                return [...common, ...bendahara];
+                return [dashboardGroup, finTransaksi, finAnggaran, finPengaturan];
             case 10: // Teller Tabungan
-                return [...common, ...tellerTabungan];
+                return [dashboardGroup, tellerTabungan];
             case 11: // Teller Infaq
-                return [...common, ...tellerInfaq];
+                return [dashboardGroup, tellerInfaq];
             default:
-                return common;
+                return [dashboardGroup];
         }
     };
 
@@ -122,15 +211,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         return roleId && roles[roleId] ? roles[roleId] : 'User';
     };
 
-    const menuItems = [...getMenus(), { icon: Settings, label: 'Pengaturan', path: '/dashboard/settings' }];
+    const menuGroups = getMenuGroups();
 
-    // Deduplicate menus by path since super admin has merged arrays
-    const uniqueMenuPaths = new Set();
-    const finalMenuItems = menuItems.filter(item => {
-        if (uniqueMenuPaths.has(item.path)) return false;
-        uniqueMenuPaths.add(item.path);
-        return true;
-    });
+    // Settings always at the end
+    const settingsItem: MenuItem = { icon: Settings, label: 'Pengaturan', path: '/dashboard/settings' };
+
+    // Track unique paths to avoid duplicates (e.g for Super Admin)
+    const seenPaths = new Set<string>();
 
     return (
         <>
@@ -154,29 +241,82 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     </button>
                 </div>
 
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    {finalMenuItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = location.pathname.startsWith(item.path) && (item.path !== '/dashboard' || location.pathname === '/dashboard');
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                onClick={() => {
-                                    if (window.innerWidth < 1024) onClose();
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                    {/* Global Academic Year Selector */}
+                    {[1, 8, 9].includes(user?.role_id || 0) && academicYears.length > 0 && (
+                        <div className="mb-3 px-1">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 block mb-1">Tahun Ajaran</label>
+                            <select
+                                value={selectedYear?.id || ''}
+                                onChange={(e) => {
+                                    const yr = academicYears.find(y => y.id === Number(e.target.value));
+                                    setSelectedYear(yr || null);
                                 }}
+                                className="w-full px-3 py-2 text-sm rounded-xl border border-green-200 bg-green-50 text-green-800 font-medium focus:ring-2 focus:ring-green-400"
+                            >
+                                {academicYears.map(y => (
+                                    <option key={y.id} value={y.id}>{y.name} {y.is_active ? '✓' : ''}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {menuGroups.map((group, gi) => {
+                        const groupItems = group.items.filter(item => {
+                            if (seenPaths.has(item.path)) return false;
+                            seenPaths.add(item.path);
+                            return true;
+                        });
+                        if (groupItems.length === 0) return null;
+
+                        return (
+                            <div key={gi}>
+                                {group.title && (
+                                    <div className={clsx("px-3 pt-4 pb-1.5", gi > 0 && "mt-2 border-t border-slate-100")}>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.title}</span>
+                                    </div>
+                                )}
+                                {groupItems.map(item => {
+                                    const Icon = item.icon;
+                                    const isActive = location.pathname.startsWith(item.path) && (item.path !== '/dashboard' || location.pathname === '/dashboard');
+                                    return (
+                                        <Link
+                                            key={item.path}
+                                            to={item.path}
+                                            onClick={() => { if (window.innerWidth < 1024) onClose(); }}
+                                            className={clsx(
+                                                'flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 group',
+                                                isActive
+                                                    ? 'bg-green-50 text-green-700 border border-green-200 shadow-sm'
+                                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                                            )}
+                                        >
+                                            <Icon size={18} className={clsx(isActive ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600')} />
+                                            <span className="text-sm font-medium">{item.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
+
+                    {/* Settings */}
+                    {!seenPaths.has(settingsItem.path) && (
+                        <div className="mt-2 pt-2 border-t border-slate-100">
+                            <Link
+                                to={settingsItem.path}
+                                onClick={() => { if (window.innerWidth < 1024) onClose(); }}
                                 className={clsx(
-                                    'flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group',
-                                    isActive
+                                    'flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 group',
+                                    location.pathname.startsWith(settingsItem.path)
                                         ? 'bg-green-50 text-green-700 border border-green-200 shadow-sm'
                                         : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                                 )}
                             >
-                                <Icon size={20} className={clsx(isActive ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600')} />
-                                <span className="font-medium">{item.label}</span>
+                                <Settings size={18} className={clsx(location.pathname.startsWith(settingsItem.path) ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600')} />
+                                <span className="text-sm font-medium">{settingsItem.label}</span>
                             </Link>
-                        );
-                    })}
+                        </div>
+                    )}
                 </nav>
 
                 <div className="p-4 border-t border-slate-200">

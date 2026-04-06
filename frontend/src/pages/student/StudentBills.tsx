@@ -1,18 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, Wallet, X, Landmark, Copy, Send } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, Wallet, X, Landmark, Copy, Send, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
+import { generateBillReceipt } from '../../utils/pdfUtils';
 
 interface Bill {
     id: string;
     title: string;
     amount: number;
     due_date: string;
+    created_at: string;
     status: string;
     bill_type: string;
+    academic_year_id?: number;
+    academic_year?: {
+        name: string;
+    };
     payment_link?: string;
+    is_installment?: boolean;
+    payments?: { amount: number; status: string; payment_method: string; proof_url?: string; paid_at: string; transaction_id?: string; created_at: string; }[];
 }
 
 const formatCurrency = (amount: number) => {
@@ -23,15 +31,51 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
+const getRemainingAmount = (bill: Bill) => {
+    if (bill.status === 'Paid') return 0;
+    const totalPaid = (bill.payments || []).reduce((sum, p) => p.status === 'Success' ? sum + p.amount : sum, 0);
+    return bill.amount - totalPaid;
+};
+
+const hasPendingTransfer = (bill: Bill) => {
+    return bill.status !== 'Paid' && (bill.payments || []).some(p => p.payment_method === 'Transfer' && p.proof_url && p.status !== 'Success');
+};
+
+const formatPaymentDate = (p: any) => {
+    if (p.status === 'Success' && p.paid_at && !p.paid_at.startsWith('0001-01-01')) {
+        return new Date(p.paid_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    if (p.created_at && !p.created_at.startsWith('0001-01-01')) {
+        return new Date(p.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    return '-';
+};
+
 const StudentBills: React.FC = () => {
     const { user } = useAuth();
 
     const [showPayModal, setShowPayModal] = useState(false);
     const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Transfer'>('Transfer');
+    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Transfer' | 'Midtrans'>('Midtrans');
+    const [paymentAmount, setPaymentAmount] = useState<number>(0);
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [loadingSnap, setLoadingSnap] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
+
+    const [selectedYear, setSelectedYear] = useState<string>('all');
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Bill | 'remaining'; direction: 'asc' | 'desc' | null }>({
+        key: 'created_at',
+        direction: 'desc'
+    });
+
+    const { data: academicYears } = useQuery({
+        queryKey: ['academic-years'],
+        queryFn: async () => {
+            const res = await api.get('/finance/academic-years');
+            return res.data;
+        }
+    });
 
     const { data: bills, isLoading, refetch } = useQuery({
         queryKey: ['student-bills', user?.id],
@@ -42,39 +86,169 @@ const StudentBills: React.FC = () => {
         enabled: !!user,
     });
 
-    const unpaidBills = bills?.filter((b: Bill) => b.status !== 'Paid') || [];
-    const paidBills = bills?.filter((b: Bill) => b.status === 'Paid') || [];
-    const totalUnpaid = unpaidBills.reduce((acc: number, b: Bill) => acc + b.amount, 0);
+    const handleSort = (key: keyof Bill | 'remaining') => {
+        let direction: 'asc' | 'desc' | null = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+            direction = null;
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: keyof Bill | 'remaining') => {
+        if (sortConfig.key !== key || !sortConfig.direction) return <ArrowUpDown size={12} className="text-slate-400" />;
+        return sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-indigo-600" /> : <ArrowDown size={12} className="text-indigo-600" />;
+    };
+
+    const filteredBills = (bills || []).filter((b: Bill) => {
+        if (selectedYear !== 'all' && b.academic_year_id?.toString() !== selectedYear) return false;
+        return true;
+    });
+
+    const sortedBills = [...filteredBills].sort((a, b) => {
+        if (!sortConfig.direction) return 0;
+
+        let aVal: any, bVal: any;
+        if (sortConfig.key === 'remaining') {
+            aVal = getRemainingAmount(a);
+            bVal = getRemainingAmount(b);
+        } else {
+            aVal = a[sortConfig.key as keyof Bill];
+            bVal = b[sortConfig.key as keyof Bill];
+        }
+
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const unpaidBills = sortedBills.filter((b: Bill) => b.status !== 'Paid');
+    const paidBills = sortedBills.filter((b: Bill) => b.status === 'Paid');
+    const totalUnpaid = unpaidBills.reduce((acc: number, b: Bill) => acc + getRemainingAmount(b), 0);
 
     const openPayModal = (bill: Bill) => {
         setSelectedBill(bill);
-        setPaymentMethod('Transfer');
+        setPaymentMethod('Midtrans');
         setProofFile(null);
         setSuccessMsg('');
+        setLoadingSnap(false);
+        setPaymentAmount(getRemainingAmount(bill));
         setShowPayModal(true);
     };
+
+    const handleMidtransPayment = async () => {
+        if (!selectedBill || paymentAmount <= 0) return;
+        setLoadingSnap(true);
+        try {
+            const res = await api.post('/finance/midtrans/create-transaction', {
+                bill_id: selectedBill.id,
+                amount: paymentAmount,
+            });
+            const snapToken = res.data.snap_token;
+            const orderID = res.data.order_id;
+
+            // Helper: verify payment status with backend (calls Midtrans API directly)
+            const verifyAndRefresh = (delay = 2000) => {
+                setTimeout(() => {
+                    api.post('/finance/midtrans/check-status', { order_id: orderID })
+                        .then(() => refetch())
+                        .catch((e) => {
+                            console.error('Failed to verify Midtrans status:', e);
+                            refetch();
+                        });
+                }, delay);
+            };
+
+            // @ts-ignore - snap is loaded globally from Midtrans Snap.js
+            window.snap.pay(snapToken, {
+                onSuccess: () => {
+                    verifyAndRefresh(1000);
+                    setSuccessMsg('Pembayaran berhasil! Terima kasih.');
+                    setTimeout(() => {
+                        setShowPayModal(false);
+                        setSuccessMsg('');
+                    }, 3500);
+                },
+                onPending: () => {
+                    verifyAndRefresh(1000);
+                    setSuccessMsg('Pembayaran sedang diproses. Status akan diperbarui otomatis.');
+                    setTimeout(() => {
+                        setShowPayModal(false);
+                        setSuccessMsg('');
+                    }, 3500);
+                },
+                onError: () => {
+                    alert('Pembayaran gagal. Silakan coba lagi.');
+                    setLoadingSnap(false);
+                },
+                onClose: () => {
+                    verifyAndRefresh(1000);
+                    setLoadingSnap(false);
+                },
+            });
+        } catch (error: any) {
+            alert(error.response?.data?.error || 'Gagal membuat transaksi Midtrans');
+            setLoadingSnap(false);
+        }
+    };
+
+    // Auto-check pending midtrans payments on load
+    useEffect(() => {
+        if (!bills) return;
+        let shouldRefetch = false;
+
+        const checkPending = async () => {
+            const promises: Promise<any>[] = [];
+            bills.forEach((b: Bill) => {
+                if (b.payments) {
+                    b.payments.forEach(p => {
+                        if (p.payment_method === 'Midtrans' && p.status === 'Pending' && p.transaction_id) {
+                            promises.push(
+                                api.post('/finance/midtrans/check-status', { order_id: p.transaction_id })
+                                    .then(res => {
+                                        // If backend says it became Success, mark for refetch
+                                        if (res.data.status === 'Success') shouldRefetch = true;
+                                    })
+                                    .catch(e => console.error(e))
+                            );
+                        }
+                    });
+                }
+            });
+            if (promises.length > 0) {
+                await Promise.all(promises);
+                if (shouldRefetch) refetch();
+            }
+        };
+
+        checkPending();
+    }, [bills, refetch]);
 
     const handleSubmitPayment = async () => {
         if (!selectedBill) return;
 
+        if (paymentAmount <= 0 || paymentAmount > getRemainingAmount(selectedBill)) {
+            alert('Jumlah pembayaran tidak valid.');
+            return;
+        }
+
         setSubmitting(true);
         try {
             if (paymentMethod === 'Transfer' && proofFile) {
-                // Upload proof and record payment
                 const formData = new FormData();
                 formData.append('file', proofFile);
                 formData.append('bill_id', selectedBill.id);
-                formData.append('amount', selectedBill.amount.toString());
+                formData.append('amount', paymentAmount.toString());
                 formData.append('method', 'Transfer');
 
                 await api.post('/finance/payment-proof', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                // Record cash payment
                 await api.post('/finance/payments', {
                     bill_id: selectedBill.id,
-                    amount: selectedBill.amount,
+                    amount: paymentAmount,
                     method: 'Cash',
                 });
             }
@@ -95,6 +269,8 @@ const StudentBills: React.FC = () => {
 
     const getStatusInfo = (bill: Bill) => {
         if (bill.status === 'Paid') return { color: 'emerald', icon: CheckCircle, label: 'Lunas' };
+        if (bill.status === 'Partial') return { color: 'amber', icon: PieChart, label: 'Sebagian/Dicicil' };
+        if (hasPendingTransfer(bill)) return { color: 'blue', icon: Clock, label: 'Menunggu Verifikasi' };
         const overdue = new Date(bill.due_date) < new Date();
         if (overdue) return { color: 'red', icon: AlertTriangle, label: 'Terlambat' };
         return { color: 'amber', icon: Clock, label: 'Belum Lunas' };
@@ -110,9 +286,9 @@ const StudentBills: React.FC = () => {
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-                    <p className="text-sm text-slate-500">Total Belum Dibayar</p>
+                    <p className="text-sm text-slate-500">Total Sisa Tagihan</p>
                     <h2 className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(totalUnpaid)}</h2>
-                    <p className="text-xs text-slate-400 mt-1">{unpaidBills.length} tagihan</p>
+                    <p className="text-xs text-slate-400 mt-1">{unpaidBills.length} tagihan belum lunas</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500">Tagihan Lunas</p>
@@ -123,8 +299,28 @@ const StudentBills: React.FC = () => {
 
             {/* Bills List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-5 border-b border-slate-100 bg-slate-50">
+                <div className="p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="font-semibold text-slate-800">Daftar Tagihan</h2>
+
+                    <div className="flex items-center gap-2">
+                        <Filter size={14} className="text-slate-700" />
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            className="text-sm border-slate-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-1.5 pl-2 pr-8 bg-white"
+                        >
+                            <option value="all">Semua Tahun Ajaran</option>
+                        {academicYears?.map((year: any) => (
+                            <option
+                                key={year.id}
+                                value={year.id.toString()}
+                                className="bg-white text-black"
+                            >
+                                {year.name}
+                            </option>
+                        ))}
+                        </select>
+                    </div>
                 </div>
                 {isLoading ? (
                     <div className="p-12 text-center">
@@ -136,45 +332,115 @@ const StudentBills: React.FC = () => {
                         <p className="text-lg font-medium text-slate-700">Belum Ada Tagihan</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-100">
-                        {bills?.map((bill: Bill) => {
-                            const status = getStatusInfo(bill);
-                            const StatusIcon = status.icon;
-                            return (
-                                <div key={bill.id} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3">
-                                            <h3 className="font-semibold text-slate-800">{bill.title}</h3>
-                                            <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                                                {bill.bill_type || 'SPP'}
-                                            </span>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-white text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider">
+                                    <th
+                                        className="p-4 font-semibold cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => handleSort('created_at')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Info Tagihan {getSortIcon('created_at')}
                                         </div>
-                                        <div className="flex items-center gap-4 mt-1.5 text-sm text-slate-500">
-                                            <span className="font-semibold text-slate-800">{formatCurrency(bill.amount)}</span>
-                                            <span>Jatuh tempo: {new Date(bill.due_date).toLocaleDateString('id-ID')}</span>
+                                    </th>
+                                    <th
+                                        className="p-4 font-semibold text-right cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => handleSort('amount')}
+                                    >
+                                        <div className="flex items-center justify-end gap-1">
+                                            Total {getSortIcon('amount')}
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={clsx(
-                                            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium gap-1",
-                                            status.color === 'emerald' && "bg-emerald-100 text-emerald-800",
-                                            status.color === 'amber' && "bg-amber-100 text-amber-800",
-                                            status.color === 'red' && "bg-red-100 text-red-800",
-                                        )}>
-                                            <StatusIcon size={12} /> {status.label}
-                                        </span>
-                                        {bill.status !== 'Paid' && (
-                                            <button
-                                                onClick={() => openPayModal(bill)}
-                                                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition flex items-center gap-1.5"
-                                            >
-                                                <DollarSign size={14} /> Bayar
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                    </th>
+                                    <th
+                                        className="p-4 font-semibold text-right cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => handleSort('remaining')}
+                                    >
+                                        <div className="flex items-center justify-end gap-1">
+                                            Sisa {getSortIcon('remaining')}
+                                        </div>
+                                    </th>
+                                    <th
+                                        className="p-4 font-semibold text-center cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => handleSort('due_date')}
+                                    >
+                                        <div className="flex items-center justify-center gap-1">
+                                            Jatuh Tempo {getSortIcon('due_date')}
+                                        </div>
+                                    </th>
+                                    <th className="p-4 font-semibold text-center">Status</th>
+                                    <th className="p-4 font-semibold text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {sortedBills.map((bill: Bill) => {
+                                    const status = getStatusInfo(bill);
+                                    const StatusIcon = status.icon;
+                                    const remainingAmount = getRemainingAmount(bill);
+                                    return (
+                                        <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="p-4">
+                                                <p className="font-semibold text-slate-800">{bill.title}</p>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded inline-block">
+                                                        {bill.bill_type || 'SPP'}
+                                                    </span>
+                                                    {bill.academic_year && (
+                                                        <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded inline-block">
+                                                            {bill.academic_year.name}
+                                                        </span>
+                                                    )}
+                                                    {bill.is_installment && (
+                                                        <span className="text-[10px] font-semibold uppercase bg-blue-50 text-blue-600 px-2 py-0.5 rounded inline-block border border-blue-100">
+                                                            Dapat Dicicil
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-right text-slate-500 text-sm whitespace-nowrap">
+                                                {formatCurrency(bill.amount)}
+                                            </td>
+                                            <td className="p-4 text-right font-semibold text-slate-800 whitespace-nowrap">
+                                                {remainingAmount > 0 ? formatCurrency(remainingAmount) : '-'}
+                                            </td>
+                                            <td className="p-4 text-center text-sm text-slate-500">
+                                                {new Date(bill.due_date).toLocaleDateString('id-ID')}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <span className={clsx(
+                                                    "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium gap-1",
+                                                    status.color === 'emerald' && "bg-emerald-100 text-emerald-800",
+                                                    status.color === 'amber' && "bg-amber-100 text-amber-800",
+                                                    status.color === 'blue' && "bg-blue-100 text-blue-800",
+                                                    status.color === 'red' && "bg-red-100 text-red-800",
+                                                )}>
+                                                    <StatusIcon size={12} /> {status.label}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {bill.status !== 'Paid' && !hasPendingTransfer(bill) ? (
+                                                    <button
+                                                        onClick={() => openPayModal(bill)}
+                                                        className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition flex items-center gap-1.5 mx-auto"
+                                                    >
+                                                        <DollarSign size={14} /> Bayar
+                                                    </button>
+                                                ) : bill.status === 'Paid' ? (
+                                                    <button
+                                                        onClick={() => generateBillReceipt(bill)}
+                                                        className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition flex items-center gap-1.5 mx-auto"
+                                                    >
+                                                        <Download size={13} /> Kuitansi
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-slate-500">Menunggu</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
@@ -202,23 +468,67 @@ const StudentBills: React.FC = () => {
                                 {/* Bill Info */}
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                                     <p className="text-sm text-slate-500">{selectedBill.title}</p>
-                                    <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(selectedBill.amount)}</p>
-                                    <p className="text-xs text-slate-400 mt-1">Jatuh tempo: {new Date(selectedBill.due_date).toLocaleDateString('id-ID')}</p>
+                                    <div className="flex justify-between items-end mt-2">
+                                        <p className="text-xs font-medium text-slate-500">Sisa Tagihan:</p>
+                                        <p className="text-2xl font-bold text-slate-800">{formatCurrency(getRemainingAmount(selectedBill))}</p>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-2">Jatuh tempo: {new Date(selectedBill.due_date).toLocaleDateString('id-ID')}</p>
+                                </div>
+
+                                {/* Riwayat Pembayaran */}
+                                {selectedBill.payments && selectedBill.payments.length > 0 && (
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                        <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">Riwayat Pembayaran</p>
+                                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                                            {selectedBill.payments.map((p, i) => (
+                                                <div key={i} className="flex justify-between items-center text-sm border-b border-slate-200 pb-1.5 last:border-0 last:pb-0">
+                                                    <div>
+                                                        <span className={clsx("text-[10px] px-1.5 py-0.5 rounded font-medium",
+                                                            p.status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                                        )}>{p.status}</span>
+                                                        <span className="text-xs text-slate-500 ml-2">{formatPaymentDate(p)}</span>
+                                                    </div>
+                                                    <span className="font-semibold text-slate-700">{formatCurrency(p.amount)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Jumlah Pembayaran</label>
+                                    {selectedBill.is_installment ? (
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">Rp</span>
+                                            <input
+                                                type="number"
+                                                value={paymentAmount}
+                                                onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                                                max={getRemainingAmount(selectedBill)}
+                                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 text-lg font-bold"
+                                            />
+                                            <p className="text-xs text-blue-600 mt-1">Tagihan ini dapat dibayar sebagian (cicil).</p>
+                                        </div>
+                                    ) : (
+                                        <div className="px-4 py-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-800 font-bold text-lg">
+                                            {formatCurrency(paymentAmount)}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Payment Method Toggle */}
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
-                                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
                                         <button
                                             type="button"
-                                            onClick={() => setPaymentMethod('Cash')}
+                                            onClick={() => setPaymentMethod('Midtrans')}
                                             className={clsx(
                                                 "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                                paymentMethod === 'Cash' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500"
+                                                paymentMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
                                             )}
                                         >
-                                            <Wallet size={14} /> Cash
+                                            <Smartphone size={14} /> Online
                                         </button>
                                         <button
                                             type="button"
@@ -230,8 +540,35 @@ const StudentBills: React.FC = () => {
                                         >
                                             <CreditCard size={14} /> Transfer
                                         </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentMethod('Cash')}
+                                            className={clsx(
+                                                "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                                paymentMethod === 'Cash' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500"
+                                            )}
+                                        >
+                                            <Wallet size={14} /> Cash
+                                        </button>
                                     </div>
                                 </div>
+
+                                {paymentMethod === 'Midtrans' && (
+                                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                                                <Smartphone size={20} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Pembayaran Online</p>
+                                                <p className="text-xs text-slate-500">QRIS, E-Wallet, Bank Transfer, Kartu Kredit</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-indigo-600 mt-2">
+                                            💡 Klik tombol bayar di bawah untuk membuka halaman pembayaran. Status akan diperbarui otomatis.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {paymentMethod === 'Transfer' && (
                                     <>
@@ -297,19 +634,35 @@ const StudentBills: React.FC = () => {
                                     </div>
                                 )}
 
-                                <button
-                                    onClick={handleSubmitPayment}
-                                    disabled={submitting || (paymentMethod === 'Transfer' && !proofFile)}
-                                    className={clsx(
-                                        "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
-                                        submitting || (paymentMethod === 'Transfer' && !proofFile)
-                                            ? "bg-slate-300 cursor-not-allowed"
-                                            : "bg-indigo-600 hover:bg-indigo-700"
-                                    )}
-                                >
-                                    <Send size={16} />
-                                    {submitting ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
-                                </button>
+                                {paymentMethod === 'Midtrans' ? (
+                                    <button
+                                        onClick={handleMidtransPayment}
+                                        disabled={loadingSnap || paymentAmount <= 0}
+                                        className={clsx(
+                                            "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
+                                            (loadingSnap || paymentAmount <= 0)
+                                                ? "bg-slate-300 cursor-not-allowed"
+                                                : "bg-indigo-600 hover:bg-indigo-700"
+                                        )}
+                                    >
+                                        <Smartphone size={16} />
+                                        {loadingSnap ? 'Memproses...' : 'Bayar via Midtrans'}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleSubmitPayment}
+                                        disabled={submitting || paymentAmount <= 0 || (paymentMethod === 'Transfer' && !proofFile)}
+                                        className={clsx(
+                                            "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
+                                            (submitting || paymentAmount <= 0 || (paymentMethod === 'Transfer' && !proofFile))
+                                                ? "bg-slate-300 cursor-not-allowed"
+                                                : "bg-indigo-600 hover:bg-indigo-700"
+                                        )}
+                                    >
+                                        <Send size={16} />
+                                        {submitting ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

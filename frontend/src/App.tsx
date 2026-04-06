@@ -60,10 +60,28 @@ import CashLedger from './pages/finance/CashLedger';
 import Payroll from './pages/finance/Payroll';
 import StudentSavings from './pages/finance/StudentSavings';
 import ParentSavings from './pages/finance/ParentSavings';
+import TransactionCodes from './pages/finance/TransactionCodes';
+import GlobalTransactions from './pages/finance/GlobalTransactions';
+import RKAS from './pages/finance/RKAS';
+import ExecutiveDashboard from './pages/finance/ExecutiveDashboard';
+import Reports from './pages/finance/Reports';
+import BillTemplates from './pages/finance/BillTemplates';
+import PaymentTypes from './pages/finance/PaymentTypes';
+import AcademicYears from './pages/finance/AcademicYears';
+import StudentObligations from './pages/finance/StudentObligations';
+import Activities from './pages/finance/Activities';
+import ActivityDetail from './pages/finance/ActivityDetail';
+import StudentBillSummary from './pages/finance/StudentBillSummary';
+import InfaqTypes from './pages/finance/InfaqTypes';
+import WATemplates from './pages/finance/WATemplates';
+import ToastProvider from './components/ui/Toast';
+import { AcademicYearProvider } from './context/AcademicYearContext';
 
 function App() {
     return (
         <AuthProvider>
+            <AcademicYearProvider>
+            <ToastProvider />
             <Router>
                 <Routes>
                     <Route path="/login" element={<Login />} />
@@ -104,6 +122,20 @@ function App() {
                                     <Route path="finance/cash-ledger" element={<CashLedger />} />
                                     <Route path="finance/daily-infaq" element={<DailyInfaq />} />
                                     <Route path="finance/payroll" element={<Payroll />} />
+                                    <Route path="finance/transaction-codes" element={<TransactionCodes />} />
+                                    <Route path="finance/global-transactions" element={<GlobalTransactions />} />
+                                    <Route path="finance/rkas" element={<RKAS />} />
+                                    <Route path="finance/executive-dashboard" element={<ExecutiveDashboard />} />
+                                    <Route path="finance/reports" element={<Reports />} />
+                                    <Route path="finance/bill-templates" element={<BillTemplates />} />
+                                    <Route path="finance/payment-types" element={<PaymentTypes />} />
+                                    <Route path="finance/academic-years" element={<AcademicYears />} />
+                                    <Route path="finance/student-obligations" element={<StudentObligations />} />
+                                    <Route path="finance/student-bill-summary" element={<StudentBillSummary />} />
+                                    <Route path="finance/infaq-types" element={<InfaqTypes />} />
+                                    <Route path="finance/wa-templates" element={<WATemplates />} />
+                                    <Route path="finance/activities" element={<Activities />} />
+                                    <Route path="finance/activities/:id" element={<ActivityDetail />} />
 
                                     {/* Teacher/Student Routes */}
                                     <Route path="teacher/schedule" element={<TeacherSchedule />} />
@@ -140,6 +172,7 @@ function App() {
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
             </Router>
+        </AcademicYearProvider>
         </AuthProvider>
     );
 }

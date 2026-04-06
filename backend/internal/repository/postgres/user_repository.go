@@ -34,9 +34,13 @@ func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 	return &user, nil
 }
 
-func (r *UserRepository) GetAll() ([]domain.User, error) {
+func (r *UserRepository) GetAll(roleID uint) ([]domain.User, error) {
 	var users []domain.User
-	err := r.db.Preload("Teacher").Preload("Parent").Preload("Student").Preload("Student.Class").Find(&users).Error
+	query := r.db.Preload("Teacher").Preload("Parent").Preload("Student").Preload("Student.Class")
+	if roleID != 0 {
+		query = query.Where("role_id = ?", roleID)
+	}
+	err := query.Find(&users).Error
 	return users, err
 }
 

@@ -53,5 +53,21 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.SavingTransaction{},
 		&domain.CashLedger{},
 		&domain.DailyInfaq{},
+		&domain.TransactionCode{},
+		&domain.BillItem{},
+		&domain.BudgetCategory{},
+		&domain.Budget{},
+		&domain.BillTemplate{},
+		&domain.PaymentType{},
+		&domain.StudentObligation{},
+
+		// Activities (Fase 3)
+		&domain.Activity{},
+		&domain.ActivityObligation{},
+		&domain.ActivityTransaction{},
+
+		// Enhancement models
+		&domain.InfaqType{},
+		&domain.WATemplate{},
 	)
 }

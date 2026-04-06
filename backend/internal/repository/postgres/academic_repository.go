@@ -21,7 +21,11 @@ func (r *AcademicRepository) CreateClass(class *domain.Class) error {
 
 func (r *AcademicRepository) GetAllClasses(unitID uint) ([]domain.Class, error) {
 	var classes []domain.Class
-	err := r.db.Where("unit_id = ?", unitID).Find(&classes).Error
+	query := r.db
+	if unitID != 0 {
+		query = query.Where("unit_id = ?", unitID)
+	}
+	err := query.Find(&classes).Error
 	return classes, err
 }
 

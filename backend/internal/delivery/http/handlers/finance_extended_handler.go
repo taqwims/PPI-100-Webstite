@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -62,6 +63,61 @@ func (h *FinanceExtendedHandler) GetAllAcademicYears(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, years)
+}
+
+func (h *FinanceExtendedHandler) UpdateAcademicYear(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	var req domain.AcademicYear
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.ID = uint(id)
+
+	if err := h.financeExtendedUsecase.UpdateAcademicYear(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Academic year updated"})
+}
+
+func (h *FinanceExtendedHandler) DeleteAcademicYear(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.DeleteAcademicYear(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Academic year deleted"})
+}
+
+func (h *FinanceExtendedHandler) SetActiveAcademicYear(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.SetActiveAcademicYear(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Academic year set as active"})
 }
 
 // ------------------- Savings -------------------
@@ -188,74 +244,6 @@ func (h *FinanceExtendedHandler) GetMyChildrenSavings(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// ------------------- Payroll -------------------
-
-func (h *FinanceExtendedHandler) CreatePayroll(c *gin.Context) {
-	processedByID, ok := getUserIDFromContext(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	var req domain.Payroll
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	req.ProcessedByID = processedByID
-	req.Total = req.BasicSalary + req.Allowances - req.Deductions
-
-	if err := h.financeExtendedUsecase.CreatePayroll(&req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"message": "Payroll created successfully", "data": req})
-}
-
-func (h *FinanceExtendedHandler) GetPayrolls(c *gin.Context) {
-	monthYear := c.Query("month_year") // optional filter
-	payrolls, err := h.financeExtendedUsecase.GetPayrolls(monthYear)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, payrolls)
-}
-
-func (h *FinanceExtendedHandler) UpdatePayroll(c *gin.Context) {
-	id := c.Param("id")
-	payrollUUID, err := uuid.Parse(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payroll ID"})
-		return
-	}
-
-	var req domain.Payroll
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	req.ID = payrollUUID
-
-	if err := h.financeExtendedUsecase.UpdatePayroll(&req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Payroll updated successfully"})
-}
-
-func (h *FinanceExtendedHandler) DeletePayroll(c *gin.Context) {
-	id := c.Param("id")
-	if err := h.financeExtendedUsecase.DeletePayroll(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Payroll deleted successfully"})
-}
 
 // ------------------- Cash Ledger -------------------
 
