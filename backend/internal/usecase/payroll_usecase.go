@@ -118,3 +118,15 @@ func (u *PayrollUsecase) Pay(id string) error {
 
 	return nil
 }
+
+func (u *PayrollUsecase) GetPayrollTemplates() ([]domain.PayrollTemplate, error) {
+	return u.payrollRepo.GetPayrollTemplates()
+}
+
+func (u *PayrollUsecase) GetPayrollTemplateByUserID(userID string) (*domain.PayrollTemplate, error) {
+	return u.payrollRepo.GetPayrollTemplateByUserID(userID)
+}
+
+func (u *PayrollUsecase) UpsertPayrollTemplate(template *domain.PayrollTemplate) error {
+	return u.payrollRepo.UpsertPayrollTemplate(template)
+}

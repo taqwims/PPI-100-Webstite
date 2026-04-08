@@ -66,6 +66,13 @@ const CashLedger = () => {
     const [transactionCodes, setTransactionCodes] = useState<TransactionCode[]>([]);
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
+    // Filters & Pagination
+    const [filterStartDate, setFilterStartDate] = useState('');
+    const [filterEndDate, setFilterEndDate] = useState('');
+    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+    const [itemsPerPage, setItemsPerPage] = useState<number>(20);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+
     // Export modal state
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportStartDate, setExportStartDate] = useState('');
@@ -222,18 +229,40 @@ const CashLedger = () => {
         setShowExportModal(false);
     };
 
-    // Filter entries by search query
-    const filteredEntries = entries.filter(e => {
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.toLowerCase();
-        return (
-            e.item_name?.toLowerCase().includes(q) ||
-            e.source?.toLowerCase().includes(q) ||
-            e.notes?.toLowerCase().includes(q) ||
-            e.category?.toLowerCase().includes(q) ||
-            e.responsible?.name?.toLowerCase().includes(q)
-        );
+    // Application of Filters
+    let processedEntries = entries.filter(e => {
+        let match = true;
+        // Search
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            if (!(
+                e.item_name?.toLowerCase().includes(q) ||
+                e.source?.toLowerCase().includes(q) ||
+                e.notes?.toLowerCase().includes(q) ||
+                e.category?.toLowerCase().includes(q) ||
+                e.responsible?.name?.toLowerCase().includes(q)
+            )) match = false;
+        }
+        // Date filters
+        if (filterStartDate) {
+            if (e.date.split('T')[0] < filterStartDate) match = false;
+        }
+        if (filterEndDate) {
+            if (e.date.split('T')[0] > filterEndDate) match = false;
+        }
+        return match;
     });
+
+    // Sorting
+    processedEntries.sort((a, b) => {
+        const da = new Date(a.date).getTime();
+        const db = new Date(b.date).getTime();
+        return sortOrder === 'desc' ? db - da : da - db;
+    });
+
+    // Pagination
+    const totalPages = Math.ceil(processedEntries.length / itemsPerPage);
+    const paginatedEntries = processedEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const totalIncome = entries.filter(e => e.type === 'Income').reduce((acc, curr) => acc + curr.amount, 0);
     const totalExpense = entries.filter(e => e.type === 'Expense').reduce((acc, curr) => acc + curr.amount, 0);
@@ -310,20 +339,38 @@ const CashLedger = () => {
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                        <div className="relative w-full max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Cari item, sumber, atau keterangan transaksi..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            />
+                    <div className="p-5 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-4 justify-between md:items-center">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative w-full sm:w-64 max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Cari transaksi..."
+                                    value={searchQuery}
+                                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setCurrentPage(1); }} title="Tanggal Mulai" className="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+                                <span className="text-slate-400">-</span>
+                                <input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }} title="Tanggal Akhir" className="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <select value={sortOrder} onChange={e => { setSortOrder(e.target.value as 'asc'|'desc'); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer">
+                                <option value="desc">Terbaru</option>
+                                <option value="asc">Terlama</option>
+                            </select>
+                            <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer">
+                                <option value="20">20 Baris</option>
+                                <option value="40">40 Baris</option>
+                                <option value="80">80 Baris</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto w-full">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-sm">
@@ -346,18 +393,17 @@ const CashLedger = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filteredEntries.length === 0 ? (
+                                ) : paginatedEntries.length === 0 ? (
                                     <tr>
                                         <td colSpan={canManage ? 8 : 7} className="p-12 text-center text-slate-500">
                                             <AlertCircle size={40} className="mx-auto text-slate-300 mb-3" />
                                             <p className="text-lg font-medium text-slate-700">
-                                                {searchQuery ? 'Tidak ditemukan hasil pencarian' : 'Buku Kas Kosong'}
+                                                {searchQuery || filterStartDate || filterEndDate ? 'Tidak ditemukan hasil pencarian' : 'Buku Kas Kosong'}
                                             </p>
-                                            {!searchQuery && <p className="text-sm">Belum ada pencatatan operasional sekolah.</p>}
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredEntries.map((entry) => (
+                                    paginatedEntries.map((entry) => (
                                         <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                                             <td className="p-4 text-slate-600 text-sm whitespace-nowrap">
                                                 {new Date(entry.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })}
@@ -426,6 +472,28 @@ const CashLedger = () => {
                             </tbody>
                         </table>
                     </div>
+                    {totalPages > 1 && (
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <p className="text-sm text-slate-500">Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, processedEntries.length)} dari {processedEntries.length} entri</p>
+                            <div className="flex gap-1 justify-end">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 text-sm hover:bg-slate-50"
+                                >
+                                    Sebelumnya
+                                </button>
+                                <span className="px-4 py-1.5 text-sm font-medium text-slate-700">Hal {currentPage} / {totalPages}</span>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 text-sm hover:bg-slate-50"
+                                >
+                                    Selanjutnya
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Modal Transaksi Kas */}

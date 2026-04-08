@@ -77,3 +77,37 @@ func (h *PayrollHandler) Pay(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Payroll paid successfully"})
 }
+
+func (h *PayrollHandler) GetTemplates(c *gin.Context) {
+	templates, err := h.payrollUsecase.GetPayrollTemplates()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, templates)
+}
+
+func (h *PayrollHandler) GetTemplateByUserID(c *gin.Context) {
+	userID := c.Param("userId")
+	template, err := h.payrollUsecase.GetPayrollTemplateByUserID(userID)
+	if err != nil {
+		// Return 404 if not found, instead of 500
+		c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
+		return
+	}
+	c.JSON(http.StatusOK, template)
+}
+
+func (h *PayrollHandler) UpsertTemplate(c *gin.Context) {
+	var template domain.PayrollTemplate
+	if err := c.ShouldBindJSON(&template); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	if err := h.payrollUsecase.UpsertPayrollTemplate(&template); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, template)
+}

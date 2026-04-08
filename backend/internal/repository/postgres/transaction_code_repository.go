@@ -111,13 +111,13 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 		FROM (
 			SELECT cl.date, cl.source, cl.item_name as description, cl.type, cl.amount,
 			       cl.category, CAST(cl.transaction_code_id AS INTEGER) as code_id, 'CashLedger' as module
-			FROM cash_ledgers cl WHERE cl.deleted_at IS NULL
+			FROM cash_ledgers cl
 
 			UNION ALL
 
 			SELECT di.date, di.source, COALESCE(di.notes, 'Infaq') as description, di.type, di.amount,
 			       'Infaq' as category, CAST(di.transaction_code_id AS INTEGER) as code_id, 'DailyInfaq' as module
-			FROM daily_infaqs di WHERE di.deleted_at IS NULL
+			FROM daily_infaqs di
 
 			UNION ALL
 
@@ -128,17 +128,50 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			JOIN bills b ON p.bill_id = b.id
 			LEFT JOIN students s ON b.student_id = s.id
 			LEFT JOIN users u ON s.user_id = u.id
-			WHERE p.status = 'Success' AND p.deleted_at IS NULL AND b.deleted_at IS NULL
+			WHERE p.status = 'Success'
 
 			UNION ALL
 
-			SELECT pr.payment_date as date, u.name as source,
-			       CONCAT('Gaji ', pr.month_year) as description,
-			       'Expense' as type, pr.total as amount, 'Gaji' as category,
-			       CAST(pr.transaction_code_id AS INTEGER) as code_id, 'Payroll' as module
+			SELECT pr.paid_at as date, u.name as source,
+			       CONCAT('Gaji ', pr.period_month, '/', pr.period_year) as description,
+			       'Expense' as type, pr.net_salary as amount, 'Gaji' as category,
+			       0 as code_id, 'Payroll' as module
 			FROM payrolls pr
 			LEFT JOIN users u ON pr.user_id = u.id
-			WHERE pr.status = 'Paid' AND pr.deleted_at IS NULL
+			WHERE pr.status = 'Paid'
+
+			UNION ALL
+
+			SELECT at2.date, COALESCE(u2.name, 'Siswa') as source,
+			       CONCAT(a.name, ' - ', at2.description) as description,
+			       at2.transaction_type as type, at2.amount, 'Kegiatan' as category,
+			       0 as code_id, 'Activity' as module
+			FROM activity_transactions at2
+			JOIN activities a ON at2.activity_id = a.id
+			LEFT JOIN users u2 ON at2.created_by_id = u2.id
+
+			UNION ALL
+
+			SELECT st.date, COALESCE(u3.name, 'Siswa') as source,
+			       CONCAT('Tabungan: ', st.description) as description,
+			       st.type, st.amount, 'Tabungan' as category,
+			       0 as code_id, 'Savings' as module
+			FROM savings_transactions st
+			LEFT JOIN savings sv ON st.savings_id = sv.id
+			LEFT JOIN students s3 ON sv.student_id = s3.id
+			LEFT JOIN users u3 ON s3.user_id = u3.id
+
+			UNION ALL
+
+			SELECT so.paid_at as date, COALESCE(u4.name, 'Siswa') as source,
+			       CONCAT('Tagihan: ', pt.name) as description,
+			       'Income' as type, so.paid_amount as amount, 'Tanggungan' as category,
+			       0 as code_id, 'Obligation' as module
+			FROM student_obligations so
+			JOIN payment_types pt ON so.payment_type_id = pt.id
+			LEFT JOIN students s4 ON so.student_id = s4.id
+			LEFT JOIN users u4 ON s4.user_id = u4.id
+			WHERE so.status IN ('Paid', 'Partial') AND so.paid_amount > 0
 		) t
 		LEFT JOIN transaction_codes tc ON t.code_id = tc.id
 		WHERE 1=1 %s %s %s

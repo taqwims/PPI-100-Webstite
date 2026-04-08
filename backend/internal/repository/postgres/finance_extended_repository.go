@@ -104,6 +104,66 @@ func (r *financeExtendedRepository) GetStudentSavingAccount(studentID uuid.UUID)
 	return &account, nil
 }
 
+func (r *financeExtendedRepository) TransferSavings(studentID, handledByID uuid.UUID, module string, direction string, amount float64, notes string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var account domain.SavingAccount
+		if err := tx.Where("student_id = ?", studentID).First(&account).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				account = domain.SavingAccount{StudentID: studentID, Balance: 0}
+				if err := tx.Create(&account).Error; err != nil { return err }
+			} else {
+				return err
+			}
+		}
+
+		// Saving side
+		txnType := "Deposit"
+		if direction == "FromSaving" {
+			txnType = "Withdrawal"
+			if account.Balance < amount {
+				return gorm.ErrInvalidData // Not enough balance
+			}
+			account.Balance -= amount
+		} else {
+			account.Balance += amount
+		}
+
+		if err := tx.Save(&account).Error; err != nil { return err }
+		savingTxn := domain.SavingTransaction{
+			AccountID: account.ID, Type: txnType, Amount: amount,
+			Date: time.Now(), HandledByID: handledByID, Notes: notes + " (" + module + ")",
+		}
+		if err := tx.Create(&savingTxn).Error; err != nil { return err }
+
+		// Module side
+		var student domain.Student
+		if err := tx.Preload("User").Where("id = ?", studentID).First(&student).Error; err == nil && student.User.Name != "" {
+			notes = notes + " - " + student.User.Name
+		}
+
+		if module == "CashLedger" {
+			ledgerType := "Expense"
+			if direction == "FromSaving" { ledgerType = "Income" }
+			entry := domain.CashLedger{
+				Date: time.Now(), Type: ledgerType, Amount: amount,
+				Source: "Pindah Dana Tabungan", ItemName: notes,
+				Category: "Transfer", CreatedBy: handledByID, Notes: notes,
+			}
+			if err := tx.Create(&entry).Error; err != nil { return err }
+		} else if module == "Infaq" {
+			if direction == "FromSaving" {
+				entry := domain.DailyInfaq{
+					Date: time.Now(), Amount: amount, Source: "Pindah Dana Tabungan",
+					HandledByID: handledByID, Notes: notes,
+				}
+				if err := tx.Create(&entry).Error; err != nil { return err }
+			}
+		}
+
+		return nil
+	})
+}
+
 
 // ------------------- Cash Ledger & Daily Infaq -------------------
 
@@ -260,3 +320,105 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 
 	return analytics, nil
 }
+
+// ------------------- Savings Operational (Pool-level) -------------------
+
+func (r *financeExtendedRepository) WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string) error {
+	// Check total pool balance first
+	var totalBalance sql.NullFloat64
+	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalBalance)
+
+	// Get total outstanding withdrawals
+	var totalWithdrawn sql.NullFloat64
+	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
+		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&totalWithdrawn)
+
+	available := totalBalance.Float64 - totalWithdrawn.Float64
+	if amount > available {
+		return gorm.ErrInvalidData // Not enough available funds
+	}
+
+	withdrawal := domain.SavingsOperationalWithdrawal{
+		Amount:      amount,
+		Purpose:     purpose,
+		Status:      "Outstanding",
+		HandledByID: handledByID,
+	}
+	return r.db.Create(&withdrawal).Error
+}
+
+func (r *financeExtendedRepository) ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var withdrawal domain.SavingsOperationalWithdrawal
+		if err := tx.Where("id = ?", withdrawalID).First(&withdrawal).Error; err != nil {
+			return err
+		}
+
+		remaining := withdrawal.Amount - withdrawal.ReturnedAmount
+		if amount > remaining {
+			return gorm.ErrInvalidData // Cannot return more than outstanding
+		}
+
+		// Record the return
+		ret := domain.SavingsOperationalReturn{
+			WithdrawalID: withdrawalID,
+			Amount:       amount,
+			Notes:        notes,
+			HandledByID:  handledByID,
+		}
+		if err := tx.Create(&ret).Error; err != nil {
+			return err
+		}
+
+		// Update withdrawal
+		withdrawal.ReturnedAmount += amount
+		if withdrawal.ReturnedAmount >= withdrawal.Amount {
+			withdrawal.Status = "Returned"
+		} else {
+			withdrawal.Status = "PartialReturn"
+		}
+		return tx.Save(&withdrawal).Error
+	})
+}
+
+func (r *financeExtendedRepository) GetSavingsOperationalHistory() ([]domain.SavingsOperationalWithdrawal, error) {
+	var withdrawals []domain.SavingsOperationalWithdrawal
+	if err := r.db.Preload("HandledBy").Order("created_at desc").Find(&withdrawals).Error; err != nil {
+		return nil, err
+	}
+	return withdrawals, nil
+}
+
+func (r *financeExtendedRepository) GetSavingsOperationalReturns(withdrawalID uuid.UUID) ([]domain.SavingsOperationalReturn, error) {
+	var returns []domain.SavingsOperationalReturn
+	if err := r.db.Preload("HandledBy").Where("withdrawal_id = ?", withdrawalID).Order("created_at desc").Find(&returns).Error; err != nil {
+		return nil, err
+	}
+	return returns, nil
+}
+
+func (r *financeExtendedRepository) GetSavingsPoolSummary() (map[string]interface{}, error) {
+	summary := make(map[string]interface{})
+
+	var totalBalance sql.NullFloat64
+	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalBalance)
+	summary["total_balance"] = totalBalance.Float64
+
+	var totalWithdrawn sql.NullFloat64
+	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
+		Select("COALESCE(sum(amount), 0)").Row().Scan(&totalWithdrawn)
+	summary["total_withdrawn"] = totalWithdrawn.Float64
+
+	var totalReturned sql.NullFloat64
+	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
+		Select("COALESCE(sum(returned_amount), 0)").Row().Scan(&totalReturned)
+	summary["total_returned"] = totalReturned.Float64
+
+	outstandingDebt := totalWithdrawn.Float64 - totalReturned.Float64
+	summary["outstanding_debt"] = outstandingDebt
+	summary["available_balance"] = totalBalance.Float64 - outstandingDebt
+
+	return summary, nil
+}
+

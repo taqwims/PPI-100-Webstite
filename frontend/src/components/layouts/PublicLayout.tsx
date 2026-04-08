@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import NavbarGlass from '../ui/glass/NavbarGlass';
+import PWAPrompt from '../ui/PWAPrompt';
 
 interface PublicLayoutProps {
     children: React.ReactNode;
@@ -38,6 +39,8 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                     </div>
                 </div>
             </footer>
+            
+            <PWAPrompt />
         </div>
     );
 };

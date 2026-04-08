@@ -298,7 +298,7 @@ export const generateFinancialReportPDF = (
     doc.text(reportTitle.toUpperCase(), pageWidth / 2, 14, { align: 'center' });
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Periode: ${periodStr}`, pageWidth / 2, 22, { align: 'center' });
+    doc.text(`Periode: ${periodStr}  —  Yayasan PPI 100`, pageWidth / 2, 22, { align: 'center' });
 
     // Summary
     const totalIncome = transactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
@@ -312,9 +312,39 @@ export const generateFinancialReportPDF = (
     doc.text(`Total Pengeluaran: ${formatCurrency(totalExpense)}`, 120, 40);
     doc.text(`Netto: ${formatCurrency(netto)}`, 226, 40);
 
-    // Table
+    // Per-Module Summary Table
+    const moduleMap: Record<string, { income: number; expense: number; count: number }> = {};
+    transactions.forEach(t => {
+        const mod = t.module || 'Lainnya';
+        if (!moduleMap[mod]) moduleMap[mod] = { income: 0, expense: 0, count: 0 };
+        moduleMap[mod].count++;
+        if (t.type === 'Income') moduleMap[mod].income += t.amount;
+        else moduleMap[mod].expense += t.amount;
+    });
+
     autoTable(doc, {
-        startY: 48,
+        startY: 46,
+        head: [['Modul', 'Jumlah Transaksi', 'Total Pemasukan', 'Total Pengeluaran', 'Netto']],
+        body: Object.entries(moduleMap).map(([mod, v]) => [
+            mod, v.count, formatCurrency(v.income), formatCurrency(v.expense), formatCurrency(v.income - v.expense)
+        ]),
+        foot: [['TOTAL', transactions.length, formatCurrency(totalIncome), formatCurrency(totalExpense), formatCurrency(netto)]],
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [71, 85, 105], textColor: 255, fontStyle: 'bold' },
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    const summaryFinalY = (doc as any).lastAutoTable?.finalY || 80;
+
+    // Detail Transaction Table
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text('Detail Transaksi', 14, summaryFinalY + 8);
+
+    autoTable(doc, {
+        startY: summaryFinalY + 12,
         head: [['No', 'Tanggal', 'Modul', 'Deskripsi/Sumber', 'Kode', 'Ket', 'Kategori', 'Pemasukan', 'Pengeluaran']],
         body: transactions.map((t, i) => [
             i + 1,
@@ -327,15 +357,21 @@ export const generateFinancialReportPDF = (
             t.type === 'Income' ? formatCurrency(t.amount) : '-',
             t.type === 'Expense' ? formatCurrency(t.amount) : '-'
         ]),
-        styles: { fontSize: 8, cellPadding: 3 },
+        styles: { fontSize: 7, cellPadding: 2 },
         headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
     });
 
-    // Footer
-    doc.setTextColor(148, 163, 184);
-    doc.setFontSize(7);
-    doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID')} - Yayasan PPI 100`, 14, doc.internal.pageSize.getHeight() - 10);
+    // Footer on each page
+    const pageCount = doc.getNumberOfPages();
+    const printDate = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(7);
+        doc.text(`Dicetak: ${printDate} - Yayasan PPI 100`, 14, doc.internal.pageSize.getHeight() - 8);
+        doc.text(`Halaman ${i} dari ${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 8, { align: 'right' });
+    }
 
     if (action === 'preview') {
         return doc.output('bloburl').toString();
@@ -683,9 +719,9 @@ export const generateActivityReportPDF = (data: ActivityReportOptions) => {
     doc.save(`Laporan_Kegiatan_${activity.name.replace(/\s+/g, '_')}.pdf`);
 };
 
-// ===================== OBLIGATION RECEIPT (Kwitansi Tanggungan/Kegiatan) =====================
+// ===================== ACTIVITY OBLIGATION RECEIPT (Kwitansi Tanggungan/Kegiatan) =====================
 
-interface ObligationReceiptData {
+interface ActivityObligationReceiptData {
     id: string;
     studentName: string;
     className: string;
@@ -694,7 +730,7 @@ interface ObligationReceiptData {
     paidAt?: string;
 }
 
-export const generateObligationReceipt = (data: ObligationReceiptData) => {
+export const generateActivityObligationReceipt = (data: ActivityObligationReceiptData) => {
     const doc = new jsPDF({ format: [148, 210] }); // A5
     const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -784,6 +820,8 @@ interface StudentBillItem {
     status: string;
     billing_month?: number;
     due_date?: string;
+    installment_number?: number;
+    total_installments?: number;
 }
 
 interface StudentBillPDFData {
@@ -840,59 +878,407 @@ export const generateStudentBillPDF = (data: StudentBillPDFData) => {
     doc.setDrawColor(203, 213, 225);
     doc.line(labelX, divY, pageWidth - 14, divY);
 
-    // Unpaid items
-    const unpaid = data.obligations.filter(o => o.status !== 'Paid');
-    const totalUnpaid = unpaid.reduce((s, o) => s + (o.amount - o.paid_amount), 0);
+    // ALL items (paid + unpaid)
+    const allObs = data.obligations;
+    const totalAmount = allObs.reduce((s, o) => s + o.amount, 0);
+    const totalPaid = allObs.reduce((s, o) => s + o.paid_amount, 0);
+    const totalUnpaid = totalAmount - totalPaid;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('Rincian Tunggakan', labelX, divY + 8);
+    doc.text('Rincian Tagihan', labelX, divY + 8);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`${unpaid.length} item belum lunas — Total: ${formatCurrency(totalUnpaid)}`, labelX, divY + 15);
+    doc.text(`${allObs.length} item tagihan`, labelX, divY + 15);
 
-    // Table
+    // Table with all obligations
     autoTable(doc, {
         startY: divY + 20,
-        head: [['No', 'Jenis Pembayaran', 'Bulan', 'Tagihan', 'Terbayar', 'Sisa', 'Status', 'Jatuh Tempo']],
-        body: unpaid.map((o, i) => [
+        head: [['No', 'Jenis Pembayaran', 'Bulan/Cicilan', 'Tagihan', 'Terbayar', 'Sisa', 'Status', 'Jatuh Tempo']],
+        body: allObs.map((o, i) => [
             i + 1,
             o.name,
-            o.billing_month && o.billing_month > 0 ? monthNames[o.billing_month] : '-',
+            o.billing_month && o.billing_month > 0
+                ? monthNames[o.billing_month]
+                : o.installment_number && o.total_installments
+                    ? `Cicilan ${o.installment_number}/${o.total_installments}`
+                    : '-',
             formatCurrency(o.amount),
             formatCurrency(o.paid_amount),
             formatCurrency(o.amount - o.paid_amount),
-            o.status === 'Partial' ? 'Cicil' : 'Belum',
+            o.status === 'Paid' ? 'Lunas' : o.status === 'Partial' ? 'Cicil' : 'Belum',
             o.due_date ? formatDate(o.due_date) : '-'
         ]),
         styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [254, 242, 242] },
+        didParseCell: (hookData: any) => {
+            // Color status column
+            if (hookData.section === 'body' && hookData.column.index === 6) {
+                const val = hookData.cell.raw;
+                if (val === 'Lunas') {
+                    hookData.cell.styles.textColor = [22, 163, 74];
+                    hookData.cell.styles.fontStyle = 'bold';
+                } else if (val === 'Belum') {
+                    hookData.cell.styles.textColor = [220, 38, 38];
+                    hookData.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
     });
 
-    const finalY = (doc as any).lastAutoTable?.finalY || divY + 60;
+    let finalY = (doc as any).lastAutoTable?.finalY || divY + 60;
 
-    // Total box
+    if (finalY + 80 > doc.internal.pageSize.getHeight()) {
+        doc.addPage();
+        finalY = 20;
+    }
+
+    // Summary box
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.roundedRect(labelX, finalY + 5, pageWidth - 28, 28, 3, 3, 'F');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+    doc.text('Total Tagihan', labelX + 6, finalY + 14);
+    doc.text(formatCurrency(totalAmount), pageWidth / 2 - 10, finalY + 14, { align: 'right' });
+    doc.text('Total Terbayar', labelX + 6, finalY + 21);
+    doc.setTextColor(22, 163, 74);
+    doc.text(formatCurrency(totalPaid), pageWidth / 2 - 10, finalY + 21, { align: 'right' });
+
+    // Unpaid highlight
     doc.setFillColor(254, 226, 226); // red-100
-    doc.roundedRect(labelX, finalY + 5, pageWidth - 28, 18, 3, 3, 'F');
+    doc.roundedRect(pageWidth / 2, finalY + 5, pageWidth / 2 - 14, 28, 3, 3, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(185, 28, 28); // red-700
-    doc.text('TOTAL SISA TUNGGAKAN', labelX + 6, finalY + 16);
+    doc.text('SISA TUNGGAKAN', pageWidth / 2 + 6, finalY + 14);
     doc.setFontSize(14);
-    doc.text(formatCurrency(totalUnpaid), pageWidth - 20, finalY + 17, { align: 'right' });
+    doc.text(formatCurrency(totalUnpaid), pageWidth - 20, finalY + 24, { align: 'right' });
 
     // Closing message
     doc.setTextColor(71, 85, 105);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text('Mohon segera melakukan pembayaran atas tunggakan di atas.', labelX, finalY + 32);
-    doc.text('Apabila sudah melakukan pembayaran, mohon abaikan surat ini.', labelX, finalY + 38);
+    doc.text('Mohon segera melakukan pembayaran atas tunggakan di atas.', labelX, finalY + 42);
+    doc.text('Apabila sudah melakukan pembayaran, mohon abaikan surat ini.', labelX, finalY + 48);
 
     // Footer
     doc.setTextColor(148, 163, 184);
     doc.setFontSize(7);
-    doc.text('Surat tagihan ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, finalY + 52, { align: 'center' });
+    doc.text('Surat tagihan ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, finalY + 60, { align: 'center' });
 
     doc.save(`Surat_Tagihan_${data.studentName.replace(/\s+/g, '_')}.pdf`);
+};
+
+// ===================== INFAQ RECEIPT =====================
+
+interface InfaqData {
+    id: string;
+    date: string;
+    class_name: string;
+    student_count: number;
+    amount: number;
+    notes: string;
+    handled_by_name: string;
+}
+
+export const generateInfaqReceipt = (entry: InfaqData) => {
+    const doc = new jsPDF({ format: [148, 210] }); // A5 size
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(16, 185, 129); // emerald-500
+    doc.rect(0, 0, pageWidth, 30, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BUKTI PENERIMAAN INFAQ', pageWidth / 2, 14, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`No: INF-${entry.id.slice(0, 8).toUpperCase()}`, pageWidth / 2, 22, { align: 'center' });
+
+    // Body
+    doc.setTextColor(30, 41, 59);
+    const startY = 40;
+    const labelX = 12;
+    const valueX = 55;
+
+    doc.setFontSize(9);
+    doc.text('Tanggal', labelX, startY);
+    doc.text(`: ${formatDate(entry.date)}`, valueX, startY);
+    doc.text('Kelas', labelX, startY + 7);
+    doc.text(`: ${entry.class_name}`, valueX, startY + 7);
+    doc.text('Jumlah Siswa', labelX, startY + 14);
+    doc.text(`: ${entry.student_count} siswa`, valueX, startY + 14);
+    doc.text('Diterima Oleh', labelX, startY + 21);
+    doc.text(`: ${entry.handled_by_name}`, valueX, startY + 21);
+
+    if (entry.notes) {
+        doc.text('Catatan', labelX, startY + 28);
+        doc.text(`: ${entry.notes}`, valueX, startY + 28);
+    }
+
+    // Amount
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, startY + 35, pageWidth - 12, startY + 35);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('NOMINAL', labelX, startY + 43);
+    doc.setTextColor(16, 185, 129);
+    doc.text(formatCurrency(entry.amount), pageWidth - 12, startY + 43, { align: 'right' });
+
+    // Footer
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID')}`, labelX, startY + 58);
+
+    doc.save(`Bukti_Infaq_${entry.class_name.replace(/\s+/g, '_')}_${new Date(entry.date).toISOString().split('T')[0]}.pdf`);
+};
+
+// ===================== OBLIGATION RECEIPT =====================
+
+interface ObligationReceiptData {
+    id: string;
+    studentName: string;
+    className: string;
+    paymentTypeName: string;
+    amount: number;
+    paidAmount: number;
+    billingMonth?: number;
+    installmentNumber?: number;
+    totalInstallments?: number;
+}
+
+export const generateObligationReceipt = (data: ObligationReceiptData) => {
+    const doc = new jsPDF({ format: [148, 210] }); // A5
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Header
+    doc.setFillColor(37, 99, 235); // blue-600
+    doc.rect(0, 0, pageWidth, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KUITANSI PEMBAYARAN', pageWidth / 2, 14, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`No: OB-${data.id.slice(0, 8).toUpperCase()}`, pageWidth / 2, 22, { align: 'center' });
+
+    // Body
+    doc.setTextColor(30, 41, 59);
+    const sY = 40;
+    const lX = 12;
+    const vX = 55;
+
+    doc.setFontSize(9);
+    doc.text('Siswa', lX, sY);
+    doc.text(`: ${data.studentName}`, vX, sY);
+    doc.text('Kelas', lX, sY + 7);
+    doc.text(`: ${data.className}`, vX, sY + 7);
+    doc.text('Jenis Bayar', lX, sY + 14);
+    doc.text(`: ${data.paymentTypeName}`, vX, sY + 14);
+    if (data.billingMonth && data.billingMonth > 0) {
+        doc.text('Bulan', lX, sY + 21);
+        doc.text(`: ${monthNames[data.billingMonth]}`, vX, sY + 21);
+    }
+    if (data.installmentNumber && data.totalInstallments) {
+        doc.text('Cicilan', lX, sY + 21);
+        doc.text(`: ${data.installmentNumber}/${data.totalInstallments}`, vX, sY + 21);
+    }
+    doc.text('Tanggal', lX, sY + 28);
+    doc.text(`: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, vX, sY + 28);
+
+    // Amount
+    doc.setDrawColor(203, 213, 225);
+    doc.line(lX, sY + 35, pageWidth - 12, sY + 35);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('TOTAL DIBAYAR', lX, sY + 43);
+    doc.setTextColor(37, 99, 235);
+    doc.setFontSize(14);
+    doc.text(formatCurrency(data.paidAmount), pageWidth - 12, sY + 43, { align: 'right' });
+
+    // Status
+    const isLunas = data.paidAmount >= data.amount;
+    doc.setTextColor(isLunas ? 16 : 245, isLunas ? 185 : 158, isLunas ? 129 : 11);
+    doc.setFontSize(12);
+    doc.text(isLunas ? '✓ LUNAS' : '◐ CICILAN', pageWidth / 2, sY + 58, { align: 'center' });
+
+    // Footer
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Kwitansi ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, sY + 70, { align: 'center' });
+
+    doc.save(`Kuitansi_${data.studentName.replace(/\s+/g, '_')}_${data.paymentTypeName.replace(/\s+/g, '_')}.pdf`);
+};
+
+// ===================== ACTIVITY BILL LETTER (Surat Tagihan Kegiatan) =====================
+
+interface ActivityBillItem {
+    studentName: string;
+    className: string;
+    activityName: string;
+    amount: number;
+    paidAmount: number;
+    status: string;
+}
+
+export const generateActivityBillPDF = (items: ActivityBillItem[], activityName: string) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(59, 130, 246); // blue-500
+    doc.rect(0, 0, pageWidth, 38, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SURAT TAGIHAN KEGIATAN', pageWidth / 2, 16, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Yayasan PPI 100 — Pondok Pesantren Islam', pageWidth / 2, 25, { align: 'center' });
+    doc.text(`Kegiatan: ${activityName}`, pageWidth / 2, 32, { align: 'center' });
+
+    // Summary
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    const totalUnpaid = items.reduce((s, i) => s + (i.amount - i.paidAmount), 0);
+    doc.text(`Total Siswa: ${items.length}  |  Total Tunggakan: ${formatCurrency(totalUnpaid)}`, 14, 48);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 55);
+
+    // Table
+    autoTable(doc, {
+        startY: 62,
+        head: [['No', 'Nama Siswa', 'Kelas', 'Tagihan', 'Terbayar', 'Sisa', 'Status']],
+        body: items.map((item, i) => [
+            i + 1,
+            item.studentName,
+            item.className,
+            formatCurrency(item.amount),
+            formatCurrency(item.paidAmount),
+            formatCurrency(item.amount - item.paidAmount),
+            item.status === 'Paid' ? 'Lunas' : item.status === 'Partial' ? 'Cicil' : 'Belum'
+        ]),
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [239, 246, 255] },
+        didParseCell: (hookData: any) => {
+            if (hookData.section === 'body' && hookData.column.index === 6) {
+                const val = hookData.cell.raw;
+                if (val === 'Lunas') {
+                    hookData.cell.styles.textColor = [22, 163, 74];
+                    hookData.cell.styles.fontStyle = 'bold';
+                } else if (val === 'Belum') {
+                    hookData.cell.styles.textColor = [220, 38, 38];
+                    hookData.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
+    });
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(7);
+        doc.text('Surat tagihan ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+        doc.text(`Halaman ${i}/${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+    }
+
+    doc.save(`Tagihan_Kegiatan_${activityName.replace(/\s+/g, '_')}.pdf`);
+};
+
+// Generate single student activity bill letter
+export const generateSingleActivityBillPDF = (item: ActivityBillItem) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pageWidth, 38, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SURAT TAGIHAN KEGIATAN', pageWidth / 2, 16, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Yayasan PPI 100 — Pondok Pesantren Islam', pageWidth / 2, 25, { align: 'center' });
+    doc.text(`Kegiatan: ${item.activityName}`, pageWidth / 2, 32, { align: 'center' });
+
+    // Student info
+    doc.setTextColor(30, 41, 59);
+    const startY = 50;
+    const labelX = 14;
+    const valueX = 60;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Data Siswa', labelX, startY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Nama', labelX, startY + 9);
+    doc.text(`: ${item.studentName}`, valueX, startY + 9);
+    doc.text('Kelas', labelX, startY + 16);
+    doc.text(`: ${item.className}`, valueX, startY + 16);
+    doc.text('Tanggal Cetak', labelX, startY + 23);
+    doc.text(`: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, valueX, startY + 23);
+
+    // Divider
+    doc.setDrawColor(203, 213, 225);
+    doc.line(labelX, startY + 29, pageWidth - 14, startY + 29);
+
+    // Bill details
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Rincian Tagihan Kegiatan', labelX, startY + 37);
+
+    autoTable(doc, {
+        startY: startY + 42,
+        head: [['Kegiatan', 'Tagihan', 'Terbayar', 'Sisa', 'Status']],
+        body: [[
+            item.activityName,
+            formatCurrency(item.amount),
+            formatCurrency(item.paidAmount),
+            formatCurrency(item.amount - item.paidAmount),
+            item.status === 'Paid' ? 'Lunas' : item.status === 'Partial' ? 'Cicilan' : 'Belum Bayar'
+        ]],
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+    });
+
+    const finalY = (doc as any).lastAutoTable?.finalY || startY + 80;
+
+    // Unpaid highlight
+    const unpaid = item.amount - item.paidAmount;
+    if (unpaid > 0) {
+        doc.setFillColor(254, 226, 226);
+        doc.roundedRect(labelX, finalY + 5, pageWidth - 28, 24, 3, 3, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(185, 28, 28);
+        doc.text('SISA TUNGGAKAN', labelX + 6, finalY + 16);
+        doc.setFontSize(14);
+        doc.text(formatCurrency(unpaid), pageWidth - 20, finalY + 20, { align: 'right' });
+    }
+
+    // Closing message
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Mohon segera melakukan pembayaran atas tunggakan di atas.', labelX, finalY + 38);
+    doc.text('Apabila sudah melakukan pembayaran, mohon abaikan surat ini.', labelX, finalY + 44);
+
+    // Footer
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.text('Surat tagihan ini dicetak secara otomatis oleh sistem keuangan PPI 100.', pageWidth / 2, finalY + 56, { align: 'center' });
+
+    doc.save(`Tagihan_${item.activityName.replace(/\s+/g, '_')}_${item.studentName.replace(/\s+/g, '_')}.pdf`);
 };

@@ -206,6 +206,18 @@ type Payroll struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
+type PayrollTemplate struct {
+	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID              uuid.UUID `gorm:"type:uuid;uniqueIndex;not null" json:"user_id"`
+	User                User      `gorm:"foreignKey:UserID" json:"user"`
+	BaseSalary          float64   `json:"base_salary"`
+	FunctionalAllowance float64   `json:"functional_allowance"`
+	TransportAllowance  float64   `json:"transport_allowance"`
+	AdditionalTask      float64   `json:"additional_task"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
 // BK
 
 type Violation struct {
@@ -427,6 +439,31 @@ type InfaqType struct {
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ------------------- Savings Operational (Pool-level) -------------------
+
+type SavingsOperationalWithdrawal struct {
+	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Amount         float64   `gorm:"not null" json:"amount"`
+	ReturnedAmount float64   `gorm:"default:0" json:"returned_amount"`
+	Purpose        string    `gorm:"not null" json:"purpose"`
+	Status         string    `gorm:"default:'Outstanding'" json:"status"` // Outstanding, PartialReturn, Returned
+	HandledByID    uuid.UUID `gorm:"type:uuid;not null" json:"handled_by_id"`
+	HandledBy      User      `gorm:"foreignKey:HandledByID" json:"handled_by"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type SavingsOperationalReturn struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	WithdrawalID uuid.UUID `gorm:"type:uuid;not null" json:"withdrawal_id"`
+	Withdrawal   SavingsOperationalWithdrawal `gorm:"foreignKey:WithdrawalID" json:"withdrawal"`
+	Amount       float64   `gorm:"not null" json:"amount"`
+	Notes        string    `json:"notes"`
+	HandledByID  uuid.UUID `gorm:"type:uuid;not null" json:"handled_by_id"`
+	HandledBy    User      `gorm:"foreignKey:HandledByID" json:"handled_by"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // ------------------- WhatsApp Template -------------------

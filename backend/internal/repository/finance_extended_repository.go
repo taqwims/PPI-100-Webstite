@@ -11,6 +11,8 @@ type FinanceExtendedRepository interface {
 	UpdateAcademicYear(year *domain.AcademicYear) error
 	DeleteAcademicYear(id uint) error
 	SetActiveAcademicYear(id uint) error
+	TransferSavings(studentID, handledByID uuid.UUID, module string, direction string, amount float64, notes string) error
+
 
 	ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error
 	GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error)
@@ -32,4 +34,11 @@ type FinanceExtendedRepository interface {
 
 
 	GetDashboardAnalytics() (map[string]interface{}, error)
+
+	// Savings Operational (Pool-level)
+	WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string) error
+	ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string) error
+	GetSavingsOperationalHistory() ([]domain.SavingsOperationalWithdrawal, error)
+	GetSavingsOperationalReturns(withdrawalID uuid.UUID) ([]domain.SavingsOperationalReturn, error)
+	GetSavingsPoolSummary() (map[string]interface{}, error)
 }

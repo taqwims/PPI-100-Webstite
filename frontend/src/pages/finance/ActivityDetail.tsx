@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
-import { ArrowLeft, Users, CreditCard, Receipt, FileText, Plus, Search, Trash2, X, CheckSquare, Upload, Printer } from 'lucide-react';
+import { ArrowLeft, Users, CreditCard, Receipt, FileText, Plus, Search, Trash2, X, CheckSquare, Upload } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
-import { generateActivityReportPDF } from '../../utils/pdfUtils';
+import { generateActivityReportPDF, generateActivityBillPDF, generateSingleActivityBillPDF } from '../../utils/pdfUtils';
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 const formatDate = (d: string) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(d));
@@ -205,9 +205,25 @@ const ActivityDetail = () => {
                             <input type="text" placeholder="Cari nama siswa atau kelas..." value={searchStudent} onChange={e => setSearchStudent(e.target.value)} className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm" />
                         </div>
                         {canManage && (
-                            <button onClick={() => setShowAssignModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition shadow-sm">
-                                <Plus size={16} /> Assign Siswa
-                            </button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button onClick={() => {
+                                    const billItems = filteredObs.filter(ob => ob.status !== 'Paid').map(ob => ({
+                                        studentName: ob.student?.user?.name || '-',
+                                        className: ob.student?.class?.name || '-',
+                                        activityName: activity.name,
+                                        amount: ob.amount,
+                                        paidAmount: ob.paid_amount,
+                                        status: ob.status
+                                    }));
+                                    if (billItems.length === 0) { toast.error('Tidak ada siswa yang belum lunas'); return; }
+                                    generateActivityBillPDF(billItems, activity.name);
+                                }} className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-red-700 transition shadow-sm">
+                                    <FileText size={16} /> Cetak Surat Tagihan
+                                </button>
+                                <button onClick={() => setShowAssignModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+                                    <Plus size={16} /> Assign Siswa
+                                </button>
+                            </div>
                         )}
                     </div>
                     <div className="overflow-x-auto">
@@ -240,12 +256,24 @@ const ActivityDetail = () => {
                                             <td className="px-5 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-1">
                                                     {ob.status !== 'Paid' && (
-                                                        <button onClick={() => { setPayModal(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition" title="Catat Bayar"><CheckSquare size={16} /></button>
+                                                        <>
+                                                            <button onClick={() => { setPayModal(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition" title="Catat Bayar"><CheckSquare size={16} /></button>
+                                                            <button onClick={() => {
+                                                                generateSingleActivityBillPDF({
+                                                                    studentName: ob.student?.user?.name || '-',
+                                                                    className: ob.student?.class?.name || '-',
+                                                                    activityName: activity.name,
+                                                                    amount: ob.amount,
+                                                                    paidAmount: ob.paid_amount,
+                                                                    status: ob.status
+                                                                });
+                                                            }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Surat Tagihan"><FileText size={16} /></button>
+                                                        </>
                                                     )}
                                                     {ob.status === 'Paid' && (
                                                         <button onClick={() => {
                                                             import('../../utils/pdfUtils').then(mod => {
-                                                                mod.generateObligationReceipt({
+                                                                mod.generateActivityObligationReceipt({
                                                                     id: ob.id,
                                                                     studentName: ob.student?.user?.name || '-',
                                                                     className: ob.student?.class?.name || '-',
@@ -254,7 +282,7 @@ const ActivityDetail = () => {
                                                                     paidAt: ob.updated_at
                                                                 });
                                                             });
-                                                        }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Cetak Kwitansi"><Printer size={16} /></button>
+                                                        }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Cetak Kwitansi"><Receipt size={16} /></button>
                                                     )}
                                                     <button onClick={() => { if (confirm('Hapus siswa dari daftar tagihan kegiatan?')) deleteObligation.mutate(ob.id); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Hapus"><Trash2 size={16} /></button>
                                                 </div>

@@ -49,6 +49,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.ContactMessage{},
 		&domain.AcademicYear{},
 		&domain.Payroll{},
+		&domain.PayrollTemplate{},
 		&domain.SavingAccount{},
 		&domain.SavingTransaction{},
 		&domain.CashLedger{},
@@ -69,5 +70,9 @@ func AutoMigrate(db *gorm.DB) error {
 		// Enhancement models
 		&domain.InfaqType{},
 		&domain.WATemplate{},
+
+		// Savings Operational
+		&domain.SavingsOperationalWithdrawal{},
+		&domain.SavingsOperationalReturn{},
 	)
 }

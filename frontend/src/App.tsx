@@ -65,7 +65,7 @@ import GlobalTransactions from './pages/finance/GlobalTransactions';
 import RKAS from './pages/finance/RKAS';
 import ExecutiveDashboard from './pages/finance/ExecutiveDashboard';
 import Reports from './pages/finance/Reports';
-import BillTemplates from './pages/finance/BillTemplates';
+
 import PaymentTypes from './pages/finance/PaymentTypes';
 import AcademicYears from './pages/finance/AcademicYears';
 import StudentObligations from './pages/finance/StudentObligations';
@@ -127,7 +127,7 @@ function App() {
                                     <Route path="finance/rkas" element={<RKAS />} />
                                     <Route path="finance/executive-dashboard" element={<ExecutiveDashboard />} />
                                     <Route path="finance/reports" element={<Reports />} />
-                                    <Route path="finance/bill-templates" element={<BillTemplates />} />
+
                                     <Route path="finance/payment-types" element={<PaymentTypes />} />
                                     <Route path="finance/academic-years" element={<AcademicYears />} />
                                     <Route path="finance/student-obligations" element={<StudentObligations />} />

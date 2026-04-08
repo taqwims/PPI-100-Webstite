@@ -5,6 +5,7 @@ import (
 	"ppi-100-sis/internal/repository"
 	"ppi-100-sis/internal/repository/postgres"
 	"github.com/google/uuid"
+	"time"
 )
 
 type FinanceExtendedUsecase struct {
@@ -55,6 +56,10 @@ func (u *FinanceExtendedUsecase) GetAllSavingAccounts() ([]domain.SavingAccount,
 
 func (u *FinanceExtendedUsecase) GetSavingTransactions(accountID uuid.UUID) ([]domain.SavingTransaction, error) {
 	return u.financeRepo.GetSavingTransactions(accountID)
+}
+
+func (u *FinanceExtendedUsecase) TransferSavings(studentID uuid.UUID, handledByID uuid.UUID, module string, direction string, amount float64, notes string) error {
+	return u.financeRepo.TransferSavings(studentID, handledByID, module, direction, amount, notes)
 }
 
 // ------------------- Payroll -------------------
@@ -120,5 +125,55 @@ func (u *FinanceExtendedUsecase) DeleteDailyInfaqEntry(id string) error {
 
 func (u *FinanceExtendedUsecase) GetDashboardAnalytics() (map[string]interface{}, error) {
 	return u.financeRepo.GetDashboardAnalytics()
+}
+
+// ------------------- Savings Operational -------------------
+
+func (u *FinanceExtendedUsecase) WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string) error {
+	err := u.financeRepo.WithdrawSavingsOperational(handledByID, amount, purpose)
+	if err == nil {
+		// Auto-sync to CashLedger: Withdrawing from savings means Kas Umum receives funds (Income)
+		entry := &domain.CashLedger{
+			Date:     time.Now(),
+			Source:   "Mutasi Tabungan",
+			ItemName: "Penarikan Dana Operasional Tabungan - " + purpose,
+			Type:     "Income",
+			Amount:   amount,
+			Category: "Mutasi Tabungan",
+			Notes:    "Otomatis dari modul Tabungan",
+		}
+		_ = u.financeRepo.AddCashLedgerEntry(entry)
+	}
+	return err
+}
+
+func (u *FinanceExtendedUsecase) ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string) error {
+	err := u.financeRepo.ReturnSavingsOperational(withdrawalID, handledByID, amount, notes)
+	if err == nil {
+		// Auto-sync to CashLedger: Returning to savings means Kas Umum spends funds (Expense)
+		entry := &domain.CashLedger{
+			Date:     time.Now(),
+			Source:   "Mutasi Tabungan",
+			ItemName: "Pengembalian Dana Operasional Tabungan",
+			Type:     "Expense",
+			Amount:   amount,
+			Category: "Mutasi Tabungan",
+			Notes:    notes,
+		}
+		_ = u.financeRepo.AddCashLedgerEntry(entry)
+	}
+	return err
+}
+
+func (u *FinanceExtendedUsecase) GetSavingsOperationalHistory() ([]domain.SavingsOperationalWithdrawal, error) {
+	return u.financeRepo.GetSavingsOperationalHistory()
+}
+
+func (u *FinanceExtendedUsecase) GetSavingsOperationalReturns(withdrawalID uuid.UUID) ([]domain.SavingsOperationalReturn, error) {
+	return u.financeRepo.GetSavingsOperationalReturns(withdrawalID)
+}
+
+func (u *FinanceExtendedUsecase) GetSavingsPoolSummary() (map[string]interface{}, error) {
+	return u.financeRepo.GetSavingsPoolSummary()
 }
 

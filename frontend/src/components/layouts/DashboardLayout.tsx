@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Menu } from 'lucide-react';
+import PWAPrompt from '../ui/PWAPrompt';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -39,6 +40,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                     </div>
                 </main>
             </div>
+            
+            <PWAPrompt />
         </div>
     );
 };

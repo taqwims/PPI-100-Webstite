@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Search, Users, X, CheckCircle, AlertCircle, Trash2, User, ChevronDown, ChevronRight, Calendar } from 'lucide-react';
+import { Plus, Search, Users, X, CheckCircle, AlertCircle, Trash2, Edit2, User, ChevronDown, ChevronRight, Calendar, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
-interface AcademicYear { id: number; name: string; is_active: boolean; }
+interface AcademicYear { id: number; name: string; is_active: boolean; start_date: string; end_date: string; }
 interface ClassOption { id: number; name: string; }
 
 interface PaymentType {
@@ -70,7 +70,50 @@ const StudentObligations = () => {
     const [submitting, setSubmitting] = useState(false);
 
     // Monthly billing & installment options
-    const [selectedMonths, setSelectedMonths] = useState<number[]>([1,2,3,4,5,6,7,8,9,10,11,12]);
+    const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
+
+    // Derive semester months from academic year dates
+    const getSemesterMonths = (year: AcademicYear): { semester1: number[]; semester2: number[] } => {
+        const start = new Date(year.start_date);
+        const end = new Date(year.end_date);
+        const startMonth = start.getMonth() + 1; // 1-indexed
+        const endMonth = end.getMonth() + 1;
+        
+        // Semester 1: from start month to December (or midpoint)
+        const sem1: number[] = [];
+        const sem2: number[] = [];
+        
+        if (startMonth >= 7) {
+            // Typical: Jul-Dec for Sem1, Jan-Jun for Sem2
+            for (let m = startMonth; m <= 12; m++) sem1.push(m);
+            for (let m = 1; m <= Math.min(endMonth, 6); m++) sem2.push(m);
+        } else {
+            // Non-standard: split evenly
+            const totalMonths: number[] = [];
+            if (startMonth <= endMonth) {
+                for (let m = startMonth; m <= endMonth; m++) totalMonths.push(m);
+            } else {
+                for (let m = startMonth; m <= 12; m++) totalMonths.push(m);
+                for (let m = 1; m <= endMonth; m++) totalMonths.push(m);
+            }
+            const half = Math.ceil(totalMonths.length / 2);
+            sem1.push(...totalMonths.slice(0, half));
+            sem2.push(...totalMonths.slice(half));
+        }
+        return { semester1: sem1, semester2: sem2 };
+    };
+
+    const activeYear = academicYears.find(y => y.is_active);
+    const semesterMonths = activeYear ? getSemesterMonths(activeYear) : { semester1: [7,8,9,10,11,12], semester2: [1,2,3,4,5,6] };
+
+    // Determine current semester
+    const getCurrentSemesterMonths = (): number[] => {
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        if (semesterMonths.semester1.includes(currentMonth)) return semesterMonths.semester1;
+        if (semesterMonths.semester2.includes(currentMonth)) return semesterMonths.semester2;
+        return [...semesterMonths.semester1, ...semesterMonths.semester2];
+    };
     const [installmentCount, setInstallmentCount] = useState(1);
 
     const MONTH_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -78,6 +121,10 @@ const StudentObligations = () => {
     // Pay modal
     const [payingOb, setPayingOb] = useState<Obligation | null>(null);
     const [payAmount, setPayAmount] = useState('');
+
+    // Edit modal
+    const [editingOb, setEditingOb] = useState<Obligation | null>(null);
+    const [editAmount, setEditAmount] = useState('');
 
     // Expandable rows
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -97,7 +144,14 @@ const StudentObligations = () => {
             const years: AcademicYear[] = res.data || [];
             setAcademicYears(years);
             const active = years.find(y => y.is_active);
-            if (active && !filterYearId) setFilterYearId(String(active.id));
+            if (active && !filterYearId) {
+                setFilterYearId(String(active.id));
+                // Automatically set selectedMonths for monthly obligations
+                const sm = getSemesterMonths(active);
+                const now = new Date();
+                const cm = now.getMonth() + 1;
+                setSelectedMonths(sm.semester1.includes(cm) ? sm.semester1 : sm.semester2.includes(cm) ? sm.semester2 : [...sm.semester1, ...sm.semester2]);
+            }
         } catch (e) { console.error(e); }
     };
 
@@ -159,12 +213,35 @@ const StudentObligations = () => {
                     const res = await api.post('/finance/student-obligations/bulk-assign', payload);
                     totalCount += res.data?.count || 0;
                 } else {
-                    await api.post('/finance/student-obligations', {
-                        student_id: studentId,
-                        payment_type_id: Number(pt_id),
-                        academic_year_id: Number(bulkForm.academic_year_id),
-                    });
-                    totalCount += 1;
+                    if (pt?.payment_schedule === 'Bulanan' && selectedMonths.length > 0) {
+                        for (const month of selectedMonths) {
+                            await api.post('/finance/student-obligations', {
+                                student_id: studentId,
+                                payment_type_id: Number(pt_id),
+                                academic_year_id: Number(bulkForm.academic_year_id),
+                                billing_month: month
+                            });
+                            totalCount += 1;
+                        }
+                    } else if (pt?.payment_schedule === 'Tahunan' && installmentCount > 1) {
+                        for (let i = 1; i <= installmentCount; i++) {
+                            await api.post('/finance/student-obligations', {
+                                student_id: studentId,
+                                payment_type_id: Number(pt_id),
+                                academic_year_id: Number(bulkForm.academic_year_id),
+                                installment_number: i,
+                                total_installments: installmentCount
+                            });
+                            totalCount += 1;
+                        }
+                    } else {
+                        await api.post('/finance/student-obligations', {
+                            student_id: studentId,
+                            payment_type_id: Number(pt_id),
+                            academic_year_id: Number(bulkForm.academic_year_id),
+                        });
+                        totalCount += 1;
+                    }
                 }
             }
             if (assignTarget === 'class') {
@@ -176,7 +253,7 @@ const StudentObligations = () => {
             setBulkForm({ class_id: '', payment_type_ids: [], academic_year_id: filterYearId });
             setStudentId('');
             setFilterAssignClassId('');
-            setSelectedMonths([1,2,3,4,5,6,7,8,9,10,11,12]);
+            setSelectedMonths(getCurrentSemesterMonths());
             setInstallmentCount(1);
             fetchData();
         } catch (err: any) {
@@ -200,7 +277,23 @@ const StudentObligations = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
+    const handleEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingOb) return;
+        try {
+            await api.put(`/finance/student-obligations/${editingOb.id}`, {
+                amount: parseFloat(editAmount)
+            });
+            toast.success('Berhasil diperbarui');
+            setEditingOb(null);
+            fetchData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Gagal memperbarui');
+        }
+    };
+
+    const handleDelete = async (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
         if (!confirm('Hapus tanggungan ini?')) return;
         try {
             await api.delete(`/finance/student-obligations/${id}`);
@@ -375,69 +468,217 @@ const StudentObligations = () => {
                                         {isExpanded && (
                                             <tr>
                                                 <td colSpan={7} className="p-0 border-b border-slate-100">
-                                                    <div className="bg-slate-50/80 p-4 pl-12 shadow-inner">
-                                                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                                            <table className="w-full text-left text-sm">
-                                                                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider">
-                                                                    <tr>
-                                                                        <th className="px-5 py-3 font-medium">Jenis Pembayaran</th>
-                                                                        <th className="px-5 py-3 font-medium text-right">Nominal Tagihan</th>
-                                                                        <th className="px-5 py-3 font-medium text-right">Terbayar</th>
-                                                                        <th className="px-5 py-3 font-medium text-center">Status</th>
-                                                                        {canManage && <th className="px-5 py-3 font-medium text-center">Aksi</th>}
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-slate-100">
-                                                                    {group.obligations.map(ob => (
-                                                                        <tr key={ob.id} className="hover:bg-slate-50 transition-colors">
-                                                                            <td className="px-5 py-3">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                                                                                    <span className="font-semibold text-slate-800">{ob.payment_type?.name}</span>
-                                                                                    {ob.billing_month > 0 && (
-                                                                                        <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-medium">
-                                                                                            {MONTH_NAMES[ob.billing_month]}
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {ob.total_installments > 0 && (
-                                                                                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 text-[10px] font-medium">
-                                                                                            Cicilan {ob.installment_number}/{ob.total_installments}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="flex items-center gap-2 mt-0.5 ml-4">
-                                                                                    <p className="text-[10px] text-slate-400">{ob.payment_type?.payment_schedule}</p>
-                                                                                    {ob.due_date && (
-                                                                                        <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                                                                                            <Calendar size={8} /> Jatuh tempo: {new Date(ob.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="px-5 py-3 text-right font-medium text-slate-900">{formatCurrency(ob.amount)}</td>
-                                                                            <td className="px-5 py-3 text-right font-medium text-emerald-600">{formatCurrency(ob.paid_amount)}</td>
-                                                                            <td className="px-5 py-3 text-center">
-                                                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${statusColor(ob.status)}`}>{statusLabel(ob.status)}</span>
-                                                                            </td>
-                                                                            {canManage && (
-                                                                                <td className="px-5 py-3">
-                                                                                    <div className="flex items-center justify-center gap-1">
-                                                                                        {ob.status !== 'Paid' && (
-                                                                                            <button onClick={() => { setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition" title="Bayar">
-                                                                                                <CheckCircle size={16} />
-                                                                                            </button>
-                                                                                        )}
-                                                                                        <button onClick={() => handleDelete(ob.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Hapus">
-                                                                                            <Trash2 size={16} />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </td>
-                                                                            )}
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
+                                                    <div className="bg-slate-50/80 p-4 pl-12 shadow-inner space-y-4">
+                                                        {/* Cetak Surat Tagihan Button */}
+                                                        <div className="flex justify-end">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    import('../../utils/pdfUtils').then(mod => {
+                                                                        const ayName = academicYears.find(y => String(y.id) === filterYearId)?.name || 'Semua';
+                                                                        mod.generateStudentBillPDF({
+                                                                            studentName: group.student_name,
+                                                                            className: group.class_name,
+                                                                            academicYear: ayName,
+                                                                            obligations: group.obligations.map(ob => ({
+                                                                                name: ob.payment_type?.name || '-',
+                                                                                amount: ob.amount,
+                                                                                paid_amount: ob.paid_amount,
+                                                                                status: ob.status,
+                                                                                billing_month: ob.billing_month,
+                                                                                due_date: ob.due_date || undefined,
+                                                                                installment_number: ob.installment_number,
+                                                                                total_installments: ob.total_installments
+                                                                            }))
+                                                                        });
+                                                                    });
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 bg-red-50 rounded-lg hover:bg-red-100 transition"
+                                                            >
+                                                                <FileText size={14} /> Cetak Surat Tagihan
+                                                            </button>
                                                         </div>
+                                                        {(() => {
+                                                            const byType: Record<string, Obligation[]> = {};
+                                                            group.obligations.forEach(ob => {
+                                                                const key = ob.payment_type?.name || 'Lainnya';
+                                                                if (!byType[key]) byType[key] = [];
+                                                                byType[key].push(ob);
+                                                            });
+                                                            return Object.entries(byType).map(([typeName, obs]) => {
+                                                                const schedule = obs[0]?.payment_type?.payment_schedule || '';
+                                                                const typeTotal = obs.reduce((s, o) => s + o.amount, 0);
+                                                                const typePaid = obs.reduce((s, o) => s + o.paid_amount, 0);
+
+                                                                return (
+                                                                    <div key={typeName} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                                                        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                                                                <span className="font-semibold text-slate-800 text-sm">{typeName}</span>
+                                                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium">{schedule}</span>
+                                                                            </div>
+                                                                            <div className="text-xs text-slate-500">
+                                                                                {formatCurrency(typePaid)} / {formatCurrency(typeTotal)}
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        {/* Monthly Grid */}
+                                                                        {schedule === 'Bulanan' ? (
+                                                                            <div className="p-4">
+                                                                                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+                                                                                    {MONTH_NAMES.slice(1).map((monthName, i) => {
+                                                                                        const month = i + 1;
+                                                                                        const ob = obs.find(o => o.billing_month === month);
+                                                                                        const isPaid = ob?.status === 'Paid';
+                                                                                        const isPartial = ob?.status === 'Partial';
+                                                                                        const hasOb = !!ob;
+                                                                                        return (
+                                                                                            <div
+                                                                                                key={month}
+                                                                                                className={clsx(
+                                                                                                    'rounded-xl p-2 text-center border transition-all cursor-default',
+                                                                                                    isPaid ? 'bg-emerald-50 border-emerald-200' :
+                                                                                                    isPartial ? 'bg-amber-50 border-amber-200' :
+                                                                                                    hasOb ? 'bg-red-50 border-red-200' :
+                                                                                                    'bg-slate-50 border-slate-100 opacity-40'
+                                                                                                )}
+                                                                                            >
+                                                                                                <p className="text-[10px] font-bold text-slate-600 uppercase">{monthName.slice(0, 3)}</p>
+                                                                                                {hasOb ? (
+                                                                                                    <>
+                                                                                                        <p className={clsx('text-[10px] font-bold mt-0.5', isPaid ? 'text-emerald-600' : isPartial ? 'text-amber-600' : 'text-red-600')}>
+                                                                                                            {isPaid ? '✓' : isPartial ? `${Math.round((ob.paid_amount/ob.amount)*100)}%` : '✗'}
+                                                                                                        </p>
+                                                                                                        {canManage && !isPaid && (
+                                                                                                            <div className="flex items-center justify-center gap-1 mt-1">
+                                                                                                                <button
+                                                                                                                    onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }}
+                                                                                                                    className="text-[9px] text-green-600 hover:text-green-700 font-medium" title="Bayar"
+                                                                                                                >💵</button>
+                                                                                                                <button
+                                                                                                                    onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }}
+                                                                                                                    className="text-[9px] text-blue-600 hover:text-blue-700 font-medium" title="Ubah Nominal"
+                                                                                                                >✏️</button>
+                                                                                                                <button
+                                                                                                                    onClick={(e) => handleDelete(ob.id, e)}
+                                                                                                                    className="text-[9px] text-red-600 hover:text-red-700 font-medium" title="Hapus"
+                                                                                                                >🗑️</button>
+                                                                                                            </div>
+                                                                                                        )}
+                                                                                                        {(isPaid || isPartial) && (
+                                                                                                            <button
+                                                                                                                onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount, billingMonth: ob.billing_month })); }}
+                                                                                                                className="mt-1 block mx-auto text-[9px] text-blue-600 hover:text-blue-700 font-medium"
+                                                                                                            >Cetak</button>
+                                                                                                        )}
+                                                                                                    </>
+                                                                                                ) : (
+                                                                                                    <p className="text-[10px] text-slate-400 mt-0.5">—</p>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : schedule === 'Semesteran' ? (
+                                                                            /* Semester Cards */
+                                                                            <div className="p-4 grid grid-cols-2 gap-3">
+                                                                                {obs.map((ob, idx) => {
+                                                                                    const isPaid = ob.status === 'Paid';
+                                                                                    const isPartial = ob.status === 'Partial';
+                                                                                    return (
+                                                                                        <div key={ob.id} className={clsx('rounded-xl p-4 border', isPaid ? 'bg-emerald-50 border-emerald-200' : isPartial ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200')}>
+                                                                                            <p className="text-sm font-semibold text-slate-800">Semester {idx + 1}</p>
+                                                                                            <p className="text-lg font-bold mt-1 text-slate-900">{formatCurrency(ob.amount)}</p>
+                                                                                            <div className="flex items-center justify-between mt-2">
+                                                                                                <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(ob.status))}>{statusLabel(ob.status)}</span>
+                                                                                                {isPartial && <span className="text-xs text-slate-500">Terbayar: {formatCurrency(ob.paid_amount)}</span>}
+                                                                                            </div>
+                                                                                            {canManage && !isPaid && (
+                                                                                                <div className="mt-2 flex gap-1">
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="flex-1 text-xs bg-green-600 text-white py-1.5 rounded-lg hover:bg-green-700 font-medium transition">Bayar</button>
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="bg-blue-100 text-blue-600 px-2 py-1.5 rounded-lg hover:bg-blue-200 transition" title="Edit Nominal"><Edit2 size={14} /></button>
+                                                                                                    <button onClick={(e) => handleDelete(ob.id, e)} className="bg-red-100 text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-200 transition" title="Hapus"><Trash2 size={14} /></button>
+                                                                                                </div>
+                                                                                            )}
+                                                                                            {(isPaid || isPartial) && (
+                                                                                                <button onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount })); }} className="mt-2 w-full text-xs bg-blue-600 text-white py-1.5 rounded-lg hover:bg-blue-700 font-medium transition">Cetak Kuitansi</button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        ) : obs[0]?.total_installments > 0 ? (
+                                                                            /* Installment Progress */
+                                                                            <div className="p-4">
+                                                                                <div className="flex items-center gap-2 mb-3">
+                                                                                    <div className="flex-1 bg-slate-100 rounded-full h-3">
+                                                                                        <div className="h-3 rounded-full bg-emerald-500 transition-all" style={{ width: `${(typePaid / typeTotal) * 100}%` }} />
+                                                                                    </div>
+                                                                                    <span className="text-xs font-bold text-slate-600">{Math.round((typePaid / typeTotal) * 100)}%</span>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                                                                    {obs.sort((a, b) => a.installment_number - b.installment_number).map(ob => {
+                                                                                        const isPaid = ob.status === 'Paid';
+                                                                                        const isPartial = ob.status === 'Partial';
+                                                                                        return (
+                                                                                            <div key={ob.id} className={clsx('rounded-lg p-3 border text-center', isPaid ? 'bg-emerald-50 border-emerald-200' : isPartial ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200')}>
+                                                                                                <p className="text-xs font-bold text-slate-600">Cicilan {ob.installment_number}/{ob.total_installments}</p>
+                                                                                                <p className="text-sm font-bold text-slate-900 mt-1">{formatCurrency(ob.amount)}</p>
+                                                                                                <span className={clsx('inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(ob.status))}>{statusLabel(ob.status)}</span>
+                                                                                                {canManage && !isPaid && (
+                                                                                                    <div className="mt-2 flex gap-1 justify-center">
+                                                                                                        <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200" title="Bayar">Bayar</button>
+                                                                                                        <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-1 rounded hover:bg-blue-200" title="Edit Nominal"><Edit2 size={10} /></button>
+                                                                                                        <button onClick={(e) => handleDelete(ob.id, e)} className="text-[10px] bg-red-100 text-red-700 px-1.5 py-1 rounded hover:bg-red-200" title="Hapus"><Trash2 size={10} /></button>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                {(isPaid || isPartial) && (
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount, installmentNumber: ob.installment_number, totalInstallments: ob.total_installments })); }} className="mt-1 block w-full text-[10px] text-blue-600 hover:text-blue-700 font-medium">Cetak</button>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            /* Default: Single / Tahunan */
+                                                                            <div className="p-4">
+                                                                                {obs.map(ob => (
+                                                                                    <div key={ob.id} className="flex items-center justify-between">
+                                                                                        <div>
+                                                                                            <p className="text-sm font-medium text-slate-800">{formatCurrency(ob.amount)}</p>
+                                                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                                                <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(ob.status))}>{statusLabel(ob.status)}</span>
+                                                                                                {ob.paid_amount > 0 && ob.status !== 'Paid' && <span className="text-xs text-slate-500">Terbayar: {formatCurrency(ob.paid_amount)}</span>}
+                                                                                                {ob.due_date && <span className="text-[10px] text-slate-400 flex items-center gap-0.5"><Calendar size={8} /> {new Date(ob.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            {(ob.status === 'Paid' || ob.status === 'Partial') && (
+                                                                                                <button onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount })); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Cetak Kuitansi">
+                                                                                                    <FileText size={16} />
+                                                                                                </button>
+                                                                                            )}
+                                                                                            {canManage && ob.status !== 'Paid' && (
+                                                                                                <>
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition" title="Bayar"><CheckCircle size={16} /></button>
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Ubah Nominal"><Edit2 size={16} /></button>
+                                                                                                </>
+                                                                                            )}
+                                                                                            {canManage && (
+                                                                                                <button onClick={(e) => handleDelete(ob.id, e)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Hapus"><Trash2 size={16} /></button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            });
+                                                        })()}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -533,12 +774,18 @@ const StudentObligations = () => {
                             </div>
 
                             {/* Monthly billing options */}
-                            {hasMonthly && assignTarget === 'class' && (
+                            {hasMonthly && (
                                 <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/50">
-                                    <div className="flex items-center justify-between mb-3">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2">
                                         <label className="text-sm font-medium text-blue-800">Bulan Tagihan (Bulanan)</label>
-                                        <div className="flex gap-2">
-                                            <button type="button" onClick={() => setSelectedMonths([1,2,3,4,5,6,7,8,9,10,11,12])} className="text-[10px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition">
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <button type="button" onClick={() => setSelectedMonths(semesterMonths.semester1)} className="text-[10px] px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition">
+                                                Semester 1 ({semesterMonths.semester1.map(m => MONTH_NAMES[m]?.substring(0,3)).join(', ')})
+                                            </button>
+                                            <button type="button" onClick={() => setSelectedMonths(semesterMonths.semester2)} className="text-[10px] px-2 py-1 rounded bg-teal-600 text-white hover:bg-teal-700 transition">
+                                                Semester 2 ({semesterMonths.semester2.map(m => MONTH_NAMES[m]?.substring(0,3)).join(', ')})
+                                            </button>
+                                            <button type="button" onClick={() => setSelectedMonths([...semesterMonths.semester1, ...semesterMonths.semester2].sort((a,b)=>a-b))} className="text-[10px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition">
                                                 Semua
                                             </button>
                                             <button type="button" onClick={() => setSelectedMonths([])} className="text-[10px] px-2 py-1 rounded bg-slate-200 text-slate-700 hover:bg-slate-300 transition">
@@ -546,10 +793,12 @@ const StudentObligations = () => {
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                         {MONTH_NAMES.slice(1).map((name, i) => {
                                             const month = i + 1;
                                             const isSelected = selectedMonths.includes(month);
+                                            const inSem1 = semesterMonths.semester1.includes(month);
+                                            const inSem2 = semesterMonths.semester2.includes(month);
                                             return (
                                                 <button
                                                     key={month}
@@ -567,6 +816,7 @@ const StudentObligations = () => {
                                                     )}
                                                 >
                                                     {name}
+                                                    <span className="block text-[9px] opacity-70">{inSem1 ? 'Sem1' : inSem2 ? 'Sem2' : ''}</span>
                                                 </button>
                                             );
                                         })}
@@ -635,6 +885,34 @@ const StudentObligations = () => {
                             <div className="pt-3 flex justify-end gap-3 border-t border-slate-100">
                                 <button type="button" onClick={() => setPayingOb(null)} className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm">Batal</button>
                                 <button type="submit" className="px-5 py-2.5 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 transition text-sm">Bayar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* Edit Modal */}
+            {editingOb && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={() => setEditingOb(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-lg font-bold text-slate-800">Ubah Tanggungan</h2>
+                            <button onClick={() => setEditingOb(null)} className="p-2 hover:bg-slate-200 rounded-full transition"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleEdit} className="p-5">
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Nominal Asli (Rp)</label>
+                                <input
+                                    type="number"
+                                    value={editAmount}
+                                    onChange={e => setEditAmount(e.target.value)}
+                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Mengubah nominal asli tagihan. Belum terbayar: {formatCurrency(Math.max(0, parseFloat(editAmount || '0') - editingOb.paid_amount))}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setEditingOb(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition">Batal</button>
+                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition">Simpan</button>
                             </div>
                         </form>
                     </div>

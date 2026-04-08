@@ -27,6 +27,8 @@ const Reports: React.FC = () => {
     const [reportType, setReportType] = useState('daily');
     const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
     const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
+    const [filterStartDate, setFilterStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [filterEndDate, setFilterEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [filterYearId, setFilterYearId] = useState('');
 
     const [showPdfPreview, setShowPdfPreview] = useState(false);
@@ -53,6 +55,13 @@ const Reports: React.FC = () => {
         enabled: reportType === 'monthly',
     });
 
+    // Custom date range
+    const { data: customData = [], isLoading: loadingCustom } = useQuery<GlobalTransaction[]>({
+        queryKey: ['report-custom', filterStartDate, filterEndDate],
+        queryFn: async () => (await api.get(`/finance/global-transactions?start_date=${filterStartDate}&end_date=${filterEndDate}`)).data || [],
+        enabled: reportType === 'custom',
+    });
+
     // Tunggakan: fetch unpaid bills, optionally filtered by academic year
     const { data: billsData = [], isLoading: loadingBills } = useQuery<Bill[]>({
         queryKey: ['report-tunggakan', filterYearId],
@@ -65,18 +74,18 @@ const Reports: React.FC = () => {
         enabled: reportType === 'tunggakan',
     });
 
-    const transactions = reportType === 'daily' ? dailyData : reportType === 'monthly' ? monthlyData : [];
-    const isLoading = reportType === 'daily' ? loadingDaily : reportType === 'monthly' ? loadingMonthly : loadingBills;
+    const transactions = reportType === 'daily' ? dailyData : reportType === 'monthly' ? monthlyData : reportType === 'custom' ? customData : [];
+    const isLoading = reportType === 'daily' ? loadingDaily : reportType === 'monthly' ? loadingMonthly : reportType === 'custom' ? loadingCustom : loadingBills;
     const totalIncome = transactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
     const totalExpense = transactions.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
 
-    // Monthly summary by category
-    const monthlySummary: Record<string, { income: number; expense: number }> = {};
-    if (reportType === 'monthly') {
-        monthlyData.forEach(t => {
-            if (!monthlySummary[t.category]) monthlySummary[t.category] = { income: 0, expense: 0 };
-            if (t.type === 'Income') monthlySummary[t.category].income += t.amount;
-            else monthlySummary[t.category].expense += t.amount;
+    // Monthly/Custom summary by category
+    const categorySummary: Record<string, { income: number; expense: number }> = {};
+    if (reportType === 'monthly' || reportType === 'custom') {
+        transactions.forEach(t => {
+            if (!categorySummary[t.category]) categorySummary[t.category] = { income: 0, expense: 0 };
+            if (t.type === 'Income') categorySummary[t.category].income += t.amount;
+            else categorySummary[t.category].expense += t.amount;
         });
     }
 
@@ -84,8 +93,8 @@ const Reports: React.FC = () => {
 
     const handlePreviewReport = () => {
         if (transactions.length === 0) return;
-        const periodStr = reportType === 'daily' ? formatDate(filterDate) : `Bulan ${filterMonth}`;
-        const title = reportType === 'daily' ? 'Laporan Transaksi Harian' : 'Laporan Transaksi Bulanan';
+        const periodStr = reportType === 'daily' ? formatDate(filterDate) : reportType === 'monthly' ? `Bulan ${filterMonth}` : `${formatDate(filterStartDate)} - ${formatDate(filterEndDate)}`;
+        const title = reportType === 'daily' ? 'Laporan Transaksi Harian' : reportType === 'monthly' ? 'Laporan Transaksi Bulanan' : 'Laporan Keuangan Lengkap';
         const url = generateFinancialReportPDF(transactions as any, title, periodStr, 'preview') as string;
         setPdfBlobUrl(url);
         setShowPdfPreview(true);
@@ -93,8 +102,8 @@ const Reports: React.FC = () => {
 
     const handleDownloadReport = () => {
         if (transactions.length === 0) return;
-        const periodStr = reportType === 'daily' ? formatDate(filterDate) : `Bulan ${filterMonth}`;
-        const title = reportType === 'daily' ? 'Laporan Transaksi Harian' : 'Laporan Transaksi Bulanan';
+        const periodStr = reportType === 'daily' ? formatDate(filterDate) : reportType === 'monthly' ? `Bulan ${filterMonth}` : `${formatDate(filterStartDate)} - ${formatDate(filterEndDate)}`;
+        const title = reportType === 'daily' ? 'Laporan Transaksi Harian' : reportType === 'monthly' ? 'Laporan Transaksi Bulanan' : 'Laporan Keuangan Lengkap';
         generateFinancialReportPDF(transactions as any, title, periodStr, 'download');
     };
 
@@ -117,6 +126,7 @@ const Reports: React.FC = () => {
                         <select value={reportType} onChange={e => setReportType(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
                             <option value="daily">Harian</option>
                             <option value="monthly">Bulanan</option>
+                            <option value="custom">Rentang Waktu (Lengkap)</option>
                             <option value="tunggakan">Tunggakan Siswa</option>
                         </select>
                     </div>
@@ -132,6 +142,18 @@ const Reports: React.FC = () => {
                             <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent" />
                         </div>
                     )}
+                    {reportType === 'custom' && (
+                        <>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Mulai Tanggal</label>
+                                <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Sampai Tanggal</label>
+                                <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+                            </div>
+                        </>
+                    )}
                     {reportType === 'tunggakan' && (
                         <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1">Tahun Ajaran</label>
@@ -143,7 +165,7 @@ const Reports: React.FC = () => {
                     )}
                 </div>
 
-                {(reportType === 'daily' || reportType === 'monthly') && transactions.length > 0 && (
+                {(reportType === 'daily' || reportType === 'monthly' || reportType === 'custom') && transactions.length > 0 && (
                     <div className="mt-6 pt-4 border-t border-slate-100 flex gap-3">
                         <button onClick={handlePreviewReport} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition shadow-sm text-sm font-medium">
                             <Eye size={16} className="text-blue-500" /> Preview Laporan
@@ -155,8 +177,8 @@ const Reports: React.FC = () => {
                 )}
             </div>
 
-            {/* Summary Cards for daily/monthly */}
-            {(reportType === 'daily' || reportType === 'monthly') && (
+            {/* Summary Cards for daily/monthly/custom */}
+            {(reportType === 'daily' || reportType === 'monthly' || reportType === 'custom') && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-slate-200 shadow-sm">
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Transaksi</p>
@@ -173,8 +195,8 @@ const Reports: React.FC = () => {
                 </div>
             )}
 
-            {/* Monthly Summary by Category */}
-            {reportType === 'monthly' && Object.keys(monthlySummary).length > 0 && (
+            {/* Monthly/Custom Summary by Category */}
+            {(reportType === 'monthly' || reportType === 'custom') && Object.keys(categorySummary).length > 0 && (
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100"><h3 className="font-semibold text-slate-900">Ringkasan per Kategori</h3></div>
                     <table className="w-full">
@@ -185,7 +207,7 @@ const Reports: React.FC = () => {
                             <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Netto</th>
                         </tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                            {Object.entries(monthlySummary).map(([cat, val]) => (
+                            {Object.entries(categorySummary).map(([cat, val]) => (
                                 <tr key={cat} className="hover:bg-slate-50/50">
                                     <td className="px-5 py-3 font-medium text-slate-900 text-sm">{cat}</td>
                                     <td className="px-5 py-3 text-right text-sm text-emerald-600 font-medium">{formatCurrency(val.income)}</td>
@@ -198,8 +220,8 @@ const Reports: React.FC = () => {
                 </div>
             )}
 
-            {/* Transaction Table (daily/monthly) */}
-            {(reportType === 'daily' || reportType === 'monthly') && (
+            {/* Transaction Table (daily/monthly/custom) */}
+            {(reportType === 'daily' || reportType === 'monthly' || reportType === 'custom') && (
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100"><h3 className="font-semibold text-slate-900">Detail Transaksi</h3></div>
                     <div className="overflow-x-auto">

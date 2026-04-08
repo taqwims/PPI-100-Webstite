@@ -87,6 +87,9 @@ func (h *BudgetHandler) Create(c *gin.Context) {
 		PlannedAmount   float64 `json:"planned_amount" binding:"required"`
 		Notes           string  `json:"notes"`
 		TemplateCodeID  uint    `json:"template_code_id" binding:"required"`
+		BudgetType      string  `json:"budget_type"`
+		Quantity        int     `json:"quantity"`
+		UnitPrice       float64 `json:"unit_price"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -98,12 +101,20 @@ func (h *BudgetHandler) Create(c *gin.Context) {
 		return
 	}
 
+	budgetType := body.BudgetType
+	if budgetType == "" {
+		budgetType = "Pengeluaran"
+	}
+
 	budget := domain.Budget{
 		AcademicYearID: body.AcademicYearID,
 		ItemName:       body.ItemName,
 		PlannedAmount:  body.PlannedAmount,
 		Notes:          body.Notes,
 		CreatedByID:    userID,
+		BudgetType:     budgetType,
+		Quantity:       body.Quantity,
+		UnitPrice:      body.UnitPrice,
 	}
 
 	if err := h.usecase.CreateBudgetFromTemplate(&budget, body.TemplateCodeID); err != nil {

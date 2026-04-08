@@ -5,7 +5,7 @@ import { Plus, Edit, Trash2, TrendingUp, X, ChevronDown, ChevronRight } from 'lu
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
 
-interface AcademicYear { id: number; name: string; is_active: boolean; }
+interface AcademicYear { id: number; name: string; is_active: boolean; start_date: string; end_date: string; }
 interface BudgetCategory { id: number; name: string; description: string; is_active: boolean; }
 interface Budget {
     id: string;
@@ -53,10 +53,11 @@ const RKAS: React.FC = () => {
     const [showCatModal, setShowCatModal] = useState(false);
     const [editItem, setEditItem] = useState<Budget | null>(null);
     const [tab, setTab] = useState<'budgets' | 'categories'>('budgets');
+    const [budgetTypeTab, setBudgetTypeTab] = useState<'Pengeluaran' | 'Penerimaan'>('Pengeluaran');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
     const [showRealizeModal, setShowRealizeModal] = useState(false);
     const [realizeForm, setRealizeForm] = useState({ id: '', amount: '', source: 'Kas Umum', transaction_code_id: '', notes: '' });
-    const [form, setForm] = useState({ academic_year_id: '', budget_type: 'Pengeluaran', item_name: '', period: 'Tahunan', month: 0, quantity: 1, unit_price: 0, planned_amount: '', notes: '', template_code_id: '' });
+    const [form, setForm] = useState({ academic_year_id: '', budget_type: 'Pengeluaran', item_name: '', period: 'Tahunan', months: [] as number[], quantity: 1, unit_price: 0, planned_amount: '', notes: '', template_code_id: '' });
     const [catForm, setCatForm] = useState({ name: '', description: '' });
 
     const { data: transactionCodes = [] } = useQuery<TransactionCode[]>({
@@ -77,6 +78,30 @@ const RKAS: React.FC = () => {
             return (await api.get(`/finance/budgets?${p.toString()}`)).data || [];
         },
     });
+
+    const MONTH_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Derive semester months from selected academic year
+    const selectedYear = years.find(y => String(y.id) === (form.academic_year_id || yearFilter));
+    const getSemesterMonths = (year?: AcademicYear) => {
+        if (!year?.start_date) return { semester1: [7,8,9,10,11,12], semester2: [1,2,3,4,5,6] };
+        const startMonth = new Date(year.start_date).getMonth() + 1;
+        const endMonth = new Date(year.end_date).getMonth() + 1;
+        const sem1: number[] = [], sem2: number[] = [];
+        if (startMonth >= 7) {
+            for (let m = startMonth; m <= 12; m++) sem1.push(m);
+            for (let m = 1; m <= Math.min(endMonth, 6); m++) sem2.push(m);
+        } else {
+            const all: number[] = [];
+            if (startMonth <= endMonth) { for (let m = startMonth; m <= endMonth; m++) all.push(m); }
+            else { for (let m = startMonth; m <= 12; m++) all.push(m); for (let m = 1; m <= endMonth; m++) all.push(m); }
+            const half = Math.ceil(all.length / 2);
+            sem1.push(...all.slice(0, half)); sem2.push(...all.slice(half));
+        }
+        return { semester1: sem1, semester2: sem2 };
+    };
+    const semMonths = getSemesterMonths(selectedYear || years.find(y => y.is_active));
+    const allSemMonths = [...semMonths.semester1, ...semMonths.semester2].sort((a,b) => a-b);
     const { data: summary = [] } = useQuery<BudgetSummary[]>({
         queryKey: ['budget-summary', yearFilter],
         queryFn: async () => {
@@ -94,7 +119,7 @@ const RKAS: React.FC = () => {
     const createCat = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-categories', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); setShowCatModal(false); setCatForm({ name: '', description: '' }); } });
     const deleteCat = useMutation({ mutationFn: (id: number) => api.delete(`/finance/budget-categories/${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budget-categories'] }) });
 
-    const handleSubmitBudget = (e: React.FormEvent) => {
+    const handleSubmitBudget = async (e: React.FormEvent) => {
         e.preventDefault();
         const calcAmount = form.quantity > 0 && form.unit_price > 0 ? form.quantity * form.unit_price : Number(form.planned_amount);
         const data: any = {
@@ -106,8 +131,25 @@ const RKAS: React.FC = () => {
             budget_type: form.budget_type,
         };
         if (form.template_code_id) data.template_code_id = Number(form.template_code_id);
-        if (editItem) updateBudget.mutate({ ...data, id: editItem.id });
-        else createBudget.mutate(data);
+        
+        if (editItem) {
+            updateBudget.mutate({ ...data, month: form.months[0] || editItem.month, id: editItem.id });
+        } else {
+            if (form.period === 'Bulanan' && form.months.length > 0) {
+                try {
+                    await Promise.all(form.months.map(m => 
+                        api.post('/finance/budgets', { ...data, month: m })
+                    ));
+                    queryClient.invalidateQueries({ queryKey: ['budgets'] });
+                    resetForm();
+                    setShowModal(false);
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                createBudget.mutate({ ...data, month: form.months[0] || 0 });
+            }
+        }
     };
 
     const handleEdit = (b: Budget) => {
@@ -117,7 +159,7 @@ const RKAS: React.FC = () => {
             budget_type: b.budget_type || 'Pengeluaran',
             item_name: b.item_name,
             period: b.period || 'Tahunan',
-            month: b.month || 0,
+            months: b.month ? [b.month] : [],
             quantity: b.quantity || 1,
             unit_price: b.unit_price || 0,
             planned_amount: String(b.planned_amount),
@@ -128,18 +170,23 @@ const RKAS: React.FC = () => {
     };
 
     const resetForm = () => {
-        setForm({ academic_year_id: yearFilter || '', budget_type: 'Pengeluaran', item_name: '', period: 'Tahunan', month: 0, quantity: 1, unit_price: 0, planned_amount: '', notes: '', template_code_id: '' });
+        setForm({ academic_year_id: yearFilter || '', budget_type: 'Pengeluaran', item_name: '', period: 'Tahunan', months: [], quantity: 1, unit_price: 0, planned_amount: '', notes: '', template_code_id: '' });
         setEditItem(null);
     };
 
     const totalPlanned = budgets.reduce((s, b) => s + b.planned_amount, 0);
     const totalRealized = budgets.reduce((s, b) => s + b.realized_amount, 0);
+    const totalPenerimaan = budgets.filter(b => b.budget_type === 'Penerimaan').reduce((s, b) => s + b.planned_amount, 0);
+    const totalPengeluaran = budgets.filter(b => b.budget_type === 'Pengeluaran').reduce((s, b) => s + b.planned_amount, 0);
+    const totalPenerimaanRealized = budgets.filter(b => b.budget_type === 'Penerimaan').reduce((s, b) => s + b.realized_amount, 0);
+    const totalPengeluaranRealized = budgets.filter(b => b.budget_type === 'Pengeluaran').reduce((s, b) => s + b.realized_amount, 0);
 
     const toggleGroup = (standarName: string) => {
         setExpandedGroups(prev => ({ ...prev, [standarName]: !prev[standarName] }));
     };
 
-    const groupedBudgets = budgets.reduce((acc, b) => {
+    const filteredBudgets = budgets.filter(b => (b.budget_type || 'Pengeluaran') === budgetTypeTab);
+    const groupedBudgets = filteredBudgets.reduce((acc, b) => {
         const standar = b.transaction_code?.name || 'Tanpa Standar';
         if (!acc[standar]) acc[standar] = [];
         acc[standar].push(b);
@@ -167,17 +214,23 @@ const RKAS: React.FC = () => {
             </div>
 
             {/* Overall Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-slate-200 shadow-sm">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Anggaran</p>
-                    <p className="text-xl font-bold text-slate-900 mt-1">{formatCurrency(totalPlanned)}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="bg-emerald-50/80 backdrop-blur-sm rounded-2xl p-5 border border-emerald-200 shadow-sm">
+                    <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Anggaran Penerimaan</p>
+                    <p className="text-lg font-bold text-emerald-700 mt-1">{formatCurrency(totalPenerimaan)}</p>
+                    <p className="text-xs text-emerald-500 mt-0.5">Realisasi: {formatCurrency(totalPenerimaanRealized)}</p>
+                </div>
+                <div className="bg-red-50/80 backdrop-blur-sm rounded-2xl p-5 border border-red-200 shadow-sm">
+                    <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Anggaran Pengeluaran</p>
+                    <p className="text-lg font-bold text-red-700 mt-1">{formatCurrency(totalPengeluaran)}</p>
+                    <p className="text-xs text-red-500 mt-0.5">Realisasi: {formatCurrency(totalPengeluaranRealized)}</p>
                 </div>
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-slate-200 shadow-sm">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Realisasi</p>
-                    <p className="text-xl font-bold text-emerald-700 mt-1">{formatCurrency(totalRealized)}</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Selisih (Penerimaan - Pengeluaran)</p>
+                    <p className={clsx('text-lg font-bold mt-1', (totalPenerimaan - totalPengeluaran) >= 0 ? 'text-emerald-700' : 'text-red-700')}>{formatCurrency(totalPenerimaan - totalPengeluaran)}</p>
                 </div>
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-slate-200 shadow-sm">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Persentase</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Realisasi Keseluruhan</p>
                     <div className="mt-2">
                         <div className="flex items-center justify-between mb-1">
                             <span className="text-lg font-bold text-slate-900">{overallPct.toFixed(1)}%</span>
@@ -215,6 +268,15 @@ const RKAS: React.FC = () => {
                     <option value="">Semua Tahun Ajaran</option>
                     {years.map(y => <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Aktif)' : ''}</option>)}
                 </select>
+                {/* Penerimaan / Pengeluaran Tab */}
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+                    <button onClick={() => setBudgetTypeTab('Pengeluaran')} className={clsx('px-4 py-1.5 rounded-lg text-sm font-medium transition-colors', budgetTypeTab === 'Pengeluaran' ? 'bg-white shadow-sm text-red-600' : 'text-slate-500')}>
+                        Pengeluaran
+                    </button>
+                    <button onClick={() => setBudgetTypeTab('Penerimaan')} className={clsx('px-4 py-1.5 rounded-lg text-sm font-medium transition-colors', budgetTypeTab === 'Penerimaan' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500')}>
+                        Penerimaan
+                    </button>
+                </div>
                 {canEdit && (
                     <div className="ml-auto flex gap-1 bg-slate-100 rounded-xl p-1">
                         <button onClick={() => setTab('budgets')} className={clsx('px-3 py-1.5 rounded-lg text-sm font-medium transition-colors', tab === 'budgets' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500')}>Anggaran</button>
@@ -256,6 +318,8 @@ const RKAS: React.FC = () => {
                                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Kode</th>
                                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Item</th>
                                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Tahun</th>
+                                <th className="text-center px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Vol/Qty</th>
+                                <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Harga Satuan</th>
                                 <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Anggaran</th>
                                 <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Realisasi</th>
                                 <th className="text-center px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Progress</th>
@@ -263,16 +327,16 @@ const RKAS: React.FC = () => {
                             </tr></thead>
                             <tbody className="divide-y divide-slate-100">
                                 {isLoading ? (
-                                    <tr><td colSpan={7} className="text-center py-12 text-slate-400">Memuat...</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-12 text-slate-400">Memuat...</td></tr>
                                 ) : Object.keys(groupedBudgets).length === 0 ? (
-                                    <tr><td colSpan={7} className="text-center py-12 text-slate-400">Belum ada data anggaran</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-12 text-slate-400">Belum ada data anggaran {budgetTypeTab.toLowerCase()}</td></tr>
                                 ) : Object.entries(groupedBudgets).map(([standarName, items]) => (
                                     <React.Fragment key={standarName}>
                                         <tr className="bg-slate-50/80 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => toggleGroup(standarName)}>
-                                            <td colSpan={7} className="px-5 py-3 text-sm font-semibold text-slate-800">
+                                            <td colSpan={9} className="px-5 py-3 text-sm font-semibold text-slate-800">
                                                 <div className="flex items-center gap-2">
                                                     {expandedGroups[standarName] ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
-                                                    Standar: {standarName} <span className="text-xs font-normal text-slate-400">({items.length} Item)</span>
+                                                    Standar: {standarName} <span className="text-xs font-normal text-slate-400">({items.length} Item — Subtotal: {formatCurrency(items.reduce((s, b) => s + b.planned_amount, 0))})</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -292,6 +356,8 @@ const RKAS: React.FC = () => {
                                                         <p className="text-xs text-slate-400">oleh {b.created_by?.name}</p>
                                                     </td>
                                                     <td className="px-5 py-3.5 text-sm text-slate-600">{b.academic_year?.name}</td>
+                                                    <td className="px-5 py-3.5 text-sm text-center text-slate-700">{b.quantity > 0 ? b.quantity : '-'}</td>
+                                                    <td className="px-5 py-3.5 text-sm text-right text-slate-600">{b.unit_price > 0 ? formatCurrency(b.unit_price) : '-'}</td>
                                                     <td className="px-5 py-3.5 text-sm text-right font-medium text-slate-900">{formatCurrency(b.planned_amount)}</td>
                                                     <td className="px-5 py-3.5 text-sm text-right font-medium">
                                                         <span className={pct > 100 ? 'text-red-600 flex items-center justify-end gap-1' : 'text-emerald-600'}>
@@ -367,7 +433,7 @@ const RKAS: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Periode</label>
-                                    <select value={form.period} onChange={e => setForm({ ...form, period: e.target.value, month: 0 })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
+                                    <select value={form.period} onChange={e => setForm({ ...form, period: e.target.value, months: [] })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
                                         <option value="Tahunan">Tahunan</option>
                                         <option value="Semester 1">Semester 1</option>
                                         <option value="Semester 2">Semester 2</option>
@@ -376,11 +442,29 @@ const RKAS: React.FC = () => {
                                 </div>
                                 {form.period === 'Bulanan' && (
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Bulan</label>
-                                        <select value={form.month || ''} onChange={e => setForm({ ...form, month: Number(e.target.value) })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
-                                            <option value="">Pilih Bulan</option>
-                                            {Array.from({ length: 12 }).map((_, i) => <option key={i + 1} value={i + 1}>Bulan {i + 1}</option>)}
-                                        </select>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Bulan <span className="text-xs text-slate-500 font-normal">(Bisa pilih lebih dari satu)</span></label>
+                                        <div className="grid grid-cols-3 gap-2 mt-2 h-36 overflow-y-auto pr-2 custom-scrollbar">
+                                            {allSemMonths.map(m => (
+                                                <label key={m} className={clsx("flex items-center space-x-2 border rounded-lg p-2 cursor-pointer text-xs transition", form.months.includes(m) ? "bg-green-50 border-green-200 text-green-700" : "hover:bg-slate-50 border-slate-200")}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="rounded text-green-600 focus:ring-green-500"
+                                                        checked={form.months.includes(m)}
+                                                        onChange={(e) => {
+                                                            if (editItem) {
+                                                                // Edit mode only allows 1 month
+                                                                setForm(prev => ({ ...prev, months: [m] }));
+                                                            } else {
+                                                                // Provide multiple selection logic
+                                                                if (e.target.checked) setForm(prev => ({ ...prev, months: [...prev.months, m] }));
+                                                                else setForm(prev => ({ ...prev, months: prev.months.filter(x => x !== m) }));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="font-medium">{MONTH_NAMES[m].substring(0,3)}</span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>

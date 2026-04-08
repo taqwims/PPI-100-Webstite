@@ -198,6 +198,42 @@ func (h *FinanceExtendedHandler) GetSavingTransactions(c *gin.Context) {
 	c.JSON(http.StatusOK, txns)
 }
 
+type TransferSavingsRequest struct {
+	StudentID string  `json:"student_id" binding:"required"`
+	Module    string  `json:"module" binding:"required"` // CashLedger, Infaq
+	Direction string  `json:"direction" binding:"required"` // ToSaving, FromSaving
+	Amount    float64 `json:"amount" binding:"required"`
+	Notes     string  `json:"notes"`
+}
+
+func (h *FinanceExtendedHandler) TransferSavings(c *gin.Context) {
+	handledByID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req TransferSavingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	studentUUID, err := uuid.Parse(req.StudentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student ID"})
+		return
+	}
+
+	err = h.financeExtendedUsecase.TransferSavings(studentUUID, handledByID, req.Module, req.Direction, req.Amount, req.Notes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Fund transferred successfully"})
+}
+
 // ------------------- My Savings (Student / Parent) -------------------
 
 func (h *FinanceExtendedHandler) GetMySavings(c *gin.Context) {
@@ -393,3 +429,99 @@ func (h *FinanceExtendedHandler) GetDashboardAnalytics(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, analytics)
 }
+
+// ------------------- Savings Operational -------------------
+
+type OperationalWithdrawRequest struct {
+	Amount  float64 `json:"amount" binding:"required"`
+	Purpose string  `json:"purpose" binding:"required"`
+}
+
+func (h *FinanceExtendedHandler) WithdrawSavingsOperational(c *gin.Context) {
+	handledByID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req OperationalWithdrawRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.WithdrawSavingsOperational(handledByID, req.Amount, req.Purpose); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dana tidak mencukupi atau terjadi kesalahan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Dana operasional berhasil diambil"})
+}
+
+type OperationalReturnRequest struct {
+	WithdrawalID string  `json:"withdrawal_id" binding:"required"`
+	Amount       float64 `json:"amount" binding:"required"`
+	Notes        string  `json:"notes"`
+}
+
+func (h *FinanceExtendedHandler) ReturnSavingsOperational(c *gin.Context) {
+	handledByID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req OperationalReturnRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	withdrawalUUID, err := uuid.Parse(req.WithdrawalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid withdrawal ID"})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.ReturnSavingsOperational(withdrawalUUID, handledByID, req.Amount, req.Notes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengembalikan dana: jumlah melebihi sisa"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Dana berhasil dikembalikan"})
+}
+
+func (h *FinanceExtendedHandler) GetSavingsOperationalHistory(c *gin.Context) {
+	history, err := h.financeExtendedUsecase.GetSavingsOperationalHistory()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, history)
+}
+
+func (h *FinanceExtendedHandler) GetSavingsOperationalReturns(c *gin.Context) {
+	withdrawalID := c.Param("withdrawal_id")
+	withdrawalUUID, err := uuid.Parse(withdrawalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid withdrawal ID"})
+		return
+	}
+
+	returns, err := h.financeExtendedUsecase.GetSavingsOperationalReturns(withdrawalUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, returns)
+}
+
+func (h *FinanceExtendedHandler) GetSavingsPoolSummary(c *gin.Context) {
+	summary, err := h.financeExtendedUsecase.GetSavingsPoolSummary()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+

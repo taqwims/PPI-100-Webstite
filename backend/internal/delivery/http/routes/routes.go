@@ -211,16 +211,29 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 			finance.GET("/savings", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetAllSavingAccounts)
 			finance.POST("/savings/transactions", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.ProcessSavingTransaction)
+			finance.POST("/savings/transfer", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.TransferSavings)
 			finance.GET("/savings/transactions/:account_id", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingTransactions)
 			finance.GET("/savings/my", middleware.RoleMiddleware(6, 7), financeExtendedHandler.GetMySavings)
 			finance.GET("/savings/my-children", middleware.RoleMiddleware(7), financeExtendedHandler.GetMyChildrenSavings)
 			finance.GET("/savings/student/:student_id", middleware.RoleMiddleware(1, 6, 7, 9, 10), financeExtendedHandler.GetStudentSavings)
+
+			// Savings Operational (Pool-level)
+			finance.POST("/savings/operational/withdraw", middleware.RoleMiddleware(1, 9), financeExtendedHandler.WithdrawSavingsOperational)
+			finance.POST("/savings/operational/return", middleware.RoleMiddleware(1, 9), financeExtendedHandler.ReturnSavingsOperational)
+			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalHistory)
+			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalReturns)
+			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsPoolSummary)
 
 			finance.POST("/payroll", middleware.RoleMiddleware(1, 9), payrollHandler.CreatePayroll)
 			finance.GET("/payroll", middleware.RoleMiddleware(1, 4, 9), payrollHandler.GetPayrolls)
 			finance.PUT("/payroll/:id", middleware.RoleMiddleware(1, 9), payrollHandler.UpdatePayroll)
 			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 9), payrollHandler.DeletePayroll)
 			finance.POST("/payroll/:id/pay", middleware.RoleMiddleware(1, 9), payrollHandler.Pay)
+
+			// Payroll Templates
+			finance.GET("/payroll/templates", middleware.RoleMiddleware(1, 9), payrollHandler.GetTemplates)
+			finance.GET("/payroll/templates/:userId", middleware.RoleMiddleware(1, 9), payrollHandler.GetTemplateByUserID)
+			finance.POST("/payroll/templates", middleware.RoleMiddleware(1, 9), payrollHandler.UpsertTemplate)
 
 			finance.POST("/cash-ledger", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.AddCashLedgerEntry)
 			finance.GET("/cash-ledger", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetCashLedger)

@@ -4,7 +4,7 @@ import {
     LayoutDashboard, Users, BookOpen, Calendar, FileText,
     Settings, LogOut, Bell, X, GraduationCap,
     AlertTriangle, CreditCard, Mail, Send, Activity, Wallet, Inbox, PieChart,
-    Tag, Table2, ClipboardList, BarChart2, FileStack, LucideIcon, Heart, MessageCircle
+    Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -76,7 +76,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Transaksi',
             items: [
                 { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
-                { icon: FileStack, label: 'Template Tagihan', path: '/dashboard/finance/bill-templates' },
                 { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities' },
                 { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations' },
                 { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary' },
@@ -89,7 +88,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Anggaran & Analisis',
             items: [
                 { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas' },
-                { icon: Table2, label: 'Transaksi Global', path: '/dashboard/finance/global-transactions' },
                 { icon: BarChart2, label: 'Dashboard Eksekutif', path: '/dashboard/finance/executive-dashboard' },
             ]
         };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Download, Search, Calendar, Heart, ArrowUpRight, ArrowDownRight, AlertCircle, Pencil, Trash2, Filter, X, FileText, UserCheck, Tag } from 'lucide-react';
+import { Plus, Download, Search, Calendar, Heart, ArrowUpRight, ArrowDownRight, AlertCircle, Pencil, Trash2, Filter, X, FileText, UserCheck, Tag, Printer } from 'lucide-react';
 import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
 import { generateCashLedgerReport } from '../../utils/pdfUtils';
@@ -530,6 +530,25 @@ const DailyInfaq = () => {
                                             {canManage && (
                                                 <td className="p-4 text-center">
                                                     <div className="flex items-center justify-center space-x-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                import('../../utils/pdfUtils').then(mod => {
+                                                                    mod.generateInfaqReceipt({
+                                                                        id: entry.id,
+                                                                        date: entry.date,
+                                                                        class_name: entry.class_name || 'Umum',
+                                                                        student_count: 0,
+                                                                        amount: entry.amount,
+                                                                        notes: entry.notes || '',
+                                                                        handled_by_name: entry.handled_by?.name || '-'
+                                                                    });
+                                                                });
+                                                            }}
+                                                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                                                            title="Cetak Kuitansi"
+                                                        >
+                                                            <Printer size={16} />
+                                                        </button>
                                                         <button
                                                             onClick={() => openEditModal(entry)}
                                                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"

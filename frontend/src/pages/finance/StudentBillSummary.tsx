@@ -48,6 +48,10 @@ const StudentBillSummary: React.FC = () => {
     const [waModal, setWaModal] = useState<{ student: Student; obligations: Obligation[] } | null>(null);
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+
     const { data: students = [] } = useQuery<Student[]>({
         queryKey: ['students'],
         queryFn: async () => (await api.get('/students')).data || [],
@@ -56,6 +60,35 @@ const StudentBillSummary: React.FC = () => {
     const { data: allObligations = [] } = useQuery<Obligation[]>({
         queryKey: ['student-obligations'],
         queryFn: async () => (await api.get('/finance/student-obligations')).data || [],
+    });
+
+    // Also fetch activity obligations
+    const { data: activities = [] } = useQuery<any[]>({
+        queryKey: ['activities-all'],
+        queryFn: async () => {
+            try { return (await api.get('/finance/activities')).data || []; }
+            catch { return []; }
+        },
+    });
+
+    // Fetch all activity obligations
+    const { data: activityObligations = [] } = useQuery<any[]>({
+        queryKey: ['activity-obligations-all', activities],
+        queryFn: async () => {
+            const allObs: any[] = [];
+            for (const act of activities) {
+                try {
+                    const res = await api.get(`/finance/activities/${act.id}/obligations`);
+                    const obs = (res.data || []).map((o: any) => ({
+                        ...o,
+                        _activityName: act.name,
+                    }));
+                    allObs.push(...obs);
+                } catch { /* skip */ }
+            }
+            return allObs;
+        },
+        enabled: activities.length > 0,
     });
 
     const { data: waTemplates = [] } = useQuery<WATemplate[]>({
@@ -72,10 +105,27 @@ const StudentBillSummary: React.FC = () => {
         const map: Record<string, { student: Student; obligations: Obligation[]; totalDebt: number; totalPaid: number }> = {};
         students.forEach(s => {
             const obs = allObligations.filter(o => o.student_id === s.id);
-            const totalDebt = obs.reduce((acc, o) => acc + (o.amount - o.paid_amount), 0);
-            const totalPaid = obs.reduce((acc, o) => acc + o.paid_amount, 0);
-            if (obs.length > 0) {
-                map[s.id] = { student: s, obligations: obs, totalDebt, totalPaid };
+            // Add activity obligations as well
+            const actObs = activityObligations
+                .filter(o => o.student_id === s.id || o.student?.id === s.id)
+                .map(o => ({
+                    id: o.id,
+                    student_id: s.id,
+                    payment_type: { id: 0, name: o._activityName || 'Kegiatan', code: 'ACT' },
+                    amount: o.amount || 0,
+                    paid_amount: o.paid_amount || 0,
+                    status: o.status || 'Pending',
+                    billing_month: undefined,
+                    due_date: undefined,
+                    installment_number: undefined,
+                    total_installments: undefined,
+                    created_at: o.created_at || '',
+                } as Obligation));
+            const allObs = [...obs, ...actObs];
+            const totalDebt = allObs.reduce((acc, o) => acc + (o.amount - o.paid_amount), 0);
+            const totalPaid = allObs.reduce((acc, o) => acc + o.paid_amount, 0);
+            if (allObs.length > 0) {
+                map[s.id] = { student: s, obligations: allObs, totalDebt, totalPaid };
             }
         });
         return map;
@@ -161,8 +211,19 @@ const StudentBillSummary: React.FC = () => {
                     placeholder="Cari siswa berdasarkan nama, NIS, atau kelas..."
                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm bg-white/80 backdrop-blur-sm"
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 />
+            </div>
+
+            <div className="flex justify-end gap-3 sm:gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">Tampilkan:</span>
+                    <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm">
+                        <option value="20">20 Baris</option>
+                        <option value="40">40 Baris</option>
+                        <option value="80">80 Baris</option>
+                    </select>
+                </div>
             </div>
 
             {/* Student List */}
@@ -173,7 +234,8 @@ const StudentBillSummary: React.FC = () => {
                         <p className="text-lg font-medium text-slate-700">Tidak ada data tagihan siswa</p>
                     </div>
                 ) : (
-                    filteredStudents.map(({ student, obligations, totalDebt, totalPaid }) => {
+                    <>
+                    {filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(({ student, obligations, totalDebt, totalPaid }) => {
                         const isExpanded = expandedStudent === student.id;
                         const unpaidCount = obligations.filter(o => o.status !== 'Paid').length;
 
@@ -257,36 +319,46 @@ const StudentBillSummary: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {obligations.map(o => {
-                                                        const sisa = o.amount - o.paid_amount;
-                                                        return (
-                                                            <tr key={o.id} className="hover:bg-white transition">
-                                                                <td className="p-3 font-medium text-slate-800">
-                                                                    {o.payment_type?.name || '-'}
-                                                                    {o.installment_number && o.total_installments && (
-                                                                        <span className="text-xs text-slate-400 ml-1">(Cicil {o.installment_number}/{o.total_installments})</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-3 text-slate-600">
-                                                                    {o.billing_month ? MONTH_NAMES[o.billing_month] : '-'}
-                                                                </td>
-                                                                <td className="p-3 text-right text-slate-700">{formatCurrency(o.amount)}</td>
-                                                                <td className="p-3 text-right text-emerald-600">{formatCurrency(o.paid_amount)}</td>
-                                                                <td className="p-3 text-right font-semibold text-red-600">{sisa > 0 ? formatCurrency(sisa) : '-'}</td>
-                                                                <td className="p-3 text-center">
-                                                                    <span className={clsx(
-                                                                        "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full",
-                                                                        o.status === 'Paid' ? "bg-emerald-100 text-emerald-700" :
-                                                                        o.status === 'Partial' ? "bg-amber-100 text-amber-700" :
-                                                                        "bg-red-100 text-red-700"
-                                                                    )}>
-                                                                        {o.status === 'Paid' ? <CheckCircle size={12} /> : o.status === 'Partial' ? <Clock size={12} /> : <XCircle size={12} />}
-                                                                        {o.status === 'Paid' ? 'Lunas' : o.status === 'Partial' ? 'Cicil' : 'Belum'}
-                                                                    </span>
-                                                                </td>
+                                                    {Object.entries(obligations.reduce((acc, o) => {
+                                                        const groupName = o.payment_type?.name || 'Lainnya';
+                                                        if (!acc[groupName]) acc[groupName] = [];
+                                                        acc[groupName].push(o);
+                                                        return acc;
+                                                    }, {} as Record<string, Obligation[]>)).map(([groupName, obs]) => (
+                                                        <React.Fragment key={groupName}>
+                                                            <tr className="bg-slate-50/50">
+                                                                <td colSpan={6} className="p-3 font-semibold text-slate-700">{groupName}</td>
                                                             </tr>
-                                                        );
-                                                    })}
+                                                            {obs.map(o => {
+                                                                const sisa = o.amount - o.paid_amount;
+                                                                return (
+                                                                    <tr key={o.id} className="hover:bg-white transition">
+                                                                        <td className="p-3 font-medium text-slate-800 pl-6">
+                                                                            {o.installment_number && o.total_installments ? `Cicilan ${o.installment_number}/${o.total_installments}` : '-'}
+                                                                        </td>
+                                                                        <td className="p-3 text-slate-600">
+                                                                            {o.billing_month ? MONTH_NAMES[o.billing_month] : '-'}
+                                                                            {o.due_date && <span className="block text-[10px] text-slate-400">JT: {new Date(o.due_date).toLocaleDateString('id-ID')}</span>}
+                                                                        </td>
+                                                                        <td className="p-3 text-right text-slate-700">{formatCurrency(o.amount)}</td>
+                                                                        <td className="p-3 text-right text-emerald-600">{formatCurrency(o.paid_amount)}</td>
+                                                                        <td className="p-3 text-right font-semibold text-red-600">{sisa > 0 ? formatCurrency(sisa) : '-'}</td>
+                                                                        <td className="p-3 text-center">
+                                                                            <span className={clsx(
+                                                                                "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full",
+                                                                                o.status === 'Paid' ? "bg-emerald-100 text-emerald-700" :
+                                                                                o.status === 'Partial' ? "bg-amber-100 text-amber-700" :
+                                                                                "bg-red-100 text-red-700"
+                                                                            )}>
+                                                                                {o.status === 'Paid' ? <CheckCircle size={12} /> : o.status === 'Partial' ? <Clock size={12} /> : <XCircle size={12} />}
+                                                                                {o.status === 'Paid' ? 'Lunas' : o.status === 'Partial' ? 'Cicil' : 'Belum'}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </React.Fragment>
+                                                    ))}
                                                 </tbody>
                                                 <tfoot>
                                                     <tr className="bg-slate-100 font-semibold text-slate-800">
@@ -303,7 +375,30 @@ const StudentBillSummary: React.FC = () => {
                                 )}
                             </div>
                         );
-                    })
+                    })}
+                    {filteredStudents.length > itemsPerPage && (
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between rounded-b-2xl">
+                            <p className="text-sm text-slate-500">Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredStudents.length)} dari {filteredStudents.length} siswa</p>
+                            <div className="flex gap-1 justify-end">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 text-sm hover:bg-slate-50"
+                                >
+                                    Sebelumnya
+                                </button>
+                                <span className="px-4 py-1.5 text-sm font-medium text-slate-700">Hal {currentPage} / {Math.ceil(filteredStudents.length / itemsPerPage)}</span>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredStudents.length / itemsPerPage)))}
+                                    disabled={currentPage === Math.ceil(filteredStudents.length / itemsPerPage)}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 text-sm hover:bg-slate-50"
+                                >
+                                    Selanjutnya
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    </>
                 )}
             </div>
 
