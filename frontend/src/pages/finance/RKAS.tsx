@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Edit, Trash2, TrendingUp, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, TrendingUp, X, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
+import { generateRKASReportPDF } from '../../utils/pdfUtils';
 
 interface AcademicYear { id: number; name: string; is_active: boolean; start_date: string; end_date: string; }
 interface BudgetCategory { id: number; name: string; description: string; is_active: boolean; }
@@ -201,7 +202,15 @@ const RKAS: React.FC = () => {
                     <h1 className="text-2xl font-bold text-slate-900">RAB / RKAS</h1>
                     <p className="text-slate-500 mt-1">Rencana Anggaran Kas Sekolah — Budget vs Realisasi</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                    {budgets.length > 0 && (
+                        <button onClick={() => {
+                            const yr = years.find(y => String(y.id) === yearFilter);
+                            generateRKASReportPDF(filteredBudgets, yr?.name || 'Semua', budgetTypeTab);
+                        }} className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-sm text-sm font-medium">
+                            <Download size={16} /> Export PDF
+                        </button>
+                    )}
                     {canEdit && (
                         <>
                             <button onClick={() => setShowCatModal(true)} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">+ Kategori</button>
@@ -432,36 +441,53 @@ const RKAS: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Periode</label>
-                                    <select value={form.period} onChange={e => setForm({ ...form, period: e.target.value, months: [] })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
-                                        <option value="Tahunan">Tahunan</option>
-                                        <option value="Semester 1">Semester 1</option>
-                                        <option value="Semester 2">Semester 2</option>
-                                        <option value="Bulanan">Bulanan</option>
-                                    </select>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Periode <span className="text-xs text-slate-400 font-normal">(Tahunan/Semester/Bulanan)</span></label>
+                                    <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                                        {['Tahunan', 'Semester 1', 'Semester 2', 'Bulanan'].map((p) => (
+                                            <button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => setForm({ ...form, period: p, months: [] })}
+                                                className={clsx(
+                                                    "flex-1 py-1.5 text-xs font-bold rounded-xl transition",
+                                                    form.period === p ? "bg-white text-blue-600 shadow-sm border border-blue-100" : "text-slate-500 hover:text-slate-700"
+                                                )}
+                                            >
+                                                {p === 'Tahunan' ? 'Tahun' : p.replace('Semester ', 'Sem ')}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 {form.period === 'Bulanan' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Bulan <span className="text-xs text-slate-500 font-normal">(Bisa pilih lebih dari satu)</span></label>
-                                        <div className="grid grid-cols-3 gap-2 mt-2 h-36 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="col-span-2">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Bulan <span className="text-xs text-slate-500 font-normal">(Bisa pilih lebih dari satu)</span></label>
+                                        
+                                        {!editItem && (
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: [...new Set([...prev.months, ...semMonths.semester1])] }))} className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 transition">Pilih Sem 1</button>
+                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: [...new Set([...prev.months, ...semMonths.semester2])] }))} className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 transition">Pilih Sem 2</button>
+                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: allSemMonths }))} className="px-2.5 py-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-lg shadow-sm hover:bg-blue-100 transition">Pilih Semua</button>
+                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: [] }))} className="px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-lg shadow-sm hover:bg-slate-200 transition">Reset</button>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                                             {allSemMonths.map(m => (
-                                                <label key={m} className={clsx("flex items-center space-x-2 border rounded-lg p-2 cursor-pointer text-xs transition", form.months.includes(m) ? "bg-green-50 border-green-200 text-green-700" : "hover:bg-slate-50 border-slate-200")}>
+                                                <label key={m} className={clsx("flex flex-col items-center justify-center p-2 rounded-xl text-xs font-medium cursor-pointer transition-all border", form.months.includes(m) ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/50")}>
                                                     <input 
                                                         type="checkbox" 
-                                                        className="rounded text-green-600 focus:ring-green-500"
+                                                        className="sr-only"
                                                         checked={form.months.includes(m)}
                                                         onChange={(e) => {
                                                             if (editItem) {
-                                                                // Edit mode only allows 1 month
                                                                 setForm(prev => ({ ...prev, months: [m] }));
                                                             } else {
-                                                                // Provide multiple selection logic
                                                                 if (e.target.checked) setForm(prev => ({ ...prev, months: [...prev.months, m] }));
                                                                 else setForm(prev => ({ ...prev, months: prev.months.filter(x => x !== m) }));
                                                             }
                                                         }}
                                                     />
-                                                    <span className="font-medium">{MONTH_NAMES[m].substring(0,3)}</span>
+                                                    <span className="capitalize">{MONTH_NAMES[m].substring(0,3)}</span>
                                                 </label>
                                             ))}
                                         </div>

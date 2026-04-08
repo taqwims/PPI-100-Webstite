@@ -27,6 +27,7 @@ import PublicTeachers from './pages/public/PublicTeachers';
 import PublicDownloads from './pages/public/PublicDownloads';
 import PublicAlumni from './pages/public/PublicAlumni';
 import PublicContact from './pages/public/PublicContact';
+import VerifyInvoice from './pages/public/VerifyInvoice';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { isAuthenticated } = useAuth();
@@ -58,6 +59,7 @@ import Savings from './pages/finance/Savings';
 import DailyInfaq from './pages/finance/DailyInfaq';
 import CashLedger from './pages/finance/CashLedger';
 import Payroll from './pages/finance/Payroll';
+import ExternalDebts from './pages/finance/ExternalDebts';
 import StudentSavings from './pages/finance/StudentSavings';
 import ParentSavings from './pages/finance/ParentSavings';
 import TransactionCodes from './pages/finance/TransactionCodes';
@@ -71,6 +73,7 @@ import AcademicYears from './pages/finance/AcademicYears';
 import StudentObligations from './pages/finance/StudentObligations';
 import Activities from './pages/finance/Activities';
 import ActivityDetail from './pages/finance/ActivityDetail';
+import InvoiceConfig from './pages/finance/InvoiceConfig';
 import StudentBillSummary from './pages/finance/StudentBillSummary';
 import InfaqTypes from './pages/finance/InfaqTypes';
 import WATemplates from './pages/finance/WATemplates';
@@ -122,6 +125,7 @@ function App() {
                                     <Route path="finance/cash-ledger" element={<CashLedger />} />
                                     <Route path="finance/daily-infaq" element={<DailyInfaq />} />
                                     <Route path="finance/payroll" element={<Payroll />} />
+                                    <Route path="finance/debts" element={<ExternalDebts />} />
                                     <Route path="finance/transaction-codes" element={<TransactionCodes />} />
                                     <Route path="finance/global-transactions" element={<GlobalTransactions />} />
                                     <Route path="finance/rkas" element={<RKAS />} />
@@ -134,6 +138,7 @@ function App() {
                                     <Route path="finance/student-bill-summary" element={<StudentBillSummary />} />
                                     <Route path="finance/infaq-types" element={<InfaqTypes />} />
                                     <Route path="finance/wa-templates" element={<WATemplates />} />
+                                    <Route path="finance/invoice-config" element={<InvoiceConfig />} />
                                     <Route path="finance/activities" element={<Activities />} />
                                     <Route path="finance/activities/:id" element={<ActivityDetail />} />
 
@@ -168,6 +173,7 @@ function App() {
                     <Route path="/downloads" element={<PublicLayout><PublicDownloads /></PublicLayout>} />
                     <Route path="/alumni" element={<PublicLayout><PublicAlumni /></PublicLayout>} />
                     <Route path="/contact" element={<PublicLayout><PublicContact /></PublicLayout>} />
+                    <Route path="/verify" element={<VerifyInvoice />} />
 
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>

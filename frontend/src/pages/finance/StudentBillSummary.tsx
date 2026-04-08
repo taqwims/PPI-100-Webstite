@@ -307,8 +307,9 @@ const StudentBillSummary: React.FC = () => {
                                 {isExpanded && (
                                     <div className="px-4 pb-4">
                                         <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
-                                            <table className="w-full text-sm">
-                                                <thead>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm min-w-[600px] whitespace-nowrap">
+                                                    <thead>
                                                     <tr className="bg-slate-100 text-slate-600">
                                                         <th className="p-3 text-left font-medium">Jenis Pembayaran</th>
                                                         <th className="p-3 text-left font-medium">Bulan</th>
@@ -370,6 +371,7 @@ const StudentBillSummary: React.FC = () => {
                                                     </tr>
                                                 </tfoot>
                                             </table>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

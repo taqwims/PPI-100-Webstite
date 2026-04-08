@@ -649,18 +649,26 @@ const Payroll = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="block text-sm font-semibold text-slate-700">Akun Pegawai (Sistem)</label>
-                                        <select
-                                            name="user_id"
-                                            required
-                                            value={formData.user_id}
-                                            onChange={handleInput}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm bg-white"
-                                        >
-                                            <option value="">-- Pilih --</option>
-                                            {users.map(u => (
-                                                <option key={u.id} value={u.id}>{u.name}</option>
-                                            ))}
-                                        </select>
+                                        <div className="flex gap-2">
+                                            <select
+                                                name="user_id"
+                                                required
+                                                value={formData.user_id}
+                                                onChange={handleInput}
+                                                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm bg-white"
+                                            >
+                                                <option value="">-- Pilih --</option>
+                                                {users.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                                ))}
+                                            </select>
+                                            {formData.user_id && (
+                                                <div className="px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl flex flex-col justify-center min-w-[120px]">
+                                                    <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-tighter">Est. Gaji</span>
+                                                    <span className="text-sm font-bold text-emerald-700">{formatCurrency(formNet)}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="space-y-1">
                                         <label className="block text-sm font-semibold text-slate-700">Nama (Bisa disesuaikan)</label>
@@ -919,27 +927,33 @@ const Payroll = () => {
                                 </div>
 
                                 {templateUser && (
-                                    <div className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in">
-                                        <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-600">Template Pendapatan</h3>
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between items-center group">
-                                                <label className="text-sm text-slate-600">Gaji Pokok</label>
-                                                <input type="number" required value={templateForm.base_salary === 0 ? '' : templateForm.base_salary} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, base_salary: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
-                                            </div>
+                                        <div className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in">
                                             <div className="flex justify-between items-center">
-                                                <label className="text-sm text-slate-600">Tunj. Fungsional</label>
-                                                <input type="number" required value={templateForm.functional_allowance === 0 ? '' : templateForm.functional_allowance} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, functional_allowance: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-600">Template Pendapatan</h3>
+                                                <div className="bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                                                    <span className="text-xs text-indigo-500 font-medium mr-2">Subtotal:</span>
+                                                    <span className="text-sm font-bold text-indigo-700">{formatCurrency(templateForm.base_salary + templateForm.functional_allowance + templateForm.transport_allowance + templateForm.additional_task)}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm text-slate-600">Tunj. Transport</label>
-                                                <input type="number" required value={templateForm.transport_allowance === 0 ? '' : templateForm.transport_allowance} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, transport_allowance: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm text-slate-600">Tugas Tambahan</label>
-                                                <input type="number" required value={templateForm.additional_task === 0 ? '' : templateForm.additional_task} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, additional_task: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center group">
+                                                    <label className="text-sm text-slate-600">Gaji Pokok</label>
+                                                    <input type="number" required value={templateForm.base_salary === 0 ? '' : templateForm.base_salary} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, base_salary: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-sm text-slate-600">Tunj. Fungsional</label>
+                                                    <input type="number" required value={templateForm.functional_allowance === 0 ? '' : templateForm.functional_allowance} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, functional_allowance: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-sm text-slate-600">Tunj. Transport</label>
+                                                    <input type="number" required value={templateForm.transport_allowance === 0 ? '' : templateForm.transport_allowance} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, transport_allowance: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-sm text-slate-600">Tugas Tambahan</label>
+                                                    <input type="number" required value={templateForm.additional_task === 0 ? '' : templateForm.additional_task} placeholder="0" onChange={(e) => setTemplateForm({...templateForm, additional_task: parseFloat(e.target.value) || 0})} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
                                 )}
                             </form>
                         </div>

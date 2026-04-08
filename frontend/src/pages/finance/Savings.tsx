@@ -108,8 +108,8 @@ const Savings = () => {
     }, [canManage, fetchAccounts, fetchStudents, fetchClasses, fetchPoolSummary, unitID]);
 
     useEffect(() => {
-        if (activeTab === 'operational' && canManage) fetchOpHistory();
-    }, [activeTab, canManage, fetchOpHistory]);
+        if (canManage) fetchOpHistory();
+    }, [canManage, fetchOpHistory]);
 
     const unitAccounts = accounts.filter(acc => students.some(s => s.id === acc.student_id));
     const totalBalance = unitAccounts.reduce((sum, acc) => sum + acc.balance, 0);
@@ -201,7 +201,7 @@ const Savings = () => {
                     <button onClick={() => { setShowWithdrawOpModal(true); setOpWithdrawAmount(''); setOpWithdrawPurpose(''); }} className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-2 rounded-xl hover:bg-amber-700 shadow-sm transition text-sm font-medium">
                         <TrendingDown size={16} /> Ambil Dana Operasional
                     </button>
-                    <button onClick={() => { setShowReturnModal(true); setReturnWithdrawalId(''); setReturnAmount(''); setReturnNotes(''); }} className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition text-sm font-medium">
+                    <button onClick={() => { fetchOpHistory(); setShowReturnModal(true); setReturnWithdrawalId(''); setReturnAmount(''); setReturnNotes(''); }} className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition text-sm font-medium">
                         <RotateCcw size={16} /> Pengembalian Dana
                     </button>
                     <button onClick={() => openDepositModal()} className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-2 rounded-xl hover:bg-emerald-700 shadow-sm transition text-sm font-medium">

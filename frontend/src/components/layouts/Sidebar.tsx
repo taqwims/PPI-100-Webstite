@@ -82,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger' },
                 { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
                 { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll' },
+                { icon: AlertTriangle, label: 'Catatan Hutang', path: '/dashboard/finance/debts' },
             ]
         };
         const finAnggaran: MenuGroup = {
@@ -100,6 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: MessageCircle, label: 'Template WA', path: '/dashboard/finance/wa-templates' },
                 { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
                 { icon: Calendar, label: 'Tahun Ajaran', path: '/dashboard/finance/academic-years' },
+                { icon: Settings, label: 'Kuitansi & TTD', path: '/dashboard/finance/invoice-config' },
                 { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
             ]
         };

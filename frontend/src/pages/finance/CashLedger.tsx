@@ -72,6 +72,7 @@ const CashLedger = () => {
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [itemsPerPage, setItemsPerPage] = useState<number>(20);
     const [currentPage, setCurrentPage] = useState<number>(1);
+    const [selectedSemester, setSelectedSemester] = useState<string>('all');
 
     // Export modal state
     const [showExportModal, setShowExportModal] = useState(false);
@@ -250,6 +251,14 @@ const CashLedger = () => {
         if (filterEndDate) {
             if (e.date.split('T')[0] > filterEndDate) match = false;
         }
+        // Semester Filter
+        if (selectedSemester !== 'all') {
+            const month = new Date(e.date).getMonth() + 1;
+            const isSem1 = month >= 7 && month <= 12; // Jul-Dec
+            if (selectedSemester === '1' && !isSem1) match = false;
+            if (selectedSemester === '2' && isSem1) match = false;
+        }
+
         return match;
     });
 
@@ -357,12 +366,17 @@ const CashLedger = () => {
                                 <input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }} title="Tanggal Akhir" className="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <select value={sortOrder} onChange={e => { setSortOrder(e.target.value as 'asc'|'desc'); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <select value={selectedSemester} onChange={e => { setSelectedSemester(e.target.value); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer w-full sm:w-auto">
+                                <option value="all">Semua Semester</option>
+                                <option value="1">Ganjil</option>
+                                <option value="2">Genap</option>
+                            </select>
+                            <select value={sortOrder} onChange={e => { setSortOrder(e.target.value as 'asc'|'desc'); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer w-full sm:w-auto">
                                 <option value="desc">Terbaru</option>
                                 <option value="asc">Terlama</option>
                             </select>
-                            <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer">
+                            <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer w-full sm:w-auto">
                                 <option value="20">20 Baris</option>
                                 <option value="40">40 Baris</option>
                                 <option value="80">80 Baris</option>

@@ -583,3 +583,31 @@ type StudentObligation struct {
 	UpdatedAt         time.Time      `json:"updated_at"`
 }
 
+// ------------------- External Debt (Catatan Hutang) -------------------
+
+type ExternalDebt struct {
+	ID               uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	CreditorName     string    `gorm:"not null" json:"creditor_name"`     // Nama pihak ketiga / vendor
+	Description      string    `gorm:"not null" json:"description"`      // Keterangan hutang
+	Amount           float64   `gorm:"not null" json:"amount"`           // Nominal hutang awal
+	PaidAmount       float64   `gorm:"default:0" json:"paid_amount"`     // Total yang sudah dibayar
+	Status           string    `gorm:"not null;default:'Unpaid'" json:"status"` // Unpaid, Partial, Paid
+	DueDate          *time.Time `json:"due_date"`
+	Notes            string    `json:"notes"`
+	CreatedByID      uuid.UUID `gorm:"type:uuid;not null" json:"created_by_id"`
+	CreatedBy        User      `gorm:"foreignKey:CreatedByID" json:"created_by"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type ExternalDebtPayment struct {
+	ID             uuid.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	DebtID         uuid.UUID    `gorm:"type:uuid;not null" json:"debt_id"`
+	Debt           ExternalDebt `gorm:"foreignKey:DebtID" json:"debt"`
+	Amount         float64      `gorm:"not null" json:"amount"`
+	FundSource     string       `gorm:"not null" json:"fund_source"` // Kas Umum, Infaq
+	Notes          string       `json:"notes"`
+	PaidByID       uuid.UUID    `gorm:"type:uuid;not null" json:"paid_by_id"`
+	PaidBy         User         `gorm:"foreignKey:PaidByID" json:"paid_by"`
+	CreatedAt      time.Time    `json:"created_at"`
+}

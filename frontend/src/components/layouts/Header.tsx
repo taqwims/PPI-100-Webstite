@@ -5,7 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+    onMenuClick?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -22,10 +26,13 @@ const Header: React.FC = () => {
     const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
 
     return (
-        <header className="sticky top-0 z-30 px-6 py-4 lg:px-8">
-            <div className="glass-panel rounded-2xl px-6 py-3 flex justify-between items-center">
+        <header className="sticky top-0 z-30 px-4 py-4 lg:px-8">
+            <div className="glass-panel rounded-2xl px-4 py-3 flex justify-between items-center sm:px-6">
                 {/* Mobile Menu Button (Visible only on small screens) */}
-                <button className="lg:hidden text-slate-500 hover:text-slate-900">
+                <button 
+                    onClick={onMenuClick}
+                    className="lg:hidden text-slate-500 hover:text-slate-900 mr-2"
+                >
                     <Menu size={24} />
                 </button>
 

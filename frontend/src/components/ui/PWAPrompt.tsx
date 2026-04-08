@@ -4,25 +4,39 @@ import { Download, X } from 'lucide-react';
 const PWAPrompt: React.FC = () => {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+    const [isIOS, setIsIOS] = useState(false);
 
     useEffect(() => {
+        // Check if already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            return;
+        }
+
+        // iOS detection
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+        setIsIOS(isIosDevice);
+
         const handler = (e: Event) => {
-            // Prevent the mini-infobar from appearing on mobile
             e.preventDefault();
-            // Stash the event so it can be triggered later.
             setDeferredPrompt(e);
-            // Update UI notify the user they can install the PWA
             setShowInstallPrompt(true);
         };
 
         window.addEventListener('beforeinstallprompt', handler);
 
-        // Check if already installed
         window.addEventListener('appinstalled', () => {
             setShowInstallPrompt(false);
             setDeferredPrompt(null);
             console.log('PWA was installed');
         });
+
+        // If it's iOS and not standalone, show prompt after a short delay since iOS doesn't fire beforeinstallprompt
+        if (isIosDevice && !window.matchMedia('(display-mode: standalone)').matches) {
+            setTimeout(() => {
+                setShowInstallPrompt(true);
+            }, 3000);
+        }
 
         return () => {
             window.removeEventListener('beforeinstallprompt', handler);
@@ -30,15 +44,18 @@ const PWAPrompt: React.FC = () => {
     }, []);
 
     const handleInstallClick = async () => {
-        if (!deferredPrompt) {
+        if (isIOS) {
+            alert("Untuk install di iOS: Tap tombol 'Share' (ikon panah ke atas) di menu browser bawah, lalu pilih 'Add to Home Screen'.");
             return;
         }
-        // Show the install prompt
+
+        if (!deferredPrompt) {
+            alert("Untuk install, silakan klik menu browser (titik tiga di pojok kanan atas) dan pilih 'Install Aplikasi' atau 'Add to Home Screen'.");
+            return;
+        }
         deferredPrompt.prompt();
-        // Wait for the user to respond to the prompt
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to the install prompt: ${outcome}`);
-        // We've used the prompt, and can't use it again, throw it away
         setDeferredPrompt(null);
         setShowInstallPrompt(false);
     };
@@ -46,15 +63,15 @@ const PWAPrompt: React.FC = () => {
     if (!showInstallPrompt) return null;
 
     return (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white shadow-2xl rounded-2xl p-4 border border-slate-200 z-[100] animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white shadow-2xl rounded-2xl p-5 border border-slate-200 z-[100] animate-in slide-in-from-bottom-5">
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="bg-emerald-100 p-2 rounded-xl text-emerald-600">
+                    <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-600">
                         <Download size={24} />
                     </div>
                     <div>
-                        <h4 className="font-bold text-slate-800 text-sm">Install Aplikasi</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">Akses lebih cepat dengan aplikasi Desktop/Mobile</p>
+                        <h4 className="font-bold text-slate-800 text-sm">Aplikasi SIS-Keuangan</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Install untuk akses lebih cepat</p>
                     </div>
                 </div>
                 <button
@@ -66,9 +83,9 @@ const PWAPrompt: React.FC = () => {
             </div>
             <button
                 onClick={handleInstallClick}
-                className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-xl text-sm transition"
+                className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl text-sm transition shadow-md shadow-blue-500/20"
             >
-                Install Sekarang
+                {isIOS ? 'Cara Install (iOS)' : 'Install Sekarang'}
             </button>
         </div>
     );

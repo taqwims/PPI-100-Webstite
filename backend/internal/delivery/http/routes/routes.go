@@ -107,6 +107,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	infaqTypeHandler := handlers.NewInfaqTypeHandler(db)
 	waTemplateHandler := handlers.NewWATemplateHandler(db)
 
+	// External Debt (Catatan Hutang)
+	externalDebtHandler := handlers.NewExternalDebtHandler(db)
+
+	// Invoice Signature & Config
+	invoiceSignatureHandler := handlers.NewInvoiceSignatureHandler(db)
+
 	// Public Routes
 	api := r.Group("/api")
 	{
@@ -121,6 +127,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 		// Midtrans Webhook (public, no auth required)
 		api.POST("/midtrans/notification", midtransHandler.HandleNotification)
+
+		// Public Invoice Verification (no auth required)
+		api.GET("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)
+		api.POST("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)
 
 		auth := api.Group("/auth")
 		{
@@ -307,6 +317,27 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.POST("/activities/:id/transactions", middleware.RoleMiddleware(1, 8, 9), activityHandler.CreateTransaction)
 			finance.GET("/activities/:id/transactions", middleware.RoleMiddleware(1, 8, 9), activityHandler.GetTransactions)
 			finance.DELETE("/activities/transactions/:tx_id", middleware.RoleMiddleware(1, 8, 9), activityHandler.DeleteTransaction)
+
+			// External Debts (Catatan Hutang)
+			finance.GET("/debts", middleware.RoleMiddleware(1, 9), externalDebtHandler.GetAll)
+			finance.POST("/debts", middleware.RoleMiddleware(1, 9), externalDebtHandler.Create)
+			finance.PUT("/debts/:id", middleware.RoleMiddleware(1, 9), externalDebtHandler.Update)
+			finance.DELETE("/debts/:id", middleware.RoleMiddleware(1, 9), externalDebtHandler.Delete)
+			finance.GET("/debts/:id/payments", middleware.RoleMiddleware(1, 9), externalDebtHandler.GetPayments)
+			finance.POST("/debts/:id/pay", middleware.RoleMiddleware(1, 9), externalDebtHandler.RecordPayment)
+
+			// Invoice Signatures & Config
+			finance.POST("/invoice/sign", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.SignInvoice)
+			finance.GET("/invoice/number", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.GenerateNumber)
+
+			// Invoice Number Configuration
+			finance.GET("/invoice-configs", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.GetInvoiceConfigs)
+			finance.PUT("/invoice-configs/:id", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.UpdateInvoiceConfig)
+			finance.POST("/invoice-configs/:id/reset", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.ResetCounter)
+
+			// Stakeholder Config
+			finance.GET("/stakeholders", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.GetStakeholders)
+			finance.PUT("/stakeholders/:id", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.UpdateStakeholder)
 		}
 
 		users := protected.Group("/users")

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { Menu } from 'lucide-react';
+
 import PWAPrompt from '../ui/PWAPrompt';
 
 interface DashboardLayoutProps {
@@ -21,18 +21,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-            <div className="flex-1 flex flex-col min-h-screen relative z-10">
-                {/* Mobile Header for Sidebar Toggle */}
-                <div className="lg:hidden p-4 flex items-center justify-between bg-white/80 backdrop-blur-md border-b border-slate-200">
-                    <h1 className="text-xl font-bold text-slate-900">SIS PPI 100</h1>
-                    <button onClick={() => setIsSidebarOpen(true)} className="text-slate-600 p-2 hover:bg-slate-100 rounded-lg">
-                        <Menu size={24} />
-                    </button>
-                </div>
-
-                <div className="hidden lg:block">
-                    <Header />
-                </div>
+            <div className="flex-1 flex flex-col min-h-screen relative z-10 w-full max-w-full overflow-hidden">
+                <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
                 <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">
                     <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">

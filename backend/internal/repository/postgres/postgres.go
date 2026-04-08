@@ -74,5 +74,14 @@ func AutoMigrate(db *gorm.DB) error {
 		// Savings Operational
 		&domain.SavingsOperationalWithdrawal{},
 		&domain.SavingsOperationalReturn{},
+
+		// External Debt (Catatan Hutang)
+		&domain.ExternalDebt{},
+		&domain.ExternalDebtPayment{},
+
+		// Invoice Signatures & Config
+		&domain.InvoiceSignature{},
+		&domain.InvoiceNumberConfig{},
+		&domain.StakeholderConfig{},
 	)
 }

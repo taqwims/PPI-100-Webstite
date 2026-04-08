@@ -68,9 +68,13 @@ const ParentChildBills: React.FC = () => {
     const [successMsg, setSuccessMsg] = useState('');
 
     const [selectedYear, setSelectedYear] = useState<string>('all');
+    const [selectedSemester, setSelectedSemester] = useState<string>('all');
+    const [itemsPerPage, setItemsPerPage] = useState<number>(20);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    
     const [sortConfig, setSortConfig] = useState<{ key: keyof Bill | 'remaining'; direction: 'asc' | 'desc' | null }>({
-        key: 'created_at',
-        direction: 'desc'
+        key: 'bill_type', // Terorganisir berdasarkan jenis tagihan by default
+        direction: 'asc'
     });
 
     const { data: academicYears } = useQuery({
@@ -109,6 +113,16 @@ const ParentChildBills: React.FC = () => {
     const filteredAndSortedBills = () => {
         let filtered = (bills || []).filter((b: Bill) => {
             if (selectedYear !== 'all' && b.academic_year_id?.toString() !== selectedYear) return false;
+            
+            if (selectedSemester !== 'all') {
+                const dt = new Date(b.due_date || b.created_at);
+                const month = dt.getMonth() + 1; // 1-12
+                // Semester 1: Jul - Dec (7-12)
+                const isSem1 = month >= 7 && month <= 12;
+                if (selectedSemester === '1' && !isSem1) return false;
+                if (selectedSemester === '2' && isSem1) return false;
+            }
+
             return true;
         });
 
@@ -134,12 +148,7 @@ const ParentChildBills: React.FC = () => {
     const unpaidBills = (bills || []).filter((b: Bill) => b.status !== 'Paid');
     const totalUnpaid = unpaidBills.reduce((acc: number, b: Bill) => acc + getRemainingAmount(b), 0);
 
-    const billsByStudent = processedBills.reduce((acc: any, bill: Bill) => {
-        const sName = bill.student?.user?.name || 'Lainnya';
-        if (!acc[sName]) acc[sName] = [];
-        acc[sName].push(bill);
-        return acc;
-    }, {});
+
 
     const openPayModal = (bill: Bill) => {
         setSelectedBill(bill);
@@ -308,6 +317,35 @@ const ParentChildBills: React.FC = () => {
                             <option key={year.id} value={year.id.toString()} className="bg-white text-black">{year.name}</option>
                         ))}
                     </select>
+                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                        <Filter size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Semester:</span>
+                        <select
+                            value={selectedSemester}
+                            onChange={(e) => setSelectedSemester(e.target.value)}
+                            className="text-sm border-none focus:ring-0 p-0 bg-transparent font-semibold text-black"
+                        >
+                            <option value="all" className="bg-white text-black">Semua</option>
+                            <option value="1" className="bg-white text-black">Ganjil</option>
+                            <option value="2" className="bg-white text-black">Genap</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {/* Controls Row */}
+            <div className="flex justify-end gap-3 flex-wrap">
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Tampilkan:</span>
+                    <select 
+                        value={itemsPerPage} 
+                        onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} 
+                        className="text-sm border-none focus:ring-0 p-0 bg-transparent font-semibold text-black"
+                    >
+                        <option value="20" className="bg-white text-black">20</option>
+                        <option value="40" className="bg-white text-black">40</option>
+                        <option value="80" className="bg-white text-black">80</option>
+                    </select>
                 </div>
             </div>
 
@@ -325,13 +363,23 @@ const ParentChildBills: React.FC = () => {
                 <div className="p-12 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mx-auto"></div>
                 </div>
-            ) : bills?.length === 0 ? (
+            ) : processedBills.length === 0 ? (
                 <div className="p-12 text-center bg-white rounded-2xl shadow-sm border border-slate-200 text-slate-500">
                     <DollarSign size={40} className="mx-auto text-slate-300 mb-3" />
                     <p className="text-lg font-medium text-slate-700">Belum Ada Tagihan</p>
                 </div>
             ) : (
-                Object.entries(billsByStudent).map(([studentName, studentBills]: [string, any]) => (
+                <>
+                {Object.entries(
+                    processedBills
+                        .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                        .reduce((acc: any, bill: Bill) => {
+                            const sName = bill.student?.user?.name || 'Lainnya';
+                            if (!acc[sName]) acc[sName] = [];
+                            acc[sName].push(bill);
+                            return acc;
+                        }, {})
+                ).map(([studentName, studentBills]: [string, any]) => (
                     <div key={studentName} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
                         <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
@@ -450,7 +498,31 @@ const ParentChildBills: React.FC = () => {
                             </table>
                         </div>
                     </div>
-                ))
+                ))}
+
+                {/* Pagination Controls */}
+                {processedBills.length > itemsPerPage && (
+                    <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500 mt-4 bg-white rounded-xl shadow-sm border">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                            Sebelumnya
+                        </button>
+                        <span className="font-medium text-slate-700">
+                            Halaman {currentPage} dari {Math.ceil(processedBills.length / itemsPerPage)}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(processedBills.length / itemsPerPage)))}
+                            disabled={currentPage === Math.ceil(processedBills.length / itemsPerPage)}
+                            className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                            Selanjutnya
+                        </button>
+                    </div>
+                )}
+                </>
             )}
 
             {/* Payment Modal */}
