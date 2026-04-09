@@ -52,7 +52,10 @@ func GenerateStakeholderSignature(role, invoiceType, referenceID string, amount 
 
 // BuildSignaturePayload constructs the canonical data string for signing.
 func BuildSignaturePayload(role, invoiceType, referenceID string, amount float64, dateStr string) string {
-	return fmt.Sprintf("%s|%s|%s|%.2f|%s", strings.ToLower(role), invoiceType, referenceID, amount, dateStr)
+	// Standardize casing to ensure signatures match regardless of input case
+	standardRole := strings.ToLower(role)
+	standardType := strings.Title(strings.ToLower(invoiceType))
+	return fmt.Sprintf("%s|%s|%s|%.2f|%s", standardRole, standardType, referenceID, amount, dateStr)
 }
 
 // VerifyStakeholderSignature verifies an existing signature for a role.

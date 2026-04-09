@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/utils"
@@ -42,7 +43,48 @@ func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
 		return
 	}
 
-	// Get stakeholder names from config
+	// Standardize InvoiceType to Title Case (e.g., "payroll" -> "Payroll")
+	req.InvoiceType = strings.Title(strings.ToLower(req.InvoiceType))
+
+	// 1. Check if already signed
+	var existing []domain.InvoiceSignature
+	h.db.Where("invoice_type = ? AND reference_id = ?", req.InvoiceType, req.ReferenceID).Find(&existing)
+	if len(existing) > 0 {
+		// Prepare signatures array
+		needsUpdate := false
+		verificationCode := existing[0].VerificationCode
+		docDate := existing[0].DocumentDate
+
+		if verificationCode == "" {
+			verificationCode = utils.GenerateVerificationCode(req.InvoiceType, req.ReferenceID, req.Amount, req.DateStr)
+			needsUpdate = true
+		}
+		if docDate == "" {
+			docDate = req.DateStr
+			needsUpdate = true
+		}
+
+		if needsUpdate {
+			h.db.Model(&domain.InvoiceSignature{}).
+				Where("invoice_type = ? AND reference_id = ?", req.InvoiceType, req.ReferenceID).
+				Updates(map[string]interface{}{
+					"verification_code": verificationCode,
+					"document_date":     docDate,
+				})
+		}
+		
+		// Return updated info
+		var updated []domain.InvoiceSignature
+		h.db.Where("invoice_type = ? AND reference_id = ?", req.InvoiceType, req.ReferenceID).Find(&updated)
+		
+		c.JSON(http.StatusOK, gin.H{
+			"verification_code": verificationCode,
+			"signatures":        updated,
+		})
+		return
+	}
+
+	// 2. Not signed yet, generate all
 	stakeholderNames := make(map[string]string)
 	var configs []domain.StakeholderConfig
 	h.db.Where("is_active = ?", true).Find(&configs)
@@ -50,24 +92,15 @@ func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
 		stakeholderNames[cfg.Role] = cfg.Name
 	}
 
-	// Generate all signatures
 	sigs, err := utils.GenerateAllSignatures(req.InvoiceType, req.ReferenceID, req.Amount, req.DateStr, stakeholderNames)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Generate verification code
 	verificationCode := utils.GenerateVerificationCode(req.InvoiceType, req.ReferenceID, req.Amount, req.DateStr)
+	invoiceNumber, _ := h.generateInvoiceNumber(req.InvoiceType)
 
-	// Generate invoice number
-	invoiceNumber, err := h.generateInvoiceNumber(req.InvoiceType)
-	if err != nil {
-		// Non-fatal: use fallback
-		invoiceNumber = fmt.Sprintf("%s-%s", strings.ToUpper(req.InvoiceType[:3]), req.ReferenceID[:8])
-	}
-
-	// Persist signatures
 	now := time.Now()
 	for _, sig := range sigs {
 		record := domain.InvoiceSignature{
@@ -79,6 +112,7 @@ func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
 			ShortCode:        sig.ShortCode,
 			VerificationCode: verificationCode,
 			Amount:           req.Amount,
+			DocumentDate:     req.DateStr,
 			SignedAt:         now,
 		}
 		h.db.Create(&record)
@@ -98,12 +132,15 @@ type VerifyInvoiceRequest struct {
 }
 
 type VerifyInvoiceResponse struct {
-	Valid            bool                    `json:"valid"`
-	InvoiceType      string                  `json:"invoice_type"`
-	ReferenceID      string                  `json:"reference_id"`
-	Amount           float64                 `json:"amount"`
-	SignedAt         time.Time               `json:"signed_at"`
-	Signatures       []domain.InvoiceSignature `json:"signatures"`
+	Valid    bool      `json:"valid"`
+	Metadata struct {
+		ModuleName  string    `json:"module_name"`
+		ReferenceID string    `json:"reference_id"`
+		Amount      float64   `json:"amount"`
+		Date        string    `json:"date"`
+		SignedAt    time.Time `json:"signed_at"`
+	} `json:"metadata"`
+	Signatures []domain.InvoiceSignature `json:"signatures"`
 }
 
 func (h *InvoiceSignatureHandler) VerifyInvoice(c *gin.Context) {
@@ -118,30 +155,55 @@ func (h *InvoiceSignatureHandler) VerifyInvoice(c *gin.Context) {
 	}
 
 	var sigs []domain.InvoiceSignature
-	result := h.db.Where("verification_code = ?", code).Find(&sigs)
+	// 1. Try search by verification_code (case-insensitive)
+	result := h.db.Where("LOWER(verification_code) = LOWER(?)", code).Find(&sigs)
 	if result.Error != nil || len(sigs) == 0 {
-		c.JSON(http.StatusOK, VerifyInvoiceResponse{Valid: false})
-		return
-	}
-
-	// Verify each signature cryptographically
-	allValid := true
-	for _, sig := range sigs {
-		dateStr := sig.SignedAt.Format("2006-01-02")
-		valid := utils.VerifyStakeholderSignature(sig.StakeholderRole, sig.InvoiceType, sig.ReferenceID, sig.Amount, dateStr, sig.SignatureHash)
-		if !valid {
-			allValid = false
+		// 2. Fallback: try search by short_code (case-insensitive)
+		result = h.db.Where("LOWER(short_code) = LOWER(?)", code).Find(&sigs)
+		if result.Error != nil || len(sigs) == 0 {
+			c.JSON(http.StatusOK, VerifyInvoiceResponse{Valid: false})
+			return
 		}
 	}
 
-	c.JSON(http.StatusOK, VerifyInvoiceResponse{
-		Valid:       allValid,
-		InvoiceType: sigs[0].InvoiceType,
-		ReferenceID: sigs[0].ReferenceID,
-		Amount:      sigs[0].Amount,
-		SignedAt:    sigs[0].SignedAt,
-		Signatures:  sigs,
-	})
+	// Verify each signature cryptographically
+	for i := range sigs {
+		sig := sigs[i]
+		// Ensure Title Case for verification too
+		invoiceType := strings.Title(strings.ToLower(sig.InvoiceType))
+		
+		valid := utils.VerifyStakeholderSignature(sig.StakeholderRole, invoiceType, sig.ReferenceID, sig.Amount, sig.DocumentDate, sig.SignatureHash)
+		
+		// DIAGNOSTIC LOGGING
+		if !valid {
+			log.Printf("[VERIFY] INVALID SIGNATURE DETECTED!")
+			log.Printf("  - Code: %s", code)
+			log.Printf("  - Role: %s", sig.StakeholderRole)
+			log.Printf("  - Type: %s (Standardized: %s)", sig.InvoiceType, invoiceType)
+			log.Printf("  - Ref:  %s", sig.ReferenceID)
+			log.Printf("  - Date: %s", sig.DocumentDate)
+			log.Printf("  - Hash in DB: %s", sig.SignatureHash)
+			
+			// Try to generate what it should be
+			expected, _ := utils.GenerateStakeholderSignature(sig.StakeholderRole, invoiceType, sig.ReferenceID, sig.Amount, sig.DocumentDate)
+			log.Printf("  - Expected:   %s", expected)
+			
+			c.JSON(http.StatusOK, VerifyInvoiceResponse{Valid: false})
+			return
+		}
+	}
+
+	res := VerifyInvoiceResponse{
+		Valid:      true,
+		Signatures: sigs,
+	}
+	res.Metadata.ModuleName = sigs[0].InvoiceType
+	res.Metadata.ReferenceID = sigs[0].ReferenceID
+	res.Metadata.Amount = sigs[0].Amount
+	res.Metadata.Date = sigs[0].DocumentDate
+	res.Metadata.SignedAt = sigs[0].SignedAt
+
+	c.JSON(http.StatusOK, res)
 }
 
 // ─── Invoice Number Generation ───

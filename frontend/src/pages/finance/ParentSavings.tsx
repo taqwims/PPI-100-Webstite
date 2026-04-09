@@ -70,8 +70,13 @@ const ParentSavings: React.FC = () => {
         fetchSavings();
     }, []);
 
-    const handleExportPDF = (child: ChildSavings) => {
-        generateSavingsReport(child.account, child.transactions);
+    const handleExportPDF = async (child: ChildSavings) => {
+        await generateSavingsReport(
+            child.account.student?.user?.name || 'Siswa',
+            child.account.student?.class?.name || '-',
+            child.transactions,
+            child.account.balance
+        );
     };
 
     if (loading) {

@@ -12,6 +12,9 @@ import (
 )
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
+	// Enable CORS
+	r.Use(middleware.CORSMiddleware())
+
 	// Repositories
 	userRepo := postgres.NewUserRepository(db)
 	academicRepo := postgres.NewAcademicRepository(db)
@@ -327,8 +330,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.POST("/debts/:id/pay", middleware.RoleMiddleware(1, 9), externalDebtHandler.RecordPayment)
 
 			// Invoice Signatures & Config
-			finance.POST("/invoice/sign", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.SignInvoice)
-			finance.GET("/invoice/number", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.GenerateNumber)
+			finance.POST("/invoice/sign", middleware.RoleMiddleware(1, 2, 3, 6, 7, 8, 9, 10, 11), invoiceSignatureHandler.SignInvoice)
+			finance.GET("/invoice/number", middleware.RoleMiddleware(1, 2, 3, 6, 7, 8, 9, 10, 11), invoiceSignatureHandler.GenerateNumber)
 
 			// Invoice Number Configuration
 			finance.GET("/invoice-configs", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.GetInvoiceConfigs)

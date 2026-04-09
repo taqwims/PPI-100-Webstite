@@ -16,9 +16,10 @@ type InvoiceSignature struct {
 	StakeholderName string    `gorm:"not null" json:"stakeholder_name"`  // Display name
 	SignatureHash   string    `gorm:"not null" json:"signature_hash"`    // Full HMAC-SHA256
 	ShortCode       string    `gorm:"not null" json:"short_code"`        // SIG-PRI-xxxxxxxxxxxx
-	VerificationCode string   `json:"verification_code"`                 // XXXX-XXXX-XXXX
-	Amount          float64   `json:"amount"`
-	SignedAt        time.Time `gorm:"not null" json:"signed_at"`
+	VerificationCode string   `gorm:"default:'';not null" json:"verification_code"` // XXXX-XXXX-XXXX
+	Amount           float64   `json:"amount"`
+	DocumentDate     string    `gorm:"default:'';not null" json:"document_date"`    // The date used for signing (ISO)
+	SignedAt         time.Time `gorm:"not null" json:"signed_at"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 

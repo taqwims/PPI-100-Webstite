@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
 import { generateCashLedgerReceipt, generateCashLedgerReport } from '../../utils/pdfUtils';
 import toast from 'react-hot-toast';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface StaffUser {
@@ -65,6 +66,10 @@ const CashLedger = () => {
     const [submitting, setSubmitting] = useState(false);
     const [transactionCodes, setTransactionCodes] = useState<TransactionCode[]>([]);
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+    // Print Options
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [entryToPrint, setEntryToPrint] = useState<CashLedgerEntry | null>(null);
 
     // Filters & Pagination
     const [filterStartDate, setFilterStartDate] = useState('');
@@ -201,7 +206,14 @@ const CashLedger = () => {
     };
 
     const handlePrintReceipt = (entry: CashLedgerEntry) => {
-        generateCashLedgerReceipt(entry);
+        setEntryToPrint(entry);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[]) => {
+        if (entryToPrint) {
+            await generateCashLedgerReceipt(entryToPrint, selectedRoles);
+        }
     };
 
     const handleExport = () => {
@@ -816,6 +828,13 @@ const CashLedger = () => {
                 onConfirm={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}
                 title="Hapus Transaksi"
                 message="Yakin ingin menghapus entri ini? Tindakan ini tidak bisa dibatalkan."
+            />
+
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Bukti Transaksi Kas"
             />
         </div>
     );

@@ -5,6 +5,7 @@ import { Plus, Search, CheckCircle, AlertTriangle, Landmark, FileText, ChevronDo
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 interface ExternalDebt {
     id: string;
@@ -64,6 +65,10 @@ const ExternalDebts: React.FC = () => {
 
     const [submitting, setSubmitting] = useState(false);
 
+    // Print Options
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [selectedPaymentToPrint, setSelectedPaymentToPrint] = useState<any>(null);
+
     // Payments View
     const [viewPaymentsDebtId, setViewPaymentsDebtId] = useState<string | null>(null);
     const { data: paymentsMapping = {} } = useQuery({
@@ -76,14 +81,21 @@ const ExternalDebts: React.FC = () => {
         enabled: !!viewPaymentsDebtId
     });
 
-    const handleDownloadReceipt = async (payment: any) => {
-        try {
-            const { generateExternalDebtPaymentReceipt } = await import('../../utils/pdfUtils');
-            await generateExternalDebtPaymentReceipt(payment);
-            toast.success('Bukti pembayaran berhasil diunduh');
-        } catch (error) {
-            console.error('Failed to generate receipt:', error);
-            toast.error('Gagal membuat bukti pembayaran');
+    const handleDownloadReceipt = (payment: any) => {
+        setSelectedPaymentToPrint(payment);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[]) => {
+        if (selectedPaymentToPrint) {
+            try {
+                const { generateDebtReceipt } = await import('../../utils/pdfUtils');
+                await generateDebtReceipt(selectedPaymentToPrint, selectedDebt, selectedRoles);
+                toast.success('Bukti pembayaran berhasil diunduh');
+            } catch (error) {
+                console.error('Failed to generate receipt:', error);
+                toast.error('Gagal membuat bukti pembayaran');
+            }
         }
     };
 
@@ -193,7 +205,7 @@ const ExternalDebts: React.FC = () => {
 
         setSubmitting(true);
         try {
-            await api.post(`/finance/debts/${selectedDebt.id}/payments`, {
+            await api.post(`/finance/debts/${selectedDebt.id}/pay`, {
                 amount: amt,
                 fund_source: paymentData.fund_source,
                 notes: paymentData.notes
@@ -572,6 +584,12 @@ const ExternalDebts: React.FC = () => {
                     </div>
                 </div>
             )}
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Bukti Pembayaran Hutang"
+            />
         </div>
     );
 };

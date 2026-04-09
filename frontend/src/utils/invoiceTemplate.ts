@@ -14,6 +14,7 @@ export interface InvoiceTemplateOptions {
     subtitle?: string;
     invoiceNumber: string;
     signatures?: StakeholderSignature[];
+    selectedRoles?: string[];
     verificationCode?: string;
     headerColor?: [number, number, number];
 }
@@ -69,7 +70,7 @@ export function drawStandardHeader(
     doc.setFont('helvetica', 'bold');
     doc.text('YAYASAN PONDOK PESANTREN ISLAM (PPI) 100', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(11);
-    doc.text('SDIT AL-MUHAJIRIN', pageWidth / 2, 15, { align: 'center' });
+    doc.text('SDIT AN-NUR', pageWidth / 2, 15, { align: 'center' });
 
     // Address
     doc.setFontSize(6);
@@ -114,7 +115,7 @@ export function drawStandardHeaderA5(
     doc.rect(0, 0, pageWidth, headerH, 'F');
 
     if (logoBase64) {
-        try { doc.addImage(logoBase64, 'PNG', 8, 3, 12, 12); } catch {}
+        try { doc.addImage(logoBase64, 'PNG', 8, 3, 12, 12); } catch { }
     }
 
     doc.setTextColor(255, 255, 255);
@@ -122,7 +123,7 @@ export function drawStandardHeaderA5(
     doc.setFont('helvetica', 'bold');
     doc.text('YAYASAN PPI 100', pageWidth / 2, 7, { align: 'center' });
     doc.setFontSize(9);
-    doc.text('SDIT AL-MUHAJIRIN', pageWidth / 2, 13, { align: 'center' });
+    doc.text('SDIT AN-NUR', pageWidth / 2, 13, { align: 'center' });
 
     doc.setFontSize(5);
     doc.setFont('helvetica', 'normal');
@@ -149,16 +150,17 @@ export function drawStandardHeaderA5(
 }
 
 // ─── Signature Block ───
-export function drawSignatureBlock(
+export async function drawSignatureBlock(
     doc: jsPDF,
     startY: number,
-    signatures?: StakeholderSignature[]
-): number {
+    signatures?: StakeholderSignature[],
+    selectedRoles?: string[]
+): Promise<number> {
     const pageWidth = doc.internal.pageSize.getWidth();
     const labelX = 14;
 
     // Check if enough space, add page if needed
-    if (startY + 65 > doc.internal.pageSize.getHeight()) {
+    if (startY + 45 > doc.internal.pageSize.getHeight()) {
         doc.addPage();
         startY = 20;
     }
@@ -170,19 +172,27 @@ export function drawSignatureBlock(
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.text('Ditandatangani secara digital oleh:', labelX, startY);
+    doc.text('Otentikasi Digital Penanggung Jawab:', labelX, startY);
 
     startY += 4;
 
-    const sigs = signatures || [
+    const allSigs = signatures || [
         { role: 'chairman', role_label: 'Ketua Yayasan', name: 'Ketua Yayasan PPI 100', short_code: '—' },
         { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara PPI 100', short_code: '—' },
         { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah SDIT', short_code: '—' },
     ];
 
-    const colW = (pageWidth - 28) / 3;
+    // Filter based on selectedRoles if provided
+    const sigs = selectedRoles
+        ? allSigs.filter(s => selectedRoles.includes(s.role))
+        : allSigs;
 
-    sigs.forEach((sig, i) => {
+    if (sigs.length === 0) return startY;
+
+    const colW = (pageWidth - 28) / Math.max(sigs.length, 1);
+
+    for (let i = 0; i < sigs.length; i++) {
+        const sig = sigs[i];
         const x = labelX + i * colW;
 
         doc.setFontSize(7);
@@ -190,24 +200,34 @@ export function drawSignatureBlock(
         doc.setTextColor(100, 116, 139);
         doc.text(sig.role_label + ',', x, startY + 4);
 
-        // Signature line
-        doc.setDrawColor(148, 163, 184);
-        doc.line(x, startY + 28, x + colW - 8, startY + 28);
+        // QR Code Signature (Replacing manual signature line)
+        try {
+            const sigQr = await QRCode.toDataURL(sig.short_code, {
+                margin: 0,
+                width: 60,
+                color: { dark: '#1e293b', light: '#ffffff' }
+            });
+            doc.addImage(sigQr, 'PNG', x, startY + 6, 15, 15);
+        } catch {
+            // Fallback if QR fails
+            doc.setDrawColor(148, 163, 184);
+            doc.line(x, startY + 20, x + colW - 8, startY + 20);
+        }
 
         // Name
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
         doc.setFontSize(7);
-        doc.text(sig.name, x, startY + 33);
+        doc.text(sig.name, x, startY + 26);
 
         // Signature code
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         doc.setFontSize(5);
-        doc.text(sig.short_code, x, startY + 37);
-    });
+        doc.text(sig.short_code, x, startY + 30);
+    }
 
-    return startY + 42;
+    return startY + 35;
 }
 
 // ─── Verification Footer with QR ───
@@ -226,7 +246,7 @@ export async function drawVerificationFooter(
     // QR Code
     try {
         const qrDataUrl = await QRCode.toDataURL(
-            `${window.location.origin}/verify/${code}`,
+            `${window.location.origin}/verify?code=${code}`,
             { width: 100, margin: 1, color: { dark: '#1e293b', light: '#ffffff' } }
         );
         doc.addImage(qrDataUrl, 'PNG', 14, startY, 20, 20);
@@ -240,7 +260,7 @@ export async function drawVerificationFooter(
     doc.setFont('helvetica', 'bold');
     doc.text(`Kode Verifikasi: ${code}`, 38, startY + 10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Verifikasi: ${window.location.origin}/verify/${code}`, 38, startY + 15);
+    doc.text(`Verifikasi: ${window.location.origin}/verify?code=${code}`, 38, startY + 15);
 
     // Print timestamp
     doc.setTextColor(148, 163, 184);
@@ -269,11 +289,11 @@ export async function drawVerificationFooterCompact(
 
     try {
         const qrDataUrl = await QRCode.toDataURL(
-            `${window.location.origin}/verify/${code}`,
+            `${window.location.origin}/verify?code=${code}`,
             { width: 80, margin: 1, color: { dark: '#1e293b', light: '#ffffff' } }
         );
         doc.addImage(qrDataUrl, 'PNG', 10, startY, 15, 15);
-    } catch {}
+    } catch { }
 
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(6);
@@ -290,15 +310,16 @@ export async function drawVerificationFooterCompact(
 }
 
 // ─── Signature Block Compact (A5) ───
-export function drawSignatureBlockCompact(
+export async function drawSignatureBlockCompact(
     doc: jsPDF,
     startY: number,
-    signatures?: StakeholderSignature[]
-): number {
+    signatures?: StakeholderSignature[],
+    selectedRoles?: string[]
+): Promise<number> {
     const pageWidth = doc.internal.pageSize.getWidth();
     const labelX = 10;
 
-    if (startY + 50 > doc.internal.pageSize.getHeight()) {
+    if (startY + 40 > doc.internal.pageSize.getHeight()) {
         doc.addPage();
         startY = 20;
     }
@@ -307,32 +328,52 @@ export function drawSignatureBlockCompact(
     doc.line(labelX, startY, pageWidth - 10, startY);
     startY += 4;
 
-    const sigs = signatures || [
+    const allSigs = signatures || [
         { role: 'chairman', role_label: 'Ketua Yayasan', name: 'Ketua Yayasan PPI 100', short_code: '—' },
         { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara PPI 100', short_code: '—' },
         { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah SDIT', short_code: '—' },
     ];
 
-    const colW = (pageWidth - 20) / 3;
-    sigs.forEach((sig, i) => {
+    const sigs = selectedRoles
+        ? allSigs.filter(s => selectedRoles.includes(s.role))
+        : allSigs;
+
+    if (sigs.length === 0) return startY;
+
+    const colW = (pageWidth - 20) / Math.max(sigs.length, 1);
+
+    for (let i = 0; i < sigs.length; i++) {
+        const sig = sigs[i];
         const x = labelX + i * colW;
         doc.setFontSize(5.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         doc.text(sig.role_label + ',', x, startY + 3);
-        doc.setDrawColor(148, 163, 184);
-        doc.line(x, startY + 20, x + colW - 6, startY + 20);
+
+        // QR Code Signature
+        try {
+            const sigQr = await QRCode.toDataURL(sig.short_code, {
+                margin: 0,
+                width: 40,
+                color: { dark: '#1e293b', light: '#ffffff' }
+            });
+            doc.addImage(sigQr, 'PNG', x, startY + 4, 10, 10);
+        } catch {
+            doc.setDrawColor(148, 163, 184);
+            doc.line(x, startY + 15, x + colW - 6, startY + 15);
+        }
+
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
         doc.setFontSize(5.5);
-        doc.text(sig.name, x, startY + 24);
+        doc.text(sig.name, x, startY + 17);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         doc.setFontSize(4);
-        doc.text(sig.short_code, x, startY + 27);
-    });
+        doc.text(sig.short_code, x, startY + 20);
+    }
 
-    return startY + 30;
+    return startY + 25;
 }
 
 // ─── HMAC Signature (Client-side for display) ───
@@ -399,7 +440,7 @@ export function addPageFooters(doc: jsPDF) {
         doc.setPage(i);
         doc.setTextColor(148, 163, 184);
         doc.setFontSize(6);
-        doc.text(`SDIT PPI 100 — Dicetak: ${printDate}`, 14, doc.internal.pageSize.getHeight() - 6);
+        doc.text(`SDIT AN-NUR — Dicetak: ${printDate}`, 14, doc.internal.pageSize.getHeight() - 6);
         doc.text(`Halaman ${i}/${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
     }
 }

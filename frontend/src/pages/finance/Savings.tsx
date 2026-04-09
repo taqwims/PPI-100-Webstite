@@ -175,7 +175,15 @@ const Savings = () => {
         finally { setLoadingHistory(false); }
     };
 
-    const handleExportPDF = () => { if (!historyAccount) return; generateSavingsReport(historyAccount, transactions); };
+    const handleExportPDF = async () => {
+        if (!historyAccount) return;
+        await generateSavingsReport(
+            historyAccount.student?.user?.name || '',
+            historyAccount.student?.class?.name || '',
+            transactions,
+            historyAccount.balance
+        );
+    };
 
     const outstandingWithdrawals = opHistory.filter(w => w.status !== 'Returned');
 

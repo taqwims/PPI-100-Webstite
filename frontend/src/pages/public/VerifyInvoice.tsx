@@ -14,7 +14,7 @@ const VerifyInvoice: React.FC = () => {
     const [result, setResult] = useState<any>(null);
     const [searched, setSearched] = useState(false);
 
-    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8082/api';
 
     const verifyCode = async (codeToVerify: string) => {
         if (!codeToVerify.trim()) return;
@@ -54,7 +54,7 @@ const VerifyInvoice: React.FC = () => {
                     </div>
                     <div className="relative z-10">
                         <h1 className="text-2xl font-bold text-white mb-2">Verifikasi Dokumen</h1>
-                        <p className="text-slate-400 text-sm">Cek keaslian dokumen & kuitansi SDIT Al-Muhajirin</p>
+                        <p className="text-slate-400 text-sm">Cek keaslian dokumen & kuitansi SDIT AN-NUR</p>
                     </div>
                 </div>
 
@@ -66,7 +66,7 @@ const VerifyInvoice: React.FC = () => {
                                 type="text"
                                 value={codeInput}
                                 onChange={(e) => setCodeInput(e.target.value)}
-                                placeholder="Contoh: SIG-1234abcd..."
+                                placeholder="Contoh: ABCD-EFGH-IJKL atau SIG-..."
                                 className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 font-mono text-sm uppercase tracking-wider"
                                 required
                             />
@@ -94,7 +94,7 @@ const VerifyInvoice: React.FC = () => {
                                     </div>
                                     <h3 className="text-lg font-bold text-emerald-900 mb-1">Dokumen Valid</h3>
                                     <p className="text-emerald-700 text-sm mb-4">Dokumen ini otentik dan ditandatangani secara digital oleh pihak berwenang SDIT.</p>
-                                    
+
                                     <div className="bg-white rounded-xl p-4 text-left border border-emerald-50 shadow-sm space-y-3">
                                         <div>
                                             <p className="text-xs text-slate-400 font-bold uppercase">Modul</p>
@@ -128,16 +128,16 @@ const VerifyInvoice: React.FC = () => {
                         </div>
                     )}
                 </div>
-                
+
                 <div className="bg-slate-50 p-4 text-center border-t border-slate-100">
                     <p className="text-xs text-slate-500">
                         Sistem verifikasi menggunakan <span className="font-semibold text-slate-700">HMAC-SHA256</span>.
                     </p>
                 </div>
             </div>
-            
+
             <div className="mt-8 text-center text-slate-500 text-sm max-w-sm">
-                Bila Anda menemukan dokumen yang dicurigai palsu, harap segera hubungi Tata Usaha SDIT Al-Muhajirin.
+                Bila Anda menemukan dokumen yang dicurigai palsu, harap segera hubungi Tata Usaha SDIT AN-NUR.
             </div>
         </div>
     );

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { exportToCSV } from '../../utils/exportUtils';
 import { generatePayrollReceipt } from '../../utils/pdfUtils';
 import { toast } from 'react-hot-toast';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 interface UserData {
     id: string;
@@ -264,6 +265,10 @@ const Payroll = () => {
     const [editingPayroll, setEditingPayroll] = useState<PayrollRecord | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
+    // Print Options
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [payrollToPrint, setPayrollToPrint] = useState<PayrollRecord | null>(null);
+
     const initialFormState = {
         user_id: '', employee_name: '', employee_nik: '', position: '',
         base_salary: 0, functional_allowance: 0, transport_allowance: 0, additional_task: 0,
@@ -441,6 +446,17 @@ const Payroll = () => {
         }
     };
 
+    const handlePrintClick = (p: PayrollRecord) => {
+        setPayrollToPrint(p);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[]) => {
+        if (payrollToPrint) {
+            await generatePayrollReceipt(payrollToPrint, selectedRoles);
+        }
+    };
+
     const handleSaveTemplate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!templateUser) return toast.error("Pilih pengguna terlebih dahulu");
@@ -606,7 +622,7 @@ const Payroll = () => {
                         onEdit={openEditModal}
                         onDelete={handleDelete}
                         onPay={handlePay}
-                        onPrint={(p: PayrollRecord) => generatePayrollReceipt(p)}
+                        onPrint={handlePrintClick}
                     />
 
                     {/* Mobile View Cards */}
@@ -624,7 +640,7 @@ const Payroll = () => {
                                     onEdit={openEditModal}
                                     onDelete={handleDelete}
                                     onPay={handlePay}
-                                    onPrint={(p: PayrollRecord) => generatePayrollReceipt(p)}
+                                    onPrint={handlePrintClick}
                                 />
                             ))
                         )}
@@ -982,6 +998,13 @@ const Payroll = () => {
                     </div>
                 </div>
             )}
+
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Slip Gaji Pegawai"
+            />
         </div>
     );
 };

@@ -7,6 +7,7 @@ import { exportToCSV } from '../../utils/exportUtils';
 import { generateCashLedgerReport } from '../../utils/pdfUtils';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 interface StaffUser {
     id: string;
@@ -97,6 +98,10 @@ const DailyInfaq = () => {
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
     const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+    // Print Options
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [printParams, setPrintParams] = useState<any>(null);
 
     useEffect(() => {
         fetchInfaq();
@@ -264,6 +269,24 @@ const DailyInfaq = () => {
             exportToCSV(filtered, `Infaq_Harian_${exportStartDate || 'all'}_${exportEndDate || 'all'}`);
         }
         setShowExportModal(false);
+    };
+
+    const handlePrintReceipt = (params: any) => {
+        setPrintParams(params);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[]) => {
+        if (printParams) {
+            try {
+                const mod = await import('../../utils/pdfUtils');
+                await mod.generateInfaqReceipt(printParams, selectedRoles);
+                toast.success('Kuitansi berhasil diunduh');
+            } catch (error) {
+                console.error(error);
+                toast.error('Gagal membuat kuitansi');
+            }
+        }
     };
 
     // Filter and search logic
@@ -532,16 +555,14 @@ const DailyInfaq = () => {
                                                     <div className="flex items-center justify-center space-x-2">
                                                         <button
                                                             onClick={() => {
-                                                                import('../../utils/pdfUtils').then(mod => {
-                                                                    mod.generateInfaqReceipt({
-                                                                        id: entry.id,
-                                                                        date: entry.date,
-                                                                        class_name: entry.class_name || 'Umum',
-                                                                        student_count: 0,
-                                                                        amount: entry.amount,
-                                                                        notes: entry.notes || '',
-                                                                        handled_by_name: entry.handled_by?.name || '-'
-                                                                    });
+                                                                handlePrintReceipt({
+                                                                    id: entry.id,
+                                                                    date: entry.date,
+                                                                    class_name: entry.class_name || 'Umum',
+                                                                    student_count: 0,
+                                                                    amount: entry.amount,
+                                                                    notes: entry.notes || '',
+                                                                    handled_by_name: entry.handled_by?.name || '-'
                                                                 });
                                                             }}
                                                             className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
@@ -791,8 +812,15 @@ const DailyInfaq = () => {
                                 </div>
                             </form>
                         </div>
-                    </div>
-                )}
+                </div>
+            )}
+
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Kuitansi Penerimaan Infaq"
+            />
 
                 {/* Export Modal */}
                 {showExportModal && (

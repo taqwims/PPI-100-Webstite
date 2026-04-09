@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import api from '../services/api';
 import {
     drawStandardHeader, drawStandardHeaderA5,
     drawSignatureBlock, drawSignatureBlockCompact,
@@ -15,21 +16,51 @@ interface PayrollData {
     employee_nik: string;
     position: string;
     user?: { name: string; email: string };
-    
+
     base_salary: number;
     functional_allowance: number;
     transport_allowance: number;
     additional_task: number;
     total_income: number;
-    
+
     lateness_penalty: number;
     infaq_deduction: number;
     cash_advance: number;
     total_deduction: number;
-    
     net_salary: number;
     status: string;
     paid_at?: string;
+}
+
+// ─── Helper: Fetch signatures from backend ───
+export async function fetchInvoiceSignatures(
+    invoiceType: string,
+    referenceId: string,
+    amount: number,
+    dateStr: string
+): Promise<{ signatures: any[]; verificationCode: string; invoiceNumber: string }> {
+    try {
+        const response = await api.post('/finance/invoice/sign', {
+            invoice_type: invoiceType,
+            reference_id: referenceId,
+            amount: amount,
+            date_str: dateStr
+        });
+        const data = response.data;
+        return {
+            signatures: data.signatures,
+            verificationCode: data.verification_code || data.code,
+            invoiceNumber: data.invoice_number
+        };
+    } catch (error) {
+        console.error('Failed to fetch backend signatures, falling back to local', error);
+        // Fallback to local generation if backend fails
+        const local = await generateLocalSignatures(invoiceType, referenceId, amount, dateStr);
+        return {
+            ...local,
+            invoiceNumber: `${invoiceType.substring(0, 3).toUpperCase()}-${referenceId.substring(0, 8)}`
+        };
+    }
 }
 
 const getMonthName = (monthNumber: number) => {
@@ -80,22 +111,25 @@ const formatDate = (dateStr: string) => {
 
 // ===================== PAYROLL RECEIPT =====================
 
-export const generatePayrollReceipt = async (payroll: PayrollData) => {
-    const doc = new jsPDF();
+export const generatePayrollReceipt = async (payroll: PayrollData, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const name = payroll.employee_name || payroll.user?.name || '-';
-    const dateStr = payroll.paid_at || new Date().toISOString();
+    const invoiceType = 'Payroll';
+    const dateStr = payroll.paid_at ? payroll.paid_at.substring(0, 10) : new Date().toISOString().substring(0, 10);
 
-    // Generate signatures
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'Payroll', payroll.id, payroll.net_salary, dateStr.split('T')[0]
+    // Fetch backend signatures & verification code
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        payroll.id,
+        payroll.net_salary,
+        dateStr
     );
 
-    // Standardized Header
     const bodyStart = drawStandardHeader(doc, {
-        title: 'SLIP GAJI',
+        title: 'SLIP GAJI KARYAWAN',
         subtitle: `Periode: ${getMonthName(payroll.period_month)} ${payroll.period_year}`,
-        invoiceNumber: `SG-${payroll.id.slice(0, 8).toUpperCase()}`,
+        invoiceNumber: invoiceNumber,
         headerColor: [15, 23, 42],
     });
 
@@ -132,7 +166,7 @@ export const generatePayrollReceipt = async (payroll: PayrollData) => {
     doc.setFont('helvetica', 'bold');
     doc.text('Pendapatan', labelX, detailY);
     doc.setFont('helvetica', 'normal');
-    
+
     const incomeItems = [
         { label: 'Gaji Pokok', value: payroll.base_salary },
         { label: 'Tunjangan Fungsional', value: payroll.functional_allowance },
@@ -196,7 +230,7 @@ export const generatePayrollReceipt = async (payroll: PayrollData) => {
     doc.text(statusText, labelX + 15, detailY + 6.5, { align: 'center' });
 
     // Signature block & verification
-    const sigY = drawSignatureBlock(doc, detailY + 18, signatures);
+    const sigY = await drawSignatureBlock(doc, detailY + 18, signatures, selectedRoles);
     await drawVerificationFooter(doc, sigY, verificationCode);
 
     const fileNameName = name.replace(/\s+/g, '_');
@@ -205,19 +239,24 @@ export const generatePayrollReceipt = async (payroll: PayrollData) => {
 
 // ===================== CASH LEDGER RECEIPT =====================
 
-export const generateCashLedgerReceipt = async (entry: CashLedgerData) => {
-    const doc = new jsPDF({ format: [148, 210] }); // A5
+export const generateCashLedgerReceipt = async (entry: CashLedgerData, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
-    const headerColor: [number, number, number] = entry.type === 'Income' ? [16, 185, 129] : [59, 130, 246];
+    const invoiceType = 'CashLedger';
+    const dateStr = entry.date.split('T')[0];
 
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'CashLedger', entry.id, entry.amount, entry.date.split('T')[0]
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        entry.id,
+        entry.amount,
+        dateStr
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
-        title: 'BUKTI TRANSAKSI KAS',
-        invoiceNumber: `BK-${entry.id.slice(0, 8).toUpperCase()}`,
-        headerColor,
+        title: entry.type === 'Income' ? 'KUITANSI PENERIMAAN' : 'BUKTI PENGELUARAN KAS',
+        invoiceNumber: invoiceNumber,
+        headerColor: entry.type === 'Income' ? [5, 150, 105] : [220, 38, 38],
     });
 
     const labelX = 12;
@@ -248,10 +287,10 @@ export const generateCashLedgerReceipt = async (entry: CashLedgerData) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.text('NOMINAL', labelX, amountY + 8);
-    doc.setTextColor(...headerColor);
+    doc.setTextColor(entry.type === 'Income' ? 5 : 220, entry.type === 'Income' ? 150 : 38, entry.type === 'Income' ? 105 : 38);
     doc.text(formatCurrency(entry.amount), pageWidth - 12, amountY + 8, { align: 'right' });
 
-    const sigY = drawSignatureBlockCompact(doc, amountY + 16, signatures);
+    const sigY = await drawSignatureBlockCompact(doc, amountY + 16, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Bukti_Kas_${entry.item_name.replace(/\s+/g, '_')}_${new Date(entry.date).toISOString().split('T')[0]}.pdf`);
@@ -275,7 +314,7 @@ export const generateFinancialReportPDF = (
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AL-MUHAJIRIN', pageWidth / 2, 8, { align: 'center' });
+    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(14);
     doc.text(reportTitle.toUpperCase(), pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(8);
@@ -373,7 +412,7 @@ export const generateCashLedgerReport = (
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AL-MUHAJIRIN', pageWidth / 2, 8, { align: 'center' });
+    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(14);
     doc.text('LAPORAN BUKU KAS UMUM', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(8);
@@ -421,98 +460,73 @@ export const generateCashLedgerReport = (
 
 // ===================== SAVINGS REPORT =====================
 
-interface SavingsAccountData {
-    id: string;
-    balance: number;
-    student?: { user?: { name: string }; class?: { name: string }; nisn?: string };
-}
+export const generateSavingsReport = async (studentName: string, className: string, transactions: any[], totalBalance: number) => {
+    try {
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const invoiceType = 'Savings';
+        const dateStr = new Date().toISOString().split('T')[0];
 
-interface SavingsTransactionData {
-    id: string;
-    type: string;
-    amount: number;
-    date: string;
-    handled_by?: { name: string };
-    notes?: string;
-}
+        // Clean student name for reference ID
+        const safeName = (studentName || 'Siswa').replace(/[^a-zA-Z0-9]/g, '').substring(0, 5);
+        const referenceId = `SAV-${safeName}-${Date.now()}`;
 
-export const generateSavingsReport = (
-    account: SavingsAccountData,
-    transactions: SavingsTransactionData[]
-) => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const studentName = account.student?.user?.name || 'Siswa';
-    const className = account.student?.class?.name || '-';
+        console.log(`Generating Savings Report for ${studentName}, Ref: ${referenceId}`);
 
-    // Standardized Header
-    const headerH = drawStandardHeader(doc, {
-        title: 'LAPORAN TABUNGAN SISWA',
-        invoiceNumber: `TB-${account.id.slice(0, 8).toUpperCase()}`,
-        headerColor: [16, 185, 129], // emerald
-    });
+        // Fetch backend signatures & verification code
+        const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+            invoiceType,
+            referenceId,
+            totalBalance,
+            dateStr
+        );
 
-    // Student Info
-    doc.setTextColor(30, 41, 59);
-    const startY = headerH + 8;
-    const labelX = 14;
-    const valueX = 55;
+        const bodyStart = drawStandardHeader(doc, {
+            title: 'LAPORAN TABUNGAN SISWA',
+            subtitle: `${studentName} - ${className}`,
+            invoiceNumber: invoiceNumber,
+        });
 
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Informasi Siswa', labelX, startY);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('Nama', labelX, startY + 10);
-    doc.text(`: ${studentName}`, valueX, startY + 10);
-    doc.text('Kelas', labelX, startY + 17);
-    doc.text(`: ${className}`, valueX, startY + 17);
-    if (account.student?.nisn) {
-        doc.text('NISN', labelX, startY + 24);
-        doc.text(`: ${account.student.nisn}`, valueX, startY + 24);
+        // Transaction Table
+        autoTable(doc, {
+            startY: bodyStart + 10,
+            head: [['No', 'Tanggal', 'Jenis', 'Nominal', 'Petugas', 'Catatan']],
+            body: transactions.map((t, i) => {
+                const isDeposit = t.type === 'Deposit' || t.type === 'deposit';
+                return [
+                    i + 1,
+                    formatDate(t.date),
+                    isDeposit ? 'Setoran' : 'Penarikan',
+                    `${isDeposit ? '+' : '-'} ${formatCurrency(t.amount)}`,
+                    t.handled_by?.name || '-',
+                    t.notes || '-'
+                ];
+            }),
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [240, 253, 244] },
+        });
+
+        // Summary box
+        const summaryY = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFillColor(248, 250, 252);
+        doc.rect(14, summaryY, pageWidth - 28, 20, 'F');
+        doc.setTextColor(30, 41, 59);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('SALDO AKHIR', 20, summaryY + 12);
+        doc.text(formatCurrency(totalBalance), pageWidth - 20, summaryY + 12, { align: 'right' });
+
+        // Signature & Verification
+        const sigY = await drawSignatureBlock(doc, summaryY + 30, signatures);
+        await drawVerificationFooter(doc, sigY, verificationCode);
+
+        addPageFooters(doc);
+        doc.save(`Tabungan_${studentName.replace(/\s+/g, '_')}.pdf`);
+    } catch (error) {
+        console.error('Failed to generate savings report:', error);
+        throw error;
     }
-
-    // Balance summary
-    const totalDeposit = transactions.filter(t => t.type === 'Deposit' || t.type === 'deposit').reduce((s, t) => s + t.amount, 0);
-    const totalWithdrawal = transactions.filter(t => t.type === 'Withdrawal' || t.type === 'withdrawal').reduce((s, t) => s + t.amount, 0);
-
-    doc.setDrawColor(203, 213, 225);
-    const summaryY = account.student?.nisn ? startY + 32 : startY + 28;
-    doc.line(labelX, summaryY, pageWidth - 14, summaryY);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text(`Saldo: ${formatCurrency(account.balance)}`, labelX, summaryY + 8);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(16, 185, 129);
-    doc.text(`Total Setoran: ${formatCurrency(totalDeposit)}`, 90, summaryY + 8);
-    doc.setTextColor(239, 68, 68);
-    doc.text(`Total Penarikan: ${formatCurrency(totalWithdrawal)}`, 155, summaryY + 8);
-
-    // Transaction Table
-    autoTable(doc, {
-        startY: summaryY + 15,
-        head: [['No', 'Tanggal', 'Jenis', 'Nominal', 'Petugas', 'Catatan']],
-        body: transactions.map((t, i) => {
-            const isDeposit = t.type === 'Deposit' || t.type === 'deposit';
-            return [
-                i + 1,
-                formatDate(t.date),
-                isDeposit ? 'Setoran' : 'Penarikan',
-                `${isDeposit ? '+' : '-'} ${formatCurrency(t.amount)}`,
-                t.handled_by?.name || '-',
-                t.notes || '-'
-            ];
-        }),
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [240, 253, 244] },
-    });
-
-    addPageFooters(doc);
-
-    doc.save(`Tabungan_${studentName.replace(/\s+/g, '_')}.pdf`);
 };
 
 // ===================== BILL PAYMENT RECEIPT =====================
@@ -531,19 +545,25 @@ interface BillReceiptData {
     paid_at?: string;
 }
 
-export const generateBillReceipt = async (bill: BillReceiptData, studentName?: string) => {
-    const doc = new jsPDF({ format: [148, 210] }); // A5 format
+export const generateBillReceipt = async (bill: BillReceiptData, studentName?: string, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
     const name = studentName || bill.student?.user?.name || '-';
+    const invoiceType = 'Bill';
     const paidDate = bill.paid_at || new Date().toISOString();
+    const dateStr = paidDate.split('T')[0];
 
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'Bill', bill.id, bill.amount, paidDate.split('T')[0]
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        bill.id,
+        bill.amount,
+        dateStr
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
         title: 'KUITANSI PEMBAYARAN',
-        invoiceNumber: `KP-${bill.id.slice(0, 8).toUpperCase()}`,
+        invoiceNumber: invoiceNumber,
         headerColor: [16, 185, 129],
     });
 
@@ -597,7 +617,7 @@ export const generateBillReceipt = async (bill: BillReceiptData, studentName?: s
     doc.setFont('helvetica', 'bold');
     doc.text('✓ LUNAS', pageWidth / 2, y + 100, { align: 'center' });
 
-    const sigY = drawSignatureBlockCompact(doc, y + 108, signatures);
+    const sigY = await drawSignatureBlockCompact(doc, y + 108, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Kuitansi_${bill.title.replace(/\s+/g, '_')}_${name.replace(/\s+/g, '_')}.pdf`);
@@ -623,7 +643,7 @@ export const generateActivityReportPDF = (options: ActivityReportOptions) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AL-MUHAJIRIN', pageWidth / 2, 8, { align: 'center' });
+    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(16);
     doc.text('LAPORAN PERTANGGUNGJAWABAN', pageWidth / 2, 18, { align: 'center' });
     doc.text('KEGIATAN SISWA (LPJ)', pageWidth / 2, 25, { align: 'center' });
@@ -638,7 +658,7 @@ export const generateActivityReportPDF = (options: ActivityReportOptions) => {
     doc.setFont('helvetica', 'bold');
     doc.text('Ringkasan Keuangan', 14, 52);
     doc.setFont('helvetica', 'normal');
-    
+
     const totalTargetAmt = obligationsCount * activity.target_amount;
 
     autoTable(doc, {
@@ -696,19 +716,23 @@ interface ActivityObligationReceiptData {
     paidAt?: string;
 }
 
-export const generateActivityObligationReceipt = async (data: ActivityObligationReceiptData) => {
-    const doc = new jsPDF({ format: [148, 210] }); // A5
+export const generateActivityObligationReceipt = async (data: ActivityObligationReceiptData, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
-    const paidDate = data.paidAt || new Date().toISOString();
+    const invoiceType = 'Activity';
+    const dateStr = new Date().toISOString().split('T')[0];
 
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'Activity', data.id, data.amount, paidDate.split('T')[0]
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        data.id,
+        data.amount,
+        dateStr
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
-        title: 'KWITANSI PEMBAYARAN',
-        invoiceNumber: `KW-${data.id.slice(0, 8).toUpperCase()}`,
-        headerColor: [59, 130, 246], // blue-500
+        title: 'KUITANSI PEMBAYARAN KEGIATAN',
+        invoiceNumber: invoiceNumber,
     });
 
     const labelX = 12;
@@ -742,7 +766,7 @@ export const generateActivityObligationReceipt = async (data: ActivityObligation
 
     const dateLabel = data.activityName ? y + 46 : y + 39;
     doc.text('Tanggal Bayar', labelX, dateLabel);
-    doc.text(`: ${formatDate(paidDate)}`, valueX, dateLabel);
+    doc.text(`: ${formatDate(data.paidAt || dateStr)}`, valueX, dateLabel);
 
     // Amount box
     const boxY = dateLabel + 10;
@@ -761,7 +785,7 @@ export const generateActivityObligationReceipt = async (data: ActivityObligation
     doc.setFont('helvetica', 'bold');
     doc.text('✓ LUNAS', pageWidth / 2, boxY + 34, { align: 'center' });
 
-    const sigY = drawSignatureBlockCompact(doc, boxY + 44, signatures);
+    const sigY = await drawSignatureBlockCompact(doc, boxY + 44, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Kwitansi_${data.studentName.replace(/\s+/g, '_')}_${data.id.slice(0, 8)}.pdf`);
@@ -930,18 +954,24 @@ interface InfaqData {
     handled_by_name: string;
 }
 
-export const generateInfaqReceipt = async (entry: InfaqData) => {
-    const doc = new jsPDF({ format: [148, 210] }); // A5
+export const generateInfaqReceipt = async (entry: InfaqData, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
+    const invoiceType = 'Infaq';
+    const dateStr = entry.date.split('T')[0];
 
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'Infaq', entry.id, entry.amount, entry.date.split('T')[0]
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        entry.id,
+        entry.amount,
+        dateStr
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
-        title: 'BUKTI PENERIMAAN INFAQ',
-        invoiceNumber: `INF-${entry.id.slice(0, 8).toUpperCase()}`,
-        headerColor: [16, 185, 129], // emerald
+        title: 'KUITANSI PENERIMAAN INFAQ',
+        invoiceNumber: invoiceNumber,
+        headerColor: [5, 150, 105],
     });
 
     const lX = 12;
@@ -973,7 +1003,7 @@ export const generateInfaqReceipt = async (entry: InfaqData) => {
     doc.setTextColor(16, 185, 129);
     doc.text(formatCurrency(entry.amount), pageWidth - 12, amountY + 8, { align: 'right' });
 
-    const sigY = drawSignatureBlockCompact(doc, amountY + 16, signatures);
+    const sigY = await drawSignatureBlockCompact(doc, amountY + 16, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Bukti_Infaq_${entry.class_name.replace(/\s+/g, '_')}_${new Date(entry.date).toISOString().split('T')[0]}.pdf`);
@@ -993,20 +1023,24 @@ interface ObligationReceiptData {
     totalInstallments?: number;
 }
 
-export const generateObligationReceipt = async (data: ObligationReceiptData) => {
-    const doc = new jsPDF({ format: [148, 210] }); // A5
+export const generateObligationReceipt = async (data: ObligationReceiptData, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
     const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const invoiceType = 'Obligation';
+    const dateStr = new Date().toISOString().split('T')[0];
 
-    const todayDate = new Date().toISOString();
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'Obligation', data.id, data.paidAmount, todayDate.split('T')[0]
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        data.id,
+        data.paidAmount,
+        dateStr
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
         title: 'KUITANSI PEMBAYARAN',
-        invoiceNumber: `OB-${data.id.slice(0, 8).toUpperCase()}`,
-        headerColor: [37, 99, 235], // blue-600
+        invoiceNumber: invoiceNumber,
     });
 
     const lX = 12;
@@ -1021,7 +1055,7 @@ export const generateObligationReceipt = async (data: ObligationReceiptData) => 
     doc.text(`: ${data.className}`, vX, sY + 7);
     doc.text('Jenis Bayar', lX, sY + 14);
     doc.text(`: ${data.paymentTypeName}`, vX, sY + 14);
-    
+
     let currentY = sY + 21;
     if (data.billingMonth && data.billingMonth > 0) {
         doc.text('Bulan', lX, currentY);
@@ -1034,7 +1068,7 @@ export const generateObligationReceipt = async (data: ObligationReceiptData) => 
         currentY += 7;
     }
     doc.text('Tanggal', lX, currentY);
-    doc.text(`: ${formatDate(todayDate)}`, vX, currentY);
+    doc.text(`: ${formatDate(dateStr)}`, vX, currentY);
     currentY += 7;
 
     // Amount
@@ -1054,7 +1088,7 @@ export const generateObligationReceipt = async (data: ObligationReceiptData) => 
     doc.setFontSize(12);
     doc.text(isLunas ? '✓ LUNAS' : '◐ CICILAN', pageWidth / 2, currentY + 5, { align: 'center' });
 
-    const sigY = drawSignatureBlockCompact(doc, currentY + 10, signatures);
+    const sigY = await drawSignatureBlockCompact(doc, currentY + 10, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Kuitansi_${data.studentName.replace(/\s+/g, '_')}_${data.paymentTypeName.replace(/\s+/g, '_')}.pdf`);
@@ -1081,7 +1115,7 @@ export const generateActivityBillPDF = (items: ActivityBillItem[], activityName:
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AL-MUHAJIRIN', pageWidth / 2, 8, { align: 'center' });
+    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(16);
     doc.text('SURAT TAGIHAN KEGIATAN', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(9);
@@ -1248,7 +1282,7 @@ export const generateRKASReportPDF = (
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AL-MUHAJIRIN', pageWidth / 2, 8, { align: 'center' });
+    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(14);
     doc.text('RENCANA ANGGARAN KAS SEKOLAH (RKAS)', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(8);
@@ -1314,31 +1348,24 @@ export const generateRKASReportPDF = (
 
 // ===================== EXTERNAL DEBT PAYMENT RECEIPT =====================
 
-interface ExternalDebtPaymentData {
-    id: string;
-    debt: {
-        creditor_name: string;
-        description: string;
-    };
-    amount: number;
-    fund_source: string;
-    notes: string;
-    created_at: string;
-    paid_by?: { name: string };
-}
-
-export const generateExternalDebtPaymentReceipt = async (payment: ExternalDebtPaymentData) => {
-    const doc = new jsPDF({ format: [148, 210] }); // A5
+export const generateDebtReceipt = async (payment: any, debt: any, selectedRoles?: string[]) => {
+    const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
+    const invoiceType = 'Debt';
+    const dateStr = payment.payment_date.split('T')[0];
 
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'DebtPayment', payment.id, payment.amount, payment.created_at.split('T')[0]
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        payment.id,
+        payment.amount,
+        dateStr
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
         title: 'BUKTI PEMBAYARAN HUTANG',
-        invoiceNumber: `PH-${payment.id.slice(0, 8).toUpperCase()}`,
-        headerColor: [245, 158, 11], // amber-500
+        invoiceNumber: invoiceNumber,
+        headerColor: [220, 38, 38],
     });
 
     const lX = 12;
@@ -1350,9 +1377,9 @@ export const generateExternalDebtPaymentReceipt = async (payment: ExternalDebtPa
     doc.text('Tanggal', lX, sY);
     doc.text(`: ${formatDate(payment.created_at)}`, vX, sY);
     doc.text('Kreditur/Vendor', lX, sY + 7);
-    doc.text(`: ${payment.debt.creditor_name}`, vX, sY + 7);
+    doc.text(`: ${debt.creditor_name}`, vX, sY + 7);
     doc.text('Keterangan', lX, sY + 14);
-    doc.text(`: ${payment.debt.description}`, vX, sY + 14);
+    doc.text(`: ${debt.description}`, vX, sY + 14);
     doc.text('Sumber Dana', lX, sY + 21);
     doc.text(`: ${payment.fund_source}`, vX, sY + 21);
     doc.text('Dibayar Oleh', lX, sY + 28);
@@ -1369,11 +1396,11 @@ export const generateExternalDebtPaymentReceipt = async (payment: ExternalDebtPa
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.text('NOMINAL DIBAYAR', lX, amountY + 8);
-    doc.setTextColor(245, 158, 11);
+    doc.setTextColor(220, 38, 38);
     doc.text(formatCurrency(payment.amount), pageWidth - 12, amountY + 8, { align: 'right' });
 
-    const sigY = drawSignatureBlockCompact(doc, amountY + 16, signatures);
+    const sigY = await drawSignatureBlockCompact(doc, amountY + 16, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
-    doc.save(`Bukti_Bayar_Hutang_${payment.debt.creditor_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Bukti_Bayar_Hutang_${debt.creditor_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };

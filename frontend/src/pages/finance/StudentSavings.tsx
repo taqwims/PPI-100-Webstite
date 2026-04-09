@@ -51,9 +51,14 @@ const StudentSavings: React.FC = () => {
         fetchSavings();
     }, []);
 
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
         if (!account) return;
-        generateSavingsReport(account, transactions);
+        await generateSavingsReport(
+            account.student?.user?.name || 'Siswa',
+            '-', // Student view doesn't always have class in the same structure
+            transactions,
+            account.balance
+        );
     };
 
     const totalDeposit = transactions.filter(t => t.type === 'Deposit' || t.type === 'deposit').reduce((s, t) => s + t.amount, 0);

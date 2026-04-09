@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { generateActivityReportPDF, generateActivityBillPDF, generateSingleActivityBillPDF } from '../../utils/pdfUtils';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 const formatDate = (d: string) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(d));
@@ -36,6 +37,10 @@ const ActivityDetail = () => {
     // Expense Modal
     const [expenseModal, setExpenseModal] = useState(false);
     const [expenseForm, setExpenseForm] = useState({ description: '', amount: '', receipt_image: '' });
+
+    // Print Options
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [printParams, setPrintParams] = useState<any>(null);
 
     // Fetch Data
     const { data: activity } = useQuery({
@@ -137,6 +142,24 @@ const ActivityDetail = () => {
             summary,
             transactions
         });
+    };
+
+    const handlePrintReceipt = (params: any) => {
+        setPrintParams(params);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[]) => {
+        if (printParams) {
+            try {
+                const mod = await import('../../utils/pdfUtils');
+                await mod.generateActivityObligationReceipt(printParams, selectedRoles);
+                toast.success('Kwitansi berhasil diunduh');
+            } catch (error) {
+                console.error(error);
+                toast.error('Gagal membuat kwitansi');
+            }
+        }
     };
 
     if (!activity) return <div className="p-12 text-center text-slate-500">Memuat data kegiatan...</div>;
@@ -272,15 +295,13 @@ const ActivityDetail = () => {
                                                     )}
                                                     {ob.status === 'Paid' && (
                                                         <button onClick={() => {
-                                                            import('../../utils/pdfUtils').then(mod => {
-                                                                mod.generateActivityObligationReceipt({
-                                                                    id: ob.id,
-                                                                    studentName: ob.student?.user?.name || '-',
-                                                                    className: ob.student?.class?.name || '-',
-                                                                    activityName: activity.name,
-                                                                    amount: ob.paid_amount,
-                                                                    paidAt: ob.updated_at
-                                                                });
+                                                            handlePrintReceipt({
+                                                                id: ob.id,
+                                                                studentName: ob.student?.user?.name || '-',
+                                                                className: ob.student?.class?.name || '-',
+                                                                activityName: activity.name,
+                                                                amount: ob.paid_amount,
+                                                                paidAt: ob.updated_at
                                                             });
                                                         }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Cetak Kwitansi"><Receipt size={16} /></button>
                                                     )}
@@ -504,6 +525,12 @@ const ActivityDetail = () => {
                     </div>
                 </div>
             )}
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Kwitansi Kegiatan"
+            />
         </div>
     );
 };

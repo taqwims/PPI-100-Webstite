@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Plus, Search, Users, X, CheckCircle, AlertCircle, Trash2, Edit2, User, ChevronDown, ChevronRight, Calendar, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 interface AcademicYear { id: number; name: string; is_active: boolean; start_date: string; end_date: string; }
 interface ClassOption { id: number; name: string; }
@@ -128,6 +129,10 @@ const StudentObligations = () => {
 
     // Expandable rows
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+    // Print Options
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [printParams, setPrintParams] = useState<any>(null);
 
     useEffect(() => {
         fetchAcademicYears();
@@ -300,6 +305,24 @@ const StudentObligations = () => {
             toast.success('Berhasil dihapus');
             fetchData();
         } catch (err: any) { toast.error(err.response?.data?.error || 'Gagal menghapus'); }
+    };
+
+    const handlePrintReceipt = (params: any) => {
+        setPrintParams(params);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[]) => {
+        if (printParams) {
+            try {
+                const mod = await import('../../utils/pdfUtils');
+                await mod.generateObligationReceipt(printParams, selectedRoles);
+                toast.success('Kuitansi berhasil diunduh');
+            } catch (error) {
+                console.error(error);
+                toast.error('Gagal membuat kuitansi');
+            }
+        }
     };
 
     const filtered = obligations.filter(ob => {
@@ -568,7 +591,7 @@ const StudentObligations = () => {
                                                                                                         )}
                                                                                                         {(isPaid || isPartial) && (
                                                                                                             <button
-                                                                                                                onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount, billingMonth: ob.billing_month })); }}
+                                                                                                                onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount, billingMonth: ob.billing_month }); }}
                                                                                                                 className="mt-1 block mx-auto text-[9px] text-blue-600 hover:text-blue-700 font-medium"
                                                                                                             >Cetak</button>
                                                                                                         )}
@@ -603,7 +626,7 @@ const StudentObligations = () => {
                                                                                                 </div>
                                                                                             )}
                                                                                             {(isPaid || isPartial) && (
-                                                                                                <button onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount })); }} className="mt-2 w-full text-xs bg-blue-600 text-white py-1.5 rounded-lg hover:bg-blue-700 font-medium transition">Cetak Kuitansi</button>
+                                                                                                <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount }); }} className="mt-2 w-full text-xs bg-blue-600 text-white py-1.5 rounded-lg hover:bg-blue-700 font-medium transition">Cetak Kuitansi</button>
                                                                                             )}
                                                                                         </div>
                                                                                     );
@@ -635,7 +658,7 @@ const StudentObligations = () => {
                                                                                                     </div>
                                                                                                 )}
                                                                                                 {(isPaid || isPartial) && (
-                                                                                                    <button onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount, installmentNumber: ob.installment_number, totalInstallments: ob.total_installments })); }} className="mt-1 block w-full text-[10px] text-blue-600 hover:text-blue-700 font-medium">Cetak</button>
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount, installmentNumber: ob.installment_number, totalInstallments: ob.total_installments }); }} className="mt-1 block w-full text-[10px] text-blue-600 hover:bg-blue-50 font-medium">Cetak</button>
                                                                                                 )}
                                                                                             </div>
                                                                                         );
@@ -657,7 +680,7 @@ const StudentObligations = () => {
                                                                                         </div>
                                                                                         <div className="flex items-center gap-1">
                                                                                             {(ob.status === 'Paid' || ob.status === 'Partial') && (
-                                                                                                <button onClick={(e) => { e.stopPropagation(); import('../../utils/pdfUtils').then(m => m.generateObligationReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount })); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Cetak Kuitansi">
+                                                                                                <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount }); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Cetak Kuitansi">
                                                                                                     <FileText size={16} />
                                                                                                 </button>
                                                                                             )}
@@ -918,6 +941,12 @@ const StudentObligations = () => {
                     </div>
                 </div>
             )}
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Kuitansi Pembayaran"
+            />
         </div>
     );
 };
