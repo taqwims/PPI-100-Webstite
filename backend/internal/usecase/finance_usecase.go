@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -84,11 +85,54 @@ func (u *FinanceUsecase) CreateBill(studentID uuid.UUID, title string, amount fl
 					"bill",
 					bill.ID.String(),
 				)
+
+				// WhatsApp Auto Notification
+				u.triggerAutoWA(student, parent, bill)
 			}
 		}
 	}
 
 	return nil
+}
+
+func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill) {
+	if parent.Phone == "" {
+		return
+	}
+
+	// Get Config for the bill type
+	cfg, err := u.financeRepo.GetInvoiceConfigByType(bill.BillType)
+	if err != nil || cfg == nil || !cfg.AutoNotifyWA {
+		return
+	}
+
+	// Get Template
+	var template *domain.WATemplate
+	if cfg.WATemplateID != nil {
+		template, _ = u.notificationUsecase.GetWATemplateByID(*cfg.WATemplateID)
+	}
+	if template == nil {
+		template, _ = u.notificationUsecase.GetDefaultWATemplate()
+	}
+
+	if template == nil {
+		return // No template found
+	}
+
+	// Format message
+	msg := u.processWATemplate(template.BodyTemplate, student, bill)
+	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
+}
+
+func (u *FinanceUsecase) processWATemplate(body string, student *domain.Student, bill *domain.Bill) string {
+	res := body
+	res = strings.ReplaceAll(res, "{nama_siswa}", student.User.Name)
+	res = strings.ReplaceAll(res, "{nis}", student.NISN)
+	res = strings.ReplaceAll(res, "{kelas}", student.Class.Name)
+	res = strings.ReplaceAll(res, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
+	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
+	res = strings.ReplaceAll(res, "{tanggal}", time.Now().Format("02 January 2006"))
+	return res
 }
 
 // helper: get parent record by parent.ID

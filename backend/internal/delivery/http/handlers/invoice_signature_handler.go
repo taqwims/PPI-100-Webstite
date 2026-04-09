@@ -77,8 +77,15 @@ func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
 		var updated []domain.InvoiceSignature
 		h.db.Where("invoice_type = ? AND reference_id = ?", req.InvoiceType, req.ReferenceID).Find(&updated)
 		
+		// Get invoice number from first record
+		invNum := ""
+		if len(updated) > 0 {
+			invNum = updated[0].InvoiceNumber
+		}
+		
 		c.JSON(http.StatusOK, gin.H{
 			"verification_code": verificationCode,
+			"invoice_number":    invNum,
 			"signatures":        updated,
 		})
 		return
@@ -111,6 +118,7 @@ func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
 			SignatureHash:    sig.Signature,
 			ShortCode:        sig.ShortCode,
 			VerificationCode: verificationCode,
+			InvoiceNumber:    invoiceNumber,
 			Amount:           req.Amount,
 			DocumentDate:     req.DateStr,
 			SignedAt:         now,
@@ -374,6 +382,8 @@ func (h *InvoiceSignatureHandler) UpdateInvoiceConfig(c *gin.Context) {
 		CounterLength      *int   `json:"counter_length"`
 		CounterResetPeriod string `json:"counter_reset_period"`
 		DisplayLabel       string `json:"display_label"`
+		AutoNotifyWA       *bool  `json:"auto_notify_wa"`
+		WATemplateID       *uint  `json:"wa_template_id"`
 		IsActive           *bool  `json:"is_active"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -401,6 +411,16 @@ func (h *InvoiceSignatureHandler) UpdateInvoiceConfig(c *gin.Context) {
 	}
 	if input.DisplayLabel != "" {
 		config.DisplayLabel = input.DisplayLabel
+	}
+	if input.AutoNotifyWA != nil {
+		config.AutoNotifyWA = *input.AutoNotifyWA
+	}
+	if input.WATemplateID != nil {
+		if *input.WATemplateID == 0 {
+			config.WATemplateID = nil
+		} else {
+			config.WATemplateID = input.WATemplateID
+		}
 	}
 	if input.IsActive != nil {
 		config.IsActive = *input.IsActive

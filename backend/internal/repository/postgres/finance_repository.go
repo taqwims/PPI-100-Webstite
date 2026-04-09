@@ -159,3 +159,11 @@ func (r *FinanceRepository) GetBillByActivityObligationID(activityObligationID s
 	return &bill, nil
 }
 
+func (r *FinanceRepository) GetInvoiceConfigByType(invType string) (*domain.InvoiceNumberConfig, error) {
+	var cfg domain.InvoiceNumberConfig
+	err := r.db.Where("invoice_type = ?", invType).First(&cfg).Error
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}

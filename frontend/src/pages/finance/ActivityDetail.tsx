@@ -229,20 +229,25 @@ const ActivityDetail = () => {
                         </div>
                         {canManage && (
                             <div className="flex items-center gap-2 flex-wrap">
-                                <button onClick={() => {
-                                    const billItems = filteredObs.filter(ob => ob.status !== 'Paid').map(ob => ({
-                                        studentName: ob.student?.user?.name || '-',
-                                        className: ob.student?.class?.name || '-',
-                                        activityName: activity.name,
-                                        amount: ob.amount,
-                                        paidAmount: ob.paid_amount,
-                                        status: ob.status
-                                    }));
-                                    if (billItems.length === 0) { toast.error('Tidak ada siswa yang belum lunas'); return; }
-                                    generateActivityBillPDF(billItems, activity.name);
-                                }} className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-red-700 transition shadow-sm">
-                                    <FileText size={16} /> Cetak Surat Tagihan
-                                </button>
+                                    <button onClick={async () => {
+                                        const billItems = filteredObs.filter(ob => ob.status !== 'Paid').map(ob => ({
+                                            studentName: ob.student?.user?.name || '-',
+                                            className: ob.student?.class?.name || '-',
+                                            activityName: activity.name,
+                                            amount: ob.amount,
+                                            paidAmount: ob.paid_amount,
+                                            status: ob.status
+                                        }));
+                                        if (billItems.length === 0) { toast.error('Tidak ada siswa yang belum lunas'); return; }
+                                        try {
+                                            await generateActivityBillPDF(billItems, activity.name, activity.id);
+                                            toast.success('Surat tagihan berhasil diunduh');
+                                        } catch (e) {
+                                            toast.error('Gagal membuat surat tagihan');
+                                        }
+                                    }} className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-red-700 transition shadow-sm">
+                                        <FileText size={16} /> Cetak Surat Tagihan
+                                    </button>
                                 <button onClick={() => setShowAssignModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition shadow-sm">
                                     <Plus size={16} /> Assign Siswa
                                 </button>
@@ -281,15 +286,20 @@ const ActivityDetail = () => {
                                                     {ob.status !== 'Paid' && (
                                                         <>
                                                             <button onClick={() => { setPayModal(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition" title="Catat Bayar"><CheckSquare size={16} /></button>
-                                                            <button onClick={() => {
-                                                                generateSingleActivityBillPDF({
-                                                                    studentName: ob.student?.user?.name || '-',
-                                                                    className: ob.student?.class?.name || '-',
-                                                                    activityName: activity.name,
-                                                                    amount: ob.amount,
-                                                                    paidAmount: ob.paid_amount,
-                                                                    status: ob.status
-                                                                });
+                                                            <button onClick={async () => {
+                                                                try {
+                                                                    await generateSingleActivityBillPDF({
+                                                                        studentName: ob.student?.user?.name || '-',
+                                                                        className: ob.student?.class?.name || '-',
+                                                                        activityName: activity.name,
+                                                                        amount: ob.amount,
+                                                                        paidAmount: ob.paid_amount,
+                                                                        status: ob.status
+                                                                    }, activity.id);
+                                                                    toast.success('Surat tagihan berhasil diunduh');
+                                                                } catch (e) {
+                                                                    toast.error('Gagal membuat surat tagihan');
+                                                                }
                                                             }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Surat Tagihan"><FileText size={16} /></button>
                                                         </>
                                                     )}

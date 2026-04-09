@@ -86,9 +86,28 @@ func (h *NotificationHandler) GetAllNotifications(c *gin.Context) {
 
 func (h *NotificationHandler) DeleteNotification(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.notificationUsecase.DeleteNotification(id); err != nil {
+	if err := h.notificationUsecase.MarkAsRead(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted successfully"})
+}
+
+func (h *NotificationHandler) SendManualWA(c *gin.Context) {
+	var req struct {
+		Phone   string `json:"phone" binding:"required"`
+		Message string `json:"message" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.notificationUsecase.SendWhatsApp(req.Phone, req.Message); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "WhatsApp message sent successfully via Fonnte"})
 }

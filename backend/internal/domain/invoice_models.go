@@ -17,6 +17,7 @@ type InvoiceSignature struct {
 	SignatureHash   string    `gorm:"not null" json:"signature_hash"`    // Full HMAC-SHA256
 	ShortCode       string    `gorm:"not null" json:"short_code"`        // SIG-PRI-xxxxxxxxxxxx
 	VerificationCode string   `gorm:"default:'';not null" json:"verification_code"` // XXXX-XXXX-XXXX
+	InvoiceNumber    string   `gorm:"default:'';not null" json:"invoice_number"`    // INV-202401-0001
 	Amount           float64   `json:"amount"`
 	DocumentDate     string    `gorm:"default:'';not null" json:"document_date"`    // The date used for signing (ISO)
 	SignedAt         time.Time `gorm:"not null" json:"signed_at"`
@@ -37,6 +38,8 @@ type InvoiceNumberConfig struct {
 	CounterResetPeriod string `gorm:"not null;default:'monthly'" json:"counter_reset_period"` // monthly, yearly, never
 	LastResetDate *time.Time `json:"last_reset_date"`
 	DisplayLabel  string    `gorm:"not null" json:"display_label"`          // "Kuitansi Pembayaran", "Slip Gaji", etc.
+	AutoNotifyWA  bool      `gorm:"default:false" json:"auto_notify_wa"`    // Automatically send WA on creation
+	WATemplateID  *uint     `json:"wa_template_id"`                         // Preferred template for this doc
 	IsActive     bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

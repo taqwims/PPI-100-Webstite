@@ -13,27 +13,38 @@ interface Stakeholder {
 
 interface InvoiceConfig {
     id: string;
-    module_name: string;
+    invoice_type: string;
+    display_label: string;
     prefix: string;
+    separator: string;
+    include_date: boolean;
+    counter_length: number;
     current_counter: number;
-    last_reset: string;
-    auto_reset_yearly: boolean;
-    auto_reset_monthly: boolean;
+    auto_notify_wa: boolean;
+    wa_template_id?: number;
+}
+
+interface WATemplate {
+    id: number;
+    name: string;
 }
 
 const InvoiceConfigPage: React.FC = () => {
     const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
     const [invoiceConfigs, setInvoiceConfigs] = useState<InvoiceConfig[]>([]);
+    const [waTemplates, setWATemplates] = useState<WATemplate[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
         try {
-            const [shRes, cfgRes] = await Promise.all([
+            const [shRes, cfgRes, waRes] = await Promise.all([
                 api.get('/finance/stakeholders'),
-                api.get('/finance/invoice-configs')
+                api.get('/finance/invoice-configs'),
+                api.get('/finance/wa-templates')
             ]);
             setStakeholders(shRes.data || []);
             setInvoiceConfigs(cfgRes.data || []);
+            setWATemplates(waRes.data || []);
         } catch (error) {
             console.error("Failed to fetch config", error);
             toast.error("Gagal memuat pengaturan");
@@ -56,13 +67,13 @@ const InvoiceConfigPage: React.FC = () => {
         }
     };
 
-    const handleUpdateConfig = async (id: string, prefix: string) => {
+    const handleUpdateConfig = async (id: string, updates: Partial<InvoiceConfig>) => {
         try {
-            await api.put(`/finance/invoice-configs/${id}`, { prefix, current_counter: -1 }); // passing -1 avoids updating counter
-            toast.success("Format nomor kuitansi berhasil diperbarui");
+            await api.put(`/finance/invoice-configs/${id}`, updates);
+            toast.success("Pengaturan kuitansi diperbarui");
             fetchData();
         } catch (error) {
-            toast.error("Gagal memperbarui format kuitansi");
+            toast.error("Gagal memperbarui pengaturan");
         }
     };
 
@@ -99,7 +110,7 @@ const InvoiceConfigPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="divide-y divide-slate-100">
-                        {stakeholders.map(sh => (
+                        {stakeholders.map((sh: Stakeholder) => (
                             <div key={sh.id} className="p-5 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50/30 transition">
                                 <div className="flex-1">
                                     <p className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1">{sh.role_label}</p>
@@ -134,41 +145,103 @@ const InvoiceConfigPage: React.FC = () => {
                             <p className="text-xs text-emerald-600/70">Awalan surat berdasarkan modul.</p>
                         </div>
                     </div>
-                    <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
-                        {invoiceConfigs.map(cfg => (
-                            <div key={cfg.id} className="p-5 hover:bg-slate-50/30 transition">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-bold text-slate-800">{cfg.module_name}</h3>
-                                    <div className="bg-slate-100 px-2 py-0.5 rounded text-xs font-mono text-slate-500">
+                    <div className="divide-y divide-slate-100 max-h-[80vh] overflow-y-auto">
+                        {invoiceConfigs.map((cfg: InvoiceConfig) => (
+                            <div key={cfg.id} className="p-6 hover:bg-slate-50/30 transition space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-bold text-slate-800 text-lg">{cfg.display_label || cfg.invoice_type}</h3>
+                                    <div className="bg-slate-100 px-3 py-1 rounded-full text-xs font-mono text-slate-600">
                                         Urutan: #{cfg.current_counter}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex-1 relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">Awal:</span>
-                                        <input 
-                                            type="text"
-                                            defaultValue={cfg.prefix}
-                                            onBlur={(e) => {
-                                                if (e.target.value !== cfg.prefix) {
-                                                    handleUpdateConfig(cfg.id, e.target.value);
-                                                }
-                                            }}
-                                            className="w-full pl-12 pr-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 font-mono text-sm uppercase"
-                                        />
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-3">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Format Penomoran</p>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 relative">
+                                                <input 
+                                                    type="text"
+                                                    defaultValue={cfg.prefix}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value !== cfg.prefix) {
+                                                            handleUpdateConfig(cfg.id, { prefix: e.target.value });
+                                                        }
+                                                    }}
+                                                    placeholder="PREFIX"
+                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 font-mono text-sm uppercase"
+                                                />
+                                            </div>
+                                            <select 
+                                                defaultValue={cfg.separator}
+                                                onChange={(e) => handleUpdateConfig(cfg.id, { separator: e.target.value })}
+                                                className="w-16 px-2 py-2 rounded-lg border border-slate-200 text-sm font-mono"
+                                            >
+                                                <option value="-">-</option>
+                                                <option value="/">/</option>
+                                                <option value=".">.</option>
+                                            </select>
+                                            <div className="w-16">
+                                                <input 
+                                                    type="number"
+                                                    defaultValue={cfg.counter_length}
+                                                    onBlur={(e) => handleUpdateConfig(cfg.id, { counter_length: parseInt(e.target.value) })}
+                                                    className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs text-center"
+                                                    title="Panjang Counter (Padded)"
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                defaultChecked={cfg.include_date} 
+                                                onChange={(e) => handleUpdateConfig(cfg.id, { include_date: e.target.checked })}
+                                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <span className="text-sm text-slate-600">Sertakan Tahun/Bulan (YYYYMM)</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="space-y-3 border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Notifikasi WhatsApp</p>
+                                        
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={cfg.auto_notify_wa} 
+                                                onChange={(e) => handleUpdateConfig(cfg.id, { auto_notify_wa: e.target.checked })}
+                                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <span className="text-sm text-slate-700 font-medium">Auto Notif saat Tagihan Dibuat</span>
+                                        </label>
+
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] text-slate-500">Gunakan Template:</p>
+                                            <select 
+                                                value={cfg.wa_template_id || 0}
+                                                onChange={(e) => handleUpdateConfig(cfg.id, { wa_template_id: parseInt(e.target.value) })}
+                                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
+                                            >
+                                                <option value={0}>Gunakan Template Default</option>
+                                                {waTemplates.map(t => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                                    <div className="text-[10px] text-slate-400">
+                                        Contoh: {cfg.prefix}{cfg.separator}{cfg.include_date ? '202604' : ''}{cfg.separator}{'0'.repeat(cfg.counter_length - 1)}1
                                     </div>
                                     <button 
                                         onClick={() => handleResetCounter(cfg.id)}
-                                        className="p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition"
-                                        title="Reset Nomor Urut"
+                                        className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition"
                                     >
-                                        <RefreshCw size={16} />
+                                        <RefreshCw size={12} /> Reset Nomor Urut
                                     </button>
-                                </div>
-                                <div className="mt-2 text-[10px] text-slate-400">
-                                    <span className="bg-slate-100 px-1 inline-block rounded">Contoh: {cfg.prefix}-2026/04-001</span>
-                                    {cfg.auto_reset_monthly && <span className="ml-2 text-blue-500">✓ Reset Tiap Bulan</span>}
-                                    {cfg.auto_reset_yearly && !cfg.auto_reset_monthly && <span className="ml-2 text-blue-500">✓ Reset Tiap Tahun</span>}
                                 </div>
                             </div>
                         ))}

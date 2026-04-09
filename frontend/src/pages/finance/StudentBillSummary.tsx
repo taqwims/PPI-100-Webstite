@@ -12,6 +12,7 @@ interface Student {
     full_name: string;
     nis: string;
     class?: { name: string };
+    parent?: { phone: string };
 }
 
 interface Obligation {
@@ -164,18 +165,42 @@ const StudentBillSummary: React.FC = () => {
             .replace(/{tanggal}/g, new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }));
     };
 
-    const handleSendWA = () => {
+    const [isSending, setIsSending] = useState(false);
+
+    const handleSendWA = async () => {
         if (!waModal) return;
         const template = waTemplates.find(t => t.id === Number(selectedTemplateId)) || waTemplates.find(t => t.is_default);
         if (!template) {
             toast.error('Pilih template WA terlebih dahulu atau buat template default');
             return;
         }
+
+        const phone = waModal.student.parent?.phone;
+        if (!phone) {
+            toast.error('Siswa tidak memiliki data nomor telepon orang tua');
+            return;
+        }
+
         const message = buildWAMessage(template, waModal.student, waModal.obligations);
-        // Use wa.me link — placeholder phone (user should have parent's phone)
-        const encodedMessage = encodeURIComponent(message);
-        window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-        setWaModal(null);
+        
+        setIsSending(true);
+        try {
+            await api.post('/notifications/wa', {
+                phone: phone,
+                message: message
+            });
+            toast.success('Pesan WhatsApp dikirim via sistem!');
+            setWaModal(null);
+        } catch (error: any) {
+            console.error('Failed to send WA via system', error);
+            // Fallback to wa.me
+            const encodedMessage = encodeURIComponent(message);
+            window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+            toast.error('Gagal kirim via sistem, mencoba buka WhatsApp manual...');
+            setWaModal(null);
+        } finally {
+            setIsSending(false);
+        }
     };
 
     return (
@@ -269,22 +294,27 @@ const StudentBillSummary: React.FC = () => {
                                         {canManage && totalDebt > 0 && (
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={e => {
+                                                    onClick={async e => {
                                                         e.stopPropagation();
-                                                        generateStudentBillPDF({
-                                                            studentName: student.full_name,
-                                                            className: student.class?.name || '-',
-                                                            nisn: student.nis,
-                                                            academicYear: obligations[0]?.created_at ? new Date(obligations[0].created_at).getFullYear().toString() : '-',
-                                                            obligations: obligations.map(o => ({
-                                                                name: o.payment_type?.name || '-',
-                                                                amount: o.amount,
-                                                                paid_amount: o.paid_amount,
-                                                                status: o.status,
-                                                                billing_month: o.billing_month,
-                                                                due_date: o.due_date
-                                                            }))
-                                                        });
+                                                        try {
+                                                            await generateStudentBillPDF({
+                                                                studentName: student.full_name,
+                                                                className: student.class?.name || '-',
+                                                                nisn: student.nis,
+                                                                academicYear: obligations[0]?.created_at ? new Date(obligations[0].created_at).getFullYear().toString() : '-',
+                                                                obligations: obligations.map(o => ({
+                                                                    name: o.payment_type?.name || '-',
+                                                                    amount: o.amount,
+                                                                    paid_amount: o.paid_amount,
+                                                                    status: o.status,
+                                                                    billing_month: o.billing_month,
+                                                                    due_date: o.due_date
+                                                                }))
+                                                            });
+                                                            toast.success('Surat tagihan berhasil diunduh');
+                                                        } catch (err) {
+                                                            toast.error('Gagal membuat surat tagihan');
+                                                        }
                                                     }}
                                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
                                                     title="Cetak Surat Tagihan"
@@ -448,9 +478,13 @@ const StudentBillSummary: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleSendWA}
-                                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2"
+                                    disabled={isSending}
+                                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    <Send size={16} /> Buka WhatsApp
+                                    {isSending ? (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    ) : <Send size={16} />} 
+                                    {isSending ? 'Mengirim...' : 'Kirim WhatsApp'}
                                 </button>
                             </div>
                         </div>

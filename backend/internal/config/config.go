@@ -17,6 +17,7 @@ type Config struct {
 	MidtransServerKey    string
 	MidtransClientKey    string
 	MidtransIsProduction bool
+	FonnteToken          string
 }
 
 func LoadConfig() (*Config, error) {
@@ -35,6 +36,7 @@ func LoadConfig() (*Config, error) {
 		MidtransServerKey:    getEnv("MIDTRANS_SERVER_KEY", ""),
 		MidtransClientKey:    getEnv("MIDTRANS_CLIENT_KEY", ""),
 		MidtransIsProduction: getEnv("MIDTRANS_IS_PRODUCTION", "false") == "true",
+		FonnteToken:          getEnv("FONNTE_TOKEN", ""),
 	}, nil
 }
 

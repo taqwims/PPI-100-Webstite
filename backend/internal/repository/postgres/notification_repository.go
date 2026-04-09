@@ -41,3 +41,21 @@ func (r *NotificationRepository) GetAll() ([]domain.Notification, error) {
 func (r *NotificationRepository) Delete(id string) error {
 	return r.db.Delete(&domain.Notification{}, "id = ?", id).Error
 }
+
+func (r *NotificationRepository) GetWATemplateByID(id uint) (*domain.WATemplate, error) {
+	var template domain.WATemplate
+	err := r.db.First(&template, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &template, nil
+}
+
+func (r *NotificationRepository) GetDefaultWATemplate() (*domain.WATemplate, error) {
+	var template domain.WATemplate
+	err := r.db.Where("is_default = ?", true).First(&template).Error
+	if err != nil {
+		return nil, err
+	}
+	return &template, nil
+}

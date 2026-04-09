@@ -812,9 +812,27 @@ interface StudentBillPDFData {
     obligations: StudentBillItem[];
 }
 
-export const generateStudentBillPDF = (data: StudentBillPDFData) => {
+export const generateStudentBillPDF = async (data: StudentBillPDFData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const invoiceType = 'Bill';
+    const dateStr = new Date().toISOString().split('T')[0];
+    
+    // Total debt for signing
+    const totalAmount = data.obligations.reduce((s, o) => s + o.amount, 0);
+    const totalPaid = data.obligations.reduce((s, o) => s + o.paid_amount, 0);
+    const totalUnpaid = totalAmount - totalPaid;
+
+    // Use student name as part of reference ID if no specific ID provided
+    const refId = `BILL-${(data.nisn || data.studentName).replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
+
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        refId,
+        totalUnpaid,
+        dateStr
+    );
 
     const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -822,7 +840,7 @@ export const generateStudentBillPDF = (data: StudentBillPDFData) => {
     const headerH = drawStandardHeader(doc, {
         title: 'SURAT TAGIHAN SISWA',
         subtitle: `Tahun Ajaran: ${data.academicYear}`,
-        invoiceNumber: `-`,
+        invoiceNumber: invoiceNumber,
         headerColor: [220, 38, 38], // red-600
     });
 
@@ -855,9 +873,7 @@ export const generateStudentBillPDF = (data: StudentBillPDFData) => {
 
     // ALL items (paid + unpaid)
     const allObs = data.obligations;
-    const totalAmount = allObs.reduce((s, o) => s + o.amount, 0);
-    const totalPaid = allObs.reduce((s, o) => s + o.paid_amount, 0);
-    const totalUnpaid = totalAmount - totalPaid;
+    // (Reusing totals calculated above)
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
@@ -930,12 +946,9 @@ export const generateStudentBillPDF = (data: StudentBillPDFData) => {
     doc.setFontSize(14);
     doc.text(formatCurrency(totalUnpaid), pageWidth - 20, finalY + 24, { align: 'right' });
 
-    // Closing message
-    doc.setTextColor(71, 85, 105);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('Mohon segera melakukan pembayaran atas tunggakan di atas.', labelX, finalY + 42);
-    doc.text('Apabila sudah melakukan pembayaran, mohon abaikan surat ini.', labelX, finalY + 48);
+    // Signature block & verification
+    const sigY = await drawSignatureBlock(doc, finalY + 54, signatures);
+    await drawVerificationFooter(doc, sigY, verificationCode);
 
     addPageFooters(doc);
 
@@ -1105,9 +1118,20 @@ interface ActivityBillItem {
     status: string;
 }
 
-export const generateActivityBillPDF = (items: ActivityBillItem[], activityName: string) => {
+export const generateActivityBillPDF = async (items: ActivityBillItem[], activityName: string, activityId: string) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const invoiceType = 'Activity';
+    const dateStr = new Date().toISOString().split('T')[0];
+    const totalUnpaid = items.reduce((s, i) => s + (i.amount - i.paidAmount), 0);
+
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        activityId || `ACT-${activityName.replace(/[^a-zA-Z0-9]/g, '')}`,
+        totalUnpaid,
+        dateStr
+    );
 
     // Standardized Header
     doc.setFillColor(59, 130, 246); // blue-500
@@ -1118,17 +1142,19 @@ export const generateActivityBillPDF = (items: ActivityBillItem[], activityName:
     doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(16);
     doc.text('SURAT TAGIHAN KEGIATAN', pageWidth / 2, 18, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`No: ${invoiceNumber}`, pageWidth / 2, 23.5, { align: 'center' });
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Kegiatan: ${activityName}`, pageWidth / 2, 26, { align: 'center' });
+    doc.text(`Kegiatan: ${activityName}`, pageWidth / 2, 30, { align: 'center' });
     doc.setFontSize(6);
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 32, { align: 'center' });
+    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 36, { align: 'center' });
 
     // Summary
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    const totalUnpaid = items.reduce((s, i) => s + (i.amount - i.paidAmount), 0);
+    // totalUnpaid already calculated above
     doc.text(`Total Siswa: ${items.length}  |  Total Tunggakan: ${formatCurrency(totalUnpaid)}`, 14, 48);
     doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 55);
 
@@ -1162,21 +1188,35 @@ export const generateActivityBillPDF = (items: ActivityBillItem[], activityName:
         }
     });
 
+    const sigY = await drawSignatureBlock(doc, (doc as any).lastAutoTable?.finalY + 15, signatures);
+    await drawVerificationFooter(doc, sigY, verificationCode);
+
     addPageFooters(doc);
 
     doc.save(`Tagihan_Kegiatan_${activityName.replace(/\s+/g, '_')}.pdf`);
 };
 
 // Generate single student activity bill letter
-export const generateSingleActivityBillPDF = (item: ActivityBillItem) => {
+export const generateSingleActivityBillPDF = async (item: ActivityBillItem, activityId: string) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const invoiceType = 'Activity';
+    const dateStr = new Date().toISOString().split('T')[0];
+    const unpaid = item.amount - item.paidAmount;
+
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        `${activityId}-${item.studentName.replace(/[^a-zA-Z0-9]/g, '')}`,
+        unpaid,
+        dateStr
+    );
 
     // Standardized Header
     const headerH = drawStandardHeader(doc, {
         title: 'SURAT TAGIHAN KEGIATAN',
         subtitle: `Kegiatan: ${item.activityName}`,
-        invoiceNumber: '-',
+        invoiceNumber: invoiceNumber,
         headerColor: [59, 130, 246], // blue-500
     });
 
@@ -1224,7 +1264,7 @@ export const generateSingleActivityBillPDF = (item: ActivityBillItem) => {
     const finalY = (doc as any).lastAutoTable?.finalY || startY + 80;
 
     // Unpaid highlight
-    const unpaid = item.amount - item.paidAmount;
+    // unpaid already calculated above
     if (unpaid > 0) {
         doc.setFillColor(254, 226, 226);
         doc.roundedRect(labelX, finalY + 5, pageWidth - 28, 24, 3, 3, 'F');
@@ -1236,12 +1276,9 @@ export const generateSingleActivityBillPDF = (item: ActivityBillItem) => {
         doc.text(formatCurrency(unpaid), pageWidth - 20, finalY + 20, { align: 'right' });
     }
 
-    // Closing message
-    doc.setTextColor(71, 85, 105);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('Mohon segera melakukan pembayaran atas tunggakan di atas.', labelX, finalY + 38);
-    doc.text('Apabila sudah melakukan pembayaran, mohon abaikan surat ini.', labelX, finalY + 44);
+    // Signature block & verification
+    const sigY = await drawSignatureBlock(doc, finalY + 54, signatures);
+    await drawVerificationFooter(doc, sigY, verificationCode);
 
     addPageFooters(doc);
 

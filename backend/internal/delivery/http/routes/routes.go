@@ -6,6 +6,7 @@ import (
 	"ppi-100-sis/internal/delivery/http/middleware"
 	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/internal/usecase"
+	"ppi-100-sis/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -40,9 +41,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	publicRepo := postgres.NewPublicRepository(db)
 	publicUsecase := usecase.NewPublicUsecase(publicRepo)
 	publicHandler := handlers.NewPublicHandler(publicUsecase)
+	
+	waService := utils.NewWAService(cfg)
 
 	notificationRepo := postgres.NewNotificationRepository(db)
-	notificationUsecase := usecase.NewNotificationUsecase(notificationRepo)
+	notificationUsecase := usecase.NewNotificationUsecase(notificationRepo, waService)
 	notificationHandler := handlers.NewNotificationHandler(notificationUsecase)
 
 	// Reuse existing userRepo
@@ -417,5 +420,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.GET("/contacts", publicHandler.GetContactMessages)
 			admin.DELETE("/contacts/:id", publicHandler.DeleteContactMessage)
 		}
+
+		// Manual WhatsApp Trigger
+		protected.POST("/notifications/wa", notificationHandler.SendManualWA)
 	}
 }

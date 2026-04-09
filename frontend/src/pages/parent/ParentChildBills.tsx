@@ -5,6 +5,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, Wallet, X, Landmark, Copy, Send, User, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import { generateBillReceipt } from '../../utils/pdfUtils';
 
 interface Bill {
@@ -20,6 +21,8 @@ interface Bill {
         name: string;
     };
     is_installment?: boolean;
+    invoice_number?: string;
+    verification_code?: string;
     student?: {
         user: { name: string };
     };
@@ -481,12 +484,27 @@ const ParentChildBills: React.FC = () => {
                                                             <DollarSign size={14} /> Bayar
                                                         </button>
                                                     ) : bill.status === 'Paid' ? (
+                                                    <div className="flex flex-col gap-1 items-center">
                                                         <button
-                                                            onClick={() => generateBillReceipt(bill)}
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await generateBillReceipt(bill);
+                                                                    toast.success('Kuitansi berhasil diunduh');
+                                                                } catch (err) {
+                                                                    console.error(err);
+                                                                    toast.error('Gagal mengunduh kuitansi');
+                                                                }
+                                                            }}
                                                             className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition flex items-center gap-1.5 mx-auto"
                                                         >
                                                             <Download size={13} /> Kuitansi
                                                         </button>
+                                                        {bill.invoice_number && (
+                                                            <span className="text-[9px] text-slate-400 font-mono tracking-tighter" title="Nomor Invoice">
+                                                                {bill.invoice_number}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     ) : (
                                                         <span className="text-xs text-slate-500">Menunggu</span>
                                                     )}
