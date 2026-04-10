@@ -1,30 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+/**
+ * AuthContext — backward-compatible wrapper di atas useAuthStore.
+ * Komponen yang sudah menggunakan useAuth() tidak perlu diubah.
+ * State sebenarnya dikelola oleh useAuthStore (Zustand).
+ */
+import React, { createContext, useContext, useEffect } from 'react';
 import api from '../services/api';
-
-interface User {
-    id: string;
-    name: string;
-    email: string;
-    role_id: number;
-    unit_id: number;
-    photo_url?: string;
-    bank_name?: string;
-    bank_account_number?: string;
-    bank_account_holder?: string;
-    student?: {
-        id: string;
-        nisn: string;
-        class_id: number;
-    };
-    teacher?: {
-        id: string;
-        nip: string;
-    };
-    parent?: {
-        id: string;
-        phone: string;
-    };
-}
+import { useAuthStore } from '../store/authStore';
+import type { User } from '../types';
 
 interface AuthContextType {
     user: User | null;
@@ -37,31 +19,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+    const { user, token, login, logout, setUser, isAuthenticated } = useAuthStore();
 
+    // Fetch user profile saat token ada tapi user belum di-load
     useEffect(() => {
-        if (token) {
-            // Validate token or fetch user profile
+        if (token && !user) {
             api.get('/profile')
-                .then(response => setUser(response.data))
+                .then((response) => setUser(response.data))
                 .catch(() => logout());
         }
     }, [token]);
 
-    const login = (newToken: string) => {
-        localStorage.setItem('token', newToken);
-        setToken(newToken);
-    };
-
-    const logout = () => {
-        localStorage.removeItem('token');
-        setToken(null);
-        setUser(null);
-    };
-
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
             {children}
         </AuthContext.Provider>
     );

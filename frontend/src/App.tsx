@@ -74,11 +74,13 @@ import StudentObligations from './pages/finance/StudentObligations';
 import Activities from './pages/finance/Activities';
 import ActivityDetail from './pages/finance/ActivityDetail';
 import InvoiceConfig from './pages/finance/InvoiceConfig';
+import InvoiceHistory from './pages/finance/InvoiceHistory';
 import StudentBillSummary from './pages/finance/StudentBillSummary';
 import InfaqTypes from './pages/finance/InfaqTypes';
 import WATemplates from './pages/finance/WATemplates';
 import ToastProvider from './components/ui/Toast';
 import { AcademicYearProvider } from './context/AcademicYearContext';
+import RoleRoute from './components/RoleRoute';
 
 function App() {
     return (
@@ -95,7 +97,11 @@ function App() {
                                     <Route path="/" element={<DashboardHome />} />
                                     <Route path="academic" element={<Academic />} />
                                     <Route path="admin/academic" element={<Academic />} />
-                                    <Route path="users" element={<UserManagement />} />
+                                    <Route path="users" element={
+                                        <RoleRoute allowedRoles={[1, 2, 3]}>
+                                            <UserManagement />
+                                        </RoleRoute>
+                                    } />
                                     <Route path="settings" element={<Settings />} />
 
                                     {/* Consolidated Routes */}
@@ -117,20 +123,64 @@ function App() {
                                     <Route path="admin/downloads" element={<AdminDownloads />} />
                                     <Route path="admin/bk" element={<BK />} />
 
-                                    {/* Extended Finance Routes */}
-                                    <Route path="principal/finance-summary" element={<PrincipalDashboard />} />
-                                    <Route path="finance/savings" element={<Savings />} />
+                                    {/* Extended Finance Routes — hanya admin, pimpinan, bendahara */}
+                                    <Route path="principal/finance-summary" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9]}>
+                                            <PrincipalDashboard />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/savings" element={
+                                        <RoleRoute allowedRoles={[1, 9, 10]}>
+                                            <Savings />
+                                        </RoleRoute>
+                                    } />
                                     <Route path="student/savings" element={<StudentSavings />} />
                                     <Route path="parent/savings" element={<ParentSavings />} />
-                                    <Route path="finance/cash-ledger" element={<CashLedger />} />
-                                    <Route path="finance/daily-infaq" element={<DailyInfaq />} />
-                                    <Route path="finance/payroll" element={<Payroll />} />
-                                    <Route path="finance/debts" element={<ExternalDebts />} />
-                                    <Route path="finance/transaction-codes" element={<TransactionCodes />} />
-                                    <Route path="finance/global-transactions" element={<GlobalTransactions />} />
-                                    <Route path="finance/rkas" element={<RKAS />} />
-                                    <Route path="finance/executive-dashboard" element={<ExecutiveDashboard />} />
-                                    <Route path="finance/reports" element={<Reports />} />
+                                    <Route path="finance/cash-ledger" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9, 11]}>
+                                            <CashLedger />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/daily-infaq" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9, 11]}>
+                                            <DailyInfaq />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/payroll" element={
+                                        <RoleRoute allowedRoles={[1, 9]}>
+                                            <Payroll />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/debts" element={
+                                        <RoleRoute allowedRoles={[1, 9]}>
+                                            <ExternalDebts />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/transaction-codes" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9, 10, 11]}>
+                                            <TransactionCodes />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/global-transactions" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9, 10, 11]}>
+                                            <GlobalTransactions />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/rkas" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9]}>
+                                            <RKAS />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/executive-dashboard" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9]}>
+                                            <ExecutiveDashboard />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/reports" element={
+                                        <RoleRoute allowedRoles={[1, 8, 9]}>
+                                            <Reports />
+                                        </RoleRoute>
+                                    } />
 
                                     <Route path="finance/payment-types" element={<PaymentTypes />} />
                                     <Route path="finance/academic-years" element={<AcademicYears />} />
@@ -139,6 +189,7 @@ function App() {
                                     <Route path="finance/infaq-types" element={<InfaqTypes />} />
                                     <Route path="finance/wa-templates" element={<WATemplates />} />
                                     <Route path="finance/invoice-config" element={<InvoiceConfig />} />
+                                    <Route path="finance/invoices" element={<InvoiceHistory />} />
                                     <Route path="finance/activities" element={<Activities />} />
                                     <Route path="finance/activities/:id" element={<ActivityDetail />} />
 

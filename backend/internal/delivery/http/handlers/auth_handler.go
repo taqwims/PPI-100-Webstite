@@ -57,7 +57,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Set httpOnly cookie untuk keamanan (tidak bisa diakses JavaScript/XSS)
+	// Backward compatible: token juga dikembalikan di response body
+	c.SetCookie("token", token, 86400*7, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+// Logout menghapus httpOnly cookie token
+func (h *AuthHandler) Logout(c *gin.Context) {
+	c.SetCookie("token", "", -1, "/", "", false, true)
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
 func (h *AuthHandler) GetProfile(c *gin.Context) {

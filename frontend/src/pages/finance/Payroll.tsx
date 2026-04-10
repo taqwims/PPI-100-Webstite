@@ -85,7 +85,7 @@ const PayrollTableDesktop = ({ payrolls, canManage, onEdit, onDelete, onPay, onP
                         <th className="p-3 border-r border-slate-200 font-semibold text-center bg-gray-100" rowSpan={2}>JML POTONGAN</th>
                         <th className="p-3 border-r border-slate-200 font-semibold text-center bg-emerald-50 text-emerald-700" rowSpan={2}>GAJI BERSIH</th>
                         <th className="p-3 border-r border-slate-200 font-semibold text-center" rowSpan={2}>KET.</th>
-                        {canManage && <th className="p-3 font-semibold text-center" rowSpan={2}>AKSI</th>}
+                        <th className="p-3 font-semibold text-center" rowSpan={2}>AKSI</th>
                     </tr>
                     <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs">
                         {/* Pendapatan */}
@@ -125,31 +125,34 @@ const PayrollTableDesktop = ({ payrolls, canManage, onEdit, onDelete, onPay, onP
                                 {p.status === 'Paid' ? <span className="text-emerald-600 font-medium">Lunas</span> : <span className="text-amber-600 font-medium">Draft</span>}
                             </td>
                             
-                            {canManage && (
-                                <td className="p-3 text-center">
-                                    <div className="flex items-center justify-center space-x-1">
-                                        <button onClick={() => onPrint(p)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Cetak Slip">
-                                            <Printer size={16} />
-                                        </button>
-                                        <button onClick={() => onEdit(p)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
-                                            <Pencil size={16} />
-                                        </button>
-                                        <button onClick={() => onDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus">
-                                            <Trash2 size={16} />
-                                        </button>
-                                        {p.status !== 'Paid' && (
-                                            <button onClick={() => onPay(p.id)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Bayar">
-                                                <CheckCircle size={16} />
+                            <td className="p-3 text-center">
+                                <div className="flex items-center justify-center space-x-1 text-slate-400">
+                                    <button onClick={() => onPrint(p)} className="p-1.5 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Cetak Slip">
+                                        <Printer size={16} />
+                                    </button>
+                                    
+                                    {canManage && (
+                                        <>
+                                            <button onClick={() => onEdit(p)} className="p-1.5 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
+                                                <Pencil size={16} />
                                             </button>
-                                        )}
-                                    </div>
-                                </td>
-                            )}
+                                            <button onClick={() => onDelete(p.id)} className="p-1.5 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus">
+                                                <Trash2 size={16} />
+                                            </button>
+                                            {p.status !== 'Paid' && (
+                                                <button onClick={() => onPay(p.id)} className="p-1.5 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Bayar">
+                                                    <CheckCircle size={16} />
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </td>
                         </tr>
                     ))}
                     {payrolls.length === 0 && (
                         <tr>
-                            <td colSpan={canManage ? 16 : 15} className="p-8 text-center text-slate-500">
+                            <td colSpan={16} className="p-8 text-center text-slate-500">
                                 Tidak ada data penggajian untuk periode ini.
                             </td>
                         </tr>
@@ -219,24 +222,27 @@ const PayrollCardMobile = ({ payroll, canManage, onEdit, onDelete, onPay, onPrin
                         <div className="pt-3 border-t border-slate-200">
                             {payroll.notes && <p className="text-xs text-slate-500 italic mb-3">Catatan: {payroll.notes}</p>}
                             
-                            {canManage && (
-                                <div className="flex space-x-2">
-                                    <button onClick={() => onPrint(payroll)} className="flex-1 bg-white border border-slate-200 text-indigo-600 py-2 rounded-lg text-sm font-medium flex justify-center items-center">
-                                        <Printer size={14} className="mr-1.5" /> Cetak
-                                    </button>
-                                    <button onClick={() => onEdit(payroll)} className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium flex justify-center items-center">
-                                        <Pencil size={14} className="mr-1.5" /> Edit
-                                    </button>
-                                    {payroll.status !== 'Paid' && (
-                                        <button onClick={() => onPay(payroll.id)} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium flex justify-center items-center">
-                                            <CheckCircle size={14} className="mr-1.5" /> Bayar
+                            <div className="flex space-x-2">
+                                <button onClick={() => onPrint(payroll)} className="flex-1 bg-white border border-slate-200 text-indigo-600 py-2 rounded-lg text-sm font-medium flex justify-center items-center">
+                                    <Printer size={14} className="mr-1.5" /> Cetak
+                                </button>
+                                
+                                {canManage && (
+                                    <>
+                                        <button onClick={() => onEdit(payroll)} className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium flex justify-center items-center">
+                                            <Pencil size={14} className="mr-1.5" /> Edit
                                         </button>
-                                    )}
-                                    <button onClick={() => onDelete(payroll.id)} className="w-10 bg-white border border-slate-200 text-red-500 rounded-lg flex justify-center items-center">
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            )}
+                                        {payroll.status !== 'Paid' && (
+                                            <button onClick={() => onPay(payroll.id)} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium flex justify-center items-center">
+                                                <CheckCircle size={14} className="mr-1.5" /> Bayar
+                                            </button>
+                                        )}
+                                        <button onClick={() => onDelete(payroll.id)} className="w-10 bg-white border border-slate-200 text-red-500 rounded-lg flex justify-center items-center">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

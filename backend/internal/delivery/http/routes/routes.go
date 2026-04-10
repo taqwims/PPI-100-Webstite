@@ -110,14 +110,23 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	activityHandler := handlers.NewActivityHandler(activityUsecase)
 
 	// Enhancement Handlers (InfaqType, WATemplate)
-	infaqTypeHandler := handlers.NewInfaqTypeHandler(db)
-	waTemplateHandler := handlers.NewWATemplateHandler(db)
+	infaqTypeRepo := postgres.NewInfaqTypeRepository(db)
+	infaqTypeUsecase := usecase.NewInfaqTypeUsecase(infaqTypeRepo)
+	infaqTypeHandler := handlers.NewInfaqTypeHandler(infaqTypeUsecase)
+
+	waTemplateRepo := postgres.NewWATemplateRepository(db)
+	waTemplateUsecase := usecase.NewWATemplateUsecase(waTemplateRepo)
+	waTemplateHandler := handlers.NewWATemplateHandler(waTemplateUsecase)
 
 	// External Debt (Catatan Hutang)
-	externalDebtHandler := handlers.NewExternalDebtHandler(db)
+	externalDebtRepo := postgres.NewExternalDebtRepository(db)
+	externalDebtUsecase := usecase.NewExternalDebtUsecase(externalDebtRepo)
+	externalDebtHandler := handlers.NewExternalDebtHandler(externalDebtUsecase)
 
 	// Invoice Signature & Config
-	invoiceSignatureHandler := handlers.NewInvoiceSignatureHandler(db)
+	invoiceSignatureRepo := postgres.NewInvoiceSignatureRepository(db)
+	invoiceSignatureUsecase := usecase.NewInvoiceSignatureUsecase(invoiceSignatureRepo)
+	invoiceSignatureHandler := handlers.NewInvoiceSignatureHandler(invoiceSignatureUsecase)
 
 	// Public Routes
 	api := r.Group("/api")
@@ -142,6 +151,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/logout", authHandler.Logout)
 		}
 	}
 
@@ -192,16 +202,22 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 		finance := protected.Group("/finance")
 		{
-			finance.POST("/bills", financeHandler.CreateBill)
-			finance.GET("/bills", financeHandler.GetAllBills)
-			finance.PUT("/bills/:id", financeHandler.UpdateBill)
-			finance.DELETE("/bills/:id", financeHandler.DeleteBill)
-			finance.POST("/payments", financeHandler.RecordPayment)
-			finance.PUT("/payments/:id", financeHandler.UpdatePayment)
-			finance.DELETE("/payments/:id", financeHandler.DeletePayment)
+			// Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas,
+			//           6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara, 10=TU, 11=Petugas Infaq
+
+			// Bills — hanya admin, pimpinan, bendahara yang bisa buat/edit/hapus
+			finance.POST("/bills", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.CreateBill)
+			finance.GET("/bills", middleware.RoleMiddleware(1, 2, 3, 6, 7, 8, 9), financeHandler.GetAllBills)
+			finance.PUT("/bills/:id", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.UpdateBill)
+			finance.DELETE("/bills/:id", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.DeleteBill)
+			finance.GET("/bills/:id", middleware.RoleMiddleware(1, 2, 3, 6, 7, 8, 9), financeHandler.GetBillByID)
+
+			// Payments — admin dan bendahara
+			finance.POST("/payments", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.RecordPayment)
+			finance.PUT("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.UpdatePayment)
+			finance.DELETE("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.DeletePayment)
 			finance.POST("/payment-proof", financeHandler.UploadPaymentProof)
 			finance.POST("/bills/batch", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.CreateBillBatch)
-			finance.GET("/bills/:id", financeHandler.GetBillByID)
 
 			// Midtrans Snap (authenticated)
 			finance.POST("/midtrans/create-transaction", midtransHandler.CreateSnapTransaction)
@@ -333,8 +349,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.POST("/debts/:id/pay", middleware.RoleMiddleware(1, 9), externalDebtHandler.RecordPayment)
 
 			// Invoice Signatures & Config
-			finance.POST("/invoice/sign", middleware.RoleMiddleware(1, 2, 3, 6, 7, 8, 9, 10, 11), invoiceSignatureHandler.SignInvoice)
-			finance.GET("/invoice/number", middleware.RoleMiddleware(1, 2, 3, 6, 7, 8, 9, 10, 11), invoiceSignatureHandler.GenerateNumber)
+			finance.POST("/invoice/sign", middleware.RoleMiddleware(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), invoiceSignatureHandler.SignInvoice)
+			finance.GET("/invoice/number", middleware.RoleMiddleware(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), invoiceSignatureHandler.GenerateNumber)
+			finance.GET("/invoice/history", invoiceSignatureHandler.GetInvoiceHistory)
 
 			// Invoice Number Configuration
 			finance.GET("/invoice-configs", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.GetInvoiceConfigs)
@@ -346,12 +363,13 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.PUT("/stakeholders/:id", middleware.RoleMiddleware(1, 9), invoiceSignatureHandler.UpdateStakeholder)
 		}
 
+		// Users — hanya Super Admin dan Admin unit yang bisa manage users
 		users := protected.Group("/users")
 		{
-			users.GET("/", userHandler.GetAllUsers)
-			users.POST("/", userHandler.CreateUser)
-			users.PUT("/:id", userHandler.UpdateUser)
-			users.DELETE("/:id", userHandler.DeleteUser)
+			users.GET("/", middleware.RoleMiddleware(1, 2, 3, 9), userHandler.GetAllUsers)
+			users.POST("/", middleware.RoleMiddleware(1, 2, 3), userHandler.CreateUser)
+			users.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.UpdateUser)
+			users.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.DeleteUser)
 		}
 
 		bk := protected.Group("/bk")

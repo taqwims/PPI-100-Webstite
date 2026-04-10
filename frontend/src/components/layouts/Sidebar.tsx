@@ -102,6 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
                 { icon: Calendar, label: 'Tahun Ajaran', path: '/dashboard/finance/academic-years' },
                 { icon: Settings, label: 'Kuitansi & TTD', path: '/dashboard/finance/invoice-config' },
+                { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
             ]
         };
@@ -115,6 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: FileText, label: 'Input Nilai', path: '/dashboard/teacher/grades' },
                 { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
                 { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
+                { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll' },
             ]
         };
@@ -128,6 +130,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
                 { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk' },
                 { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+                { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: Wallet, label: 'Tabungan', path: '/dashboard/student/savings' },
             ]
         };
@@ -138,6 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             items: [
                 { icon: Users, label: 'Data Anak', path: '/dashboard/children' },
                 { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+                { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings' },
                 { icon: GraduationCap, label: 'Laporan Nilai', path: '/dashboard/grades' },
             ]
