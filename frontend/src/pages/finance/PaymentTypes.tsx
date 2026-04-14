@@ -147,7 +147,6 @@ const PaymentTypes = () => {
             handleClose();
             fetchData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal menyimpan');
         }
     };
 
@@ -157,7 +156,7 @@ const PaymentTypes = () => {
             await api.delete(`/finance/payment-types/${id}`);
             toast.success('Berhasil dihapus');
             fetchData();
-        } catch (err: any) { toast.error(err.response?.data?.error || 'Gagal menghapus'); }
+        } catch (err: any) { }
     };
 
     const scheduleLabel: Record<string, string> = {

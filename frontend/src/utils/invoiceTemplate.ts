@@ -177,7 +177,7 @@ export async function drawSignatureBlock(
     startY += 4;
 
     const allSigs = signatures || [
-        { role: 'chairman', role_label: 'Ketua Yayasan', name: 'Ketua Yayasan PPI 100', short_code: '—' },
+        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha PPI 100', short_code: '—' },
         { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara PPI 100', short_code: '—' },
         { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah SDIT', short_code: '—' },
     ];
@@ -329,7 +329,7 @@ export async function drawSignatureBlockCompact(
     startY += 4;
 
     const allSigs = signatures || [
-        { role: 'chairman', role_label: 'Ketua Yayasan', name: 'Ketua Yayasan PPI 100', short_code: '—' },
+        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha PPI 100', short_code: '—' },
         { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara PPI 100', short_code: '—' },
         { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah SDIT', short_code: '—' },
     ];
@@ -392,6 +392,7 @@ const KEYS: Record<string, string> = {
     principal: 'ppi100-principal-sig-key-2026',
     treasurer: 'ppi100-treasurer-sig-key-2026',
     chairman: 'ppi100-chairman-sig-key-2026',
+    admin_tu: 'ppi100-admin-tu-sig-key-2026',
 };
 
 export async function generateLocalSignatures(
@@ -401,9 +402,9 @@ export async function generateLocalSignatures(
     dateStr: string,
     stakeholderNames?: Record<string, string>
 ): Promise<{ signatures: StakeholderSignature[]; verificationCode: string }> {
-    const roles = ['chairman', 'treasurer', 'principal'];
+    const roles = ['admin_tu', 'treasurer', 'principal'];
     const labels: Record<string, string> = {
-        chairman: 'Ketua Yayasan',
+        admin_tu: 'Tata Usaha',
         treasurer: 'Bendahara',
         principal: 'Kepala Sekolah',
     };
@@ -443,4 +444,485 @@ export function addPageFooters(doc: jsPDF) {
         doc.text(`SDIT AN-NUR — Dicetak: ${printDate}`, 14, doc.internal.pageSize.getHeight() - 6);
         doc.text(`Halaman ${i}/${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
     }
+}
+
+// ─── Invoice A5 ───
+export async function generateInvoiceA5(params: {
+    invoiceNumber: string;
+    studentName: string;
+    paymentMethod: string;
+    bills: { title: string; amount: number }[];
+    totalAmount: number;
+    date: string;
+    signatures?: StakeholderSignature[];
+}): Promise<void> {
+    const { invoiceNumber, studentName, paymentMethod, bills, totalAmount, date } = params;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+    const pageWidth = doc.internal.pageSize.getWidth(); // 148mm
+
+    await loadLogo();
+
+    let y = drawStandardHeaderA5(doc, {
+        title: 'KWITANSI PEMBAYARAN',
+        subtitle: 'Bukti Pembayaran',
+        invoiceNumber,
+    });
+
+    const labelX = 10;
+    const valueX = 50;
+
+    // Info block
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Informasi Pembayaran', labelX, y);
+    y += 5;
+
+    const infoRows: [string, string][] = [
+        ['Nama Siswa', studentName],
+        ['Tanggal Bayar', date],
+        ['Metode Bayar', paymentMethod],
+        ['No. Invoice', invoiceNumber],
+    ];
+
+    doc.setFontSize(6);
+    for (const [label, value] of infoRows) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, labelX, y);
+        doc.setTextColor(30, 41, 59);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`: ${value}`, valueX, y);
+        y += 4.5;
+    }
+
+    y += 3;
+
+    // Bills table header
+    const tableW = pageWidth - 20;
+    doc.setFillColor(15, 23, 42);
+    doc.rect(labelX, y, tableW, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.text('No.', labelX + 2, y + 4);
+    doc.text('Keterangan', labelX + 10, y + 4);
+    doc.text('Jumlah', pageWidth - 10, y + 4, { align: 'right' });
+    y += 6;
+
+    const formatRp = (n: number) =>
+        new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+    bills.forEach((bill, idx) => {
+        const rowBg = idx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+        doc.setFillColor(rowBg[0], rowBg[1], rowBg[2]);
+        doc.rect(labelX, y, tableW, 6, 'F');
+
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(idx + 1), labelX + 2, y + 4);
+        doc.text(bill.title, labelX + 10, y + 4);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatRp(bill.amount), pageWidth - 10, y + 4, { align: 'right' });
+        y += 6;
+    });
+
+    // Total row
+    doc.setFillColor(15, 23, 42);
+    doc.rect(labelX, y, tableW, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL', labelX + 2, y + 4.5);
+    doc.text(formatRp(totalAmount), pageWidth - 10, y + 4.5, { align: 'right' });
+    y += 11;
+
+    // Note
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'italic');
+    doc.text('* Dokumen ini merupakan bukti pembayaran yang sah.', labelX, y);
+    y += 6;
+
+    // Signatures & verification
+    const { signatures, verificationCode } = await generateLocalSignatures(
+        'INVOICE-A5',
+        invoiceNumber,
+        totalAmount,
+        date,
+    );
+    const sigsToUse = params.signatures || signatures;
+
+    y = await drawSignatureBlockCompact(doc, y, sigsToUse);
+    y = await drawVerificationFooterCompact(doc, y, verificationCode);
+
+    doc.save(`invoice-a5-${invoiceNumber}.pdf`);
+}
+
+// ─── Multi-Payment Invoice ───
+export interface MultiPaymentBillItem {
+    title: string;
+    amount: number;
+}
+
+export async function generateMultiPaymentInvoice(params: {
+    invoiceNumber: string;
+    studentName: string;
+    paymentMethod: string;
+    bills: MultiPaymentBillItem[];
+    totalAmount: number;
+    date: string;
+    signatures?: StakeholderSignature[];
+}): Promise<void> {
+    const { invoiceNumber, studentName, paymentMethod, bills, totalAmount, date } = params;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Ensure logo is loaded
+    await loadLogo();
+
+    // Draw header
+    let y = drawStandardHeader(doc, {
+        title: 'KWITANSI PEMBAYARAN',
+        subtitle: 'Pembayaran Multi-Tagihan',
+        invoiceNumber,
+    });
+
+    // Info block
+    const labelX = 14;
+    const valueX = 60;
+
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Informasi Pembayaran', labelX, y);
+    y += 6;
+
+    const infoRows: [string, string][] = [
+        ['Nama Siswa', studentName],
+        ['Tanggal Bayar', date],
+        ['Metode Pembayaran', paymentMethod],
+        ['No. Invoice', invoiceNumber],
+    ];
+
+    doc.setFontSize(8);
+    for (const [label, value] of infoRows) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, labelX, y);
+        doc.setTextColor(30, 41, 59);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`: ${value}`, valueX, y);
+        y += 5;
+    }
+
+    y += 4;
+
+    // Bills table header
+    doc.setFillColor(15, 23, 42);
+    doc.rect(labelX, y, pageWidth - 28, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('No.', labelX + 2, y + 4.5);
+    doc.text('Keterangan Tagihan', labelX + 12, y + 4.5);
+    doc.text('Jumlah', pageWidth - 14, y + 4.5, { align: 'right' });
+    y += 7;
+
+    // Bills rows
+    const formatRp = (n: number) =>
+        new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+    bills.forEach((bill, idx) => {
+        const rowBg = idx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+        doc.setFillColor(rowBg[0], rowBg[1], rowBg[2]);
+        doc.rect(labelX, y, pageWidth - 28, 7, 'F');
+
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(idx + 1), labelX + 2, y + 4.5);
+        doc.text(bill.title, labelX + 12, y + 4.5);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatRp(bill.amount), pageWidth - 14, y + 4.5, { align: 'right' });
+        y += 7;
+    });
+
+    // Total row
+    doc.setFillColor(15, 23, 42);
+    doc.rect(labelX, y, pageWidth - 28, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL PEMBAYARAN', labelX + 2, y + 5.5);
+    doc.text(formatRp(totalAmount), pageWidth - 14, y + 5.5, { align: 'right' });
+    y += 12;
+
+    // Note
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.text('* Dokumen ini merupakan bukti pembayaran yang sah.', labelX, y);
+    y += 8;
+
+    // Generate signatures & verification
+    const { signatures, verificationCode } = await generateLocalSignatures(
+        'MULTI-PAYMENT',
+        invoiceNumber,
+        totalAmount,
+        date,
+    );
+    const sigsToUse = params.signatures || signatures;
+
+    y = await drawSignatureBlock(doc, y, sigsToUse);
+    y = await drawVerificationFooter(doc, y, verificationCode);
+
+    addPageFooters(doc);
+
+    doc.save(`invoice-multi-${invoiceNumber}.pdf`);
+}
+
+// ─── Invoice A5 Double (two A5 invoices on one A4 page) ───
+export interface InvoiceA5Params {
+    invoiceNumber: string;
+    studentName: string;
+    paymentMethod: string;
+    bills: { title: string; amount: number }[];
+    totalAmount: number;
+    date: string;
+    signatures?: StakeholderSignature[];
+}
+
+/**
+ * Renders a single A5 invoice section at a given y-offset on an A4 page.
+ * All coordinates are offset by `yOffset` to place the invoice in the correct half.
+ */
+async function renderInvoiceSection(
+    doc: jsPDF,
+    params: InvoiceA5Params,
+    yOffset: number
+): Promise<void> {
+    const { invoiceNumber, studentName, paymentMethod, bills, totalAmount, date } = params;
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210mm (A4 width)
+
+    // A5 content area margins (scaled to fit within 210mm wide A4)
+    const labelX = 10;
+    const valueX = 55;
+    const tableW = pageWidth - 20;
+    const color: [number, number, number] = [15, 23, 42];
+
+    const formatRp = (n: number) =>
+        new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+    // ── Header ──
+    const headerH = 36;
+    doc.setFillColor(...color);
+    doc.rect(0, yOffset, pageWidth, headerH, 'F');
+
+    if (logoBase64) {
+        try { doc.addImage(logoBase64, 'PNG', 8, yOffset + 3, 11, 11); } catch { }
+    }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.text('YAYASAN PPI 100', pageWidth / 2, yOffset + 6, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text('SDIT AN-NUR', pageWidth / 2, yOffset + 12, { align: 'center' });
+
+    doc.setFontSize(5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Jl. Pesantren No. 100', pageWidth / 2, yOffset + 16, { align: 'center' });
+
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.2);
+    doc.line(8, yOffset + 18, pageWidth - 8, yOffset + 18);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KWITANSI PEMBAYARAN', pageWidth / 2, yOffset + 25, { align: 'center' });
+
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`No: ${invoiceNumber}`, pageWidth / 2, yOffset + 30, { align: 'center' });
+
+    let y = yOffset + headerH + 4;
+
+    // ── Info block ──
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Informasi Pembayaran', labelX, y);
+    y += 4;
+
+    const infoRows: [string, string][] = [
+        ['Nama Siswa', studentName],
+        ['Tanggal Bayar', date],
+        ['Metode Bayar', paymentMethod],
+        ['No. Invoice', invoiceNumber],
+    ];
+
+    doc.setFontSize(6);
+    for (const [label, value] of infoRows) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, labelX, y);
+        doc.setTextColor(30, 41, 59);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`: ${value}`, valueX, y);
+        y += 4;
+    }
+
+    y += 2;
+
+    // ── Bills table ──
+    doc.setFillColor(...color);
+    doc.rect(labelX, y, tableW, 5.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.text('No.', labelX + 2, y + 3.5);
+    doc.text('Keterangan', labelX + 10, y + 3.5);
+    doc.text('Jumlah', pageWidth - 10, y + 3.5, { align: 'right' });
+    y += 5.5;
+
+    bills.forEach((bill, idx) => {
+        const rowBg = idx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+        doc.setFillColor(rowBg[0], rowBg[1], rowBg[2]);
+        doc.rect(labelX, y, tableW, 5.5, 'F');
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(idx + 1), labelX + 2, y + 3.5);
+        doc.text(bill.title, labelX + 10, y + 3.5);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatRp(bill.amount), pageWidth - 10, y + 3.5, { align: 'right' });
+        y += 5.5;
+    });
+
+    // Total row
+    doc.setFillColor(...color);
+    doc.rect(labelX, y, tableW, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL', labelX + 2, y + 4);
+    doc.text(formatRp(totalAmount), pageWidth - 10, y + 4, { align: 'right' });
+    y += 9;
+
+    // Note
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'italic');
+    doc.text('* Dokumen ini merupakan bukti pembayaran yang sah.', labelX, y);
+    y += 5;
+
+    // ── Compact signature block ──
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.2);
+    doc.line(labelX, y, pageWidth - 10, y);
+    y += 3;
+
+    const { signatures, verificationCode } = await generateLocalSignatures(
+        'INVOICE-A5',
+        invoiceNumber,
+        totalAmount,
+        date,
+    );
+    const sigsToUse = params.signatures || signatures;
+
+    const colW = (pageWidth - 20) / Math.max(sigsToUse.length, 1);
+    for (let i = 0; i < sigsToUse.length; i++) {
+        const sig = sigsToUse[i];
+        const x = labelX + i * colW;
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(sig.role_label + ',', x, y + 3);
+
+        try {
+            const sigQr = await QRCode.toDataURL(sig.short_code, {
+                margin: 0, width: 40,
+                color: { dark: '#1e293b', light: '#ffffff' }
+            });
+            doc.addImage(sigQr, 'PNG', x, y + 4, 9, 9);
+        } catch {
+            doc.setDrawColor(148, 163, 184);
+            doc.line(x, y + 14, x + colW - 6, y + 14);
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(5.5);
+        doc.text(sig.name, x, y + 15);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(4);
+        doc.text(sig.short_code, x, y + 18);
+    }
+
+    y += 22;
+
+    // ── Compact verification footer ──
+    try {
+        const qrDataUrl = await QRCode.toDataURL(
+            `${window.location.origin}/verify?code=${verificationCode}`,
+            { width: 60, margin: 1, color: { dark: '#1e293b', light: '#ffffff' } }
+        );
+        doc.addImage(qrDataUrl, 'PNG', labelX, y, 12, 12);
+    } catch { }
+
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Ditandatangani digital.', labelX + 14, y + 4);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Verifikasi: ${verificationCode}`, labelX + 14, y + 8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5);
+    const printedDate = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`Dicetak: ${printedDate}`, labelX + 14, y + 12);
+}
+
+/**
+ * Generates a single A4 PDF containing two A5 invoices stacked vertically.
+ * The first invoice occupies the top half (0–148mm) and the second the bottom half (148–297mm).
+ * A dashed cut line is drawn at the midpoint (148mm).
+ *
+ * Requirements: 4.2
+ */
+export async function generateInvoiceA5Double(
+    invoice1: InvoiceA5Params,
+    invoice2: InvoiceA5Params
+): Promise<void> {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();   // 210mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+    const halfHeight = pageHeight / 2;                    // 148.5mm
+
+    await loadLogo();
+
+    // Render first invoice in the top half
+    await renderInvoiceSection(doc, invoice1, 0);
+
+    // ── Dashed cut line at midpoint ──
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.3);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.line(5, halfHeight, pageWidth - 5, halfHeight);
+    doc.setLineDashPattern([], 0); // reset dash
+
+    // Scissors icon text near the cut line
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('(Potong di sini)', 2, halfHeight + 1);
+
+    // Render second invoice in the bottom half
+    await renderInvoiceSection(doc, invoice2, halfHeight + 1);
+
+    doc.save(`invoice-a5-double-${invoice1.invoiceNumber}.pdf`);
 }

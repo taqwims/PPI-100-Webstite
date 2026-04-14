@@ -12,7 +12,7 @@ type InvoiceSignature struct {
 	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	InvoiceType     string    `gorm:"not null" json:"invoice_type"`      // Payroll, CashLedger, Bill, Obligation, Infaq, Activity, RKAS, Debt, Savings
 	ReferenceID     string    `gorm:"not null" json:"reference_id"`      // UUID or ID of the source record
-	StakeholderRole string    `gorm:"not null" json:"stakeholder_role"`  // principal, treasurer, chairman
+	StakeholderRole string    `gorm:"not null" json:"stakeholder_role"`  // principal, treasurer, committee, admin_tu, chairman
 	StakeholderName string    `gorm:"not null" json:"stakeholder_name"`  // Display name
 	SignatureHash   string    `gorm:"not null" json:"signature_hash"`    // Full HMAC-SHA256
 	ShortCode       string    `gorm:"not null" json:"short_code"`        // SIG-PRI-xxxxxxxxxxxx
@@ -49,8 +49,8 @@ type InvoiceNumberConfig struct {
 
 type StakeholderConfig struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
-	Role            string    `gorm:"uniqueIndex;not null" json:"role"` // principal, treasurer, chairman
-	DisplayLabel    string    `gorm:"not null" json:"display_label"`    // Kepala Sekolah, Bendahara, Ketua Yayasan
+	Role            string    `gorm:"uniqueIndex;not null" json:"role"` // principal, treasurer, committee, admin_tu, chairman
+	DisplayLabel    string    `gorm:"not null" json:"display_label"`    // Kepala Sekolah, Bendahara, Komite, Tata Usaha, Ketua Yayasan
 	Name            string    `gorm:"not null" json:"name"`             // Actual person's name
 	NIP             string    `json:"nip"`                              // Optional NIP/ID number
 	IsActive        bool      `gorm:"default:true" json:"is_active"`

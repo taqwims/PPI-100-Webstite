@@ -15,6 +15,7 @@ import (
 func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	// Enable CORS
 	r.Use(middleware.CORSMiddleware())
+	r.Static("/uploads", "./uploads")
 
 	// Repositories
 	userRepo := postgres.NewUserRepository(db)
@@ -48,8 +49,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	notificationUsecase := usecase.NewNotificationUsecase(notificationRepo, waService)
 	notificationHandler := handlers.NewNotificationHandler(notificationUsecase)
 
-	// Reuse existing userRepo
-	userUsecase := usecase.NewUserUsecase(userRepo)
+	// Reuse existing userRepo and studentRepo
+	userUsecase := usecase.NewUserUsecase(userRepo, studentRepo)
 	userHandler := handlers.NewUserHandler(userUsecase)
 
 	bkRepo := postgres.NewBKRepository(db)
@@ -73,17 +74,23 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	financeRepo := postgres.NewFinanceRepository(db)
 	budgetRepo := postgres.NewBudgetRepository(db)
-	
-	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo, studentRepo, budgetRepo, studentObligationRepo, activityRepo)
-	financeHandler := handlers.NewFinanceHandler(financeUsecase)
 
+	// Invoice Signature & Config - Need this early for FinanceUsecase
+	invoiceSignatureRepo := postgres.NewInvoiceSignatureRepository(db)
+	invoiceSignatureUsecase := usecase.NewInvoiceSignatureUsecase(invoiceSignatureRepo)
+	invoiceSignatureHandler := handlers.NewInvoiceSignatureHandler(invoiceSignatureUsecase)
+
+	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo, studentRepo, budgetRepo, studentObligationRepo, activityRepo, invoiceSignatureUsecase)
+	
+	// Midtrans Payment Gateway - initialized early because FinanceHandler needs it
+	midtransUsecase := usecase.NewMidtransUsecase(cfg, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
+	midtransHandler := handlers.NewMidtransHandler(midtransUsecase)
+
+	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase)
+	
 	payrollRepo := postgres.NewPayrollRepository(db)
 	payrollUsecase := usecase.NewPayrollUsecase(payrollRepo, userRepo, financeRepo)
 	payrollHandler := handlers.NewPayrollHandler(payrollUsecase)
-
-	// Midtrans Payment Gateway
-	midtransUsecase := usecase.NewMidtransUsecase(cfg, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
-	midtransHandler := handlers.NewMidtransHandler(midtransUsecase)
 
 	financeExtendedRepo := postgres.NewFinanceExtendedRepository(db)
 	financeExtendedUsecase := usecase.NewFinanceExtendedUsecase(financeExtendedRepo, budgetRepo)
@@ -123,10 +130,20 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	externalDebtUsecase := usecase.NewExternalDebtUsecase(externalDebtRepo)
 	externalDebtHandler := handlers.NewExternalDebtHandler(externalDebtUsecase)
 
-	// Invoice Signature & Config
-	invoiceSignatureRepo := postgres.NewInvoiceSignatureRepository(db)
-	invoiceSignatureUsecase := usecase.NewInvoiceSignatureUsecase(invoiceSignatureRepo)
-	invoiceSignatureHandler := handlers.NewInvoiceSignatureHandler(invoiceSignatureUsecase)
+	// PPDB Payment
+	ppdbPaymentRepo := postgres.NewPPDBPaymentRepository(db)
+	ppdbPaymentUsecase := usecase.NewPPDBPaymentUsecase(ppdbPaymentRepo, publicRepo, invoiceSignatureUsecase)
+	ppdbPaymentHandler := handlers.NewPPDBPaymentHandler(ppdbPaymentUsecase)
+
+	// Asset Management
+	assetRepo := postgres.NewAssetRepository(db)
+	assetUsecase := usecase.NewAssetUsecase(assetRepo)
+	assetHandler := handlers.NewAssetHandler(assetUsecase)
+
+	// Asset Category
+	assetCategoryRepo := postgres.NewAssetCategoryRepository(db)
+	assetCategoryUsecase := usecase.NewAssetCategoryUsecase(assetCategoryRepo)
+	assetCategoryHandler := handlers.NewAssetCategoryHandler(assetCategoryUsecase)
 
 	// Public Routes
 	api := r.Group("/api")
@@ -214,10 +231,13 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 			// Payments — admin dan bendahara
 			finance.POST("/payments", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.RecordPayment)
+			finance.GET("/payments/pending", middleware.RoleMiddleware(1, 9), financeHandler.GetPendingPayments)
+			finance.POST("/payments/:id/approve", middleware.RoleMiddleware(1, 9), financeHandler.ApprovePayment)
 			finance.PUT("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.UpdatePayment)
 			finance.DELETE("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.DeletePayment)
 			finance.POST("/payment-proof", financeHandler.UploadPaymentProof)
 			finance.POST("/bills/batch", middleware.RoleMiddleware(1, 2, 3, 9), financeHandler.CreateBillBatch)
+			finance.POST("/bills/multi-payment", middleware.RoleMiddleware(1, 2, 3, 6, 7, 9), financeHandler.MultiPayment)
 
 			// Midtrans Snap (authenticated)
 			finance.POST("/midtrans/create-transaction", midtransHandler.CreateSnapTransaction)
@@ -255,6 +275,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalHistory)
 			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalReturns)
 			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsPoolSummary)
+			finance.GET("/savings/recap", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingsRecap)
 
 			finance.POST("/payroll", middleware.RoleMiddleware(1, 9), payrollHandler.CreatePayroll)
 			finance.GET("/payroll", middleware.RoleMiddleware(1, 4, 9), payrollHandler.GetPayrolls)
@@ -368,6 +389,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		{
 			users.GET("/", middleware.RoleMiddleware(1, 2, 3, 9), userHandler.GetAllUsers)
 			users.POST("/", middleware.RoleMiddleware(1, 2, 3), userHandler.CreateUser)
+			users.POST("/bulk", middleware.RoleMiddleware(1, 2, 3), userHandler.BulkCreateUsers)
 			users.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.UpdateUser)
 			users.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.DeleteUser)
 		}
@@ -416,7 +438,29 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			ppdb.GET("/", publicHandler.GetPPDBRegistrations)
 			ppdb.PUT("/:id/status", publicHandler.UpdatePPDBStatus)
 			ppdb.DELETE("/:id", publicHandler.DeletePPDBRegistration)
+
+			// PPDB Payments
+			ppdb.POST("/payments", middleware.RoleMiddleware(1, 2, 3, 9), ppdbPaymentHandler.CreatePayment)
+			ppdb.GET("/payments", middleware.RoleMiddleware(1, 2, 3, 9), ppdbPaymentHandler.GetPayments)
+			ppdb.GET("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), ppdbPaymentHandler.GetPaymentByID)
+			ppdb.PUT("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), ppdbPaymentHandler.UpdatePayment)
+			ppdb.DELETE("/payments/:id", middleware.RoleMiddleware(1, 2, 3, 9), ppdbPaymentHandler.DeletePayment)
 		}
+
+		// Asset Management
+		// Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 8=Pimpinan, 9=Bendahara, 10=TU
+		protected.POST("/assets", middleware.RoleMiddleware(1, 2, 3, 10), assetHandler.CreateAsset)
+		protected.GET("/assets", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10), assetHandler.GetAssets)
+		protected.GET("/assets/recap", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10), assetHandler.GetAssetRecap)
+		protected.GET("/assets/:id", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10), assetHandler.GetAssetByID)
+		protected.PUT("/assets/:id", middleware.RoleMiddleware(1, 2, 3, 10), assetHandler.UpdateAsset)
+		protected.DELETE("/assets/:id", middleware.RoleMiddleware(1, 2, 3), assetHandler.DeleteAsset)
+
+		// Asset Categories
+		protected.POST("/assets/categories", middleware.RoleMiddleware(1, 2, 3, 10), assetCategoryHandler.Create)
+		protected.GET("/assets/categories", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10), assetCategoryHandler.GetAll)
+		protected.PUT("/assets/categories/:id", middleware.RoleMiddleware(1, 2, 3, 10), assetCategoryHandler.Update)
+		protected.DELETE("/assets/categories/:id", middleware.RoleMiddleware(1, 2, 3, 10), assetCategoryHandler.Delete)
 
 		// Public Content Management (Admin)
 		publicContent := protected.Group("/public-content")

@@ -189,7 +189,6 @@ const CashLedger = () => {
             fetchLedger();
             toast.success(editingEntry ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil disimpan');
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menyimpan data kas');
         } finally {
             setSubmitting(false);
         }
@@ -201,7 +200,6 @@ const CashLedger = () => {
             fetchLedger();
             toast.success('Data berhasil dihapus');
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menghapus data kas');
         }
     };
 

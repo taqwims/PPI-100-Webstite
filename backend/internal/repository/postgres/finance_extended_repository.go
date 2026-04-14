@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository"
 	"time"
@@ -221,9 +222,14 @@ func (r *financeExtendedRepository) DeleteDailyInfaqEntry(id string) error {
 
 // ------------------- Savings (Extended) -------------------
 
-func (r *financeExtendedRepository) GetAllSavingAccounts() ([]domain.SavingAccount, error) {
+func (r *financeExtendedRepository) GetAllSavingAccounts(classID *uint) ([]domain.SavingAccount, error) {
 	var accounts []domain.SavingAccount
-	if err := r.db.Preload("Student").Preload("Student.User").Preload("Student.Class").Order("updated_at desc").Find(&accounts).Error; err != nil {
+	query := r.db.Preload("Student").Preload("Student.User").Preload("Student.Class")
+	if classID != nil {
+		query = query.Select("saving_accounts.*").Joins("JOIN students ON students.id = saving_accounts.student_id").
+			Where("students.class_id = ?", *classID)
+	}
+	if err := query.Order("saving_accounts.updated_at desc").Find(&accounts).Error; err != nil {
 		return nil, err
 	}
 	return accounts, nil
@@ -420,5 +426,102 @@ func (r *financeExtendedRepository) GetSavingsPoolSummary() (map[string]interfac
 	summary["available_balance"] = totalBalance.Float64 - outstandingDebt
 
 	return summary, nil
+}
+
+// ------------------- Savings Recap -------------------
+
+func (r *financeExtendedRepository) GetSavingsRecap(params domain.SavingsRecapParams) (*domain.SavingsRecapResponse, error) {
+	// Determine date range and period label
+	var startDate, endDate time.Time
+	var periodLabel string
+
+	switch params.PeriodType {
+	case "monthly":
+		startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)
+		periodLabel = fmt.Sprintf("Tahun %d (Per Bulan)", params.Year)
+	case "range":
+		startDate = params.StartDate
+		endDate = params.EndDate
+		periodLabel = fmt.Sprintf("%s s/d %s", startDate.Format("02 Jan 2006"), endDate.Format("02 Jan 2006"))
+	case "semester":
+		if params.Semester == 1 {
+			// Semester 1 = Juli–Desember
+			startDate = time.Date(params.Year, time.July, 1, 0, 0, 0, 0, time.UTC)
+			endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)
+			periodLabel = fmt.Sprintf("Semester 1 (Juli–Desember %d)", params.Year)
+		} else {
+			// Semester 2 = Januari–Juni
+			startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
+			endDate = time.Date(params.Year, time.June, 30, 23, 59, 59, 0, time.UTC)
+			periodLabel = fmt.Sprintf("Semester 2 (Januari–Juni %d)", params.Year)
+		}
+	case "yearly":
+		startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)
+		periodLabel = fmt.Sprintf("Tahun %d", params.Year)
+	default:
+		return nil, fmt.Errorf("period_type tidak valid: %s", params.PeriodType)
+	}
+
+	type recapRow struct {
+		StudentID     string  `gorm:"column:student_id"`
+		StudentName   string  `gorm:"column:student_name"`
+		ClassName     string  `gorm:"column:class_name"`
+		TotalDeposit  float64 `gorm:"column:total_deposit"`
+		TotalWithdraw float64 `gorm:"column:total_withdraw"`
+		EndBalance    float64 `gorm:"column:end_balance"`
+	}
+
+	query := r.db.Table("saving_transactions st").
+		Select(`
+			sa.student_id::text AS student_id,
+			u.name AS student_name,
+			c.name AS class_name,
+			COALESCE(SUM(CASE WHEN st.type = 'Deposit' THEN st.amount ELSE 0 END), 0) AS total_deposit,
+			COALESCE(SUM(CASE WHEN st.type = 'Withdrawal' THEN st.amount ELSE 0 END), 0) AS total_withdraw,
+			MAX(sa.balance) AS end_balance
+		`).
+		Joins("JOIN saving_accounts sa ON sa.id = st.account_id").
+		Joins("JOIN students s ON s.id = sa.student_id").
+		Joins("JOIN users u ON u.id = s.user_id").
+		Joins("JOIN classes c ON c.id = s.class_id").
+		Where("st.date >= ? AND st.date <= ?", startDate, endDate).
+		Group("sa.student_id, u.name, c.name, sa.balance").
+		Order("c.name, u.name")
+
+	if params.ClassID != nil {
+		query = query.Where("s.class_id = ?", *params.ClassID)
+	}
+
+	var rows []recapRow
+	if err := query.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	recapRows := make([]domain.SavingsRecapRow, 0, len(rows))
+	var grandDeposit, grandWithdraw float64
+
+	for _, row := range rows {
+		studentUUID, _ := uuid.Parse(row.StudentID)
+		recapRows = append(recapRows, domain.SavingsRecapRow{
+			StudentID:     studentUUID,
+			StudentName:   row.StudentName,
+			ClassName:     row.ClassName,
+			TotalDeposit:  row.TotalDeposit,
+			TotalWithdraw: row.TotalWithdraw,
+			EndBalance:    row.EndBalance,
+		})
+		grandDeposit += row.TotalDeposit
+		grandWithdraw += row.TotalWithdraw
+	}
+
+	return &domain.SavingsRecapResponse{
+		Period:        periodLabel,
+		Rows:          recapRows,
+		GrandDeposit:  grandDeposit,
+		GrandWithdraw: grandWithdraw,
+		GrandBalance:  grandDeposit - grandWithdraw,
+	}, nil
 }
 

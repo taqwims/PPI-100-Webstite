@@ -119,7 +119,6 @@ func (u *MidtransUsecase) CreateSnapTransaction(billID uuid.UUID, amount float64
 	return snapResp.Token, snapResp.RedirectURL, orderID, nil
 }
 
-// HandleNotification processes webhook notification from Midtrans
 func (u *MidtransUsecase) HandleNotification(notificationPayload map[string]interface{}) error {
 	orderID, ok := notificationPayload["order_id"].(string)
 	if !ok || orderID == "" {
@@ -138,6 +137,43 @@ func (u *MidtransUsecase) HandleNotification(notificationPayload map[string]inte
 	return u.processPaymentStatus(orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
 }
 
+// CreateMultiSnapTransaction creates a Midtrans Snap transaction for multiple bills
+func (u *MidtransUsecase) CreateMultiSnapTransaction(orderID string, totalAmount float64, student *domain.Student, billIDs []string) (string, string, string, error) {
+	if student == nil {
+		return "", "", "", fmt.Errorf("student data missing")
+	}
+
+	req := &snap.Request{
+		TransactionDetails: midtrans.TransactionDetails{
+			OrderID:  orderID,
+			GrossAmt: int64(totalAmount),
+		},
+		CustomerDetail: &midtrans.CustomerDetails{
+			FName: student.User.Name,
+			Email: student.User.Email,
+		},
+	}
+
+	// Add item details for each bill (summarized or descriptive)
+	itemDetails := []midtrans.ItemDetails{
+		{
+			ID:    "MULTI",
+			Price: int64(totalAmount),
+			Qty:   1,
+			Name:  fmt.Sprintf("Pembayaran %d Tagihan", len(billIDs)),
+		},
+	}
+	req.Items = &itemDetails
+
+	snapResp, midErr := u.snapClient.CreateTransaction(req)
+	if midErr != nil {
+		log.Printf("Midtrans Snap error: %v", midErr.GetMessage())
+		return "", "", "", fmt.Errorf("failed to create Midtrans multi-transaction: %s", midErr.GetMessage())
+	}
+
+	return snapResp.Token, snapResp.RedirectURL, orderID, nil
+}
+
 // CheckTransactionStatus checks payment status directly with Midtrans API
 // This is called from the frontend after Snap popup completes, to handle cases
 // where the webhook can't reach the server (e.g. localhost development)
@@ -145,6 +181,11 @@ func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (string, error)
 	// Verify transaction status with Midtrans
 	transactionStatusResp, midErr := u.coreClient.CheckTransaction(orderID)
 	if midErr != nil {
+		// Handle 404/Not Found from Midtrans gracefully to avoid 500 errors on UX
+		if midErr.GetMessage() == "Transaction doesn't exist." {
+			log.Printf("Midtrans status check - OrderID %s not found in Midtrans (Uninitiated)", orderID)
+			return "Uninitiated", nil
+		}
 		return "", fmt.Errorf("failed to check transaction: %s", midErr.GetMessage())
 	}
 
@@ -167,110 +208,120 @@ func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (string, error)
 
 // processPaymentStatus is the shared logic for updating payment and bill status
 func (u *MidtransUsecase) processPaymentStatus(orderID string, transactionStatus string, fraudStatus string) error {
-	// Find the payment record by transaction_id (order_id)
-	payment, err := u.financeRepo.GetPaymentByTransactionID(orderID)
+	// Find all payment records by transaction_id (order_id)
+	payments, err := u.financeRepo.GetPaymentsByTransactionID(orderID)
 	if err != nil {
-		return fmt.Errorf("payment not found for order_id %s: %w", orderID, err)
+		return fmt.Errorf("payments not found for order_id %s: %w", orderID, err)
 	}
 
-	// If already processed as Success, skip
-	if payment.Status == "Success" {
-		return nil
+	if len(payments) == 0 {
+		return fmt.Errorf("no payments found for order_id %s", orderID)
 	}
 
-	// Update payment status based on Midtrans response
-	switch transactionStatus {
-	case "capture":
-		if fraudStatus == "accept" {
+	for i := range payments {
+		payment := &payments[i]
+
+		// If already processed as Success, skip this individual payment
+		if payment.Status == "Success" {
+			continue
+		}
+
+		// Update payment status based on Midtrans response
+		switch transactionStatus {
+		case "capture":
+			if fraudStatus == "accept" {
+				payment.Status = "Success"
+				payment.PaidAt = time.Now()
+			} else if fraudStatus == "challenge" {
+				payment.Status = "Pending"
+			}
+		case "settlement":
 			payment.Status = "Success"
 			payment.PaidAt = time.Now()
-		} else if fraudStatus == "challenge" {
+		case "pending":
 			payment.Status = "Pending"
-		}
-	case "settlement":
-		payment.Status = "Success"
-		payment.PaidAt = time.Now()
-	case "pending":
-		payment.Status = "Pending"
-	case "cancel", "expire":
-		payment.Status = "Failed"
-	case "deny":
-		payment.Status = "Failed"
-	default:
-		log.Printf("Unknown transaction status: %s", transactionStatus)
-		return nil
-	}
-
-	// Save updated payment
-	if err := u.financeRepo.UpdatePayment(payment); err != nil {
-		return fmt.Errorf("failed to update payment: %w", err)
-	}
-
-	// If payment is successful, update bill status and sync to CashLedger
-	if payment.Status == "Success" {
-		bill, err := u.financeRepo.GetBillByID(payment.BillID.String())
-		if err != nil {
-			return fmt.Errorf("failed to get bill: %w", err)
+		case "cancel", "expire":
+			payment.Status = "Failed"
+		case "deny":
+			payment.Status = "Failed"
+		default:
+			log.Printf("Unknown transaction status: %s", transactionStatus)
+			continue
 		}
 
-		// Calculate total paid
-		totalPaid := float64(0)
-		for _, p := range bill.Payments {
-			if p.Status == "Success" {
-				totalPaid += p.Amount
+		// Save updated payment
+		if err := u.financeRepo.UpdatePayment(payment); err != nil {
+			log.Printf("failed to update payment %s: %v", payment.ID, err)
+			continue
+		}
+
+		// If payment is successful, update bill status and sync to CashLedger
+		if payment.Status == "Success" {
+			bill, err := u.financeRepo.GetBillByID(payment.BillID.String())
+			if err != nil {
+				log.Printf("failed to get bill for payment %s: %v", payment.ID, err)
+				continue
 			}
-		}
 
-		// Update bill status
-		if totalPaid >= bill.Amount {
-			_ = u.financeRepo.UpdateBillStatus(payment.BillID.String(), "Paid")
-		} else {
-			_ = u.financeRepo.UpdateBillStatus(payment.BillID.String(), "Partial")
-		}
-
-		// Sync to CashLedger
-		category := "Lain-lain"
-		if bill.TransactionCode != nil {
-			category = bill.TransactionCode.Category
-		} else if bill.BillType != "" {
-			category = bill.BillType
-		}
-
-		cashLedgerEntry := domain.CashLedger{
-			Date:              time.Now(),
-			Source:            bill.Student.User.Name,
-			ItemName:          "Pembayaran Midtrans - " + bill.Title,
-			Type:              "Income",
-			Amount:            payment.Amount,
-			Category:          category,
-			TransactionCodeID: bill.TransactionCodeID,
-		}
-		_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
-
-		// Send notifications
-		_ = u.notificationUsecase.SendNotification(
-			bill.Student.UserID,
-			"Pembayaran Berhasil",
-			fmt.Sprintf("Pembayaran %s sebesar Rp%.0f via Midtrans telah berhasil.", bill.Title, payment.Amount),
-			"payment",
-			bill.ID.String(),
-		)
-
-		if bill.Student.ParentID != nil {
-			parent, err := u.studentRepo.GetParentByID(bill.Student.ParentID.String())
-			if err == nil {
-				_ = u.notificationUsecase.SendNotification(
-					parent.UserID,
-					"Pembayaran Tagihan Anak Berhasil",
-					fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f via Midtrans telah berhasil.", bill.Title, bill.Student.User.Name, payment.Amount),
-					"payment",
-					bill.ID.String(),
-				)
+			// Calculate total paid across all successful payments for this bill
+			totalPaid := float64(0)
+			for _, p := range bill.Payments {
+				if p.Status == "Success" || p.ID == payment.ID { // Include current payment
+					totalPaid += p.Amount
+				}
 			}
-		}
 
-		// Sync payment status back to StudentObligation or ActivityObligation
-		u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
+			// Update bill status
+			newBillStatus := "Partial"
+			if totalPaid >= bill.Amount {
+				newBillStatus = "Paid"
+			}
+			_ = u.financeRepo.UpdateBillStatus(payment.BillID.String(), newBillStatus)
+
+			// Sync to CashLedger
+			category := "Lain-lain"
+			if bill.TransactionCode != nil {
+				category = bill.TransactionCode.Category
+			} else if bill.BillType != "" {
+				category = bill.BillType
+			}
+
+			cashLedgerEntry := domain.CashLedger{
+				Date:              time.Now(),
+				Source:            bill.Student.User.Name,
+				ItemName:          "Pembayaran Midtrans - " + bill.Title,
+				Type:              "Income",
+				Amount:            payment.Amount,
+				Category:          category,
+				TransactionCodeID: bill.TransactionCodeID,
+			}
+			_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
+
+			// Send notifications
+			_ = u.notificationUsecase.SendNotification(
+				bill.Student.UserID,
+				"Pembayaran Berhasil",
+				fmt.Sprintf("Pembayaran %s sebesar Rp%.0f via Midtrans telah berhasil.", bill.Title, payment.Amount),
+				"payment",
+				bill.ID.String(),
+			)
+
+			if bill.Student.ParentID != nil {
+				parent, err := u.studentRepo.GetParentByID(bill.Student.ParentID.String())
+				if err == nil {
+					_ = u.notificationUsecase.SendNotification(
+						parent.UserID,
+						"Pembayaran Tagihan Anak Berhasil",
+						fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f via Midtrans telah berhasil.", bill.Title, bill.Student.User.Name, payment.Amount),
+						"payment",
+						bill.ID.String(),
+					)
+				}
+			}
+
+			// Sync payment status back to StudentObligation or ActivityObligation
+			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
+		}
 	}
 
 	return nil

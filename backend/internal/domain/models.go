@@ -342,6 +342,29 @@ type PPDBRegistration struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type PPDBPayment struct {
+	ID                 uuid.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	PPDBRegistrationID uuid.UUID          `gorm:"type:uuid;not null" json:"ppdb_registration_id"`
+	PPDBRegistration   PPDBRegistration   `gorm:"foreignKey:PPDBRegistrationID" json:"ppdb_registration"`
+	InvoiceNumber      string             `gorm:"unique;not null" json:"invoice_number"`
+	TotalAmount        float64            `gorm:"not null;default:0" json:"total_amount"`
+	PaidAmount         float64            `gorm:"not null;default:0" json:"paid_amount"`
+	Status             string             `gorm:"not null;default:'Belum Bayar'" json:"status"` // Belum Bayar, DP Terpenuhi, Lunas
+	Items              []PPDBPaymentItem  `gorm:"foreignKey:PPDBPaymentID" json:"items,omitempty"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+
+type PPDBPaymentItem struct {
+	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	PPDBPaymentID  uuid.UUID `gorm:"type:uuid;not null" json:"ppdb_payment_id"`
+	ItemName       string    `gorm:"not null" json:"item_name"`        // "Uang Bangunan", "Uang Tes Kemampuan"
+	ExpectedAmount float64   `gorm:"not null" json:"expected_amount"`  // Nominal yang seharusnya dibayar
+	PaidAmount     float64   `gorm:"not null;default:0" json:"paid_amount"` // Nominal yang sudah dibayar
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type ContactMessage struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Name      string    `gorm:"not null" json:"name"`
@@ -610,4 +633,117 @@ type ExternalDebtPayment struct {
 	PaidByID       uuid.UUID    `gorm:"type:uuid;not null" json:"paid_by_id"`
 	PaidBy         User         `gorm:"foreignKey:PaidByID" json:"paid_by"`
 	CreatedAt      time.Time    `json:"created_at"`
+}
+
+// ------------------- Bulk User Import -------------------
+
+type BulkUserImportRow struct {
+	Name     string `csv:"name"`
+	Email    string `csv:"email"`
+	Password string `csv:"password"`
+	RoleID   uint   `csv:"role_id"`
+	UnitID   uint   `csv:"unit_id"`
+	NISN     string `csv:"nisn"`
+	ClassID  *uint  `csv:"class_id"`
+}
+
+type BulkImportResult struct {
+	TotalRows int                  `json:"total_rows"`
+	Success   int                  `json:"success"`
+	Failed    int                  `json:"failed"`
+	Errors    []BulkImportRowError `json:"errors"`
+}
+
+type BulkImportRowError struct {
+	Row    int    `json:"row"`
+	Email  string `json:"email"`
+	Reason string `json:"reason"`
+}
+
+// ------------------- Multi-Bill Payment -------------------
+
+// MultiBillPaymentRequest is used as request body only, not persisted to DB
+type MultiBillPaymentRequest struct {
+	BillIDs       []string `json:"bill_ids" binding:"required,min=2"`
+	Amount        float64  `json:"amount" binding:"required"`
+	PaymentMethod string   `json:"payment_method" binding:"required"`
+}
+
+// MultiPaymentResult is the response for a successful multi-payment
+type MultiPaymentResult struct {
+	Payments      []Payment `json:"payments"`
+	InvoiceNumber string    `json:"invoice_number"`
+}
+
+// ------------------- Savings Recap -------------------
+
+type SavingsRecapParams struct {
+	PeriodType string    // monthly, range, semester, yearly
+	StartDate  time.Time
+	EndDate    time.Time
+	Year       int
+	Semester   int // 1 atau 2
+	ClassID    *uint
+}
+
+type SavingsRecapRow struct {
+	StudentID     uuid.UUID `json:"student_id"`
+	StudentName   string    `json:"student_name"`
+	ClassName     string    `json:"class_name"`
+	TotalDeposit  float64   `json:"total_deposit"`
+	TotalWithdraw float64   `json:"total_withdraw"`
+	EndBalance    float64   `json:"end_balance"`
+}
+
+type SavingsRecapResponse struct {
+	Period        string            `json:"period"`
+	Rows          []SavingsRecapRow `json:"rows"`
+	GrandDeposit  float64           `json:"grand_deposit"`
+	GrandWithdraw float64           `json:"grand_withdraw"`
+	GrandBalance  float64           `json:"grand_balance"`
+}
+
+// ------------------- Asset Management -------------------
+
+type Asset struct {
+	ID               uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name             string     `gorm:"not null" json:"name"`
+	Category         string     `gorm:"not null" json:"category"`          // Elektronik, Furnitur, Kendaraan, Bangunan, Perlengkapan
+	Condition        string     `gorm:"not null" json:"condition"`         // Baik, Rusak Ringan, Rusak Berat
+	Location         string     `gorm:"not null" json:"location"`
+	AcquisitionValue float64    `gorm:"not null" json:"acquisition_value"`
+	AcquisitionDate  time.Time  `gorm:"not null" json:"acquisition_date"`
+	Status           string     `gorm:"not null;default:'Aktif'" json:"status"` // Aktif, Dalam Perbaikan, Dihapuskan
+	DeletedAt        *time.Time `json:"deleted_at"`                        // Diisi otomatis saat status = Dihapuskan
+	Notes            string     `json:"notes"`
+	CreatedByID      uuid.UUID  `gorm:"type:uuid;not null" json:"created_by_id"`
+	CreatedBy        User       `gorm:"foreignKey:CreatedByID" json:"created_by"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type AssetRecap struct {
+	ByCategory  []AssetCategoryCount `json:"by_category"`
+	ByStatus    []AssetStatusCount   `json:"by_status"`
+	TotalValue  float64              `json:"total_value"`
+	TotalAssets int                  `json:"total_assets"`
+}
+
+type AssetCategoryCount struct {
+	Category string  `json:"category"`
+	Count    int     `json:"count"`
+	Value    float64 `json:"value"`
+}
+
+type AssetStatusCount struct {
+	Status string `json:"status"`
+	Count  int    `json:"count"`
+}
+
+type AssetCategory struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"uniqueIndex;not null" json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

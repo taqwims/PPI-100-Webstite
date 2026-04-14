@@ -47,7 +47,6 @@ const InvoiceConfigPage: React.FC = () => {
             setWATemplates(waRes.data || []);
         } catch (error) {
             console.error("Failed to fetch config", error);
-            toast.error("Gagal memuat pengaturan");
         } finally {
             setLoading(false);
         }
@@ -63,7 +62,6 @@ const InvoiceConfigPage: React.FC = () => {
             toast.success("Nama penandatangan berhasil diperbarui");
             fetchData();
         } catch (error) {
-            toast.error("Gagal memperbarui penandatangan");
         }
     };
 
@@ -73,7 +71,6 @@ const InvoiceConfigPage: React.FC = () => {
             toast.success("Pengaturan kuitansi diperbarui");
             fetchData();
         } catch (error) {
-            toast.error("Gagal memperbarui pengaturan");
         }
     };
 
@@ -84,7 +81,6 @@ const InvoiceConfigPage: React.FC = () => {
             toast.success("Urutan dokumen berhasil di-reset");
             fetchData();
         } catch (error) {
-            toast.error("Gagal me-reset urutan");
         }
     };
 

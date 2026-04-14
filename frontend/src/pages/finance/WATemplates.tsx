@@ -30,13 +30,11 @@ const WATemplates: React.FC = () => {
     const createMutation = useMutation({
         mutationFn: (d: any) => api.post('/finance/wa-templates', d),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wa-templates'] }); setShowModal(false); toast.success('Template berhasil ditambahkan'); },
-        onError: (e: any) => toast.error(e.response?.data?.error || 'Gagal menyimpan'),
     });
 
     const updateMutation = useMutation({
         mutationFn: (d: any) => api.put(`/finance/wa-templates/${d.id}`, d),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wa-templates'] }); setShowModal(false); setEditItem(null); toast.success('Berhasil diperbarui'); },
-        onError: (e: any) => toast.error(e.response?.data?.error || 'Gagal memperbarui'),
     });
 
     const deleteMutation = useMutation({

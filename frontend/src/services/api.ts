@@ -1,6 +1,13 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+// Augment Axios config to support _suppressToast flag
+declare module 'axios' {
+    interface InternalAxiosRequestConfig {
+        _suppressToast?: boolean;
+    }
+}
+
 const api = axios.create({
     baseURL: '/api',
     headers: {
@@ -61,7 +68,7 @@ api.interceptors.response.use(
         const requestUrl = error.config?.url ?? '';
         const shouldSkipToast = skipToastUrls.some((url) => requestUrl.includes(url));
 
-        if (!shouldSkipToast) {
+        if (!error.config?._suppressToast && !shouldSkipToast) {
             toast.error(message);
         }
 

@@ -111,6 +111,32 @@ func (r *FinanceRepository) GetPaymentByTransactionID(transactionID string) (*do
 	return &payment, nil
 }
 
+// GetPaymentsByTransactionID finds all payments associated with a transaction/order ID
+func (r *FinanceRepository) GetPaymentsByTransactionID(transactionID string) ([]domain.Payment, error) {
+	var payments []domain.Payment
+	err := r.db.Where("transaction_id = ?", transactionID).Find(&payments).Error
+	return payments, err
+}
+
+func (r *FinanceRepository) GetPaymentByID(id string) (*domain.Payment, error) {
+	var payment domain.Payment
+	err := r.db.Where("id = ?", id).Preload("Bill.Student.User").First(&payment).Error
+	if err != nil {
+		return nil, err
+	}
+	return &payment, nil
+}
+
+func (r *FinanceRepository) GetPendingPayments() ([]domain.Payment, error) {
+	var payments []domain.Payment
+	err := r.db.Where("status = ?", "Pending").
+		Preload("Bill.Student.User").
+		Preload("Bill.Student.Class").
+		Order("created_at desc").
+		Find(&payments).Error
+	return payments, err
+}
+
 // Bill Template CRUD
 func (r *FinanceRepository) CreateBillTemplate(template *domain.BillTemplate) error {
 	return r.db.Create(template).Error
@@ -166,4 +192,54 @@ func (r *FinanceRepository) GetInvoiceConfigByType(invType string) (*domain.Invo
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// GetBillsByIDsOrObligationIDs fetches multiple bills by their IDs or linked obligation IDs
+func (r *FinanceRepository) GetBillsByIDsOrObligationIDs(ids []string) ([]domain.Bill, error) {
+	var bills []domain.Bill
+	if len(ids) == 0 {
+		return bills, nil
+	}
+	// Check standard ID, student obligation ID, and activity obligation ID
+	err := r.db.Where("id IN ? OR obligation_id IN ? OR activity_obligation_id IN ?", ids, ids, ids).
+		Preload("Payments").
+		Preload("Student.User").
+		Preload("Student.Class").
+		Preload("AcademicYear").
+		Preload("TransactionCode").
+		Find(&bills).Error
+	return bills, err
+}
+
+// GetBillsByIDs fetches multiple bills by their IDs
+func (r *FinanceRepository) GetBillsByIDs(ids []string) ([]domain.Bill, error) {
+	var bills []domain.Bill
+	if len(ids) == 0 {
+		return bills, nil
+	}
+	err := r.db.Where("id IN ?", ids).
+		Preload("Payments").
+		Preload("Student.User").
+		Preload("Student.Class").
+		Preload("AcademicYear").
+		Preload("TransactionCode").
+		Find(&bills).Error
+	return bills, err
+}
+
+// CreatePaymentsInTransaction creates multiple payments and updates bill statuses atomically
+func (r *FinanceRepository) CreatePaymentsInTransaction(payments []domain.Payment, billStatusUpdates map[string]string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for i := range payments {
+			if err := tx.Create(&payments[i]).Error; err != nil {
+				return err
+			}
+		}
+		for billID, status := range billStatusUpdates {
+			if err := tx.Model(&domain.Bill{}).Where("id = ?", billID).Update("status", status).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

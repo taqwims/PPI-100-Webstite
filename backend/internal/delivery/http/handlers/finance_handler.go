@@ -8,6 +8,7 @@ import (
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,11 +16,15 @@ import (
 )
 
 type FinanceHandler struct {
-	financeUsecase *usecase.FinanceUsecase
+	financeUsecase  *usecase.FinanceUsecase
+	midtransUsecase *usecase.MidtransUsecase
 }
 
-func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase) *FinanceHandler {
-	return &FinanceHandler{financeUsecase: financeUsecase}
+func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase) *FinanceHandler {
+	return &FinanceHandler{
+		financeUsecase:  financeUsecase,
+		midtransUsecase: midtransUsecase,
+	}
 }
 
 type CreateBillRequest struct {
@@ -159,7 +164,7 @@ func (h *FinanceHandler) RecordPayment(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeUsecase.RecordPayment(billUUID, req.Amount, req.Method); err != nil {
+	if err := h.financeUsecase.RecordPayment(billUUID, req.Amount, req.Method, ""); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -313,7 +318,7 @@ func (h *FinanceHandler) UploadPaymentProof(c *gin.Context) {
 	}
 
 	// Record payment
-	if err := h.financeUsecase.RecordPayment(billUUID, amount, method); err != nil {
+	if err := h.financeUsecase.RecordPayment(billUUID, amount, method, proofURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -397,6 +402,102 @@ func (h *FinanceHandler) GetBillByID(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, bill)
+}
+
+// ---------------- MULTI-PAYMENT ----------------
+
+// MultiPayment handles POST /finance/bills/multi-payment
+// Processes payment for multiple bills in a single atomic transaction.
+func (h *FinanceHandler) MultiPayment(c *gin.Context) {
+	var req domain.MultiBillPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.financeUsecase.ProcessMultiPayment(&req)
+	if err != nil {
+		msg := err.Error()
+		if strings.Contains(msg, "semua tagihan harus milik siswa yang sama") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+			return
+		}
+		if strings.Contains(msg, "sudah berstatus Paid") {
+			c.JSON(http.StatusConflict, gin.H{"error": msg})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+		return
+	}
+
+	// If method is Midtrans, generate snap token
+	if req.PaymentMethod == "Midtrans" && h.midtransUsecase != nil {
+		// Midtrans transaction ID will be the invoice number from the first payment
+		// since all payments in this multi-pay share the same transaction_id
+		orderID := result.InvoiceNumber
+		
+		// We need to pass the student as well for customer details
+		// We'll just fetch a bill to get student details
+		bills, _ := h.financeUsecase.GetBillsByIDsOrObligationIDs([]string{req.BillIDs[0]})
+		var student *domain.Student
+		if len(bills) > 0 {
+			student = &bills[0].Student
+		}
+
+		token, redirectURL, _, err := h.midtransUsecase.CreateMultiSnapTransaction(orderID, req.Amount, student, req.BillIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat transaksi Midtrans: " + err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"invoice_number": result.InvoiceNumber,
+			"snap_token":     token,
+			"redirect_url":   redirectURL,
+			"payments":       result.Payments,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *FinanceHandler) GetPendingPayments(c *gin.Context) {
+	payments, err := h.financeUsecase.GetPendingPayments()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, payments)
+}
+
+func (h *FinanceHandler) ApprovePayment(c *gin.Context) {
+	id := c.Param("id")
+	paymentUUID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment ID"})
+		return
+	}
+
+	if err := h.financeUsecase.ApprovePayment(paymentUUID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Payment approved successfully"})
+}
+
+// contains is a simple substring check helper.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}())
 }
 
 // ---------------- BILL TEMPLATES ----------------

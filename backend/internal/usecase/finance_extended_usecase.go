@@ -50,8 +50,8 @@ func (u *FinanceExtendedUsecase) GetStudentSavingAccount(studentID uuid.UUID) (*
 	return u.financeRepo.GetStudentSavingAccount(studentID)
 }
 
-func (u *FinanceExtendedUsecase) GetAllSavingAccounts() ([]domain.SavingAccount, error) {
-	return u.financeRepo.GetAllSavingAccounts()
+func (u *FinanceExtendedUsecase) GetAllSavingAccounts(classID *uint) ([]domain.SavingAccount, error) {
+	return u.financeRepo.GetAllSavingAccounts(classID)
 }
 
 func (u *FinanceExtendedUsecase) GetSavingTransactions(accountID uuid.UUID) ([]domain.SavingTransaction, error) {
@@ -175,5 +175,9 @@ func (u *FinanceExtendedUsecase) GetSavingsOperationalReturns(withdrawalID uuid.
 
 func (u *FinanceExtendedUsecase) GetSavingsPoolSummary() (map[string]interface{}, error) {
 	return u.financeRepo.GetSavingsPoolSummary()
+}
+
+func (u *FinanceExtendedUsecase) GetSavingsRecap(params domain.SavingsRecapParams) (*domain.SavingsRecapResponse, error) {
+	return u.financeRepo.GetSavingsRecap(params)
 }
 

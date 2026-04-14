@@ -59,12 +59,16 @@ const StudentBills: React.FC = () => {
 
     const [showPayModal, setShowPayModal] = useState(false);
     const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Transfer' | 'Midtrans'>('Midtrans');
+    const [paymentMethod, setPaymentMethod] = useState<'Transfer' | 'Midtrans'>('Midtrans');
     const [paymentAmount, setPaymentAmount] = useState<number>(0);
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [loadingSnap, setLoadingSnap] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
+    const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+    const [showMultiPayModal, setShowMultiPayModal] = useState(false);
+    const [multiPayMethod, setMultiPayMethod] = useState<'Transfer' | 'Midtrans'>('Midtrans');
+    const [isSubmittingMulti, setIsSubmittingMulti] = useState(false);
 
     const [selectedYear, setSelectedYear] = useState<string>('all');
     const [sortConfig, setSortConfig] = useState<{ key: keyof Bill | 'remaining'; direction: 'asc' | 'desc' | null }>({
@@ -129,6 +133,81 @@ const StudentBills: React.FC = () => {
     const unpaidBills = sortedBills.filter((b: Bill) => b.status !== 'Paid');
     const paidBills = sortedBills.filter((b: Bill) => b.status === 'Paid');
     const totalUnpaid = unpaidBills.reduce((acc: number, b: Bill) => acc + getRemainingAmount(b), 0);
+
+    const selectedBills = unpaidBills.filter(b => selectedBillIds.includes(b.id));
+    const selectedTotal = selectedBills.reduce((sum, b) => sum + getRemainingAmount(b), 0);
+
+    const toggleBillSelection = (billId: string) => {
+        setSelectedBillIds(prev =>
+            prev.includes(billId)
+                ? prev.filter(id => id !== billId)
+                : [...prev, billId]
+        );
+    };
+
+    const handleMultiPayment = async () => {
+        if (selectedBillIds.length < 2) return;
+        setIsSubmittingMulti(true);
+        try {
+            const res = await api.post('/finance/bills/multi-payment', {
+                bill_ids: selectedBillIds,
+                amount: selectedTotal,
+                payment_method: multiPayMethod
+            });
+
+            if (multiPayMethod === 'Midtrans') {
+                const snapToken = res.data.snap_token;
+                const invoiceNumber = res.data.invoice_number;
+
+                const verifyAndRefresh = (delay = 2000) => {
+                    setTimeout(() => {
+                        api.post('/finance/midtrans/check-status', { order_id: invoiceNumber })
+                            .then(() => refetch())
+                            .catch((e) => {
+                                console.error('Failed to verify Midtrans multi-payment status:', e);
+                                refetch();
+                            });
+                    }, delay);
+                };
+
+                // @ts-ignore
+                window.snap.pay(snapToken, {
+                    onSuccess: () => {
+                        verifyAndRefresh(1000);
+                        toast.success('Pembayaran sukses!');
+                        setSelectedBillIds([]);
+                        setShowMultiPayModal(false);
+                    },
+                    onPending: () => {
+                        verifyAndRefresh(1000);
+                        toast.success('Pembayaran pending, silakan selesaikan transaksi.');
+                        setSelectedBillIds([]);
+                        setShowMultiPayModal(false);
+                    },
+                    onError: () => {
+                        toast.error('Pembayaran gagal');
+                        setIsSubmittingMulti(false);
+                    },
+                    onClose: () => {
+                        verifyAndRefresh(1000);
+                        setIsSubmittingMulti(false);
+                    }
+                });
+            } else {
+                toast.success(`Berhasil mengirim permintaan pembayaran untuk ${selectedBillIds.length} tagihan. Silakan hubungi admin.`);
+                setSelectedBillIds([]);
+                setShowMultiPayModal(false);
+                refetch();
+            }
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Gagal memproses pembayaran');
+            setIsSubmittingMulti(false);
+        } finally {
+            if (multiPayMethod !== 'Midtrans') {
+                setIsSubmittingMulti(false);
+            }
+        }
+    };
 
     const openPayModal = (bill: Bill) => {
         setSelectedBill(bill);
@@ -339,6 +418,20 @@ const StudentBills: React.FC = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-white text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider">
+                                    <th className="p-4 w-10">
+                                        <input
+                                            type="checkbox"
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedBillIds(unpaidBills.filter(b => !hasPendingTransfer(b)).map(b => b.id));
+                                                } else {
+                                                    setSelectedBillIds([]);
+                                                }
+                                            }}
+                                            checked={unpaidBills.length > 0 && selectedBillIds.length === unpaidBills.filter(b => !hasPendingTransfer(b)).length}
+                                        />
+                                    </th>
                                     <th
                                         className="p-4 font-semibold cursor-pointer hover:bg-slate-50 transition-colors"
                                         onClick={() => handleSort('created_at')}
@@ -381,7 +474,17 @@ const StudentBills: React.FC = () => {
                                     const StatusIcon = status.icon;
                                     const remainingAmount = getRemainingAmount(bill);
                                     return (
-                                        <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <tr key={bill.id} className={clsx("hover:bg-slate-50/50 transition-colors", selectedBillIds.includes(bill.id) && "bg-indigo-50/30")}>
+                                            <td className="p-4">
+                                                {bill.status !== 'Paid' && !hasPendingTransfer(bill) ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                        checked={selectedBillIds.includes(bill.id)}
+                                                        onChange={() => toggleBillSelection(bill.id)}
+                                                    />
+                                                ) : null}
+                                            </td>
                                             <td className="p-4">
                                                 <p className="font-semibold text-slate-800">{bill.title}</p>
                                                 <div className="mt-1 flex items-center gap-2">
@@ -558,16 +661,6 @@ const StudentBills: React.FC = () => {
                                         >
                                             <CreditCard size={14} /> Transfer
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod('Cash')}
-                                            className={clsx(
-                                                "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                                paymentMethod === 'Cash' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500"
-                                            )}
-                                        >
-                                            <Wallet size={14} /> Cash
-                                        </button>
                                     </div>
                                 </div>
 
@@ -646,8 +739,8 @@ const StudentBills: React.FC = () => {
 
                                 {paymentMethod === 'Cash' && (
                                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                        <p className="text-sm text-emerald-800">
-                                            💰 Silakan bayar langsung ke bendahara sekolah. Klik "Kirim" untuk mencatat pembayaran Anda.
+                                        <p className="text-sm text-blue-800">
+                                            💡 Silakan transfer sesuai nominal, lalu upload bukti transfer. Pembayaran Anda akan diverifikasi oleh admin sebelum status berubah menjadi lunas.
                                         </p>
                                     </div>
                                 )}
@@ -683,6 +776,119 @@ const StudentBills: React.FC = () => {
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Multi-Payment Modal */}
+            {showMultiPayModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+                            <h2 className="text-lg font-bold flex items-center text-slate-800">
+                                <CreditCard className="text-indigo-600 mr-2" size={22} /> Bayar Tagihan Terpilih
+                            </h2>
+                            <button onClick={() => setShowMultiPayModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Tagihan Yang Dipilih ({selectedBillIds.length})</p>
+                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    {selectedBills.map(b => (
+                                        <div key={b.id} className="flex justify-between items-center text-sm bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                            <span className="text-slate-700 font-medium truncate pr-4">{b.title}</span>
+                                            <span className="font-bold text-slate-900 shrink-0">{formatCurrency(getRemainingAmount(b))}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
+                                    <span className="text-sm font-bold text-slate-600">Total Pembayaran</span>
+                                    <span className="text-xl font-bold text-indigo-600 font-mono">{formatCurrency(selectedTotal)}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
+                                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setMultiPayMethod('Midtrans')}
+                                        className={clsx(
+                                            "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                            multiPayMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
+                                        )}
+                                    >
+                                        <Smartphone size={14} /> Online
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMultiPayMethod('Transfer')}
+                                        className={clsx(
+                                            "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                            multiPayMethod === 'Transfer' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
+                                        )}
+                                    >
+                                        <CreditCard size={14} /> Transfer
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                <p className="text-xs text-blue-700 leading-relaxed italic text-center font-medium">
+                                    💡 Seluruh tagihan di atas akan dibayarkan secara kolektif dengan satu bukti atau satu kali transaksi.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowMultiPayModal(false)}
+                                    className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleMultiPayment}
+                                    disabled={isSubmittingMulti}
+                                    className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isSubmittingMulti ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <CreditCard size={16} />}
+                                    Konfirmasi Bayar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Floating Selection Bar */}
+            {selectedBillIds.length >= 2 && !showMultiPayModal && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl px-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl shadow-indigo-500/20 border border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-indigo-600 p-2 rounded-xl">
+                                <DollarSign size={20} />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-400 font-medium">{selectedBillIds.length} tagihan dipilih</p>
+                                <p className="text-lg font-bold text-white font-mono leading-tight">{formatCurrency(selectedTotal)}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setSelectedBillIds([])}
+                                className="text-sm font-medium text-slate-400 hover:text-white transition px-2"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={() => setShowMultiPayModal(true)}
+                                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
+                            >
+                                <CreditCard size={16} /> Bayar Sekarang
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

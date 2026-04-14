@@ -19,6 +19,8 @@ func init() {
 		"principal": loadKey("SIGNATURE_KEY_PRINCIPAL", "ppi100-principal-sig-key-2026"),
 		"treasurer": loadKey("SIGNATURE_KEY_TREASURER", "ppi100-treasurer-sig-key-2026"),
 		"chairman":  loadKey("SIGNATURE_KEY_CHAIRMAN", "ppi100-chairman-sig-key-2026"),
+		"committee": loadKey("SIGNATURE_KEY_COMMITTEE", "ppi100-committee-sig-key-2026"),
+		"admin_tu":  loadKey("SIGNATURE_KEY_ADMIN_TU", "ppi100-admin-tu-sig-key-2026"),
 	}
 }
 
@@ -39,7 +41,7 @@ func hmacSha256(key []byte, data string) string {
 }
 
 // GenerateStakeholderSignature creates an HMAC-SHA256 for a specific stakeholder role.
-// role must be "principal", "treasurer", or "chairman".
+// role must be "principal", "treasurer", "chairman", or "admin_tu".
 func GenerateStakeholderSignature(role, invoiceType, referenceID string, amount float64, dateStr string) (string, error) {
 	key, ok := stakeholderKeys[strings.ToLower(role)]
 	if !ok {
@@ -82,11 +84,13 @@ var RoleLabels = map[string]string{
 	"principal": "Kepala Sekolah",
 	"treasurer": "Bendahara",
 	"chairman":  "Ketua Yayasan",
+	"committee": "Komite",
+	"admin_tu":  "Tata Usaha",
 }
 
 // GenerateAllSignatures produces signatures for all three stakeholders.
 func GenerateAllSignatures(invoiceType, referenceID string, amount float64, dateStr string, stakeholderNames map[string]string) ([]StakeholderSig, error) {
-	roles := []string{"chairman", "treasurer", "principal"}
+	roles := []string{"admin_tu", "treasurer", "principal", "committee"}
 	sigs := make([]StakeholderSig, 0, len(roles))
 
 	for _, role := range roles {

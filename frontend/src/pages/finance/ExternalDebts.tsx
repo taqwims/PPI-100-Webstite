@@ -163,7 +163,6 @@ const ExternalDebts: React.FC = () => {
             setShowFormModal(false);
             fetchDebts();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menyimpan catatan hutang');
         } finally {
             setSubmitting(false);
         }
@@ -176,7 +175,6 @@ const ExternalDebts: React.FC = () => {
             toast.success("Hutang berhasil dihapus");
             fetchDebts();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menghapus hutang');
         }
     };
 
@@ -214,7 +212,6 @@ const ExternalDebts: React.FC = () => {
             setShowPaymentModal(false);
             fetchDebts();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal memproses pembayaran');
         } finally {
             setSubmitting(false);
         }

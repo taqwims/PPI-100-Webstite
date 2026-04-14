@@ -141,18 +141,18 @@ func (mr *MockFinanceExtendedRepositoryMockRecorder) GetAllAcademicYears() *gomo
 }
 
 // GetAllSavingAccounts mocks base method.
-func (m *MockFinanceExtendedRepository) GetAllSavingAccounts() ([]domain.SavingAccount, error) {
+func (m *MockFinanceExtendedRepository) GetAllSavingAccounts(classID *uint) ([]domain.SavingAccount, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAllSavingAccounts")
+	ret := m.ctrl.Call(m, "GetAllSavingAccounts", classID)
 	ret0, _ := ret[0].([]domain.SavingAccount)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAllSavingAccounts indicates an expected call of GetAllSavingAccounts.
-func (mr *MockFinanceExtendedRepositoryMockRecorder) GetAllSavingAccounts() *gomock.Call {
+func (mr *MockFinanceExtendedRepositoryMockRecorder) GetAllSavingAccounts(classID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllSavingAccounts", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetAllSavingAccounts))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllSavingAccounts", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetAllSavingAccounts), classID)
 }
 
 // GetCashLedger mocks base method.
@@ -415,4 +415,19 @@ func (m *MockFinanceExtendedRepository) WithdrawSavingsOperational(handledByID u
 func (mr *MockFinanceExtendedRepositoryMockRecorder) WithdrawSavingsOperational(handledByID, amount, purpose any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithdrawSavingsOperational", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).WithdrawSavingsOperational), handledByID, amount, purpose)
+}
+
+// GetSavingsRecap mocks base method.
+func (m *MockFinanceExtendedRepository) GetSavingsRecap(params domain.SavingsRecapParams) (*domain.SavingsRecapResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSavingsRecap", params)
+	ret0, _ := ret[0].(*domain.SavingsRecapResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSavingsRecap indicates an expected call of GetSavingsRecap.
+func (mr *MockFinanceExtendedRepositoryMockRecorder) GetSavingsRecap(params any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSavingsRecap", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetSavingsRecap), params)
 }

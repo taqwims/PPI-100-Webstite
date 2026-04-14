@@ -306,7 +306,6 @@ const Payroll = () => {
             setPayrolls(res.data);
         } catch (error) {
             console.error("Failed to fetch payrolls", error);
-            toast.error("Gagal memuat data gaji");
         } finally {
             setLoading(false);
         }
@@ -424,7 +423,6 @@ const Payroll = () => {
             setShowModal(false);
             fetchPayrolls();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || "Gagal menyimpan slip gaji");
         } finally {
             setSubmitting(false);
         }
@@ -437,7 +435,6 @@ const Payroll = () => {
             toast.success("Slip gaji dihapus!");
             fetchPayrolls();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || "Gagal menghapus slip gaji");
         }
     };
 
@@ -448,7 +445,6 @@ const Payroll = () => {
             toast.success("Gaji berhasil dilunasi dan tercatat sebagai pengeluaran otomatis.");
             fetchPayrolls();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || "Gagal menandai lunas");
         }
     };
 
@@ -476,7 +472,6 @@ const Payroll = () => {
             toast.success("Template gaji berhasil disimpan");
             fetchTemplates();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || "Gagal menyimpan template");
         } finally {
             setSavingTemplate(false);
         }

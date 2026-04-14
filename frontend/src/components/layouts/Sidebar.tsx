@@ -1,10 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-    LayoutDashboard, Users, BookOpen, Calendar, FileText,
-    Settings, LogOut, Bell, X, GraduationCap,
-    AlertTriangle, CreditCard, Mail, Send, Activity, Wallet, Inbox, PieChart,
-    Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle
+    Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
+    LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Send, Mail, GraduationCap, FileText, CreditCard,
+    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -42,8 +41,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Manajemen',
             items: [
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
+                { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
                 { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
+                { icon: Package, label: 'Aset Sekolah', path: '/dashboard/admin/assets' },
             ]
         };
         const adminContent: MenuGroup = {
@@ -68,6 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Keuangan',
             items: [
                 { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
+                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify' },
             ]
         };
 
@@ -76,6 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Transaksi',
             items: [
                 { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
+                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify' },
                 { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities' },
                 { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations' },
                 { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary' },

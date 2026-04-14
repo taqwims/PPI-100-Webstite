@@ -125,7 +125,6 @@ const BillTemplates = () => {
             setNewTemplateName('');
             fetchTemplates(); // refresh list
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menyimpan template');
         }
     };
 
@@ -137,7 +136,6 @@ const BillTemplates = () => {
             if (selectedTemplateId === id.toString()) setSelectedTemplateId('');
             fetchTemplates();
         } catch (error: any) {
-            toast.error('Gagal menghapus template');
         }
     }
 
@@ -169,7 +167,6 @@ const BillTemplates = () => {
             setSelectAll(false);
             setFormData({ title: '', amount: '', due_date: '', bill_type: '', academic_year_id: '', transaction_code_id: '', is_installment: false });
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal membuat tagihan batch');
         } finally {
             setSubmitting(false);
         }

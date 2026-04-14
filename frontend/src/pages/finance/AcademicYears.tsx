@@ -64,7 +64,6 @@ const AcademicYears = () => {
             handleClose();
             fetchData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal menyimpan');
         }
     };
 
@@ -74,7 +73,7 @@ const AcademicYears = () => {
             await api.delete(`/finance/academic-years/${id}`);
             toast.success('Berhasil dihapus');
             fetchData();
-        } catch (err: any) { toast.error(err.response?.data?.error || 'Gagal menghapus'); }
+        } catch (err: any) { }
     };
 
     const handleSetActive = async (id: number) => {
@@ -82,7 +81,7 @@ const AcademicYears = () => {
             await api.put(`/finance/academic-years/${id}/set-active`);
             toast.success('Tahun ajaran diaktifkan');
             fetchData();
-        } catch (err: any) { toast.error(err.response?.data?.error || 'Gagal mengaktifkan'); }
+        } catch (err: any) { }
     };
 
     return (

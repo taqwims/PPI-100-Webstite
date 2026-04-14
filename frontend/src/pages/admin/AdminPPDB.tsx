@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { CheckCircle, XCircle, Search, Phone, School, Trash2 } from 'lucide-react';
+import { CheckCircle, XCircle, Search, Phone, School, Trash2, Users, DollarSign } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import { useAuth } from '../../context/AuthContext';
+import PPDBPayment from './PPDBPayment';
 
 interface PPDBRegistration {
     id: string;
@@ -22,6 +23,7 @@ interface PPDBRegistration {
 const AdminPPDB: React.FC = () => {
     const { user } = useAuth();
     const [search, setSearch] = useState('');
+    const [activeTab, setActiveTab] = useState<'registrations' | 'payments'>('registrations');
     const queryClient = useQueryClient();
 
     const { data: registrations, isLoading } = useQuery({
@@ -74,113 +76,144 @@ const AdminPPDB: React.FC = () => {
                 </div>
             </div>
 
-            <CardGlass className="p-6 space-y-4">
-                <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1">
-                        <InputGlass
-                            placeholder="Cari nama atau NISN..."
-                            icon={Search}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                </div>
+            {/* Tab Navigation */}
+            <div className="flex gap-2 border-b border-slate-200">
+                <button
+                    onClick={() => setActiveTab('registrations')}
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                        activeTab === 'registrations'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    <Users size={18} />
+                    Pendaftaran
+                </button>
+                <button
+                    onClick={() => setActiveTab('payments')}
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                        activeTab === 'payments'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    <DollarSign size={18} />
+                    Pembayaran
+                </button>
+            </div>
 
-                <TableGlass>
-                    <TableHeaderGlass>
-                        <TableRowGlass>
-                            <TableHeadGlass>Tanggal</TableHeadGlass>
-                            <TableHeadGlass>Calon Siswa</TableHeadGlass>
-                            <TableHeadGlass>Asal Sekolah</TableHeadGlass>
-                            <TableHeadGlass>Orang Tua / Wali</TableHeadGlass>
-                            <TableHeadGlass>Status</TableHeadGlass>
-                            <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
-                        </TableRowGlass>
-                    </TableHeaderGlass>
-                    <TableBodyGlass>
-                        {isLoading ? (
+            {/* Tab Content */}
+            {activeTab === 'registrations' ? (
+                <CardGlass className="p-6 space-y-4">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                            <InputGlass
+                                placeholder="Cari nama atau NISN..."
+                                icon={Search}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <TableGlass>
+                        <TableHeaderGlass>
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
+                                <TableHeadGlass>Tanggal</TableHeadGlass>
+                                <TableHeadGlass>Calon Siswa</TableHeadGlass>
+                                <TableHeadGlass>Asal Sekolah</TableHeadGlass>
+                                <TableHeadGlass>Orang Tua / Wali</TableHeadGlass>
+                                <TableHeadGlass>Status</TableHeadGlass>
+                                <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
                             </TableRowGlass>
-                        ) : filteredRegistrations?.length === 0 ? (
-                            <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Tidak ada data pendaftaran</TableCellGlass>
-                            </TableRowGlass>
-                        ) : (
-                            filteredRegistrations?.map((reg: PPDBRegistration) => (
-                                <TableRowGlass key={reg.id}>
-                                    <TableCellGlass>
-                                        <span className="text-slate-600 text-sm">
-                                            {new Date(reg.created_at).toLocaleDateString('id-ID')}
-                                        </span>
-                                    </TableCellGlass>
-                                    <TableCellGlass>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium text-slate-900">{reg.name}</span>
-                                            <span className="text-xs text-slate-500 font-mono">{reg.nisn}</span>
-                                        </div>
-                                    </TableCellGlass>
-                                    <TableCellGlass>
-                                        <div className="flex items-center gap-2 text-slate-600">
-                                            <School size={14} />
-                                            <span>{reg.origin_school}</span>
-                                        </div>
-                                    </TableCellGlass>
-                                    <TableCellGlass>
-                                        <div className="flex flex-col">
-                                            <span className="text-slate-900">{reg.parent_name}</span>
-                                            <div className="flex items-center gap-1 text-xs text-slate-500">
-                                                <Phone size={10} /> {reg.phone}
-                                            </div>
-                                        </div>
-                                    </TableCellGlass>
-                                    <TableCellGlass>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold 
-                                            ${reg.status === 'Accepted' ? 'bg-green-100 text-green-600' :
-                                                reg.status === 'Rejected' ? 'bg-red-100 text-red-600' :
-                                                    'bg-yellow-100 text-yellow-600'}`}>
-                                            {reg.status === 'Accepted' ? 'Diterima' :
-                                                reg.status === 'Rejected' ? 'Ditolak' : 'Menunggu'}
-                                        </span>
-                                    </TableCellGlass>
-                                    <TableCellGlass className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            {reg.status === 'Pending' && (
-                                                <>
-                                                    <ButtonGlass
-                                                        variant="primary"
-                                                        onClick={() => handleStatusUpdate(reg.id, 'Accepted')}
-                                                        className="py-1 px-3 text-xs bg-green-600 hover:bg-green-700 text-slate-900"
-                                                    >
-                                                        <CheckCircle size={14} /> Terima
-                                                    </ButtonGlass>
-                                                    <ButtonGlass
-                                                        variant="danger"
-                                                        onClick={() => handleStatusUpdate(reg.id, 'Rejected')}
-                                                        className="py-1 px-3 text-xs"
-                                                    >
-                                                        <XCircle size={14} /> Tolak
-                                                    </ButtonGlass>
-                                                </>
-                                            )}
-                                            {reg.status !== 'Pending' && (
-                                                <span className="text-slate-500 text-xs italic">Selesai</span>
-                                            )}
-                                            <ButtonGlass
-                                                variant="danger"
-                                                onClick={() => handleDelete(reg.id)}
-                                                className="py-1 px-3 text-xs"
-                                            >
-                                                <Trash2 size={14} />
-                                            </ButtonGlass>
-                                        </div>
-                                    </TableCellGlass>
+                        </TableHeaderGlass>
+                        <TableBodyGlass>
+                            {isLoading ? (
+                                <TableRowGlass>
+                                    <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                                 </TableRowGlass>
-                            ))
-                        )}
-                    </TableBodyGlass>
-                </TableGlass>
-            </CardGlass>
+                            ) : filteredRegistrations?.length === 0 ? (
+                                <TableRowGlass>
+                                    <TableCellGlass colSpan={6} className="text-center py-8 text-slate-600">Tidak ada data pendaftaran</TableCellGlass>
+                                </TableRowGlass>
+                            ) : (
+                                filteredRegistrations?.map((reg: PPDBRegistration) => (
+                                    <TableRowGlass key={reg.id}>
+                                        <TableCellGlass>
+                                            <span className="text-slate-600 text-sm">
+                                                {new Date(reg.created_at).toLocaleDateString('id-ID')}
+                                            </span>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-slate-900">{reg.name}</span>
+                                                <span className="text-xs text-slate-500 font-mono">{reg.nisn}</span>
+                                            </div>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <div className="flex items-center gap-2 text-slate-600">
+                                                <School size={14} />
+                                                <span>{reg.origin_school}</span>
+                                            </div>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <div className="flex flex-col">
+                                                <span className="text-slate-900">{reg.parent_name}</span>
+                                                <div className="flex items-center gap-1 text-xs text-slate-500">
+                                                    <Phone size={10} /> {reg.phone}
+                                                </div>
+                                            </div>
+                                        </TableCellGlass>
+                                        <TableCellGlass>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold 
+                                                ${reg.status === 'Accepted' ? 'bg-green-100 text-green-600' :
+                                                    reg.status === 'Rejected' ? 'bg-red-100 text-red-600' :
+                                                        'bg-yellow-100 text-yellow-600'}`}>
+                                                {reg.status === 'Accepted' ? 'Diterima' :
+                                                    reg.status === 'Rejected' ? 'Ditolak' : 'Menunggu'}
+                                            </span>
+                                        </TableCellGlass>
+                                        <TableCellGlass className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                {reg.status === 'Pending' && (
+                                                    <>
+                                                        <ButtonGlass
+                                                            variant="primary"
+                                                            onClick={() => handleStatusUpdate(reg.id, 'Accepted')}
+                                                            className="py-1 px-3 text-xs bg-green-600 hover:bg-green-700 text-slate-900"
+                                                        >
+                                                            <CheckCircle size={14} /> Terima
+                                                        </ButtonGlass>
+                                                        <ButtonGlass
+                                                            variant="danger"
+                                                            onClick={() => handleStatusUpdate(reg.id, 'Rejected')}
+                                                            className="py-1 px-3 text-xs"
+                                                        >
+                                                            <XCircle size={14} /> Tolak
+                                                        </ButtonGlass>
+                                                    </>
+                                                )}
+                                                {reg.status !== 'Pending' && (
+                                                    <span className="text-slate-500 text-xs italic">Selesai</span>
+                                                )}
+                                                <ButtonGlass
+                                                    variant="danger"
+                                                    onClick={() => handleDelete(reg.id)}
+                                                    className="py-1 px-3 text-xs"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </ButtonGlass>
+                                            </div>
+                                        </TableCellGlass>
+                                    </TableRowGlass>
+                                ))
+                            )}
+                        </TableBodyGlass>
+                    </TableGlass>
+                </CardGlass>
+            ) : (
+                <PPDBPayment />
+            )}
         </div>
     );
 };

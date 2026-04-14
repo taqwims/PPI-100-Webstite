@@ -74,7 +74,6 @@ const Activities = () => {
             setShowModal(false);
             toast.success('Kegiatan berhasil ditambahkan');
         },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menyimpan kegiatan')
     });
 
     const updateMutation = useMutation({
@@ -84,7 +83,6 @@ const Activities = () => {
             setShowModal(false);
             toast.success('Kegiatan berhasil diupdate');
         },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal mengupdate kegiatan')
     });
 
     const deleteMutation = useMutation({
@@ -93,7 +91,6 @@ const Activities = () => {
             queryClient.invalidateQueries({ queryKey: ['activities'] });
             toast.success('Kegiatan berhasil dihapus');
         },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus kegiatan')
     });
 
     const handleSubmit = (e: React.FormEvent) => {

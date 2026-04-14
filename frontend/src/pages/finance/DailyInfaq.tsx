@@ -218,7 +218,6 @@ const DailyInfaq = () => {
             fetchInfaq();
             toast.success(editingEntry ? 'Data infaq berhasil diperbarui' : 'Data infaq berhasil disimpan');
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menyimpan data infaq');
         } finally {
             setSubmitting(false);
         }
@@ -230,7 +229,6 @@ const DailyInfaq = () => {
             fetchInfaq();
             toast.success('Data infaq berhasil dihapus');
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal menghapus data infaq');
         }
     };
 

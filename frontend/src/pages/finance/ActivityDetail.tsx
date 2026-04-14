@@ -86,7 +86,7 @@ const ActivityDetail = () => {
                 toast.success(`1 siswa berhasil ditambahkan tagihan`);
             }
         },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal assign tagihan')
+        onError: (_err: any) => { /* interceptor handles API errors */ }
     });
 
     const payMutation = useMutation({
@@ -98,7 +98,6 @@ const ActivityDetail = () => {
             setPayModal(null);
             toast.success('Pembayaran berhasil dicatat');
         },
-        onError: () => toast.error('Gagal mencatat pembayaran')
     });
 
     const expenseMutation = useMutation({
@@ -115,7 +114,6 @@ const ActivityDetail = () => {
             setExpenseForm({ description: '', amount: '', receipt_image: '' });
             toast.success('Pengeluaran berhasil dicatat');
         },
-        onError: () => toast.error('Gagal mencatat pengeluaran')
     });
 
     const deleteObligation = useMutation({
@@ -157,7 +155,6 @@ const ActivityDetail = () => {
                 toast.success('Kwitansi berhasil diunduh');
             } catch (error) {
                 console.error(error);
-                toast.error('Gagal membuat kwitansi');
             }
         }
     };
@@ -243,7 +240,7 @@ const ActivityDetail = () => {
                                             await generateActivityBillPDF(billItems, activity.name, activity.id);
                                             toast.success('Surat tagihan berhasil diunduh');
                                         } catch (e) {
-                                            toast.error('Gagal membuat surat tagihan');
+                                            console.error(e);
                                         }
                                     }} className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-red-700 transition shadow-sm">
                                         <FileText size={16} /> Cetak Surat Tagihan
@@ -298,7 +295,7 @@ const ActivityDetail = () => {
                                                                     }, activity.id);
                                                                     toast.success('Surat tagihan berhasil diunduh');
                                                                 } catch (e) {
-                                                                    toast.error('Gagal membuat surat tagihan');
+                                                                    console.error(e);
                                                                 }
                                                             }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Surat Tagihan"><FileText size={16} /></button>
                                                         </>

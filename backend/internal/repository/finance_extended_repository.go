@@ -16,7 +16,7 @@ type FinanceExtendedRepository interface {
 
 	ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error
 	GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error)
-	GetAllSavingAccounts() ([]domain.SavingAccount, error)
+	GetAllSavingAccounts(classID *uint) ([]domain.SavingAccount, error)
 	GetSavingTransactions(accountID uuid.UUID) ([]domain.SavingTransaction, error)
 	GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error)
 	GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error)
@@ -41,4 +41,7 @@ type FinanceExtendedRepository interface {
 	GetSavingsOperationalHistory() ([]domain.SavingsOperationalWithdrawal, error)
 	GetSavingsOperationalReturns(withdrawalID uuid.UUID) ([]domain.SavingsOperationalReturn, error)
 	GetSavingsPoolSummary() (map[string]interface{}, error)
+
+	// Savings Recap
+	GetSavingsRecap(params domain.SavingsRecapParams) (*domain.SavingsRecapResponse, error)
 }

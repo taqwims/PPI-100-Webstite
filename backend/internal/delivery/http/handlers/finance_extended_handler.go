@@ -174,7 +174,18 @@ func (h *FinanceExtendedHandler) GetStudentSavings(c *gin.Context) {
 }
 
 func (h *FinanceExtendedHandler) GetAllSavingAccounts(c *gin.Context) {
-	accounts, err := h.financeExtendedUsecase.GetAllSavingAccounts()
+	var classID *uint
+	if classIDStr := c.Query("class_id"); classIDStr != "" {
+		parsed, err := strconv.ParseUint(classIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
+			return
+		}
+		v := uint(parsed)
+		classID = &v
+	}
+
+	accounts, err := h.financeExtendedUsecase.GetAllSavingAccounts(classID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -523,5 +534,64 @@ func (h *FinanceExtendedHandler) GetSavingsPoolSummary(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, summary)
+}
+
+func (h *FinanceExtendedHandler) GetSavingsRecap(c *gin.Context) {
+	params := domain.SavingsRecapParams{}
+
+	params.PeriodType = c.Query("period_type")
+
+	if startDateStr := c.Query("start_date"); startDateStr != "" {
+		t, err := time.Parse("2006-01-02", startDateStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format, use YYYY-MM-DD"})
+			return
+		}
+		params.StartDate = t
+	}
+
+	if endDateStr := c.Query("end_date"); endDateStr != "" {
+		t, err := time.Parse("2006-01-02", endDateStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format, use YYYY-MM-DD"})
+			return
+		}
+		params.EndDate = t
+	}
+
+	if yearStr := c.Query("year"); yearStr != "" {
+		year, err := strconv.Atoi(yearStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid year"})
+			return
+		}
+		params.Year = year
+	}
+
+	if semesterStr := c.Query("semester"); semesterStr != "" {
+		semester, err := strconv.Atoi(semesterStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid semester"})
+			return
+		}
+		params.Semester = semester
+	}
+
+	if classIDStr := c.Query("class_id"); classIDStr != "" {
+		parsed, err := strconv.ParseUint(classIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
+			return
+		}
+		v := uint(parsed)
+		params.ClassID = &v
+	}
+
+	resp, err := h.financeExtendedUsecase.GetSavingsRecap(params)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
 }
 

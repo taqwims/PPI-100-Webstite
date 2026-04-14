@@ -29,13 +29,11 @@ const InfaqTypes: React.FC = () => {
     const createMutation = useMutation({
         mutationFn: (d: any) => api.post('/finance/infaq-types', d),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['infaq-types'] }); setShowModal(false); toast.success('Jenis infaq berhasil ditambahkan'); },
-        onError: (e: any) => toast.error(e.response?.data?.error || 'Gagal menyimpan'),
     });
 
     const updateMutation = useMutation({
         mutationFn: (d: any) => api.put(`/finance/infaq-types/${d.id}`, d),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['infaq-types'] }); setShowModal(false); setEditItem(null); toast.success('Berhasil diperbarui'); },
-        onError: (e: any) => toast.error(e.response?.data?.error || 'Gagal memperbarui'),
     });
 
     const deleteMutation = useMutation({

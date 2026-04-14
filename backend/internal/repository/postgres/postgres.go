@@ -83,5 +83,13 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.InvoiceSignature{},
 		&domain.InvoiceNumberConfig{},
 		&domain.StakeholderConfig{},
+
+		// PPDB Payment
+		&domain.PPDBPayment{},
+		&domain.PPDBPaymentItem{},
+
+		// Asset Management
+		&domain.Asset{},
+		&domain.AssetCategory{},
 	)
 }

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Wallet, ArrowUpRight, ArrowDownRight, Users, Search, Plus, Eye, X, History, Download, ArrowRightLeft, RotateCcw, TrendingDown, ShieldCheck } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, Users, Search, Plus, Eye, X, History, Download, ArrowRightLeft, RotateCcw, TrendingDown, ShieldCheck, BarChart3 } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
 import toast from 'react-hot-toast';
+import SavingsRecap from './SavingsRecap';
 
 interface ClassData { id: number; name: string; }
 interface Student { id: string; user: { name: string; email: string }; nisn: string; class: { id: number; name: string }; class_id: number; }
@@ -32,7 +33,7 @@ const Savings = () => {
         return 1;
     };
     const [unitID, setUnitID] = useState<number>(getDefaultUnitID());
-    const [activeTab, setActiveTab] = useState<'accounts' | 'operational'>('accounts');
+    const [activeTab, setActiveTab] = useState<'accounts' | 'operational' | 'recap'>('accounts');
 
     const [accounts, setAccounts] = useState<SavingAccount[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -74,9 +75,14 @@ const Savings = () => {
     const [transactions, setTransactions] = useState<SavingTransaction[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
-    const fetchAccounts = useCallback(async () => {
+    const fetchAccounts = useCallback(async (classId?: string) => {
         setLoading(true);
-        try { const res = await api.get('/finance/savings'); setAccounts(res.data || []); }
+        try {
+            const params = new URLSearchParams();
+            if (classId) params.set('class_id', classId);
+            const res = await api.get(`/finance/savings${params.toString() ? `?${params.toString()}` : ''}`);
+            setAccounts(res.data || []);
+        }
         catch (error) { console.error("Failed to fetch accounts", error); }
         finally { setLoading(false); }
     }, []);
@@ -103,9 +109,16 @@ const Savings = () => {
         finally { setLoadingOpHistory(false); }
     }, []);
 
+    const isFirstRender = React.useRef(true);
+
     useEffect(() => {
-        if (canManage) { fetchAccounts(); fetchStudents(); fetchClasses(); fetchPoolSummary(); }
+        if (canManage) { fetchAccounts(classFilter || undefined); fetchStudents(); fetchClasses(); fetchPoolSummary(); }
     }, [canManage, fetchAccounts, fetchStudents, fetchClasses, fetchPoolSummary, unitID]);
+
+    useEffect(() => {
+        if (isFirstRender.current) { isFirstRender.current = false; return; }
+        if (canManage) fetchAccounts(classFilter || undefined);
+    }, [classFilter, canManage, fetchAccounts]);
 
     useEffect(() => {
         if (canManage) fetchOpHistory();
@@ -117,7 +130,6 @@ const Savings = () => {
     const studentsWithoutAccount = students.filter(s => !unitAccounts.find(a => a.student_id === s.id));
 
     const filtered = unitAccounts.filter(acc => {
-        if (classFilter && acc.student?.class?.id?.toString() !== classFilter) return false;
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
         return acc.student?.user?.name?.toLowerCase().includes(q) || acc.student?.nisn?.toLowerCase().includes(q) || acc.student?.class?.name?.toLowerCase().includes(q);
@@ -137,7 +149,7 @@ const Savings = () => {
             await api.post('/finance/savings/transactions', { student_id: trxStudentId, type: trxType, amount: parseFloat(trxAmount), notes: trxNotes });
             setShowTrxModal(false); fetchAccounts(); fetchPoolSummary();
             toast.success(trxType === 'Deposit' ? 'Setoran berhasil' : 'Penarikan berhasil');
-        } catch (error: any) { toast.error(error.response?.data?.error || "Gagal memproses transaksi"); }
+        } catch (error: any) { }
         finally { setSubmitting(false); }
     };
 
@@ -150,7 +162,7 @@ const Savings = () => {
             setShowWithdrawOpModal(false); setOpWithdrawAmount(''); setOpWithdrawPurpose('');
             fetchPoolSummary(); fetchOpHistory();
             toast.success('Dana operasional berhasil diambil');
-        } catch (error: any) { toast.error(error.response?.data?.error || "Dana tidak mencukupi"); }
+        } catch (error: any) { }
         finally { setSubmitting(false); }
     };
 
@@ -163,7 +175,7 @@ const Savings = () => {
             setShowReturnModal(false); setReturnWithdrawalId(''); setReturnAmount(''); setReturnNotes('');
             fetchPoolSummary(); fetchOpHistory();
             toast.success('Dana berhasil dikembalikan');
-        } catch (error: any) { toast.error(error.response?.data?.error || "Gagal mengembalikan dana"); }
+        } catch (error: any) { }
         finally { setSubmitting(false); }
     };
 
@@ -262,13 +274,24 @@ const Savings = () => {
                 <button onClick={() => setActiveTab('operational')} className={clsx('px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors', activeTab === 'operational' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700')}>
                     <ArrowRightLeft size={16} /> Riwayat Operasional
                 </button>
+                <button onClick={() => setActiveTab('recap')} className={clsx('px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors', activeTab === 'recap' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700')}>
+                    <BarChart3 size={16} /> Rekap Tabungan
+                </button>
             </div>
 
             {/* Tab: Accounts */}
             {activeTab === 'accounts' && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50">
-                        <h2 className="text-base font-bold text-slate-800">Daftar Rekening Tabungan</h2>
+                        <div>
+                            <h2 className="text-base font-bold text-slate-800">Daftar Rekening Tabungan</h2>
+                            {classFilter && (() => {
+                                const selectedClass = classList.find(c => c.id.toString() === classFilter);
+                                return selectedClass ? (
+                                    <p className="text-xs text-emerald-600 font-medium mt-0.5">Filter: Kelas {selectedClass.name}</p>
+                                ) : null;
+                            })()}
+                        </div>
                         <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
                             <div className="relative flex-1 sm:flex-initial sm:w-56">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -371,6 +394,11 @@ const Savings = () => {
                         </table>
                     </div>
                 </div>
+            )}
+
+            {/* Tab: Rekap Tabungan */}
+            {activeTab === 'recap' && (
+                <SavingsRecap classList={classList} unitID={unitID} />
             )}
 
             {/* Transaction Modal */}

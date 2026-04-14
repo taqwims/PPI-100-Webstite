@@ -177,9 +177,10 @@ func (r *invoiceSignatureRepository) GetStakeholders() ([]domain.StakeholderConf
 
 	if len(configs) == 0 {
 		defaults := []domain.StakeholderConfig{
-			{Role: "chairman", DisplayLabel: "Ketua Yayasan", Name: "Ketua Yayasan PPI 100", IsActive: true},
+			{Role: "admin_tu", DisplayLabel: "Tata Usaha", Name: "Tata Usaha PPI 100", IsActive: true},
 			{Role: "treasurer", DisplayLabel: "Bendahara", Name: "Bendahara PPI 100", IsActive: true},
 			{Role: "principal", DisplayLabel: "Kepala Sekolah", Name: "Kepala Sekolah SDIT", IsActive: true},
+			{Role: "committee", DisplayLabel: "Komite", Name: "Komite Sekolah", IsActive: true},
 		}
 		for i := range defaults {
 			r.db.Create(&defaults[i])

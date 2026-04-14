@@ -262,7 +262,6 @@ const StudentObligations = () => {
             setInstallmentCount(1);
             fetchData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal menambahkan tanggungan');
         } finally { setSubmitting(false); }
     };
 
@@ -278,7 +277,6 @@ const StudentObligations = () => {
             setPayAmount('');
             fetchData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal mencatat pembayaran');
         }
     };
 
@@ -293,7 +291,6 @@ const StudentObligations = () => {
             setEditingOb(null);
             fetchData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal memperbarui');
         }
     };
 
@@ -304,7 +301,7 @@ const StudentObligations = () => {
             await api.delete(`/finance/student-obligations/${id}`);
             toast.success('Berhasil dihapus');
             fetchData();
-        } catch (err: any) { toast.error(err.response?.data?.error || 'Gagal menghapus'); }
+        } catch (err: any) { }
     };
 
     const handlePrintReceipt = (params: any) => {

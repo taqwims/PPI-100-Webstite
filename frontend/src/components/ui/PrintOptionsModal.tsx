@@ -29,7 +29,8 @@ const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({ isOpen, onClose, 
     const roles = [
         { id: 'principal', label: 'Kepala Sekolah' },
         { id: 'treasurer', label: 'Bendahara' },
-        { id: 'chairman', label: 'Ketua Yayasan' },
+        { id: 'admin_tu', label: 'Tata Usaha' },
+        { id: 'committee', label: 'Komite' },
     ];
 
     return (

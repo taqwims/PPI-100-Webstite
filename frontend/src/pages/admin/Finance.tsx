@@ -188,7 +188,6 @@ const Finance: React.FC = () => {
             transaction_code_id: data.transaction_code_id ? Number(data.transaction_code_id) : null,
         }),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['bills'] }); handleCloseModal(); toast.success('Tagihan berhasil dibuat'); },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membuat tagihan'),
     });
 
     const updateBillMutation = useMutation({
@@ -197,19 +196,16 @@ const Finance: React.FC = () => {
             transaction_code_id: data.transaction_code_id ? Number(data.transaction_code_id) : null,
         }),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['bills'] }); handleCloseModal(); toast.success('Tagihan berhasil diperbarui'); },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal memperbarui tagihan'),
     });
 
     const deleteBillMutation = useMutation({
         mutationFn: (id: string) => api.delete(`/finance/bills/${id}`),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['bills'] }); toast.success('Tagihan berhasil dihapus'); },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus tagihan'),
     });
 
     const recordPaymentMutation = useMutation({
         mutationFn: (data: { bill_id: string, amount: number, method: string }) => api.post('/finance/payments', data),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['bills'] }); toast.success('Pembayaran dicatat'); setShowAdminPayModal(false); },
-        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal merekam pembayaran'),
     });
 
     const createTemplateMutation = useMutation({

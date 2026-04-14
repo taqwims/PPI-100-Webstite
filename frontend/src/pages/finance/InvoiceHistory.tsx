@@ -12,6 +12,7 @@ import {
     generatePayrollReceipt, 
     generateBillReceipt
 } from '../../utils/pdfUtils';
+import { generateInvoiceA5, generateInvoiceA5Double } from '../../utils/invoiceTemplate';
 
 interface InvoiceHistoryItem {
     invoice_number: string;
@@ -41,6 +42,7 @@ const InvoiceHistory: React.FC = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [isExporting, setIsExporting] = useState<string | null>(null);
+    const [printFormat, setPrintFormat] = useState<'a4' | 'a5'>('a4');
 
     const fetchInvoices = async () => {
         setLoading(true);
@@ -55,7 +57,6 @@ const InvoiceHistory: React.FC = () => {
             setInvoices(response.data || []);
         } catch (error) {
             console.error("Failed to fetch invoices", error);
-            toast.error("Gagal memuat riwayat kuitansi");
         } finally {
             setLoading(false);
         }
@@ -95,13 +96,48 @@ const InvoiceHistory: React.FC = () => {
                 try {
                     const res = await api.get(`/finance/bills/${inv.reference_id}`);
                     if (res.data) {
-                        await generateBillReceipt(res.data);
+                        if (printFormat === 'a5') {
+                            const bill = res.data;
+                            const studentName = bill.student?.user?.name || '-';
+                            const paidDate = bill.paid_at || inv.document_date || new Date().toISOString();
+                            const dateStr = paidDate.split('T')[0];
+                            if (printFormat === 'a5') {
+                                // A5 Double
+                                await generateInvoiceA5Double(
+                                    {
+                                        invoiceNumber: inv.invoice_number,
+                                        studentName,
+                                        paymentMethod: 'Signed Digital',
+                                        bills: [{ title: bill.title, amount: bill.amount }],
+                                        totalAmount: bill.amount,
+                                        date: dateStr,
+                                    },
+                                    {
+                                        invoiceNumber: inv.invoice_number,
+                                        studentName,
+                                        paymentMethod: 'Signed Digital',
+                                        bills: [{ title: bill.title, amount: bill.amount }],
+                                        totalAmount: bill.amount,
+                                        date: dateStr,
+                                    }
+                                );
+                            } else {
+                                // Normal A5 since 'A4 Standar' handles it differently elsewhere or we can stick to A5 for now
+                                await generateInvoiceA5({
+                                    invoiceNumber: inv.invoice_number,
+                                    studentName,
+                                    paymentMethod: 'Signed Digital',
+                                    bills: [{ title: bill.title, amount: bill.amount }],
+                                    totalAmount: bill.amount,
+                                    date: dateStr,
+                                });
+                            }
+                        } else {
+                            await generateBillReceipt(res.data);
+                        }
                     }
                 } catch (e) {
-                    // If not found in bills, maybe it's an activity obligation
-                    // Activity receipts in pdfUtils take a specific format
-                    // For now, let's assume we can fetch the bill
-                    toast.error("Gagal memuat rincian pembayaran");
+                    // interceptor handles API errors
                 }
             } else if (inv.invoice_type === 'Savings') {
                 // Savings report needs different data structure
@@ -111,7 +147,6 @@ const InvoiceHistory: React.FC = () => {
             }
         } catch (error) {
             console.error("Print failed", error);
-            toast.error("Gagal mencetak dokumen");
         } finally {
             setIsExporting(null);
         }
@@ -138,6 +173,36 @@ const InvoiceHistory: React.FC = () => {
                         Lihat dan unduh kembali dokumen keuangan yang telah diterbitkan.
                     </motion.p>
                 </div>
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                    className="flex items-center gap-2 bg-white border border-slate-100 rounded-2xl p-1.5 shadow-sm self-start md:self-auto"
+                >
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">Format Cetak</span>
+                    <button
+                        onClick={() => setPrintFormat('a4')}
+                        className={clsx(
+                            "px-4 py-2 rounded-xl text-sm font-bold transition-all",
+                            printFormat === 'a4'
+                                ? "bg-slate-900 text-white shadow"
+                                : "text-slate-500 hover:bg-slate-50"
+                        )}
+                    >
+                        A4 Standar
+                    </button>
+                    <button
+                        onClick={() => setPrintFormat('a5')}
+                        className={clsx(
+                            "px-4 py-2 rounded-xl text-sm font-bold transition-all",
+                            printFormat === 'a5'
+                                ? "bg-emerald-600 text-white shadow"
+                                : "text-slate-500 hover:bg-slate-50"
+                        )}
+                    >
+                        A5 (2 per halaman)
+                    </button>
+                </motion.div>
             </div>
 
             {/* Filters Section */}

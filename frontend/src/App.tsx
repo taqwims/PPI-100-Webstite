@@ -52,6 +52,8 @@ import AdminAlumni from './pages/admin/AdminAlumni';
 import AdminPublicTeachers from './pages/admin/AdminPublicTeachers';
 import AdminDownloads from './pages/admin/AdminDownloads';
 import AdminPublicContent from './pages/admin/AdminPublicContent';
+import BulkImport from './pages/admin/BulkImport';
+import Assets from './pages/admin/Assets';
 
 // Finance Pages
 import PrincipalDashboard from './pages/finance/PrincipalDashboard';
@@ -78,6 +80,7 @@ import InvoiceHistory from './pages/finance/InvoiceHistory';
 import StudentBillSummary from './pages/finance/StudentBillSummary';
 import InfaqTypes from './pages/finance/InfaqTypes';
 import WATemplates from './pages/finance/WATemplates';
+import PaymentVerification from './pages/finance/PaymentVerification';
 import ToastProvider from './components/ui/Toast';
 import { AcademicYearProvider } from './context/AcademicYearContext';
 import RoleRoute from './components/RoleRoute';
@@ -122,6 +125,16 @@ function App() {
                                     <Route path="admin/teachers" element={<AdminPublicTeachers />} />
                                     <Route path="admin/downloads" element={<AdminDownloads />} />
                                     <Route path="admin/bk" element={<BK />} />
+                                    <Route path="admin/bulk-import" element={
+                                        <RoleRoute allowedRoles={[1, 2, 3]}>
+                                            <BulkImport />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="admin/assets" element={
+                                        <RoleRoute allowedRoles={[1, 2, 3, 10]}>
+                                            <Assets />
+                                        </RoleRoute>
+                                    } />
 
                                     {/* Extended Finance Routes — hanya admin, pimpinan, bendahara */}
                                     <Route path="principal/finance-summary" element={
@@ -190,6 +203,11 @@ function App() {
                                     <Route path="finance/wa-templates" element={<WATemplates />} />
                                     <Route path="finance/invoice-config" element={<InvoiceConfig />} />
                                     <Route path="finance/invoices" element={<InvoiceHistory />} />
+                                    <Route path="finance/payments/verify" element={
+                                        <RoleRoute allowedRoles={[1, 9]}>
+                                            <PaymentVerification />
+                                        </RoleRoute>
+                                    } />
                                     <Route path="finance/activities" element={<Activities />} />
                                     <Route path="finance/activities/:id" element={<ActivityDetail />} />
 

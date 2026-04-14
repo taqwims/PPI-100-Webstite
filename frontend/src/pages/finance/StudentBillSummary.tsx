@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Search, AlertCircle, ChevronDown, ChevronRight, Send, CheckCircle, Clock, XCircle, Printer } from 'lucide-react';
+import { Search, AlertCircle, ChevronDown, ChevronRight, Send, CheckCircle, Clock, XCircle, Printer, CreditCard, X, Download } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { generateStudentBillPDF } from '../../utils/pdfUtils';
+import MultiBillSelector from '../../components/finance/MultiBillSelector';
+import { generateMultiPaymentInvoice } from '../../utils/invoiceTemplate';
 
 interface Student {
     id: string;
@@ -42,7 +44,8 @@ const MONTH_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
 
 const StudentBillSummary: React.FC = () => {
     const { user } = useAuth();
-    const canManage = [1, 9].includes(user?.role_id || 0);
+    const canManage = [1, 2, 3, 4, 9].includes(user?.role_id || 0);
+    const queryClient = useQueryClient();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
@@ -52,6 +55,21 @@ const StudentBillSummary: React.FC = () => {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
+
+    // Multi-payment state
+    const [multiPayModal, setMultiPayModal] = useState<{ student: Student; obligations: Obligation[] } | null>(null);
+    const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+    const [multiPayTotal, setMultiPayTotal] = useState(0);
+    const [multiPayMethod, setMultiPayMethod] = useState<'Cash' | 'Transfer'>('Cash');
+    const [isSubmittingMultiPay, setIsSubmittingMultiPay] = useState(false);
+    const [lastMultiPayResult, setLastMultiPayResult] = useState<{
+        invoiceNumber: string;
+        studentName: string;
+        paymentMethod: string;
+        bills: { title: string; amount: number }[];
+        totalAmount: number;
+        date: string;
+    } | null>(null);
 
     const { data: students = [] } = useQuery<Student[]>({
         queryKey: ['students'],
@@ -166,6 +184,50 @@ const StudentBillSummary: React.FC = () => {
     };
 
     const [isSending, setIsSending] = useState(false);
+
+    const handleMultiPayment = async () => {
+        if (selectedBillIds.length < 2) {
+            toast.error('Pilih minimal 2 tagihan untuk pembayaran multi-tagihan');
+            return;
+        }
+        setIsSubmittingMultiPay(true);
+        try {
+            const res = await api.post('/finance/bills/multi-payment', {
+                bill_ids: selectedBillIds,
+                amount: multiPayTotal,
+                payment_method: multiPayMethod,
+            });
+
+            // Build bill items from selected obligations
+            const selectedObligations = multiPayModal?.obligations.filter(o =>
+                selectedBillIds.includes(o.id)
+            ) || [];
+            const invoiceNumber = res.data?.invoice_number || `INV-MULTI-${Date.now()}`;
+            const dateStr = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            setLastMultiPayResult({
+                invoiceNumber,
+                studentName: multiPayModal?.student.full_name || '',
+                paymentMethod: multiPayMethod,
+                bills: selectedObligations.map(o => ({
+                    title: o.payment_type?.name || 'Tagihan',
+                    amount: o.amount - o.paid_amount,
+                })),
+                totalAmount: multiPayTotal,
+                date: dateStr,
+            });
+
+            toast.success(`Pembayaran ${selectedBillIds.length} tagihan berhasil dicatat`);
+            setMultiPayModal(null);
+            setSelectedBillIds([]);
+            setMultiPayTotal(0);
+            queryClient.invalidateQueries({ queryKey: ['student-obligations'] });
+            queryClient.invalidateQueries({ queryKey: ['activity-obligations-all'] });
+        } catch (err: any) {
+        } finally {
+            setIsSubmittingMultiPay(false);
+        }
+    };
 
     const handleSendWA = async () => {
         if (!waModal) return;
@@ -336,6 +398,46 @@ const StudentBillSummary: React.FC = () => {
                                 {/* Expanded Detail */}
                                 {isExpanded && (
                                     <div className="px-4 pb-4">
+                                        {/* Multi-bill selector for canManage users */}
+                                        {canManage && (
+                                            <div className="mb-4">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <p className="text-sm font-semibold text-slate-700">Pilih Tagihan untuk Dibayar Sekaligus</p>
+                                                    <button
+                                                        disabled={selectedBillIds.length < 2}
+                                                        onClick={() => setMultiPayModal({ student, obligations })}
+                                                        className={clsx(
+                                                            'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition',
+                                                            selectedBillIds.length >= 2
+                                                                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-600/25'
+                                                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                        )}
+                                                    >
+                                                        <CreditCard size={15} />
+                                                        Bayar Terpilih
+                                                        {selectedBillIds.length >= 2 && (
+                                                            <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                                                {selectedBillIds.length}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                <MultiBillSelector
+                                                    bills={obligations.map(o => ({
+                                                        id: o.id,
+                                                        title: o.payment_type?.name || 'Tagihan',
+                                                        amount: o.amount - o.paid_amount,
+                                                        due_date: o.due_date || '',
+                                                        status: o.status === 'Paid' ? 'Paid' : o.status === 'Partial' ? 'Partial' : 'Unpaid',
+                                                        student_id: typeof o.student_id === 'string' ? parseInt(o.student_id) : o.student_id,
+                                                    }))}
+                                                    onSelectionChange={(ids, total) => {
+                                                        setSelectedBillIds(ids);
+                                                        setMultiPayTotal(total);
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
                                         <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-sm min-w-[600px] whitespace-nowrap">
@@ -485,6 +587,132 @@ const StudentBillSummary: React.FC = () => {
                                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                     ) : <Send size={16} />} 
                                     {isSending ? 'Mengirim...' : 'Kirim WhatsApp'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Multi-Payment Modal */}
+            {multiPayModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-indigo-50 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-indigo-800 flex items-center gap-2">
+                                    <CreditCard className="text-indigo-600" size={22} /> Bayar Terpilih
+                                </h2>
+                                <p className="text-sm text-indigo-600 mt-1">Siswa: {multiPayModal.student.full_name}</p>
+                            </div>
+                            <button
+                                onClick={() => setMultiPayModal(null)}
+                                className="p-2 rounded-xl hover:bg-indigo-100 text-indigo-600 transition"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                                <p className="text-sm text-indigo-700 font-medium">
+                                    {selectedBillIds.length} tagihan dipilih
+                                </p>
+                                <p className="text-2xl font-bold text-indigo-800 mt-1">
+                                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(multiPayTotal)}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Metode Pembayaran</label>
+                                <select
+                                    value={multiPayMethod}
+                                    onChange={e => setMultiPayMethod(e.target.value as 'Cash' | 'Transfer')}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 text-sm"
+                                >
+                                    <option value="Cash">Tunai (Cash)</option>
+                                    <option value="Transfer">Transfer Bank</option>
+                                </select>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setMultiPayModal(null)}
+                                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleMultiPayment}
+                                    disabled={isSubmittingMultiPay || selectedBillIds.length < 2}
+                                    className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isSubmittingMultiPay ? (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    ) : <CreditCard size={16} />}
+                                    {isSubmittingMultiPay ? 'Memproses...' : 'Konfirmasi Pembayaran'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Multi-Payment Invoice Download Modal */}
+            {lastMultiPayResult && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-emerald-50 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-emerald-800 flex items-center gap-2">
+                                    <CheckCircle className="text-emerald-600" size={22} /> Pembayaran Berhasil
+                                </h2>
+                                <p className="text-sm text-emerald-600 mt-1">
+                                    {lastMultiPayResult.bills.length} tagihan telah dibayar
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setLastMultiPayResult(null)}
+                                className="p-2 rounded-xl hover:bg-emerald-100 text-emerald-600 transition"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">Siswa</span>
+                                    <span className="font-semibold text-slate-800">{lastMultiPayResult.studentName}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">No. Invoice</span>
+                                    <span className="font-mono text-slate-700">{lastMultiPayResult.invoiceNumber}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">Total</span>
+                                    <span className="font-bold text-emerald-700">
+                                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(lastMultiPayResult.totalAmount)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setLastMultiPayResult(null)}
+                                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50"
+                                >
+                                    Tutup
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            await generateMultiPaymentInvoice(lastMultiPayResult);
+                                            toast.success('Invoice berhasil diunduh');
+                                        } catch {
+                                            toast.error('Gagal membuat invoice');
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2"
+                                >
+                                    <Download size={16} /> Download Invoice
                                 </button>
                             </div>
                         </div>
