@@ -446,6 +446,7 @@ func (h *FinanceExtendedHandler) GetDashboardAnalytics(c *gin.Context) {
 type OperationalWithdrawRequest struct {
 	Amount  float64 `json:"amount" binding:"required"`
 	Purpose string  `json:"purpose" binding:"required"`
+	UnitID  uint    `json:"unit_id" binding:"required"`
 }
 
 func (h *FinanceExtendedHandler) WithdrawSavingsOperational(c *gin.Context) {
@@ -461,7 +462,7 @@ func (h *FinanceExtendedHandler) WithdrawSavingsOperational(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeExtendedUsecase.WithdrawSavingsOperational(handledByID, req.Amount, req.Purpose); err != nil {
+	if err := h.financeExtendedUsecase.WithdrawSavingsOperational(handledByID, req.Amount, req.Purpose, req.UnitID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dana tidak mencukupi atau terjadi kesalahan"})
 		return
 	}
@@ -472,7 +473,9 @@ func (h *FinanceExtendedHandler) WithdrawSavingsOperational(c *gin.Context) {
 type OperationalReturnRequest struct {
 	WithdrawalID string  `json:"withdrawal_id" binding:"required"`
 	Amount       float64 `json:"amount" binding:"required"`
+	Source       string  `json:"source"` // CashLedger, Infaq
 	Notes        string  `json:"notes"`
+	UnitID       uint    `json:"unit_id" binding:"required"`
 }
 
 func (h *FinanceExtendedHandler) ReturnSavingsOperational(c *gin.Context) {
@@ -494,7 +497,7 @@ func (h *FinanceExtendedHandler) ReturnSavingsOperational(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeExtendedUsecase.ReturnSavingsOperational(withdrawalUUID, handledByID, req.Amount, req.Notes); err != nil {
+	if err := h.financeExtendedUsecase.ReturnSavingsOperational(withdrawalUUID, handledByID, req.Amount, req.Notes, req.Source, req.UnitID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengembalikan dana: jumlah melebihi sisa"})
 		return
 	}

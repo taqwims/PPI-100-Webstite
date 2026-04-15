@@ -36,8 +36,8 @@ type FinanceExtendedRepository interface {
 	GetDashboardAnalytics() (map[string]interface{}, error)
 
 	// Savings Operational (Pool-level)
-	WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string) error
-	ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string) error
+	WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string, unitID uint) error
+	ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string, source string, unitID uint) error
 	GetSavingsOperationalHistory() ([]domain.SavingsOperationalWithdrawal, error)
 	GetSavingsOperationalReturns(withdrawalID uuid.UUID) ([]domain.SavingsOperationalReturn, error)
 	GetSavingsPoolSummary() (map[string]interface{}, error)

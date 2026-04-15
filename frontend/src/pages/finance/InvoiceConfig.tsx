@@ -106,29 +106,52 @@ const InvoiceConfigPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="divide-y divide-slate-100">
-                        {stakeholders.map((sh: Stakeholder) => (
-                            <div key={sh.id} className="p-5 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50/30 transition">
-                                <div className="flex-1">
-                                    <p className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1">{sh.role_label}</p>
-                                    <input 
-                                        type="text"
-                                        defaultValue={sh.name}
-                                        onBlur={(e) => {
-                                            if (e.target.value !== sh.name) {
-                                                handleUpdateStakeholder(sh.id, e.target.value);
-                                            }
-                                        }}
-                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800"
-                                    />
-                                    <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
-                                        <Shield size={10} /> Kode Jabatan: {sh.short_code}
-                                    </p>
+                        {stakeholders.map((sh: Stakeholder) => {
+                            // Fallback mapping for role names if display_label is missing or English
+                            const roleMap: Record<string, string> = {
+                                'admin_tu': 'Tata Usaha',
+                                'admin': 'Tata Usaha',
+                                'tu': 'Tata Usaha',
+                                'treasurer': 'Bendahara',
+                                'principal': 'Kepala Sekolah',
+                                'committee': 'Komite',
+                                'chairman': 'Komite'
+                            };
+                            const displayLabel = roleMap[sh.role] || sh.role_label || sh.role;
+                            return (
+                                <div key={sh.id} className="p-5 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50/30 transition">
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-bold text-slate-700">Nama {displayLabel} <span className="text-slate-400 font-normal">(yang tampil di dokumen)</span></p>
+                                        </div>
+                                        <input 
+                                            type="text"
+                                            defaultValue={sh.name}
+                                            onBlur={(e) => {
+                                                if (e.target.value !== sh.name) {
+                                                    handleUpdateStakeholder(sh.id, e.target.value);
+                                                }
+                                            }}
+                                            placeholder={`Masukkan nama ${displayLabel.toLowerCase()}`}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800 bg-white shadow-sm"
+                                        />
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                <Shield size={10} /> Kode Jabatan: <span className="font-mono text-blue-600">{sh.short_code || sh.role || '—'}</span>
+                                            </p>
+                                            <div className="md:hidden flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                                                <CheckCircle size={10} /> Tersimpan
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="hidden md:flex justify-end items-center">
+                                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full" title="Tanda tangan aktif">
+                                            <CheckCircle size={20} />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="hidden md:flex justify-end items-center">
-                                    <CheckCircle size={20} className="text-slate-300" />
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -230,7 +253,7 @@ const InvoiceConfigPage: React.FC = () => {
 
                                 <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                                     <div className="text-[10px] text-slate-400">
-                                        Contoh: {cfg.prefix}{cfg.separator}{cfg.include_date ? '202604' : ''}{cfg.separator}{'0'.repeat(cfg.counter_length - 1)}1
+                                        Contoh: {cfg.prefix || ''}{cfg.separator || ''}{cfg.include_date ? '202604' : ''}{cfg.separator || ''}{'0'.repeat(Math.max(0, (cfg.counter_length || 1) - 1))}1
                                     </div>
                                     <button 
                                         onClick={() => handleResetCounter(cfg.id)}

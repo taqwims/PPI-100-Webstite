@@ -153,12 +153,12 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			UNION ALL
 
 			SELECT st.date, COALESCE(u3.name, 'Siswa') as source,
-			       CONCAT('Tabungan: ', st.description) as description,
+			       CONCAT('Tabungan: ', st.notes) as description,
 			       st.type, st.amount, 'Tabungan' as category,
 			       0 as code_id, 'Savings' as module
-			FROM savings_transactions st
-			LEFT JOIN savings sv ON st.savings_id = sv.id
-			LEFT JOIN students s3 ON sv.student_id = s3.id
+			FROM saving_transactions st
+			LEFT JOIN saving_accounts sa ON st.account_id = sa.id
+			LEFT JOIN students s3 ON sa.student_id = s3.id
 			LEFT JOIN users u3 ON s3.user_id = u3.id
 
 			UNION ALL

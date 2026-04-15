@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository"
 	"ppi-100-sis/internal/repository/postgres"
@@ -129,38 +130,65 @@ func (u *FinanceExtendedUsecase) GetDashboardAnalytics() (map[string]interface{}
 
 // ------------------- Savings Operational -------------------
 
-func (u *FinanceExtendedUsecase) WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string) error {
-	err := u.financeRepo.WithdrawSavingsOperational(handledByID, amount, purpose)
+func (u *FinanceExtendedUsecase) WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string, unitID uint) error {
+	err := u.financeRepo.WithdrawSavingsOperational(handledByID, amount, purpose, unitID)
 	if err == nil {
 		// Auto-sync to CashLedger: Withdrawing from savings means Kas Umum receives funds (Income)
 		entry := &domain.CashLedger{
+			ID:       uuid.New(),
 			Date:     time.Now(),
 			Source:   "Mutasi Tabungan",
 			ItemName: "Penarikan Dana Operasional Tabungan - " + purpose,
 			Type:     "Income",
 			Amount:   amount,
-			Category: "Mutasi Tabungan",
-			Notes:    "Otomatis dari modul Tabungan",
+			Category:  "Mutasi Tabungan",
+			Notes:     "Otomatis dari modul Tabungan (Penarikan Operasional)",
+			UnitID:    unitID,
+			CreatedBy: handledByID,
 		}
-		_ = u.financeRepo.AddCashLedgerEntry(entry)
+		if err := u.financeRepo.AddCashLedgerEntry(entry); err != nil {
+			fmt.Println("Error auto-sync CashLedger (Withdrawal):", err)
+		}
 	}
 	return err
 }
 
-func (u *FinanceExtendedUsecase) ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string) error {
-	err := u.financeRepo.ReturnSavingsOperational(withdrawalID, handledByID, amount, notes)
+func (u *FinanceExtendedUsecase) ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string, source string, unitID uint) error {
+	err := u.financeRepo.ReturnSavingsOperational(withdrawalID, handledByID, amount, notes, source, unitID)
 	if err == nil {
-		// Auto-sync to CashLedger: Returning to savings means Kas Umum spends funds (Expense)
-		entry := &domain.CashLedger{
-			Date:     time.Now(),
-			Source:   "Mutasi Tabungan",
-			ItemName: "Pengembalian Dana Operasional Tabungan",
-			Type:     "Expense",
-			Amount:   amount,
-			Category: "Mutasi Tabungan",
-			Notes:    notes,
+		if source == "Infaq" {
+			// Auto-sync to DailyInfaq: Returning to savings from Infaq means Infaq spends funds (Expense)
+			entry := &domain.DailyInfaq{
+				ID:          uuid.New(),
+				Date:        time.Now(),
+				Source:      "Mutasi Tabungan",
+				Type:        "Expense",
+				Amount:      amount,
+				HandledByID: handledByID,
+				Notes:       "Pengembalian Operasional Tabungan: " + notes,
+				UnitID:      unitID,
+			}
+			if err := u.financeRepo.AddDailyInfaqEntry(entry); err != nil {
+				fmt.Println("Error auto-sync DailyInfaq (Return):", err)
+			}
+		} else {
+			// Default or "CashLedger": Sync to CashLedger (Buku Kas Umum)
+			entry := &domain.CashLedger{
+				ID:       uuid.New(),
+				Date:     time.Now(),
+				Source:   "Mutasi Tabungan",
+				ItemName: "Pengembalian Dana Operasional Tabungan",
+				Type:     "Expense",
+				Amount:    amount,
+				Category:  "Mutasi Tabungan",
+				Notes:     "Pengembalian Operasional: " + notes,
+				UnitID:    unitID,
+				CreatedBy: handledByID,
+			}
+			if err := u.financeRepo.AddCashLedgerEntry(entry); err != nil {
+				fmt.Println("Error auto-sync CashLedger (Return):", err)
+			}
 		}
-		_ = u.financeRepo.AddCashLedgerEntry(entry)
 	}
 	return err
 }

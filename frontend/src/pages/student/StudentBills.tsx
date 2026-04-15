@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, Wallet, X, Landmark, Copy, Send, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, X, Landmark, Copy, Send, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { generateBillReceipt } from '../../utils/pdfUtils';
@@ -737,13 +737,6 @@ const StudentBills: React.FC = () => {
                                     </>
                                 )}
 
-                                {paymentMethod === 'Cash' && (
-                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                        <p className="text-sm text-blue-800">
-                                            💡 Silakan transfer sesuai nominal, lalu upload bukti transfer. Pembayaran Anda akan diverifikasi oleh admin sebelum status berubah menjadi lunas.
-                                        </p>
-                                    </div>
-                                )}
 
                                 {paymentMethod === 'Midtrans' ? (
                                     <button

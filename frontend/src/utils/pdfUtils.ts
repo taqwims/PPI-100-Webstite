@@ -47,8 +47,34 @@ export async function fetchInvoiceSignatures(
             date_str: dateStr
         });
         const data = response.data;
+        
+        let finalSigs = data.signatures;
+        const roleLabels: Record<string, string> = {
+            admin_tu: 'Tata Usaha',
+            admin: 'Tata Usaha',
+            tu: 'Tata Usaha',
+            treasurer: 'Bendahara',
+            principal: 'Kepala Sekolah',
+            committee: 'Komite',
+            chairman: 'Komite',
+        };
+
+        if (!finalSigs && data.existing) {
+            finalSigs = data.existing.map((s: any) => ({
+                role: s.stakeholder_role,
+                name: s.stakeholder_name,
+                role_label: roleLabels[s.stakeholder_role] || s.stakeholder_role,
+                short_code: s.short_code
+            }));
+        } else if (finalSigs) {
+            finalSigs = finalSigs.map((s: any) => ({
+                ...s,
+                role_label: s.role_label || roleLabels[s.role] || s.role
+            }));
+        }
+
         return {
-            signatures: data.signatures,
+            signatures: finalSigs || [],
             verificationCode: data.verification_code || data.code,
             invoiceNumber: data.invoice_number
         };
@@ -130,7 +156,6 @@ export const generatePayrollReceipt = async (payroll: PayrollData, selectedRoles
         title: 'SLIP GAJI KARYAWAN',
         subtitle: `Periode: ${getMonthName(payroll.period_month)} ${payroll.period_year}`,
         invoiceNumber: invoiceNumber,
-        headerColor: [15, 23, 42],
     });
 
     const labelX = 20;
@@ -256,7 +281,6 @@ export const generateCashLedgerReceipt = async (entry: CashLedgerData, selectedR
     const bodyStart = drawStandardHeaderA5(doc, {
         title: entry.type === 'Income' ? 'KUITANSI PENERIMAAN' : 'BUKTI PENGELUARAN KAS',
         invoiceNumber: invoiceNumber,
-        headerColor: entry.type === 'Income' ? [5, 150, 105] : [220, 38, 38],
     });
 
     const labelX = 12;
@@ -305,23 +329,13 @@ export const generateFinancialReportPDF = (
     action: 'preview' | 'download' = 'download'
 ): string | void => {
     const doc = new jsPDF({ orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
 
     // Standardized Header (landscape)
-    const headerH = 36;
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, headerH, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text(reportTitle.toUpperCase(), pageWidth / 2, 18, { align: 'center' });
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Periode: ${periodStr}`, pageWidth / 2, 25, { align: 'center' });
-    doc.setFontSize(6);
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 30, { align: 'center' });
+    const bodyStart = drawStandardHeader(doc, {
+        title: reportTitle,
+        subtitle: `Periode: ${periodStr}`,
+        invoiceNumber: `REP-${periodStr.replace(/\s+/g, '-')}`,
+    });
 
     // Summary
     const totalIncome = transactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
@@ -331,9 +345,9 @@ export const generateFinancialReportPDF = (
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Pendapatan: ${formatCurrency(totalIncome)}`, 14, headerH + 10);
-    doc.text(`Total Pengeluaran: ${formatCurrency(totalExpense)}`, 120, headerH + 10);
-    doc.text(`Netto: ${formatCurrency(netto)}`, 226, headerH + 10);
+    doc.text(`Total Pendapatan: ${formatCurrency(totalIncome)}`, 14, bodyStart + 10);
+    doc.text(`Total Pengeluaran: ${formatCurrency(totalExpense)}`, 120, bodyStart + 10);
+    doc.text(`Netto: ${formatCurrency(netto)}`, 226, bodyStart + 10);
 
     // Per-Module Summary Table
     const moduleMap: Record<string, { income: number; expense: number; count: number }> = {};
@@ -346,7 +360,7 @@ export const generateFinancialReportPDF = (
     });
 
     autoTable(doc, {
-        startY: headerH + 16,
+        startY: bodyStart + 16,
         head: [['Modul', 'Jumlah Transaksi', 'Total Pemasukan', 'Total Pengeluaran', 'Netto']],
         body: Object.entries(moduleMap).map(([mod, v]) => [
             mod, v.count, formatCurrency(v.income), formatCurrency(v.expense), formatCurrency(v.income - v.expense)
@@ -403,23 +417,13 @@ export const generateCashLedgerReport = (
     endDate: string
 ) => {
     const doc = new jsPDF({ orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
 
     // Standardized Header (landscape)
-    const headerH = 36;
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, headerH, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text('LAPORAN BUKU KAS UMUM', pageWidth / 2, 18, { align: 'center' });
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Periode: ${formatDate(startDate)} — ${formatDate(endDate)}`, pageWidth / 2, 25, { align: 'center' });
-    doc.setFontSize(6);
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 30, { align: 'center' });
+    const bodyStart = drawStandardHeader(doc, {
+        title: 'LAPORAN BUKU KAS UMUM',
+        subtitle: `Periode: ${formatDate(startDate)} — ${formatDate(endDate)}`,
+        invoiceNumber: `BK-${startDate}-${endDate}`,
+    });
 
     // Summary
     const totalIncome = entries.filter(e => e.type === 'Income').reduce((a, c) => a + c.amount, 0);
@@ -429,13 +433,13 @@ export const generateCashLedgerReport = (
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Pemasukan: ${formatCurrency(totalIncome)}`, 14, headerH + 10);
-    doc.text(`Total Pengeluaran: ${formatCurrency(totalExpense)}`, 120, headerH + 10);
-    doc.text(`Saldo: ${formatCurrency(balance)}`, 226, headerH + 10);
+    doc.text(`Total Pemasukan: ${formatCurrency(totalIncome)}`, 14, bodyStart + 10);
+    doc.text(`Total Pengeluaran: ${formatCurrency(totalExpense)}`, 120, bodyStart + 10);
+    doc.text(`Saldo: ${formatCurrency(balance)}`, 226, bodyStart + 10);
 
     // Table
     autoTable(doc, {
-        startY: headerH + 16,
+        startY: bodyStart + 16,
         head: [['No', 'Tanggal', 'Item/Keperluan', 'Sumber/Tujuan', 'Kategori', 'Pemasukan', 'Pengeluaran', 'Keterangan']],
         body: entries.map((e, i) => [
             i + 1,
@@ -518,7 +522,7 @@ export const generateSavingsReport = async (studentName: string, className: stri
         doc.text(formatCurrency(totalBalance), pageWidth - 20, summaryY + 12, { align: 'right' });
 
         // Signature & Verification
-        const sigY = await drawSignatureBlock(doc, summaryY + 30, signatures);
+        const sigY = await drawSignatureBlock(doc, summaryY + 30, signatures, ['admin_tu', 'treasurer', 'principal']);
         await drawVerificationFooter(doc, sigY, verificationCode);
 
         addPageFooters(doc);
@@ -545,10 +549,10 @@ interface BillReceiptData {
     paid_at?: string;
 }
 
-export const generateBillReceipt = async (bill: BillReceiptData, studentName?: string, selectedRoles?: string[]) => {
+export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?: string[]) => {
     const doc = new jsPDF('p', 'mm', 'a5');
     const pageWidth = doc.internal.pageSize.getWidth();
-    const name = studentName || bill.student?.user?.name || '-';
+    const name = bill.student?.user?.name || '-';
     const invoiceType = 'Bill';
     const paidDate = bill.paid_at || new Date().toISOString();
     const dateStr = paidDate.split('T')[0];
@@ -564,7 +568,6 @@ export const generateBillReceipt = async (bill: BillReceiptData, studentName?: s
     const bodyStart = drawStandardHeaderA5(doc, {
         title: 'KUITANSI PEMBAYARAN',
         invoiceNumber: invoiceNumber,
-        headerColor: [16, 185, 129],
     });
 
     const labelX = 14;

@@ -169,24 +169,68 @@ func (r *invoiceSignatureRepository) SaveConfig(config *domain.InvoiceNumberConf
 }
 
 func (r *invoiceSignatureRepository) GetStakeholders() ([]domain.StakeholderConfig, error) {
+	// 1. Initial Fetch
 	var configs []domain.StakeholderConfig
 	err := r.db.Order("id ASC").Find(&configs).Error
 	if err != nil {
 		return nil, err
 	}
 
-	if len(configs) == 0 {
-		defaults := []domain.StakeholderConfig{
-			{Role: "admin_tu", DisplayLabel: "Tata Usaha", Name: "Tata Usaha PPI 100", IsActive: true},
-			{Role: "treasurer", DisplayLabel: "Bendahara", Name: "Bendahara PPI 100", IsActive: true},
-			{Role: "principal", DisplayLabel: "Kepala Sekolah", Name: "Kepala Sekolah SDIT", IsActive: true},
-			{Role: "committee", DisplayLabel: "Komite", Name: "Komite Sekolah", IsActive: true},
+	// 2. Migration: Rename 'chairman' to 'committee' if exists
+	for i, c := range configs {
+		if c.Role == "chairman" {
+			r.db.Model(&domain.StakeholderConfig{}).Where("id = ?", c.ID).Update("role", "committee")
+			configs[i].Role = "committee"
 		}
-		for i := range defaults {
-			r.db.Create(&defaults[i])
+	}
+
+	// 3. Define Required State
+	requiredRoles := []struct {
+		Role         string
+		DisplayLabel string
+		DefaultName  string
+	}{
+		{Role: "admin_tu", DisplayLabel: "Tata Usaha", DefaultName: "Tata Usaha"},
+		{Role: "treasurer", DisplayLabel: "Bendahara", DefaultName: "Bendahara"},
+		{Role: "principal", DisplayLabel: "Kepala Sekolah", DefaultName: "Kepala Sekolah"},
+		{Role: "committee", DisplayLabel: "Komite", DefaultName: "Komite"},
+	}
+
+	// 4. Update existing labels and Create missing roles
+	existingRoles := make(map[string]bool)
+	needsRefresh := false
+
+	for _, rr := range requiredRoles {
+		found := false
+		for i, c := range configs {
+			if c.Role == rr.Role {
+				found = true
+				existingRoles[rr.Role] = true
+				// Update label if it's missing or set to English key
+				if c.DisplayLabel == "" || c.DisplayLabel == c.Role {
+					r.db.Model(&domain.StakeholderConfig{}).Where("id = ?", c.ID).Update("display_label", rr.DisplayLabel)
+					configs[i].DisplayLabel = rr.DisplayLabel
+					needsRefresh = true
+				}
+				break
+			}
 		}
+
+		if !found {
+			r.db.Create(&domain.StakeholderConfig{
+				Role:         rr.Role,
+				DisplayLabel: rr.DisplayLabel,
+				Name:         rr.DefaultName,
+				IsActive:     true,
+			})
+			needsRefresh = true
+		}
+	}
+
+	if needsRefresh {
 		err = r.db.Order("id ASC").Find(&configs).Error
 	}
+
 	return configs, err
 }
 

@@ -10,9 +10,11 @@ import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { 
     generatePayrollReceipt, 
-    generateBillReceipt
+    generateBillReceipt,
+    fetchInvoiceSignatures
 } from '../../utils/pdfUtils';
-import { generateInvoiceA5, generateInvoiceA5Double } from '../../utils/invoiceTemplate';
+import { generateInvoiceA5Double } from '../../utils/invoiceTemplate';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 interface InvoiceHistoryItem {
     invoice_number: string;
@@ -42,7 +44,8 @@ const InvoiceHistory: React.FC = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [isExporting, setIsExporting] = useState<string | null>(null);
-    const [printFormat, setPrintFormat] = useState<'a4' | 'a5'>('a4');
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [activeInvoice, setActiveInvoice] = useState<InvoiceHistoryItem | null>(null);
 
     const fetchInvoices = async () => {
         setLoading(true);
@@ -79,7 +82,14 @@ const InvoiceHistory: React.FC = () => {
         }).format(amount);
     };
 
-    const handlePrint = async (inv: InvoiceHistoryItem) => {
+    const handlePrintClick = (inv: InvoiceHistoryItem) => {
+        setActiveInvoice(inv);
+        setShowPrintModal(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[], format: 'A4' | 'A5') => {
+        if (!activeInvoice) return;
+        const inv = activeInvoice;
         setIsExporting(inv.invoice_number);
         try {
             // Depending on the invoice type, we might need to fetch the underlying record
@@ -87,7 +97,7 @@ const InvoiceHistory: React.FC = () => {
                 const res = await api.get(`/finance/payroll`); // Payroll doesn't have a direct detail API by ID, usually we filter from list
                 const payroll = res.data.find((p: any) => p.id === inv.reference_id);
                 if (payroll) {
-                    await generatePayrollReceipt(payroll);
+                    await generatePayrollReceipt(payroll, selectedRoles);
                 } else {
                     toast.error("Data slip gaji tidak ditemukan");
                 }
@@ -96,44 +106,40 @@ const InvoiceHistory: React.FC = () => {
                 try {
                     const res = await api.get(`/finance/bills/${inv.reference_id}`);
                     if (res.data) {
-                        if (printFormat === 'a5') {
-                            const bill = res.data;
-                            const studentName = bill.student?.user?.name || '-';
-                            const paidDate = bill.paid_at || inv.document_date || new Date().toISOString();
-                            const dateStr = paidDate.split('T')[0];
-                            if (printFormat === 'a5') {
-                                // A5 Double
-                                await generateInvoiceA5Double(
-                                    {
-                                        invoiceNumber: inv.invoice_number,
-                                        studentName,
-                                        paymentMethod: 'Signed Digital',
-                                        bills: [{ title: bill.title, amount: bill.amount }],
-                                        totalAmount: bill.amount,
-                                        date: dateStr,
-                                    },
-                                    {
-                                        invoiceNumber: inv.invoice_number,
-                                        studentName,
-                                        paymentMethod: 'Signed Digital',
-                                        bills: [{ title: bill.title, amount: bill.amount }],
-                                        totalAmount: bill.amount,
-                                        date: dateStr,
-                                    }
-                                );
-                            } else {
-                                // Normal A5 since 'A4 Standar' handles it differently elsewhere or we can stick to A5 for now
-                                await generateInvoiceA5({
+                        const bill = res.data;
+                        const studentName = bill.student?.user?.name || '-';
+                        const paidDate = bill.paid_at || inv.document_date || new Date().toISOString();
+                        const dateStr = paidDate.split('T')[0];
+
+                        if (format === 'A5') {
+                            const sigData = await fetchInvoiceSignatures('Bill', bill.id, bill.amount, dateStr);
+                            
+                            // A5 Double
+                            await generateInvoiceA5Double(
+                                {
                                     invoiceNumber: inv.invoice_number,
                                     studentName,
                                     paymentMethod: 'Signed Digital',
                                     bills: [{ title: bill.title, amount: bill.amount }],
                                     totalAmount: bill.amount,
                                     date: dateStr,
-                                });
-                            }
+                                    selectedRoles,
+                                    signatures: sigData.signatures,
+                                },
+                                {
+                                    invoiceNumber: inv.invoice_number,
+                                    studentName,
+                                    paymentMethod: 'Signed Digital',
+                                    bills: [{ title: bill.title, amount: bill.amount }],
+                                    totalAmount: bill.amount,
+                                    date: dateStr,
+                                    selectedRoles,
+                                    signatures: sigData.signatures,
+                                }
+                            );
                         } else {
-                            await generateBillReceipt(res.data);
+                            // A4 Standard
+                            await generateBillReceipt(res.data, selectedRoles);
                         }
                     }
                 } catch (e) {
@@ -173,36 +179,6 @@ const InvoiceHistory: React.FC = () => {
                         Lihat dan unduh kembali dokumen keuangan yang telah diterbitkan.
                     </motion.p>
                 </div>
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                    className="flex items-center gap-2 bg-white border border-slate-100 rounded-2xl p-1.5 shadow-sm self-start md:self-auto"
-                >
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">Format Cetak</span>
-                    <button
-                        onClick={() => setPrintFormat('a4')}
-                        className={clsx(
-                            "px-4 py-2 rounded-xl text-sm font-bold transition-all",
-                            printFormat === 'a4'
-                                ? "bg-slate-900 text-white shadow"
-                                : "text-slate-500 hover:bg-slate-50"
-                        )}
-                    >
-                        A4 Standar
-                    </button>
-                    <button
-                        onClick={() => setPrintFormat('a5')}
-                        className={clsx(
-                            "px-4 py-2 rounded-xl text-sm font-bold transition-all",
-                            printFormat === 'a5'
-                                ? "bg-emerald-600 text-white shadow"
-                                : "text-slate-500 hover:bg-slate-50"
-                        )}
-                    >
-                        A5 (2 per halaman)
-                    </button>
-                </motion.div>
             </div>
 
             {/* Filters Section */}
@@ -368,7 +344,7 @@ const InvoiceHistory: React.FC = () => {
                                             <td className="p-6">
                                                 <div className="flex items-center gap-2">
                                                     <button 
-                                                        onClick={() => handlePrint(inv)}
+                                                        onClick={() => handlePrintClick(inv)}
                                                         disabled={isExporting === inv.invoice_number}
                                                         className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50"
                                                     >
@@ -398,6 +374,11 @@ const InvoiceHistory: React.FC = () => {
                     </div>
                 )}
             </div>
+            <PrintOptionsModal 
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                onConfirm={handleConfirmPrint}
+            />
         </div>
     );
 };

@@ -315,21 +315,36 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalSavings)
 	analytics["total_student_savings"] = totalSavings.Float64
 
-	// Cash Ledger Hutang (Debt to third parties) — use NullFloat64 to handle empty table
-	var totalDebt sql.NullFloat64
-	r.db.Model(&domain.CashLedger{}).Where("category = ? AND type = ?", "Hutang", "Income").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalDebt)
+	// 1. External Debt (Catatan Hutang)
+	var externalDebtRemaining sql.NullFloat64
+	r.db.Model(&domain.ExternalDebt{}).Select("COALESCE(sum(amount - paid_amount), 0)").Row().Scan(&externalDebtRemaining)
 
-	var totalDebtPaid sql.NullFloat64
-	r.db.Model(&domain.CashLedger{}).Where("category = ? AND type = ?", "Hutang", "Expense").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalDebtPaid)
+	// 2. Savings Operational (Tabungan Operasional)
+	var operationalDebtRemaining sql.NullFloat64
+	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
+		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&operationalDebtRemaining)
 
-	analytics["total_school_debt"] = totalDebt.Float64 - totalDebtPaid.Float64
+	// 3. Cash Ledger Hutang (BKU) - Avoid double counting external debt payments
+	var totalDebtIncome sql.NullFloat64
+	r.db.Model(&domain.CashLedger{}).Where("category = ? AND type = ?", "Hutang", "Income").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalDebtIncome)
+
+	var totalDebtExpense sql.NullFloat64
+	r.db.Model(&domain.CashLedger{}).Where("category = ? AND type = ?", "Hutang", "Expense").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalDebtExpense)
+
+	var externalDebtPaidKas sql.NullFloat64
+	r.db.Model(&domain.ExternalDebtPayment{}).Where("fund_source = ?", "Kas Umum").Select("COALESCE(sum(amount), 0)").Row().Scan(&externalDebtPaidKas)
+
+	bkuDebtRemaining := totalDebtIncome.Float64 - (totalDebtExpense.Float64 - externalDebtPaidKas.Float64)
+
+	analytics["total_school_debt"] = externalDebtRemaining.Float64 + operationalDebtRemaining.Float64 + bkuDebtRemaining
 
 	return analytics, nil
 }
 
 // ------------------- Savings Operational (Pool-level) -------------------
 
-func (r *financeExtendedRepository) WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string) error {
+func (r *financeExtendedRepository) WithdrawSavingsOperational(handledByID uuid.UUID, amount float64, purpose string, unitID uint) error {
 	// Check total pool balance first
 	var totalBalance sql.NullFloat64
 	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalBalance)
@@ -350,11 +365,12 @@ func (r *financeExtendedRepository) WithdrawSavingsOperational(handledByID uuid.
 		Purpose:     purpose,
 		Status:      "Outstanding",
 		HandledByID: handledByID,
+		UnitID:      unitID,
 	}
 	return r.db.Create(&withdrawal).Error
 }
 
-func (r *financeExtendedRepository) ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string) error {
+func (r *financeExtendedRepository) ReturnSavingsOperational(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string, source string, unitID uint) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var withdrawal domain.SavingsOperationalWithdrawal
 		if err := tx.Where("id = ?", withdrawalID).First(&withdrawal).Error; err != nil {
@@ -370,8 +386,10 @@ func (r *financeExtendedRepository) ReturnSavingsOperational(withdrawalID uuid.U
 		ret := domain.SavingsOperationalReturn{
 			WithdrawalID: withdrawalID,
 			Amount:       amount,
+			ReturnSource: source,
 			Notes:        notes,
 			HandledByID:  handledByID,
+			UnitID:       unitID,
 		}
 		if err := tx.Create(&ret).Error; err != nil {
 			return err

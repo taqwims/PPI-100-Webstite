@@ -17,7 +17,18 @@ export interface InvoiceTemplateOptions {
     selectedRoles?: string[];
     verificationCode?: string;
     headerColor?: [number, number, number];
+    isA5?: boolean;
 }
+
+// ─── Brand Colors ───
+const BRAND_GREEN: [number, number, number] = [0, 128, 0];
+const BRAND_BLUE: [number, number, number] = [0, 32, 96];
+
+// ─── Institutional Details ───
+const INST_NAME = 'SEKOLAH DASAR ISLAM TERPADU  AN NUR BANJARSARI';
+const INST_TAGLINE = 'Apply Sunnah in Daily Activity - Caracter Building - Tahfidz With Fun Learning - Life Skill';
+const INST_ADDRESS = 'Alamat: Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari Kecamtan Banjarsari Kabupaten Ciamis';
+const INST_PHONE = 'TLP. 081282109785 Kode Pos 46383';
 
 // ─── Logo as Base64 (loaded once) ───
 let logoBase64: string | null = null;
@@ -25,7 +36,7 @@ let logoBase64: string | null = null;
 async function loadLogo(): Promise<string | null> {
     if (logoBase64) return logoBase64;
     try {
-        const response = await fetch(new URL('../assets/school_logo.png', import.meta.url).href);
+        const response = await fetch(new URL('../assets/logo.jpeg', import.meta.url).href);
         const blob = await response.blob();
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -49,57 +60,60 @@ export function drawStandardHeader(
     options: InvoiceTemplateOptions
 ): number {
     const pageWidth = doc.internal.pageSize.getWidth();
-    const headerH = 48;
-    const color = options.headerColor || [15, 23, 42];
-
-    // Background
-    doc.setFillColor(...color);
-    doc.rect(0, 0, pageWidth, headerH, 'F');
+    // const headerH = 48; // Old height with background
 
     // Logo (if loaded)
-    const logoX = 14;
     if (logoBase64) {
         try {
-            doc.addImage(logoBase64, 'PNG', logoX, 4, 16, 16);
+            // Center logo at top
+            doc.addImage(logoBase64, 'PNG', (pageWidth - 20) / 2, 5, 20, 20);
         } catch { /* skip logo if error */ }
     }
 
-    // Institution name
-    doc.setTextColor(255, 255, 255);
+    // Institution name (Green)
+    doc.setTextColor(...BRAND_GREEN);
+    doc.setFontSize(14);
+    doc.setFont('times', 'bold');
+    doc.text(INST_NAME, pageWidth / 2, 32, { align: 'center' });
+
+    // Tagline (Green)
+    doc.setFontSize(9);
+    doc.setFont('times', 'bold'); // Slightly bold as in image
+    doc.text(INST_TAGLINE, pageWidth / 2, 37, { align: 'center' });
+
+    // Address & Phone (Blue/Navy)
+    doc.setTextColor(...BRAND_BLUE);
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PONDOK PESANTREN ISLAM (PPI) 100', pageWidth / 2, 8, { align: 'center' });
-    doc.setFontSize(11);
-    doc.text('SDIT AN-NUR', pageWidth / 2, 15, { align: 'center' });
+    doc.setFont('times', 'normal');
+    doc.text(INST_ADDRESS, pageWidth / 2, 42, { align: 'center' });
+    doc.text(INST_PHONE, pageWidth / 2, 46, { align: 'center' });
 
-    // Address
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Jl. Pesantren No. 100 — Telp. (021) XXXXXXX', pageWidth / 2, 20, { align: 'center' });
+    // Separator line (Double Green line)
+    doc.setDrawColor(...BRAND_GREEN);
+    doc.setLineWidth(0.8);
+    doc.line(14, 49, pageWidth - 14, 49);
+    doc.setLineWidth(0.2);
+    doc.line(14, 50.5, pageWidth - 14, 50.5);
 
-    // Separator line
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.3);
-    doc.line(14, 23, pageWidth - 14, 23);
-
-    // Document title
+    // Document title (Black)
+    doc.setTextColor(30, 41, 59);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(options.title.toUpperCase(), pageWidth / 2, 31, { align: 'center' });
+    doc.text(options.title.toUpperCase(), pageWidth / 2, 60, { align: 'center' });
 
     // Subtitle
     if (options.subtitle) {
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(options.subtitle, pageWidth / 2, 37, { align: 'center' });
+        doc.text(options.subtitle, pageWidth / 2, 66, { align: 'center' });
     }
 
     // Invoice number
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, options.subtitle ? 43 : 38, { align: 'center' });
+    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, options.subtitle ? 72 : 67, { align: 'center' });
 
-    return headerH + 6;
+    return options.subtitle ? 78 : 73;
 }
 
 // ─── A5 Header (for receipts) ───
@@ -108,45 +122,49 @@ export function drawStandardHeaderA5(
     options: InvoiceTemplateOptions
 ): number {
     const pageWidth = doc.internal.pageSize.getWidth();
-    const headerH = 40;
-    const color = options.headerColor || [15, 23, 42];
-
-    doc.setFillColor(...color);
-    doc.rect(0, 0, pageWidth, headerH, 'F');
 
     if (logoBase64) {
-        try { doc.addImage(logoBase64, 'PNG', 8, 3, 12, 12); } catch { }
+        try {
+            doc.addImage(logoBase64, 'PNG', (pageWidth - 14) / 2, 3, 14, 14);
+        } catch { }
     }
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100', pageWidth / 2, 7, { align: 'center' });
-    doc.setFontSize(9);
-    doc.text('SDIT AN-NUR', pageWidth / 2, 13, { align: 'center' });
+    doc.setTextColor(...BRAND_GREEN);
+    doc.setFontSize(10);
+    doc.setFont('times', 'bold');
+    doc.text(INST_NAME, pageWidth / 2, 22, { align: 'center' });
 
-    doc.setFontSize(5);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 17, { align: 'center' });
+    doc.setFontSize(6.5);
+    doc.text(INST_TAGLINE, pageWidth / 2, 26, { align: 'center' });
 
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.2);
-    doc.line(8, 19, pageWidth - 8, 19);
+    doc.setTextColor(...BRAND_BLUE);
+    doc.setFontSize(5.5);
+    doc.setFont('times', 'normal');
+    // Reduced address for A5 to fit better
+    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari', pageWidth / 2, 30, { align: 'center' });
+    doc.text('Banjarsari - Ciamis. TLP. 081282109785', pageWidth / 2, 33, { align: 'center' });
 
+    doc.setDrawColor(...BRAND_GREEN);
+    doc.setLineWidth(0.5);
+    doc.line(8, 35, pageWidth - 8, 35);
+    doc.setLineWidth(0.15);
+    doc.line(8, 36, pageWidth - 8, 36);
+
+    doc.setTextColor(30, 41, 59);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(options.title.toUpperCase(), pageWidth / 2, 27, { align: 'center' });
+    doc.text(options.title.toUpperCase(), pageWidth / 2, 45, { align: 'center' });
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, 33, { align: 'center' });
+    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, 50, { align: 'center' });
 
     if (options.subtitle) {
         doc.setFontSize(6);
-        doc.text(options.subtitle, pageWidth / 2, 37, { align: 'center' });
+        doc.text(options.subtitle, pageWidth / 2, 54, { align: 'center' });
     }
 
-    return headerH + 4;
+    return options.subtitle ? 58 : 54;
 }
 
 // ─── Signature Block ───
@@ -177,9 +195,10 @@ export async function drawSignatureBlock(
     startY += 4;
 
     const allSigs = signatures || [
-        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha PPI 100', short_code: '—' },
-        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara PPI 100', short_code: '—' },
-        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah SDIT', short_code: '—' },
+        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha', short_code: '—' },
+        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara', short_code: '—' },
+        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah', short_code: '—' },
+        { role: 'committee', role_label: 'Komite', name: 'Komite', short_code: '—' },
     ];
 
     // Filter based on selectedRoles if provided
@@ -329,9 +348,10 @@ export async function drawSignatureBlockCompact(
     startY += 4;
 
     const allSigs = signatures || [
-        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha PPI 100', short_code: '—' },
-        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara PPI 100', short_code: '—' },
-        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah SDIT', short_code: '—' },
+        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha', short_code: '—' },
+        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara', short_code: '—' },
+        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah', short_code: '—' },
+        { role: 'committee', role_label: 'Komite', name: 'Komite', short_code: '—' },
     ];
 
     const sigs = selectedRoles
@@ -391,7 +411,7 @@ async function generateHmacSha256(message: string, key: string): Promise<string>
 const KEYS: Record<string, string> = {
     principal: 'ppi100-principal-sig-key-2026',
     treasurer: 'ppi100-treasurer-sig-key-2026',
-    chairman: 'ppi100-chairman-sig-key-2026',
+    committee: 'ppi100-committee-sig-key-2026',
     admin_tu: 'ppi100-admin-tu-sig-key-2026',
 };
 
@@ -402,11 +422,12 @@ export async function generateLocalSignatures(
     dateStr: string,
     stakeholderNames?: Record<string, string>
 ): Promise<{ signatures: StakeholderSignature[]; verificationCode: string }> {
-    const roles = ['admin_tu', 'treasurer', 'principal'];
+    const roles = ['admin_tu', 'treasurer', 'principal', 'committee'];
     const labels: Record<string, string> = {
         admin_tu: 'Tata Usaha',
         treasurer: 'Bendahara',
         principal: 'Kepala Sekolah',
+        committee: 'Komite',
     };
 
     const signatures: StakeholderSignature[] = [];
@@ -441,7 +462,7 @@ export function addPageFooters(doc: jsPDF) {
         doc.setPage(i);
         doc.setTextColor(148, 163, 184);
         doc.setFontSize(6);
-        doc.text(`SDIT AN-NUR — Dicetak: ${printDate}`, 14, doc.internal.pageSize.getHeight() - 6);
+        doc.text(`SDIT AN NUR BANJARSARI — Dicetak: ${printDate}`, 14, doc.internal.pageSize.getHeight() - 6);
         doc.text(`Halaman ${i}/${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
     }
 }
@@ -455,6 +476,7 @@ export async function generateInvoiceA5(params: {
     totalAmount: number;
     date: string;
     signatures?: StakeholderSignature[];
+    selectedRoles?: string[];
 }): Promise<void> {
     const { invoiceNumber, studentName, paymentMethod, bills, totalAmount, date } = params;
 
@@ -554,8 +576,11 @@ export async function generateInvoiceA5(params: {
         date,
     );
     const sigsToUse = params.signatures || signatures;
+    const finalSigs = params.selectedRoles && params.selectedRoles.length > 0
+        ? sigsToUse.filter(s => params.selectedRoles?.includes(s.role))
+        : sigsToUse;
 
-    y = await drawSignatureBlockCompact(doc, y, sigsToUse);
+    y = await drawSignatureBlockCompact(doc, y, finalSigs);
     y = await drawVerificationFooterCompact(doc, y, verificationCode);
 
     doc.save(`invoice-a5-${invoiceNumber}.pdf`);
@@ -575,6 +600,7 @@ export async function generateMultiPaymentInvoice(params: {
     totalAmount: number;
     date: string;
     signatures?: StakeholderSignature[];
+    selectedRoles?: string[];
 }): Promise<void> {
     const { invoiceNumber, studentName, paymentMethod, bills, totalAmount, date } = params;
 
@@ -676,8 +702,11 @@ export async function generateMultiPaymentInvoice(params: {
         date,
     );
     const sigsToUse = params.signatures || signatures;
+    const finalSigs = params.selectedRoles && params.selectedRoles.length > 0
+        ? sigsToUse.filter(s => params.selectedRoles?.includes(s.role))
+        : sigsToUse;
 
-    y = await drawSignatureBlock(doc, y, sigsToUse);
+    y = await drawSignatureBlock(doc, y, finalSigs);
     y = await drawVerificationFooter(doc, y, verificationCode);
 
     addPageFooters(doc);
@@ -694,6 +723,7 @@ export interface InvoiceA5Params {
     totalAmount: number;
     date: string;
     signatures?: StakeholderSignature[];
+    selectedRoles?: string[];
 }
 
 /**
@@ -717,37 +747,40 @@ async function renderInvoiceSection(
     const formatRp = (n: number) =>
         new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 
-    // ── Header ──
+    // ── Header (Standard White) ──
     const headerH = 36;
-    doc.setFillColor(...color);
-    doc.rect(0, yOffset, pageWidth, headerH, 'F');
-
     if (logoBase64) {
-        try { doc.addImage(logoBase64, 'PNG', 8, yOffset + 3, 11, 11); } catch { }
+        try { doc.addImage(logoBase64, 'PNG', (pageWidth - 14) / 2, yOffset + 3, 11, 11); } catch { }
     }
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100', pageWidth / 2, yOffset + 6, { align: 'center' });
+    doc.setTextColor(...BRAND_GREEN);
     doc.setFontSize(9);
-    doc.text('SDIT AN-NUR', pageWidth / 2, yOffset + 12, { align: 'center' });
+    doc.setFont('times', 'bold');
+    doc.text(INST_NAME, pageWidth / 2, yOffset + 18, { align: 'center' });
 
+    doc.setFontSize(5.5);
+    doc.text(INST_TAGLINE, pageWidth / 2, yOffset + 22, { align: 'center' });
+
+    doc.setTextColor(...BRAND_BLUE);
     doc.setFontSize(5);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, yOffset + 16, { align: 'center' });
+    doc.setFont('times', 'normal');
+    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari', pageWidth / 2, yOffset + 25, { align: 'center' });
+    doc.text('Banjarsari - Ciamis. TLP. 081282109785', pageWidth / 2, yOffset + 28, { align: 'center' });
 
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.2);
-    doc.line(8, yOffset + 18, pageWidth - 8, yOffset + 18);
+    doc.setDrawColor(...BRAND_GREEN);
+    doc.setLineWidth(0.5);
+    doc.line(8, yOffset + 30, pageWidth - 8, yOffset + 30);
+    doc.setLineWidth(0.1);
+    doc.line(8, yOffset + 31, pageWidth - 8, yOffset + 31);
 
+    doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('KWITANSI PEMBAYARAN', pageWidth / 2, yOffset + 25, { align: 'center' });
+    doc.text('KWITANSI PEMBAYARAN', pageWidth / 2, yOffset + 38, { align: 'center' });
 
     doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
-    doc.text(`No: ${invoiceNumber}`, pageWidth / 2, yOffset + 30, { align: 'center' });
+    doc.text(`No: ${invoiceNumber}`, pageWidth / 2, yOffset + 43, { align: 'center' });
 
     let y = yOffset + headerH + 4;
 
@@ -833,10 +866,13 @@ async function renderInvoiceSection(
         date,
     );
     const sigsToUse = params.signatures || signatures;
+    const finalSigs = params.selectedRoles && params.selectedRoles.length > 0
+        ? sigsToUse.filter(s => params.selectedRoles?.includes(s.role))
+        : sigsToUse;
 
-    const colW = (pageWidth - 20) / Math.max(sigsToUse.length, 1);
-    for (let i = 0; i < sigsToUse.length; i++) {
-        const sig = sigsToUse[i];
+    const colW = (pageWidth - 20) / Math.max(finalSigs.length, 1);
+    for (let i = 0; i < finalSigs.length; i++) {
+        const sig = finalSigs[i];
         const x = labelX + i * colW;
         doc.setFontSize(5.5);
         doc.setFont('helvetica', 'normal');

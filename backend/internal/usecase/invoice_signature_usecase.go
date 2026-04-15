@@ -114,6 +114,20 @@ func (u *invoiceSignatureUsecase) SignInvoice(invoiceType, referenceID string, a
 			invNum = updated[0].InvoiceNumber
 		}
 
+		// Dynamically override names to match current config
+		stakeholders, _ := u.repo.GetStakeholders()
+		stakeholderNames := make(map[string]string)
+		for _, s := range stakeholders {
+			if s.IsActive {
+				stakeholderNames[s.Role] = s.Name
+			}
+		}
+		for i := range updated {
+			if newName, ok := stakeholderNames[updated[i].StakeholderRole]; ok {
+				updated[i].StakeholderName = newName
+			}
+		}
+
 		return &SignInvoiceResult{
 			VerificationCode: verificationCode,
 			InvoiceNumber:    invNum,

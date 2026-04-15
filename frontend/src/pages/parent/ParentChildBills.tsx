@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, Wallet, X, Landmark, Copy, Send, User, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, X, Landmark, Copy, Send, User, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { generateBillReceipt } from '../../utils/pdfUtils';
@@ -156,7 +156,7 @@ const ParentChildBills: React.FC = () => {
     const totalUnpaid = unpaidBills.reduce((acc: number, b: Bill) => acc + getRemainingAmount(b), 0);
 
     const selectedBills = (bills || []).filter((b: Bill) => selectedBillIds.includes(b.id));
-    const selectedTotal = selectedBills.reduce((sum, b) => sum + getRemainingAmount(b), 0);
+    const selectedTotal = selectedBills.reduce((sum: number, b: Bill) => sum + getRemainingAmount(b), 0);
 
     const toggleBillSelection = (billId: string) => {
         setSelectedBillIds(prev =>
@@ -811,14 +811,6 @@ const ParentChildBills: React.FC = () => {
                                     </>
                                 )}
 
-                                {paymentMethod === 'Cash' && (
-                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                        <p className="text-sm text-blue-800">
-                                            💡 Silakan transfer sesuai nominal, lalu upload bukti transfer. Pembayaran Anda akan diverifikasi oleh admin sebelum status berubah menjadi lunas.
-                                        </p>
-                                    </div>
-                                )}
-
                                 {paymentMethod === 'Midtrans' ? (
                                     <button
                                         onClick={handleMidtransPayment}
@@ -870,7 +862,7 @@ const ParentChildBills: React.FC = () => {
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Rincian Pembayaran ({selectedBillIds.length} Tagihan)</p>
                                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                    {selectedBills.map(b => (
+                                    {selectedBills.map((b: Bill) => (
                                         <div key={b.id} className="flex justify-between items-center text-sm bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
                                             <div className="flex flex-col">
                                                 <span className="text-slate-700 font-medium truncate pr-4">{b.title}</span>

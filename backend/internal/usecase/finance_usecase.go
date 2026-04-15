@@ -634,7 +634,7 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 	entry := &domain.CashLedger{
 		Date:              time.Now(),
 		Source:            bill.Student.User.Name,
-		ItemName:          fmt.Sprintf("Hapus / Approval Pembayaran %s - %s", bill.Title, payment.PaymentMethod),
+		ItemName:          fmt.Sprintf("Approval Pembayaran %s - %s", bill.Title, payment.PaymentMethod),
 		Type:              "Income",
 		Amount:            payment.Amount,
 		Category:          category,
