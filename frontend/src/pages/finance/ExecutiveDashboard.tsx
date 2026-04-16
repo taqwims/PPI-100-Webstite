@@ -12,6 +12,7 @@ interface DashboardData {
     unpaid_spp_count: number;
     total_student_savings: number;
     total_school_debt: number;
+    total_school_receivables: number;
 }
 
 interface BudgetSummary { category: string; planned: number; realized: number; percentage: number; }
@@ -81,7 +82,7 @@ const ExecutiveDashboard: React.FC = () => {
             {/* Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard icon={<AlertTriangle size={20} />} label="Total Hutang" value={formatCurrency(analytics?.total_school_debt || 0)} color="red" />
-                <StatCard icon={<DollarSign size={20} />} label="Total Piutang (Tagihan)" value={`${analytics?.unpaid_spp_count || 0} tagihan`} color="amber" />
+                <StatCard icon={<DollarSign size={20} />} label="Total Piutang (Tagihan)" value={formatCurrency(analytics?.total_school_receivables || 0)} subtitle={`${analytics?.unpaid_spp_count || 0} tagihan belum lunas`} color="amber" />
                 <StatCard icon={<TrendingUp size={20} />} label="Pendapatan Hari Ini" value={formatCurrency(pendapatanHariIni)} color="emerald" />
                 <StatCard icon={<TrendingDown size={20} />} label="Belanja Hari Ini" value={formatCurrency(belanjaHariIni)} color="rose" />
             </div>

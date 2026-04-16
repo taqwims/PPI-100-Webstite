@@ -163,15 +163,31 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 
 			UNION ALL
 
-			SELECT so.paid_at as date, COALESCE(u4.name, 'Siswa') as source,
+			SELECT so.updated_at as date, COALESCE(u4.name, 'Siswa') as source,
 			       CONCAT('Tagihan: ', pt.name) as description,
 			       'Income' as type, so.paid_amount as amount, 'Tanggungan' as category,
 			       0 as code_id, 'Obligation' as module
 			FROM student_obligations so
 			JOIN payment_types pt ON so.payment_type_id = pt.id
-			LEFT JOIN students s4 ON so.student_id = s4.id
-			LEFT JOIN users u4 ON s4.user_id = u4.id
-			WHERE so.status IN ('Paid', 'Partial') AND so.paid_amount > 0
+			JOIN students s4 ON so.student_id = s4.id
+			JOIN users u4 ON s4.user_id = u4.id
+			WHERE so.status != 'Unpaid'
+
+			UNION ALL
+
+			SELECT sw.created_at as date, 'Tabungan Operasional' as source,
+			       CONCAT('Penarikan Op: ', sw.purpose) as description,
+			       'Expense' as type, sw.amount, 'Operasional' as category,
+			       0 as code_id, 'SavingsOp' as module
+			FROM savings_operational_withdrawals sw
+
+			UNION ALL
+
+			SELECT sr.created_at as date, 'Tabungan Operasional' as source,
+			       sr.notes as description,
+			       'Income' as type, sr.amount, 'Operasional' as category,
+			       0 as code_id, 'SavingsOp' as module
+			FROM savings_operational_returns sr
 		) t
 		LEFT JOIN transaction_codes tc ON t.code_id = tc.id
 		WHERE 1=1 %s %s %s

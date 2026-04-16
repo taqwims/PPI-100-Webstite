@@ -81,6 +81,7 @@ import StudentBillSummary from './pages/finance/StudentBillSummary';
 import InfaqTypes from './pages/finance/InfaqTypes';
 import WATemplates from './pages/finance/WATemplates';
 import PaymentVerification from './pages/finance/PaymentVerification';
+import SchoolBankAccounts from './pages/finance/SchoolBankAccounts';
 import ToastProvider from './components/ui/Toast';
 import { AcademicYearProvider } from './context/AcademicYearContext';
 import RoleRoute from './components/RoleRoute';
@@ -210,6 +211,11 @@ function App() {
                                     } />
                                     <Route path="finance/activities" element={<Activities />} />
                                     <Route path="finance/activities/:id" element={<ActivityDetail />} />
+                                    <Route path="finance/bank-accounts" element={
+                                        <RoleRoute allowedRoles={[1, 9]}>
+                                            <SchoolBankAccounts />
+                                        </RoleRoute>
+                                    } />
 
                                     {/* Teacher/Student Routes */}
                                     <Route path="teacher/schedule" element={<TeacherSchedule />} />

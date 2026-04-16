@@ -91,5 +91,8 @@ func AutoMigrate(db *gorm.DB) error {
 		// Asset Management
 		&domain.Asset{},
 		&domain.AssetCategory{},
+
+		// School Bank Account
+		&domain.SchoolBankAccount{},
 	)
 }

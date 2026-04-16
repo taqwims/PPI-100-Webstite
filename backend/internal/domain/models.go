@@ -752,3 +752,17 @@ type AssetCategory struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// ------------------- School Bank Account -------------------
+
+type SchoolBankAccount struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	BankName      string    `gorm:"not null" json:"bank_name"`       // BSI, BCA, Mandiri
+	AccountNumber string    `gorm:"not null" json:"account_number"`  // 7123456789
+	AccountHolder string    `gorm:"not null" json:"account_holder"`  // Yayasan PPI 100
+	IsPrimary     bool      `gorm:"default:false" json:"is_primary"` // Rekening utama
+	IsActive      bool      `gorm:"default:true" json:"is_active"`   // Tampil/Tidak
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+

@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import { useFeatureStore } from '../store/featureStore';
 import type { User } from '../types';
 
 interface AuthContextType {
@@ -20,6 +21,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user, token, login, logout, setUser, isAuthenticated } = useAuthStore();
+    const fetchFeatures = useFeatureStore((s) => s.fetchFeatures);
+    const featuresLoaded = useFeatureStore((s) => s.loaded);
+
+    // Fetch feature config on mount (once)
+    useEffect(() => {
+        if (!featuresLoaded) {
+            fetchFeatures();
+        }
+    }, []);
 
     // Fetch user profile saat token ada tapi user belum di-load
     useEffect(() => {
@@ -44,3 +54,4 @@ export const useAuth = () => {
     }
     return context;
 };
+

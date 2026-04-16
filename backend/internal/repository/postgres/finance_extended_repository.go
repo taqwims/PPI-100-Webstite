@@ -301,14 +301,23 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 	r.db.Model(&domain.Teacher{}).Count(&totalTeachers)
 	analytics["total_teachers"] = totalTeachers
 
-	// SPP Statistics (Simplified)
+	// SPP Statistics
 	var paidSpp int64
 	r.db.Model(&domain.Bill{}).Where("bill_type = ? AND status = ?", "SPP", "Paid").Count(&paidSpp)
 	analytics["paid_spp_count"] = paidSpp
 
 	var unpaidSpp int64
-	r.db.Model(&domain.Bill{}).Where("bill_type = ? AND status = ?", "SPP", "Unpaid").Count(&unpaidSpp)
+	r.db.Model(&domain.Bill{}).Where("bill_type = ? AND status IN ?", "SPP", []string{"Unpaid", "Partial", "Overdue"}).Count(&unpaidSpp)
 	analytics["unpaid_spp_count"] = unpaidSpp
+
+	// PIUTANG NOMINAL (Total Unpaid Bills)
+	var totalUnpaidBills sql.NullFloat64
+	r.db.Table("bills b").
+		Joins("LEFT JOIN (SELECT bill_id, sum(amount) as total_paid FROM payments WHERE status = 'Success' GROUP BY bill_id) p ON b.id = p.bill_id").
+		Where("b.status != ?", "Paid").
+		Select("COALESCE(sum(b.amount - COALESCE(p.total_paid, 0)), 0)").
+		Row().Scan(&totalUnpaidBills)
+	analytics["total_school_receivables"] = totalUnpaidBills.Float64
 
 	// Savings Receivables (Total Balances) — use NullFloat64 to handle empty table
 	var totalSavings sql.NullFloat64
@@ -336,6 +345,9 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 	r.db.Model(&domain.ExternalDebtPayment{}).Where("fund_source = ?", "Kas Umum").Select("COALESCE(sum(amount), 0)").Row().Scan(&externalDebtPaidKas)
 
 	bkuDebtRemaining := totalDebtIncome.Float64 - (totalDebtExpense.Float64 - externalDebtPaidKas.Float64)
+	if bkuDebtRemaining < 0 {
+		bkuDebtRemaining = 0
+	}
 
 	analytics["total_school_debt"] = externalDebtRemaining.Float64 + operationalDebtRemaining.Float64 + bkuDebtRemaining
 

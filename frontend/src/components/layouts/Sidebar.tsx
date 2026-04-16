@@ -3,10 +3,11 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Send, Mail, GraduationCap, FileText, CreditCard,
-    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut
+    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
+import { useFeatureStore } from '../../store/featureStore';
 import clsx from 'clsx';
 
 interface SidebarProps {
@@ -18,6 +19,7 @@ interface MenuItem {
     icon: LucideIcon;
     label: string;
     path: string;
+    feature?: string; // Feature flag key — item hidden if feature is disabled
 }
 
 interface MenuGroup {
@@ -29,6 +31,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     const location = useLocation();
     const { logout, user } = useAuth();
     const { academicYears, selectedYear, setSelectedYear } = useAcademicYear();
+    const isEnabled = useFeatureStore((s) => s.isEnabled);
+    const school = useFeatureStore((s) => s.school);
 
     const getMenuGroups = (): MenuGroup[] => {
         // ── Common (always first) ──
@@ -43,8 +47,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
-                { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk' },
-                { icon: Package, label: 'Aset Sekolah', path: '/dashboard/admin/assets' },
+                { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk', feature: 'bk' },
+                { icon: Package, label: 'Aset Sekolah', path: '/dashboard/admin/assets', feature: 'assets' },
             ]
         };
         const adminContent: MenuGroup = {
@@ -58,18 +62,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const adminData: MenuGroup = {
             title: 'Data Publik',
             items: [
-                { icon: Users, label: 'Data PPDB', path: '/dashboard/admin/ppdb' },
-                { icon: GraduationCap, label: 'Data Alumni', path: '/dashboard/admin/alumni' },
-                { icon: Users, label: 'Dewan Asatidz', path: '/dashboard/admin/teachers' },
-                { icon: FileText, label: 'Pusat Unduhan', path: '/dashboard/admin/downloads' },
-                { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/admin/bk' },
+                { icon: Users, label: 'Data PPDB', path: '/dashboard/admin/ppdb', feature: 'ppdb' },
+                { icon: GraduationCap, label: 'Data Alumni', path: '/dashboard/admin/alumni', feature: 'public_website' },
+                { icon: Users, label: 'Dewan Asatidz', path: '/dashboard/admin/teachers', feature: 'public_website' },
+                { icon: FileText, label: 'Pusat Unduhan', path: '/dashboard/admin/downloads', feature: 'public_website' },
+                { icon: AlertTriangle, label: 'Laporan BK', path: '/dashboard/admin/bk', feature: 'bk' },
             ]
         };
         const adminFinance: MenuGroup = {
             title: 'Keuangan',
             items: [
-                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
-                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify' },
+                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance', feature: 'billing' },
+                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify', feature: 'billing' },
             ]
         };
 
@@ -77,21 +81,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const finTransaksi: MenuGroup = {
             title: 'Transaksi',
             items: [
-                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance' },
-                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify' },
-                { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities' },
-                { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations' },
-                { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary' },
-                { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger' },
-                { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
-                { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll' },
-                { icon: AlertTriangle, label: 'Catatan Hutang', path: '/dashboard/finance/debts' },
+                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance', feature: 'billing' },
+                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify', feature: 'billing' },
+                { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities', feature: 'activities' },
+                { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations', feature: 'student_obligations' },
+                { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary', feature: 'billing' },
+                { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger', feature: 'cash_ledger' },
+                { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq', feature: 'infaq' },
+                { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll', feature: 'payroll' },
+                { icon: AlertTriangle, label: 'Catatan Hutang', path: '/dashboard/finance/debts', feature: 'external_debts' },
             ]
         };
         const finAnggaran: MenuGroup = {
             title: 'Anggaran & Analisis',
             items: [
-                { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas' },
+                { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas', feature: 'rkas' },
                 { icon: BarChart2, label: 'Dashboard Eksekutif', path: '/dashboard/finance/executive-dashboard' },
             ]
         };
@@ -99,14 +103,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Pengaturan Keuangan',
             items: [
                 { icon: Tag, label: 'Kode Transaksi', path: '/dashboard/finance/transaction-codes' },
-                { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types' },
-                { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types' },
-                { icon: MessageCircle, label: 'Template WA', path: '/dashboard/finance/wa-templates' },
-                { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
+                { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types', feature: 'student_obligations' },
+                { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types', feature: 'infaq' },
+                { icon: MessageCircle, label: 'Template WA', path: '/dashboard/finance/wa-templates', feature: 'wa_gateway' },
+                { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings', feature: 'savings' },
                 { icon: Calendar, label: 'Tahun Ajaran', path: '/dashboard/finance/academic-years' },
                 { icon: Settings, label: 'Kuitansi & TTD', path: '/dashboard/finance/invoice-config' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
+                { icon: Building2, label: 'Rekening Bank', path: '/dashboard/finance/bank-accounts' },
             ]
         };
 
@@ -117,10 +122,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Calendar, label: 'Jadwal Mengajar', path: '/dashboard/teacher/schedule' },
                 { icon: Users, label: 'Data Siswa', path: '/dashboard/teacher/students' },
                 { icon: FileText, label: 'Input Nilai', path: '/dashboard/teacher/grades' },
-                { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning' },
-                { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report' },
+                { icon: BookOpen, label: 'E-Learning', path: '/dashboard/elearning', feature: 'elearning' },
+                { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report', feature: 'bk' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
-                { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll' },
+                { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll', feature: 'payroll' },
             ]
         };
 
@@ -130,11 +135,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             items: [
                 { icon: Calendar, label: 'Jadwal Pelajaran', path: '/dashboard/student/schedule' },
                 { icon: GraduationCap, label: 'Nilai Akademik', path: '/dashboard/student/grades' },
-                { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning' },
-                { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk' },
-                { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+                { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning', feature: 'elearning' },
+                { icon: AlertTriangle, label: 'Catatan BK', path: '/dashboard/student/bk', feature: 'bk' },
+                { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills', feature: 'billing' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
-                { icon: Wallet, label: 'Tabungan', path: '/dashboard/student/savings' },
+                { icon: Wallet, label: 'Tabungan', path: '/dashboard/student/savings', feature: 'savings' },
             ]
         };
 
@@ -143,9 +148,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Anak Saya',
             items: [
                 { icon: Users, label: 'Data Anak', path: '/dashboard/children' },
-                { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills' },
+                { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills', feature: 'billing' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
-                { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings' },
+                { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings', feature: 'savings' },
                 { icon: GraduationCap, label: 'Laporan Nilai', path: '/dashboard/grades' },
             ]
         };
@@ -161,9 +166,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const principalDetail: MenuGroup = {
             title: 'Detail Keuangan',
             items: [
-                { icon: Wallet, label: 'Tabungan', path: '/dashboard/finance/savings' },
-                { icon: Inbox, label: 'Kas Umum', path: '/dashboard/finance/cash-ledger' },
-                { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas' },
+                { icon: Wallet, label: 'Tabungan', path: '/dashboard/finance/savings', feature: 'savings' },
+                { icon: Inbox, label: 'Kas Umum', path: '/dashboard/finance/cash-ledger', feature: 'cash_ledger' },
+                { icon: ClipboardList, label: 'RAB / RKAS', path: '/dashboard/finance/rkas', feature: 'rkas' },
                 { icon: Table2, label: 'Transaksi Global', path: '/dashboard/finance/global-transactions' },
                 { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
             ]
@@ -242,7 +247,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="p-6 flex items-center justify-between border-b border-slate-200">
-                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-500">SDIT Management</h1>
+                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-500">{school.name || 'SDIT Management'}</h1>
                     <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-slate-600">
                         <X size={24} />
                     </button>
@@ -269,6 +274,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     )}
                     {menuGroups.map((group, gi) => {
                         const groupItems = group.items.filter(item => {
+                            // Skip items for disabled features
+                            if (item.feature && !isEnabled(item.feature)) return false;
                             if (seenPaths.has(item.path)) return false;
                             seenPaths.add(item.path);
                             return true;
