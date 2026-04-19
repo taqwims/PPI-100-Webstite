@@ -150,6 +150,16 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	schoolBankUsecase := usecase.NewSchoolBankUsecase(schoolBankRepo)
 	schoolBankHandler := handlers.NewSchoolBankHandler(schoolBankUsecase)
 
+	// School Settings (SaaS)
+	schoolSettingRepo := postgres.NewSchoolSettingRepository(db)
+	schoolSettingUsecase := usecase.NewSchoolSettingUsecase(schoolSettingRepo)
+	schoolSettingHandler := handlers.NewSchoolSettingHandler(schoolSettingUsecase)
+
+	// Database Backup
+	backupRepo := postgres.NewBackupRepository(db)
+	backupUsecase := usecase.NewBackupUsecase(backupRepo)
+	backupHandler := handlers.NewBackupHandler(backupUsecase, cfg)
+
 	// Public Routes
 	api := r.Group("/api")
 	{
@@ -157,9 +167,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		api.GET("/config/features", func(c *gin.Context) {
 			// Get active bank accounts for public display
 			bankAccounts, _ := schoolBankUsecase.GetActive()
+			// Get school info from DB (fallback to config)
+			schoolInfo := schoolSettingUsecase.GetSchoolInfo()
 			c.JSON(200, gin.H{
 				"features":      cfg.FeatureMap(),
-				"school":        cfg.SchoolInfo(),
+				"school":        schoolInfo,
 				"bank_accounts": bankAccounts,
 			})
 		})
@@ -536,6 +548,19 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		{
 			admin.GET("/contacts", publicHandler.GetContactMessages)
 			admin.DELETE("/contacts/:id", publicHandler.DeleteContactMessage)
+
+			// ── School Settings (SaaS) ──
+			admin.GET("/settings", middleware.RoleMiddleware(1), schoolSettingHandler.GetAllSettings)
+			admin.PUT("/settings", middleware.RoleMiddleware(1), schoolSettingHandler.UpdateSettings)
+			admin.POST("/settings/logo", middleware.RoleMiddleware(1), schoolSettingHandler.UploadLogo)
+			admin.GET("/units", middleware.RoleMiddleware(1), schoolSettingHandler.GetUnits)
+
+			// ── Database Backup & Restore ──
+			admin.POST("/backups", middleware.RoleMiddleware(1), backupHandler.CreateBackup)
+			admin.GET("/backups", middleware.RoleMiddleware(1), backupHandler.ListBackups)
+			admin.POST("/backups/:id/restore", middleware.RoleMiddleware(1), backupHandler.RestoreBackup)
+			admin.GET("/backups/:id/download", middleware.RoleMiddleware(1), backupHandler.DownloadBackup)
+			admin.DELETE("/backups/:id", middleware.RoleMiddleware(1), backupHandler.DeleteBackup)
 		}
 
 		// Manual WhatsApp Trigger

@@ -1,47 +1,18 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Edit, Trash2, TrendingUp, X, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { Plus, TrendingUp, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
 import { generateRKASReportPDF } from '../../utils/pdfUtils';
+import { RKASTable } from '../../components/finance/RKAS/RKASTable';
+import { RKASCategoriesTab } from '../../components/finance/RKAS/RKASCategoriesTab';
+import { RKASBudgetModal } from '../../components/finance/RKAS/RKASBudgetModal';
+import { RKASRealizeModal } from '../../components/finance/RKAS/RKASRealizeModal';
+import { RKASCategoryModal } from '../../components/finance/RKAS/RKASCategoryModal';
+import { Budget, AcademicYear, TransactionCode, BudgetCategory, BudgetSummary } from '../../components/finance/RKAS/types';
 
-interface AcademicYear { id: number; name: string; is_active: boolean; start_date: string; end_date: string; }
-interface BudgetCategory { id: number; name: string; description: string; is_active: boolean; }
-interface Budget {
-    id: string;
-    academic_year_id: number;
-    academic_year: AcademicYear;
-    category_id: number;
-    category: BudgetCategory;
-    budget_type: string;
-    item_name: string;
-    period: string;
-    month: number;
-    quantity: number;
-    unit_price: number;
-    planned_amount: number;
-    realized_amount: number;
-    status: string;
-    approved_by?: { name: string };
-    approved_at?: string;
-    notes: string;
-    transaction_code_id?: number;
-    transaction_code?: { id: number; code: string; name: string };
-    created_by: { name: string };
-    created_at: string;
-}
-interface TransactionCode {
-    id: number;
-    code: string;
-    name: string;
-    category: string;
-    transaction_type: string;
-    description?: string;
-}
-interface BudgetSummary { category: string; planned: number; realized: number; percentage: number; }
-
-const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
 
 const RKAS: React.FC = () => {
     const { user } = useAuth();
@@ -55,11 +26,8 @@ const RKAS: React.FC = () => {
     const [editItem, setEditItem] = useState<Budget | null>(null);
     const [tab, setTab] = useState<'budgets' | 'categories'>('budgets');
     const [budgetTypeTab, setBudgetTypeTab] = useState<'Pengeluaran' | 'Penerimaan'>('Pengeluaran');
-    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
     const [showRealizeModal, setShowRealizeModal] = useState(false);
-    const [realizeForm, setRealizeForm] = useState({ id: '', amount: '', source: 'Kas Umum', transaction_code_id: '', notes: '' });
-    const [form, setForm] = useState({ academic_year_id: '', budget_type: 'Pengeluaran', item_name: '', period: 'Tahunan', months: [] as number[], quantity: 1, unit_price: 0, planned_amount: '', notes: '', template_code_id: '' });
-    const [catForm, setCatForm] = useState({ name: '', description: '' });
+    const [realizeBudgetId, setRealizeBudgetId] = useState<string | null>(null);
 
     const { data: transactionCodes = [] } = useQuery<TransactionCode[]>({
         queryKey: ['transaction-codes'], queryFn: async () => (await api.get('/finance/transaction-codes')).data,
@@ -80,29 +48,6 @@ const RKAS: React.FC = () => {
         },
     });
 
-    const MONTH_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-    // Derive semester months from selected academic year
-    const selectedYear = years.find(y => String(y.id) === (form.academic_year_id || yearFilter));
-    const getSemesterMonths = (year?: AcademicYear) => {
-        if (!year?.start_date) return { semester1: [7,8,9,10,11,12], semester2: [1,2,3,4,5,6] };
-        const startMonth = new Date(year.start_date).getMonth() + 1;
-        const endMonth = new Date(year.end_date).getMonth() + 1;
-        const sem1: number[] = [], sem2: number[] = [];
-        if (startMonth >= 7) {
-            for (let m = startMonth; m <= 12; m++) sem1.push(m);
-            for (let m = 1; m <= Math.min(endMonth, 6); m++) sem2.push(m);
-        } else {
-            const all: number[] = [];
-            if (startMonth <= endMonth) { for (let m = startMonth; m <= endMonth; m++) all.push(m); }
-            else { for (let m = startMonth; m <= 12; m++) all.push(m); for (let m = 1; m <= endMonth; m++) all.push(m); }
-            const half = Math.ceil(all.length / 2);
-            sem1.push(...all.slice(0, half)); sem2.push(...all.slice(half));
-        }
-        return { semester1: sem1, semester2: sem2 };
-    };
-    const semMonths = getSemesterMonths(selectedYear || years.find(y => y.is_active));
-    const allSemMonths = [...semMonths.semester1, ...semMonths.semester2].sort((a,b) => a-b);
     const { data: summary = [] } = useQuery<BudgetSummary[]>({
         queryKey: ['budget-summary', yearFilter],
         queryFn: async () => {
@@ -116,63 +61,30 @@ const RKAS: React.FC = () => {
     const createBudget = useMutation({ mutationFn: (d: any) => api.post('/finance/budgets', d), onSuccess: () => { invalidateAll(); setShowModal(false); } });
     const updateBudget = useMutation({ mutationFn: (d: any) => api.put(`/finance/budgets/${d.id}`, d), onSuccess: () => { invalidateAll(); setShowModal(false); setEditItem(null); } });
     const deleteBudget = useMutation({ mutationFn: (id: string) => api.delete(`/finance/budgets/${id}`), onSuccess: invalidateAll });
-    const realizeBudget = useMutation({ mutationFn: (d: any) => api.put(`/finance/budgets/${d.id}/realize`, { ...d, amount: Number(d.amount), transaction_code_id: Number(d.transaction_code_id) }), onSuccess: () => { invalidateAll(); setShowRealizeModal(false); setRealizeForm({ id: '', amount: '', source: 'Kas Umum', transaction_code_id: '', notes: '' }); } });
-    const createCat = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-categories', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); setShowCatModal(false); setCatForm({ name: '', description: '' }); } });
+    const realizeBudget = useMutation({ mutationFn: (d: any) => api.put(`/finance/budgets/${d.id}/realize`, { ...d, amount: Number(d.amount), transaction_code_id: Number(d.transaction_code_id) }), onSuccess: () => { invalidateAll(); setShowRealizeModal(false); } });
+    const createCat = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-categories', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); setShowCatModal(false); } });
     const deleteCat = useMutation({ mutationFn: (id: number) => api.delete(`/finance/budget-categories/${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budget-categories'] }) });
 
-    const handleSubmitBudget = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const calcAmount = form.quantity > 0 && form.unit_price > 0 ? form.quantity * form.unit_price : Number(form.planned_amount);
-        const data: any = {
-            ...form,
-            academic_year_id: Number(form.academic_year_id),
-            planned_amount: calcAmount,
-            quantity: form.quantity,
-            unit_price: form.unit_price,
-            budget_type: form.budget_type,
-        };
-        if (form.template_code_id) data.template_code_id = Number(form.template_code_id);
-        
+    const handleSaveBudget = async (data: any, isMultiple: boolean, months: number[]) => {
         if (editItem) {
-            updateBudget.mutate({ ...data, month: form.months[0] || editItem.month, id: editItem.id });
+            updateBudget.mutate({ ...data, month: months[0] || editItem.month, id: editItem.id });
         } else {
-            if (form.period === 'Bulanan' && form.months.length > 0) {
+            if (isMultiple && months.length > 0) {
                 try {
-                    await Promise.all(form.months.map(m => 
-                        api.post('/finance/budgets', { ...data, month: m })
-                    ));
+                    await Promise.all(months.map((m: number) => api.post('/finance/budgets', { ...data, month: m })));
                     queryClient.invalidateQueries({ queryKey: ['budgets'] });
-                    resetForm();
+                    setEditItem(null);
                     setShowModal(false);
-                } catch (error) {
-                    console.error(error);
-                }
+                } catch (error) { console.error(error); }
             } else {
-                createBudget.mutate({ ...data, month: form.months[0] || 0 });
+                createBudget.mutate({ ...data, month: months[0] || 0 });
             }
         }
     };
 
     const handleEdit = (b: Budget) => {
         setEditItem(b);
-        setForm({
-            academic_year_id: String(b.academic_year_id),
-            budget_type: b.budget_type || 'Pengeluaran',
-            item_name: b.item_name,
-            period: b.period || 'Tahunan',
-            months: b.month ? [b.month] : [],
-            quantity: b.quantity || 1,
-            unit_price: b.unit_price || 0,
-            planned_amount: String(b.planned_amount),
-            notes: b.notes,
-            template_code_id: String(b.transaction_code_id || '')
-        });
         setShowModal(true);
-    };
-
-    const resetForm = () => {
-        setForm({ academic_year_id: yearFilter || '', budget_type: 'Pengeluaran', item_name: '', period: 'Tahunan', months: [], quantity: 1, unit_price: 0, planned_amount: '', notes: '', template_code_id: '' });
-        setEditItem(null);
     };
 
     const totalPlanned = budgets.reduce((s, b) => s + b.planned_amount, 0);
@@ -181,10 +93,6 @@ const RKAS: React.FC = () => {
     const totalPengeluaran = budgets.filter(b => b.budget_type === 'Pengeluaran').reduce((s, b) => s + b.planned_amount, 0);
     const totalPenerimaanRealized = budgets.filter(b => b.budget_type === 'Penerimaan').reduce((s, b) => s + b.realized_amount, 0);
     const totalPengeluaranRealized = budgets.filter(b => b.budget_type === 'Pengeluaran').reduce((s, b) => s + b.realized_amount, 0);
-
-    const toggleGroup = (standarName: string) => {
-        setExpandedGroups(prev => ({ ...prev, [standarName]: !prev[standarName] }));
-    };
 
     const filteredBudgets = budgets.filter(b => (b.budget_type || 'Pengeluaran') === budgetTypeTab);
     const groupedBudgets = filteredBudgets.reduce((acc, b) => {
@@ -214,7 +122,7 @@ const RKAS: React.FC = () => {
                     {canEdit && (
                         <>
                             <button onClick={() => setShowCatModal(true)} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">+ Kategori</button>
-                            <button onClick={() => { resetForm(); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-600/25 text-sm font-medium">
+                            <button onClick={() => { setEditItem(null); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-600/25 text-sm font-medium">
                                 <Plus size={16} /> Tambah Anggaran
                             </button>
                         </>
@@ -296,311 +204,44 @@ const RKAS: React.FC = () => {
 
             {/* Categories Tab */}
             {tab === 'categories' && canEdit && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-slate-50/80"><tr>
-                            <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Nama</th>
-                            <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Deskripsi</th>
-                            <th className="text-right px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Aksi</th>
-                        </tr></thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {categories.map(c => (
-                                <tr key={c.id} className="hover:bg-slate-50/50">
-                                    <td className="px-6 py-4 font-medium text-slate-900">{c.name}</td>
-                                    <td className="px-6 py-4 text-slate-600 text-sm">{c.description || '-'}</td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button onClick={() => { if (confirm('Hapus kategori?')) deleteCat.mutate(c.id); }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <RKASCategoriesTab categories={categories || []} onDelete={(id: number) => deleteCat.mutate(id)} />
             )}
-
+            
             {/* Budgets Table */}
             {tab === 'budgets' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-slate-50/80"><tr>
-                                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Kode</th>
-                                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Item</th>
-                                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Tahun</th>
-                                <th className="text-center px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Vol/Qty</th>
-                                <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Harga Satuan</th>
-                                <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Anggaran</th>
-                                <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Realisasi</th>
-                                <th className="text-center px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Progress</th>
-                                <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Aksi</th>
-                            </tr></thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {isLoading ? (
-                                    <tr><td colSpan={9} className="text-center py-12 text-slate-400">Memuat...</td></tr>
-                                ) : Object.keys(groupedBudgets).length === 0 ? (
-                                    <tr><td colSpan={9} className="text-center py-12 text-slate-400">Belum ada data anggaran {budgetTypeTab.toLowerCase()}</td></tr>
-                                ) : Object.entries(groupedBudgets).map(([standarName, items]) => (
-                                    <React.Fragment key={standarName}>
-                                        <tr className="bg-slate-50/80 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => toggleGroup(standarName)}>
-                                            <td colSpan={9} className="px-5 py-3 text-sm font-semibold text-slate-800">
-                                                <div className="flex items-center gap-2">
-                                                    {expandedGroups[standarName] ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
-                                                    Standar: {standarName} <span className="text-xs font-normal text-slate-400">({items.length} Item — Subtotal: {formatCurrency(items.reduce((s, b) => s + b.planned_amount, 0))})</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {expandedGroups[standarName] && items.map(b => {
-                                            const pct = b.planned_amount > 0 ? (b.realized_amount / b.planned_amount) * 100 : 0;
-                                            return (
-                                                <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="px-5 py-3.5">
-                                                        <span className="font-medium text-slate-900 bg-white border border-slate-200 px-2 py-1 rounded text-xs">{b.transaction_code?.code || '-'}</span>
-                                                    </td>
-                                                    <td className="px-5 py-3.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-medium text-slate-900 text-sm">{b.item_name}</p>
-                                                            {b.period === 'Bulanan' && b.month > 0 && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-full font-medium">Bulan {b.month}</span>}
-                                                            {b.period && b.period !== 'Tahunan' && b.period !== 'Bulanan' && <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[10px] rounded-full font-medium">{b.period}</span>}
-                                                        </div>
-                                                        <p className="text-xs text-slate-400">oleh {b.created_by?.name}</p>
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-sm text-slate-600">{b.academic_year?.name}</td>
-                                                    <td className="px-5 py-3.5 text-sm text-center text-slate-700">{b.quantity > 0 ? b.quantity : '-'}</td>
-                                                    <td className="px-5 py-3.5 text-sm text-right text-slate-600">{b.unit_price > 0 ? formatCurrency(b.unit_price) : '-'}</td>
-                                                    <td className="px-5 py-3.5 text-sm text-right font-medium text-slate-900">{formatCurrency(b.planned_amount)}</td>
-                                                    <td className="px-5 py-3.5 text-sm text-right font-medium">
-                                                        <span className={pct > 100 ? 'text-red-600 flex items-center justify-end gap-1' : 'text-emerald-600'}>
-                                                            {pct > 100 && <span className="flex items-center justify-center w-4 h-4 bg-red-100 rounded-full text-[10px] text-red-600 font-bold" title="Realisasi melebihi anggaran">!</span>}
-                                                            {formatCurrency(b.realized_amount)}
-                                                        </span>
-                                                        {pct > 100 && <p className="text-[10px] text-red-500 mt-0.5">Overbudget {formatCurrency(b.realized_amount - b.planned_amount)}</p>}
-                                                    </td>
-                                                    <td className="px-5 py-3.5">
-                                                        <div className="w-20 mx-auto">
-                                                            <div className="w-full bg-slate-100 rounded-full h-2">
-                                                                <div className={clsx('h-2 rounded-full', pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${Math.min(pct, 100)}%` }} />
-                                                            </div>
-                                                            <p className="text-[10px] text-center text-slate-500 mt-0.5">{pct.toFixed(0)}%</p>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {canEdit && (
-                                                        <>
-                                                            <button onClick={() => handleEdit(b)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><Edit size={14} /></button>
-                                                            <button onClick={() => { if (confirm('Hapus anggaran ini?')) deleteBudget.mutate(b.id); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><Trash2 size={14} /></button>
-                                                            <button onClick={() => { setRealizeForm({ ...realizeForm, id: b.id }); setShowRealizeModal(true); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Input Realisasi"><TrendingUp size={14} /></button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                            );
-                                        })}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <RKASTable
+                    isLoading={isLoading}
+                    budgetTypeTab={budgetTypeTab as any}
+                    groupedBudgets={groupedBudgets}
+                    canEdit={canEdit}
+                    onEdit={handleEdit}
+                    onDelete={(id: string) => deleteBudget.mutate(id)}
+                    onRealize={(id: string) => { setRealizeBudgetId(id); setShowRealizeModal(true); }}
+                />
             )}
-
-            {/* Budget Modal */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                            <h3 className="text-lg font-semibold">{editItem ? 'Edit Anggaran' : 'Tambah Anggaran'}</h3>
-                            <button onClick={() => setShowModal(false)} className="p-1 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
-                        </div>
-                        <form onSubmit={handleSubmitBudget} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Tahun Ajaran</label>
-                                <select value={form.academic_year_id} onChange={e => setForm({ ...form, academic_year_id: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
-                                    <option value="">Pilih</option>
-                                    {years.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Jenis Anggaran</label>
-                                <div className="flex bg-slate-100 p-1 rounded-xl">
-                                    <button type="button" onClick={() => setForm({ ...form, budget_type: 'Pengeluaran' })}
-                                        className={clsx("flex-1 py-1.5 text-sm font-medium rounded-lg transition", form.budget_type === 'Pengeluaran' ? "bg-white text-red-600 shadow-sm" : "text-slate-500")}>
-                                        Pengeluaran
-                                    </button>
-                                    <button type="button" onClick={() => setForm({ ...form, budget_type: 'Penerimaan' })}
-                                        className={clsx("flex-1 py-1.5 text-sm font-medium rounded-lg transition", form.budget_type === 'Penerimaan' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500")}>
-                                        Penerimaan
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Nama Item</label>
-                                <input type="text" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Periode <span className="text-xs text-slate-400 font-normal">(Tahunan/Semester/Bulanan)</span></label>
-                                    <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
-                                        {['Tahunan', 'Semester 1', 'Semester 2', 'Bulanan'].map((p) => (
-                                            <button
-                                                key={p}
-                                                type="button"
-                                                onClick={() => setForm({ ...form, period: p, months: [] })}
-                                                className={clsx(
-                                                    "flex-1 py-1.5 text-xs font-bold rounded-xl transition",
-                                                    form.period === p ? "bg-white text-blue-600 shadow-sm border border-blue-100" : "text-slate-500 hover:text-slate-700"
-                                                )}
-                                            >
-                                                {p === 'Tahunan' ? 'Tahun' : p.replace('Semester ', 'Sem ')}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                {form.period === 'Bulanan' && (
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">Bulan <span className="text-xs text-slate-500 font-normal">(Bisa pilih lebih dari satu)</span></label>
-                                        
-                                        {!editItem && (
-                                            <div className="flex flex-wrap gap-2 mb-3">
-                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: [...new Set([...prev.months, ...semMonths.semester1])] }))} className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 transition">Pilih Sem 1</button>
-                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: [...new Set([...prev.months, ...semMonths.semester2])] }))} className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 transition">Pilih Sem 2</button>
-                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: allSemMonths }))} className="px-2.5 py-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-lg shadow-sm hover:bg-blue-100 transition">Pilih Semua</button>
-                                                <button type="button" onClick={() => setForm(prev => ({ ...prev, months: [] }))} className="px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-lg shadow-sm hover:bg-slate-200 transition">Reset</button>
-                                            </div>
-                                        )}
-
-                                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                                            {allSemMonths.map(m => (
-                                                <label key={m} className={clsx("flex flex-col items-center justify-center p-2 rounded-xl text-xs font-medium cursor-pointer transition-all border", form.months.includes(m) ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/50")}>
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="sr-only"
-                                                        checked={form.months.includes(m)}
-                                                        onChange={(e) => {
-                                                            if (editItem) {
-                                                                setForm(prev => ({ ...prev, months: [m] }));
-                                                            } else {
-                                                                if (e.target.checked) setForm(prev => ({ ...prev, months: [...prev.months, m] }));
-                                                                else setForm(prev => ({ ...prev, months: prev.months.filter(x => x !== m) }));
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span className="capitalize">{MONTH_NAMES[m].substring(0,3)}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            {/* Quantity & Unit Price */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Volume / Qty</label>
-                                    <input type="number" min={1} value={form.quantity} onChange={e => {
-                                        const qty = Number(e.target.value);
-                                        setForm({ ...form, quantity: qty, planned_amount: String(qty * form.unit_price || form.planned_amount) });
-                                    }} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Harga Satuan (Rp)</label>
-                                    <input type="number" min={0} value={form.unit_price} onChange={e => {
-                                        const price = Number(e.target.value);
-                                        setForm({ ...form, unit_price: price, planned_amount: String(form.quantity * price || form.planned_amount) });
-                                    }} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Total Anggaran (Rp) {form.quantity > 0 && form.unit_price > 0 && <span className="text-xs text-slate-400">= {form.quantity} × {formatCurrency(form.unit_price)}</span>}
-                                </label>
-                                <input type="number" value={form.planned_amount} onChange={e => setForm({ ...form, planned_amount: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium" required />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Standar (Wajib)</label>
-                                <select value={form.template_code_id} onChange={e => setForm({ ...form, template_code_id: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required disabled={!!editItem}>
-                                    <option value="">Pilih Standar</option>
-                                    {transactionCodes.filter(tc => !tc.description?.startsWith('RKAS Item: ')).map(tc => <option key={tc.id} value={tc.id}>{tc.name} ({tc.category})</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
-                                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" rows={2} />
-                            </div>
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl">Batal</button>
-                                <button type="submit" className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-600/25">{editItem ? 'Simpan' : 'Tambah'}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Category Modal */}
-            {showCatModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCatModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                            <h3 className="text-lg font-semibold">Tambah Kategori</h3>
-                            <button onClick={() => setShowCatModal(false)} className="p-1 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
-                        </div>
-                        <form onSubmit={e => { e.preventDefault(); createCat.mutate(catForm); }} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Nama Kategori</label>
-                                <input type="text" value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Deskripsi</label>
-                                <input type="text" value={catForm.description} onChange={e => setCatForm({ ...catForm, description: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" />
-                            </div>
-                            <div className="flex gap-3">
-                                <button type="button" onClick={() => setShowCatModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl">Batal</button>
-                                <button type="submit" className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700">Tambah</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-            {/* Realization Modal */}
-            {showRealizeModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRealizeModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                            <h3 className="text-lg font-semibold flex items-center gap-2"><TrendingUp className="text-green-600" size={20} /> Input Realisasi</h3>
-                            <button onClick={() => setShowRealizeModal(false)} className="p-1 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
-                        </div>
-                        <form onSubmit={e => { e.preventDefault(); realizeBudget.mutate(realizeForm); }} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Jumlah Realisasi (Rp)</label>
-                                <input type="number" value={realizeForm.amount} onChange={e => setRealizeForm({ ...realizeForm, amount: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Sumber Kas</label>
-                                <select value={realizeForm.source} onChange={e => setRealizeForm({ ...realizeForm, source: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
-                                    <option value="Kas Umum">Kas Umum</option>
-                                    <option value="Infaq">Infaq / Donasi</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Kode Transaksi</label>
-                                <select value={realizeForm.transaction_code_id} onChange={e => setRealizeForm({ ...realizeForm, transaction_code_id: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" required>
-                                    <option value="">Pilih Kode Transaksi</option>
-                                    {transactionCodes.filter(tc => tc.transaction_type === 'Expense').map(tc => <option key={tc.id} value={tc.id}>{tc.name} ({tc.category})</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Catatan Tambahan</label>
-                                <input type="text" value={realizeForm.notes} onChange={e => setRealizeForm({ ...realizeForm, notes: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl" placeholder="Opsional" />
-                            </div>
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowRealizeModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl">Batal</button>
-                                <button type="submit" disabled={realizeBudget.isPending} className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-600/25">Simpan Realisasi</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            
+            {/* Modals from components */}
+            <RKASBudgetModal
+                isOpen={showModal}
+                onClose={() => { setShowModal(false); setEditItem(null); }}
+                editingItem={editItem}
+                years={years || []}
+                transactionCodes={transactionCodes || []}
+                yearFilter={yearFilter}
+                onSubmit={handleSaveBudget}
+            />
+            <RKASCategoryModal
+                isOpen={showCatModal}
+                onClose={() => setShowCatModal(false)}
+                onSubmit={async (data) => { createCat.mutate(data); }}
+            />
+            <RKASRealizeModal
+                isOpen={showRealizeModal}
+                onClose={() => setShowRealizeModal(false)}
+                budgetId={realizeBudgetId}
+                transactionCodes={transactionCodes || []}
+                onSubmit={async (data) => { realizeBudget.mutate(data); }}
+            />
         </div>
     );
 };

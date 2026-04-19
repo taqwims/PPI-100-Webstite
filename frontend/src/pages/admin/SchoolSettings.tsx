@@ -1,0 +1,708 @@
+import React, { useState } from 'react';
+import CardGlass from '../../components/ui/glass/CardGlass';
+import InputGlass from '../../components/ui/glass/InputGlass';
+import ButtonGlass from '../../components/ui/glass/ButtonGlass';
+import {
+    Building2, MapPin, Phone, Mail, Hash, Save, Camera,
+    Database, Download, Trash2, RotateCcw, Clock, CheckCircle2,
+    XCircle, AlertTriangle, Info, Shield, HardDrive, FileText
+} from 'lucide-react';
+import api from '../../services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useFeatureStore } from '../../store/featureStore';
+
+// ─── Types ───
+interface SchoolSetting {
+    id: number;
+    key: string;
+    value: string;
+    description: string;
+    is_admin_edit: boolean;
+}
+
+interface UnitData {
+    id: number;
+    name: string;
+    code: string;
+    is_active: boolean;
+    foundation?: {
+        id: number;
+        name: string;
+        address: string;
+        phone: string;
+        email: string;
+    };
+}
+
+interface FoundationData {
+    id: number;
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+}
+
+interface BackupData {
+    id: string;
+    filename: string;
+    file_size_bytes: number;
+    label: string;
+    notes: string;
+    status: string;
+    created_by: { name: string };
+    restored_at: string | null;
+    created_at: string;
+}
+
+type TabKey = 'profile' | 'units' | 'backup';
+
+// ─── Helpers ───
+function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatDate(iso: string): string {
+    const d = new Date(iso);
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) +
+        ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function timeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins} menit lalu`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} jam lalu`;
+    const days = Math.floor(hrs / 24);
+    return `${days} hari lalu`;
+}
+
+// ─── Status Badge ───
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const map: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+        Success: { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: <CheckCircle2 size={12} /> },
+        Failed: { bg: 'bg-red-100', text: 'text-red-700', icon: <XCircle size={12} /> },
+        Restoring: { bg: 'bg-amber-100', text: 'text-amber-700', icon: <RotateCcw size={12} className="animate-spin" /> },
+        Restored: { bg: 'bg-blue-100', text: 'text-blue-700', icon: <CheckCircle2 size={12} /> },
+    };
+    const s = map[status] || map.Success;
+    return (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
+            {s.icon} {status}
+        </span>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Main Component ───
+// ═══════════════════════════════════════════
+const SchoolSettings: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<TabKey>('profile');
+    const fetchFeatures = useFeatureStore((s) => s.fetchFeatures);
+
+    const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
+        { key: 'profile', label: 'Profil Sekolah', icon: <Building2 size={16} /> },
+        { key: 'units', label: 'Unit Sekolah', icon: <Shield size={16} /> },
+        { key: 'backup', label: 'Backup & Restore', icon: <Database size={16} /> },
+    ];
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Pengaturan Sekolah</h1>
+                <p className="text-sm text-slate-500 mt-1">Kelola profil sekolah, unit, serta backup & restore database</p>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex space-x-1 bg-white/50 backdrop-blur-sm rounded-xl p-1 border border-slate-200 shadow-sm w-fit">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            activeTab === tab.key
+                                ? 'bg-white text-green-700 shadow-sm border border-green-200'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-white/40'
+                        }`}
+                    >
+                        {tab.icon}
+                        <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'profile' && <ProfileTab onSaved={fetchFeatures} />}
+            {activeTab === 'units' && <UnitsTab />}
+            {activeTab === 'backup' && <BackupTab />}
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab 1: Profil Sekolah ───
+// ═══════════════════════════════════════════
+const ProfileTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
+    const queryClient = useQueryClient();
+
+    const { data: settings, isLoading } = useQuery<SchoolSetting[]>({
+        queryKey: ['school-settings'],
+        queryFn: async () => {
+            const res = await api.get('/admin/settings');
+            return res.data;
+        },
+    });
+
+    const getVal = (key: string) => settings?.find(s => s.key === key)?.value || '';
+
+    const [form, setForm] = useState<Record<string, string>>({});
+
+    // Initialize form when settings load
+    React.useEffect(() => {
+        if (settings && Object.keys(form).length === 0) {
+            const f: Record<string, string> = {};
+            settings.forEach(s => { if (s.is_admin_edit) f[s.key] = s.value; });
+            setForm(f);
+        }
+    }, [settings]);
+
+    const updateField = (key: string, value: string) => {
+        setForm(prev => ({ ...prev, [key]: value }));
+    };
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            const updates = Object.entries(form).map(([key, value]) => ({ key, value }));
+            return api.put('/admin/settings', { settings: updates });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['school-settings'] });
+            onSaved(); // Refresh featureStore for sidebar
+            alert('Pengaturan berhasil disimpan!');
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.error || 'Gagal menyimpan');
+        },
+    });
+
+    const logoMutation = useMutation({
+        mutationFn: async (file: File) => {
+            const fd = new FormData();
+            fd.append('file', file);
+            return api.post('/admin/settings/logo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        },
+        onSuccess: (res) => {
+            queryClient.invalidateQueries({ queryKey: ['school-settings'] });
+            onSaved();
+            setForm(prev => ({ ...prev, school_logo_url: res.data.logo_url }));
+            alert('Logo berhasil diupload!');
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.error || 'Gagal upload logo');
+        },
+    });
+
+    if (isLoading) {
+        return <CardGlass className="p-8 text-center text-slate-500">Memuat pengaturan...</CardGlass>;
+    }
+
+    const logoUrl = form.school_logo_url || getVal('school_logo_url');
+
+    return (
+        <div className="grid lg:grid-cols-3 gap-6">
+            {/* Logo Card */}
+            <CardGlass className="p-6 text-center space-y-4">
+                <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Logo Sekolah</h3>
+                <div className="relative inline-block">
+                    <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-green-100 to-emerald-50 border-2 border-dashed border-green-300 flex items-center justify-center overflow-hidden mx-auto">
+                        {logoUrl ? (
+                            <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                        ) : (
+                            <Building2 size={48} className="text-green-300" />
+                        )}
+                    </div>
+                    <label className="absolute -bottom-2 -right-2 p-2 bg-white/80 hover:bg-white backdrop-blur-md rounded-full border border-green-200 transition-colors cursor-pointer shadow-md">
+                        <Camera size={16} className="text-green-600" />
+                        <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) logoMutation.mutate(file);
+                            }}
+                        />
+                    </label>
+                </div>
+                <p className="text-xs text-slate-400">Klik ikon kamera untuk upload logo baru</p>
+
+                {/* Developer-only fields info */}
+                {settings?.filter(s => !s.is_admin_edit).map(s => (
+                    <div key={s.key} className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                        <p className="text-xs text-amber-600 font-medium">{s.description}</p>
+                        <p className="text-sm text-amber-800 font-bold mt-1">{s.value || '—'}</p>
+                        <p className="text-[10px] text-amber-500 mt-1">🔒 Hanya developer yang bisa mengubah</p>
+                    </div>
+                ))}
+            </CardGlass>
+
+            {/* Form */}
+            <CardGlass className="lg:col-span-2 p-6">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Building2 size={20} className="text-green-600" />
+                    Informasi Sekolah
+                </h3>
+
+                <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="space-y-5">
+                    <div className="grid md:grid-cols-2 gap-5">
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">Nama Sekolah</label>
+                            <InputGlass
+                                value={form.school_name || ''}
+                                onChange={(e) => updateField('school_name', e.target.value)}
+                                icon={Building2}
+                                placeholder="SDIT Al-Ikhlas"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">NPSN</label>
+                            <InputGlass
+                                value={form.school_npsn || ''}
+                                onChange={(e) => updateField('school_npsn', e.target.value)}
+                                icon={Hash}
+                                placeholder="12345678"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Alamat</label>
+                        <InputGlass
+                            value={form.school_address || ''}
+                            onChange={(e) => updateField('school_address', e.target.value)}
+                            icon={MapPin}
+                            placeholder="Jl. Pendidikan No.1, Kota ..."
+                        />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">Telepon</label>
+                            <InputGlass
+                                value={form.school_phone || ''}
+                                onChange={(e) => updateField('school_phone', e.target.value)}
+                                icon={Phone}
+                                placeholder="021-1234567"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">Email</label>
+                            <InputGlass
+                                value={form.school_email || ''}
+                                onChange={(e) => updateField('school_email', e.target.value)}
+                                icon={Mail}
+                                placeholder="info@sekolah.sch.id"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                        <ButtonGlass type="submit" className="flex items-center gap-2" disabled={saveMutation.isPending}>
+                            <Save size={18} />
+                            {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
+                        </ButtonGlass>
+                    </div>
+                </form>
+            </CardGlass>
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab 2: Unit Sekolah (View Only) ───
+// ═══════════════════════════════════════════
+const UnitsTab: React.FC = () => {
+    const { data, isLoading } = useQuery<{ units: UnitData[]; foundations: FoundationData[] }>({
+        queryKey: ['school-units'],
+        queryFn: async () => {
+            const res = await api.get('/admin/units');
+            return res.data;
+        },
+    });
+
+    if (isLoading) {
+        return <CardGlass className="p-8 text-center text-slate-500">Memuat data unit...</CardGlass>;
+    }
+
+    const units = data?.units || [];
+    const foundations = data?.foundations || [];
+
+    return (
+        <div className="space-y-6">
+            {/* Info Banner */}
+            <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <Info size={20} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                <div>
+                    <p className="text-sm font-medium text-blue-800">Unit Sekolah dikelola oleh Developer</p>
+                    <p className="text-xs text-blue-600 mt-1">
+                        Untuk keamanan arsitektur SaaS, unit sekolah dan yayasan hanya bisa ditambah atau diubah oleh tim developer.
+                        Hubungi developer jika perlu perubahan.
+                    </p>
+                </div>
+            </div>
+
+            {/* Foundation Card */}
+            {foundations.length > 0 && (
+                <CardGlass className="p-6">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Shield size={20} className="text-purple-600" />
+                        Yayasan
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        {foundations.map(f => (
+                            <div key={f.id} className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                                <h4 className="text-sm font-bold text-purple-800">{f.name}</h4>
+                                {f.address && <p className="text-xs text-purple-600 mt-1">📍 {f.address}</p>}
+                                {f.phone && <p className="text-xs text-purple-600">📞 {f.phone}</p>}
+                                {f.email && <p className="text-xs text-purple-600">✉️ {f.email}</p>}
+                            </div>
+                        ))}
+                    </div>
+                </CardGlass>
+            )}
+
+            {/* Units List */}
+            <CardGlass className="p-6">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Building2 size={20} className="text-green-600" />
+                    Daftar Unit
+                </h3>
+
+                {units.length === 0 ? (
+                    <p className="text-slate-500 text-sm text-center py-8">Belum ada unit terdaftar.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-200">
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">ID</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Nama Unit</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Kode</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Yayasan</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {units.map(u => (
+                                    <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                        <td className="py-3 px-4 text-slate-400 font-mono">{u.id}</td>
+                                        <td className="py-3 px-4 font-medium text-slate-800">{u.name}</td>
+                                        <td className="py-3 px-4">
+                                            {u.code ? (
+                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded font-mono text-xs">{u.code}</span>
+                                            ) : (
+                                                <span className="text-slate-300">—</span>
+                                            )}
+                                        </td>
+                                        <td className="py-3 px-4 text-slate-600">{u.foundation?.name || '—'}</td>
+                                        <td className="py-3 px-4">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                                            }`}>
+                                                {u.is_active ? 'Aktif' : 'Nonaktif'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </CardGlass>
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab 3: Backup & Restore (Timeline) ───
+// ═══════════════════════════════════════════
+const BackupTab: React.FC = () => {
+    const queryClient = useQueryClient();
+    const [label, setLabel] = useState('');
+    const [notes, setNotes] = useState('');
+    const [restoreId, setRestoreId] = useState<string | null>(null);
+    const [confirmation, setConfirmation] = useState('');
+
+    const { data: backups = [], isLoading } = useQuery<BackupData[]>({
+        queryKey: ['backups'],
+        queryFn: async () => {
+            const res = await api.get('/admin/backups');
+            return res.data;
+        },
+    });
+
+    const createMutation = useMutation({
+        mutationFn: async () => {
+            return api.post('/admin/backups', { label, notes });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['backups'] });
+            setLabel('');
+            setNotes('');
+            alert('Backup berhasil dibuat!');
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.error || 'Gagal membuat backup');
+        },
+    });
+
+    const restoreMutation = useMutation({
+        mutationFn: async (id: string) => {
+            return api.post(`/admin/backups/${id}/restore`, { confirmation: 'RESTORE' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['backups'] });
+            setRestoreId(null);
+            setConfirmation('');
+            alert('Database berhasil di-restore!');
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.error || 'Gagal restore database');
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => {
+            return api.delete(`/admin/backups/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['backups'] });
+        },
+    });
+
+    const handleDownload = async (id: string, filename: string) => {
+        try {
+            const res = await api.get(`/admin/backups/${id}/download`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            alert('Gagal download backup');
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Create Backup Card */}
+            <CardGlass className="p-6">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <HardDrive size={20} className="text-green-600" />
+                    Buat Backup Baru
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Label (opsional)</label>
+                        <InputGlass
+                            value={label}
+                            onChange={(e) => setLabel(e.target.value)}
+                            icon={FileText}
+                            placeholder="Mis: Sebelum Migrasi Data"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Catatan (opsional)</label>
+                        <InputGlass
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            icon={FileText}
+                            placeholder="Catatan tambahan..."
+                        />
+                    </div>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                    <p className="text-xs text-slate-400">Backup menggunakan PostgreSQL pg_dump (format custom)</p>
+                    <ButtonGlass
+                        onClick={() => createMutation.mutate()}
+                        disabled={createMutation.isPending}
+                        className="flex items-center gap-2"
+                    >
+                        <Database size={16} />
+                        {createMutation.isPending ? 'Membuat backup...' : 'Buat Backup Sekarang'}
+                    </ButtonGlass>
+                </div>
+            </CardGlass>
+
+            {/* Timeline */}
+            <CardGlass className="p-6">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Clock size={20} className="text-blue-600" />
+                    Timeline Backup
+                    <span className="ml-auto text-xs text-slate-400 font-normal">{backups.length} backup</span>
+                </h3>
+
+                {isLoading ? (
+                    <p className="text-center text-slate-500 py-8">Memuat timeline...</p>
+                ) : backups.length === 0 ? (
+                    <div className="text-center py-12">
+                        <Database size={48} className="mx-auto text-slate-200 mb-4" />
+                        <p className="text-slate-500">Belum ada backup. Buat backup pertama Anda!</p>
+                    </div>
+                ) : (
+                    <div className="relative">
+                        {/* Vertical timeline line */}
+                        <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-green-300 via-blue-300 to-slate-200" />
+
+                        <div className="space-y-4">
+                            {backups.map((backup, idx) => (
+                                <div key={backup.id} className="relative pl-12">
+                                    {/* Timeline dot */}
+                                    <div className={`absolute left-3 top-4 w-4 h-4 rounded-full border-2 border-white shadow-md ${
+                                        idx === 0 ? 'bg-green-500' :
+                                        backup.restored_at ? 'bg-blue-500' :
+                                        backup.status === 'Failed' ? 'bg-red-400' :
+                                        'bg-slate-300'
+                                    }`} />
+
+                                    {/* Backup Card */}
+                                    <div className={`p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${
+                                        idx === 0
+                                            ? 'bg-green-50/50 border-green-200 shadow-sm'
+                                            : 'bg-white/60 border-slate-200 hover:bg-white/80'
+                                    }`}>
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h4 className="text-sm font-bold text-slate-800 truncate">
+                                                        {backup.label || backup.filename}
+                                                    </h4>
+                                                    <StatusBadge status={backup.status} />
+                                                    {idx === 0 && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 bg-green-200 text-green-800 rounded font-semibold uppercase">
+                                                            Terbaru
+                                                        </span>
+                                                    )}
+                                                    {backup.restored_at && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded font-semibold">
+                                                            Pernah di-restore
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock size={11} /> {formatDate(backup.created_at)}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span>{timeAgo(backup.created_at)}</span>
+                                                    <span>•</span>
+                                                    <span>{formatBytes(backup.file_size_bytes)}</span>
+                                                    <span>•</span>
+                                                    <span>oleh {backup.created_by?.name || '—'}</span>
+                                                </div>
+                                                {backup.notes && (
+                                                    <p className="text-xs text-slate-400 mt-1 italic">📝 {backup.notes}</p>
+                                                )}
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <button
+                                                    onClick={() => handleDownload(backup.id, backup.filename)}
+                                                    className="p-2 rounded-lg bg-white/60 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-500 hover:text-blue-600 transition-all"
+                                                    title="Download"
+                                                >
+                                                    <Download size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setRestoreId(backup.id); setConfirmation(''); }}
+                                                    className="p-2 rounded-lg bg-white/60 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 text-slate-500 hover:text-amber-600 transition-all"
+                                                    title="Restore"
+                                                >
+                                                    <RotateCcw size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Hapus backup ini?')) deleteMutation.mutate(backup.id);
+                                                    }}
+                                                    className="p-2 rounded-lg bg-white/60 hover:bg-red-50 border border-slate-200 hover:border-red-300 text-slate-500 hover:text-red-600 transition-all"
+                                                    title="Hapus"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </CardGlass>
+
+            {/* Restore Confirmation Modal */}
+            {restoreId && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3 text-red-600">
+                            <AlertTriangle size={28} />
+                            <h3 className="text-lg font-bold">Konfirmasi Restore</h3>
+                        </div>
+                        <div className="p-4 bg-red-50 rounded-xl border border-red-200">
+                            <p className="text-sm text-red-700 font-medium">⚠️ Peringatan!</p>
+                            <p className="text-xs text-red-600 mt-1">
+                                Restore akan <strong>menghapus SEMUA data saat ini</strong> dan menggantinya dengan data dari backup.
+                                Tindakan ini tidak bisa dibatalkan!
+                            </p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">
+                                Ketik <code className="px-1.5 py-0.5 bg-slate-100 rounded text-red-600 font-bold">RESTORE</code> untuk konfirmasi:
+                            </label>
+                            <input
+                                type="text"
+                                value={confirmation}
+                                onChange={(e) => setConfirmation(e.target.value)}
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-red-400 focus:ring-2 focus:ring-red-200 text-sm font-mono"
+                                placeholder="RESTORE"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => { setRestoreId(null); setConfirmation(''); }}
+                                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (confirmation === 'RESTORE') {
+                                        restoreMutation.mutate(restoreId);
+                                    } else {
+                                        alert('Anda harus mengetik RESTORE untuk melanjutkan');
+                                    }
+                                }}
+                                disabled={confirmation !== 'RESTORE' || restoreMutation.isPending}
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                    confirmation === 'RESTORE'
+                                        ? 'bg-red-600 text-white hover:bg-red-700 shadow-sm'
+                                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                }`}
+                            >
+                                {restoreMutation.isPending ? 'Restoring...' : 'Restore Database'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default SchoolSettings;

@@ -24,6 +24,9 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	// Seed default school settings from env vars (only inserts if not exist)
+	postgres.SeedSchoolSettings(db, cfg)
+
 	r := gin.Default()
 
 	routes.SetupRoutes(r, db, cfg)

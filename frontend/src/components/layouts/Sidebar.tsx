@@ -49,6 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
                 { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk', feature: 'bk' },
                 { icon: Package, label: 'Aset Sekolah', path: '/dashboard/admin/assets', feature: 'assets' },
+                { icon: Building2, label: 'Pengaturan Sekolah', path: '/dashboard/admin/school-settings' },
             ]
         };
         const adminContent: MenuGroup = {

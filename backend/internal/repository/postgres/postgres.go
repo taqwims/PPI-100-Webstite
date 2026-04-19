@@ -94,5 +94,22 @@ func AutoMigrate(db *gorm.DB) error {
 
 		// School Bank Account
 		&domain.SchoolBankAccount{},
+
+		// Foundation & School Settings (SaaS)
+		&domain.Foundation{},
+		&domain.SchoolSetting{},
+		&domain.DatabaseBackup{},
 	)
+}
+
+// SeedSchoolSettings seeds default school settings from config env vars.
+// Should be called after AutoMigrate.
+func SeedSchoolSettings(db *gorm.DB, cfg *config.Config) {
+	repo := NewSchoolSettingRepository(db)
+	defaults := map[string]string{
+		"school_name":     cfg.SchoolName,
+		"school_address":  cfg.SchoolAddress,
+		"school_logo_url": cfg.SchoolLogoURL,
+	}
+	repo.Seed(defaults)
 }

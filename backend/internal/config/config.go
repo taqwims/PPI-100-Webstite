@@ -41,6 +41,9 @@ type Config struct {
 	SchoolName    string
 	SchoolLogoURL string
 	SchoolAddress string
+
+	// Backup
+	BackupDir string
 }
 
 // FeatureMap returns a map of feature flags for the API response
@@ -114,6 +117,9 @@ func LoadConfig() (*Config, error) {
 		SchoolName:    getEnv("SCHOOL_NAME", "Sekolah"),
 		SchoolLogoURL: getEnv("SCHOOL_LOGO_URL", ""),
 		SchoolAddress: getEnv("SCHOOL_ADDRESS", ""),
+
+		// Backup
+		BackupDir: getEnv("BACKUP_DIR", "./backups"),
 	}, nil
 }
 

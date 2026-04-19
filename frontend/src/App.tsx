@@ -54,6 +54,7 @@ import AdminDownloads from './pages/admin/AdminDownloads';
 import AdminPublicContent from './pages/admin/AdminPublicContent';
 import BulkImport from './pages/admin/BulkImport';
 import Assets from './pages/admin/Assets';
+import SchoolSettings from './pages/admin/SchoolSettings';
 
 // Finance Pages
 import PrincipalDashboard from './pages/finance/PrincipalDashboard';
@@ -134,6 +135,11 @@ function App() {
                                     <Route path="admin/assets" element={
                                         <RoleRoute allowedRoles={[1, 2, 3, 10]}>
                                             <Assets />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="admin/school-settings" element={
+                                        <RoleRoute allowedRoles={[1]}>
+                                            <SchoolSettings />
                                         </RoleRoute>
                                     } />
 

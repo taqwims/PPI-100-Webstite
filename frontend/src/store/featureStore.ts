@@ -14,6 +14,9 @@ interface SchoolInfo {
     name: string;
     logo_url: string;
     address: string;
+    phone: string;
+    email: string;
+    npsn: string;
 }
 
 interface FeatureState {
@@ -27,7 +30,7 @@ interface FeatureState {
 
 export const useFeatureStore = create<FeatureState>((set, get) => ({
     features: {},
-    school: { name: 'Sekolah', logo_url: '', address: '' },
+    school: { name: 'Sekolah', logo_url: '', address: '', phone: '', email: '', npsn: '' },
     bankAccounts: [],
     loaded: false,
 
@@ -36,7 +39,7 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
             const res = await api.get('/config/features', { _suppressToast: true } as any);
             set({
                 features: res.data.features || {},
-                school: res.data.school || { name: 'Sekolah', logo_url: '', address: '' },
+                school: res.data.school || { name: 'Sekolah', logo_url: '', address: '', phone: '', email: '', npsn: '' },
                 bankAccounts: res.data.bank_accounts || [],
                 loaded: true,
             });

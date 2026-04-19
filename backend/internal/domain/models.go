@@ -34,8 +34,12 @@ type Role struct {
 }
 
 type Unit struct {
-	ID   uint   `gorm:"primaryKey"`
-	Name string `gorm:"unique;not null"` // MTS, MA, PUBLIC
+	ID           uint        `gorm:"primaryKey" json:"id"`
+	Name         string      `gorm:"unique;not null" json:"name"` // MTS, MA, PUBLIC
+	FoundationID *uint       `json:"foundation_id"`
+	Foundation   *Foundation `gorm:"foreignKey:FoundationID" json:"foundation,omitempty"`
+	Code         string      `json:"code"`                     // Short code: "mts", "ma"
+	IsActive     bool        `gorm:"default:true" json:"is_active"`
 }
 
 // Akademik
@@ -766,3 +770,42 @@ type SchoolBankAccount struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+// ------------------- Foundation (Yayasan) -------------------
+
+type Foundation struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"not null" json:"name"` // "Yayasan PPI 100"
+	Address   string    `json:"address"`
+	Phone     string    `json:"phone"`
+	Email     string    `json:"email"`
+	LogoURL   string    `json:"logo_url"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ------------------- School Settings -------------------
+
+type SchoolSetting struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Key         string    `gorm:"uniqueIndex;not null" json:"key"` // "school_name", "school_address", etc.
+	Value       string    `gorm:"type:text" json:"value"`
+	Description string    `json:"description"`
+	IsAdminEdit bool      `gorm:"default:true" json:"is_admin_edit"` // true = admin can edit
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ------------------- Database Backup (Timeline) -------------------
+
+type DatabaseBackup struct {
+	ID            uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Filename      string     `gorm:"not null" json:"filename"`
+	FileSizeBytes int64      `json:"file_size_bytes"`
+	Label         string     `json:"label"`       // User label: "Sebelum Migrasi"
+	Notes         string     `json:"notes"`       // Extra notes
+	Status        string     `gorm:"default:'Success'" json:"status"` // Success, Failed, Restoring
+	CreatedByID   uuid.UUID  `gorm:"type:uuid;not null" json:"created_by_id"`
+	CreatedBy     User       `gorm:"foreignKey:CreatedByID" json:"created_by"`
+	RestoredAt    *time.Time `json:"restored_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
