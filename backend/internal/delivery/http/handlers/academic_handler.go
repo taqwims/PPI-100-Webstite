@@ -206,14 +206,26 @@ func (h *AcademicHandler) GetAllSchedules(c *gin.Context) {
 func (h *AcademicHandler) UpdateClass(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var req struct {
-		Name string `json:"name" binding:"required"`
+		Name              string  `json:"name" binding:"required"`
+		HomeroomTeacherID *string `json:"homeroom_teacher_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.academicUsecase.UpdateClass(uint(id), req.Name); err != nil {
+	// Parse homeroom teacher ID if provided
+	var homeroomTeacherUUID *uuid.UUID
+	if req.HomeroomTeacherID != nil && *req.HomeroomTeacherID != "" {
+		parsed, err := uuid.Parse(*req.HomeroomTeacherID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid homeroom teacher ID"})
+			return
+		}
+		homeroomTeacherUUID = &parsed
+	}
+
+	if err := h.academicUsecase.UpdateClass(uint(id), req.Name, homeroomTeacherUUID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

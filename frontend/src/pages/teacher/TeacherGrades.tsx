@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import CardGlass from '../../components/ui/glass/CardGlass';
@@ -8,13 +8,16 @@ import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadG
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { Calendar, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
 
 interface Task {
     id: number;
     title: string;
     deadline: string;
-    class: { name: string };
+    class: { id: number; name: string };
+    class_id: number;
     subject: { name: string };
+    teacher_id: string;
 }
 
 interface Submission {
@@ -30,9 +33,10 @@ const TeacherGrades: React.FC = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [gradingSubmission, setGradingSubmission] = useState<Submission | null>(null);
     const [gradeInput, setGradeInput] = useState('');
+    const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
     const queryClient = useQueryClient();
 
-    // Fetch Teachers to get current teacher ID (same strategy as Schedule)
+    // Fetch teacher record for current user
     const { data: teachers } = useQuery({
         queryKey: ['teachers'],
         queryFn: async () => {
@@ -40,45 +44,57 @@ const TeacherGrades: React.FC = () => {
             return response.data;
         }
     });
-    const currentTeacher = teachers?.find((t: any) => t.user.id === user?.id);
+    const currentTeacher = teachers?.find((t: any) => t.user?.id === user?.id);
 
-    // Fetch Tasks created by this teacher
-    // Note: Backend GetTasks currently filters by ClassID. 
-    // We might need to fetch all tasks for a class and filter by teacher on client, 
-    // or update backend to filter by teacher. 
-    // For now, let's assume we select a class first? 
-    // Or simpler: Fetch tasks for a default class (e.g. 1) for MVP, or iterate all classes.
-    // Let's stick to Class ID 1 for now as per previous implementation, but ideally we should let teacher select class.
-    const [selectedClassId] = useState(1);
+    // Fetch schedules to figure out which classes this teacher teaches
+    const { data: schedules } = useQuery({
+        queryKey: ['teacher_schedules', currentTeacher?.id],
+        queryFn: async () => {
+            if (!currentTeacher?.id) return [];
+            const response = await api.get(`/academic/schedules?teacher_id=${currentTeacher.id}`);
+            return response.data;
+        },
+        enabled: !!currentTeacher?.id
+    });
 
+    // Extract unique classes from teacher's schedules
+    const teacherClasses = useMemo(() => {
+        if (!schedules) return [];
+        const classMap = new Map<number, string>();
+        schedules.forEach((s: any) => {
+            if (s.class?.id && s.class?.name) {
+                classMap.set(s.class.id, s.class.name);
+            }
+        });
+        return Array.from(classMap, ([id, name]) => ({ id, name }));
+    }, [schedules]);
+
+    // Auto-select first class if none selected
+    React.useEffect(() => {
+        if (teacherClasses.length > 0 && selectedClassId === null) {
+            setSelectedClassId(teacherClasses[0].id);
+        }
+    }, [teacherClasses, selectedClassId]);
+
+    // Fetch Tasks for the selected class
     const { data: tasks, isLoading: isLoadingTasks } = useQuery({
         queryKey: ['tasks', selectedClassId],
         queryFn: async () => {
+            if (!selectedClassId) return [];
             const response = await api.get(`/elearning/tasks?class_id=${selectedClassId}`);
             return response.data;
-        }
+        },
+        enabled: !!selectedClassId
     });
 
     // Filter tasks by current teacher
     const myTasks = tasks?.filter((t: any) => t.teacher_id === currentTeacher?.id);
 
     // Fetch Submissions for selected task
-    // We need a new endpoint for this: GET /elearning/tasks/:id/submissions
-    // Wait, we didn't add this endpoint in the plan!
-    // We added `UpdateSubmissionGrade` but not `GetSubmissions`.
-    // Let's check `elearning_handler.go`. 
-    // Ah, we missed adding a handler to GET submissions for a task.
-    // We need to add that. 
-
-    // HOLD ON: I need to add GET /elearning/tasks/:id/submissions to backend first.
-    // I will add a placeholder/comment here and then go fix the backend.
-
-    // Assuming the endpoint exists for now to structure the code:
     const { data: submissions, isLoading: isLoadingSubmissions } = useQuery({
         queryKey: ['submissions', selectedTask?.id],
         queryFn: async () => {
             if (!selectedTask) return [];
-            // We need to implement this endpoint
             const response = await api.get(`/elearning/tasks/${selectedTask.id}/submissions`);
             return response.data;
         },
@@ -92,6 +108,10 @@ const TeacherGrades: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['submissions', selectedTask?.id] });
             setGradingSubmission(null);
             setGradeInput('');
+            toast.success('Nilai berhasil disimpan');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Gagal menyimpan nilai');
         }
     });
 
@@ -103,9 +123,26 @@ const TeacherGrades: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Penilaian Tugas</h1>
-                <p className="text-slate-600">Kelola nilai tugas siswa</p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Penilaian Tugas</h1>
+                    <p className="text-slate-600">Kelola nilai tugas siswa</p>
+                </div>
+                {/* Class Selector */}
+                {teacherClasses.length > 0 && (
+                    <select
+                        value={selectedClassId || ''}
+                        onChange={(e) => {
+                            setSelectedClassId(Number(e.target.value));
+                            setSelectedTask(null);
+                        }}
+                        className="px-4 py-2 border border-slate-200 rounded-xl text-sm bg-white/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-slate-700"
+                    >
+                        {teacherClasses.map((cls) => (
+                            <option key={cls.id} value={cls.id}>{cls.name}</option>
+                        ))}
+                    </select>
+                )}
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
@@ -113,11 +150,11 @@ const TeacherGrades: React.FC = () => {
                 <div className="md:col-span-1 space-y-4">
                     <CardGlass className="p-4">
                         <h3 className="font-bold text-slate-900 mb-4">Daftar Tugas</h3>
-                        <div className="space-y-2">
+                        <div className="space-y-2 max-h-[500px] overflow-y-auto">
                             {isLoadingTasks ? (
                                 <p className="text-slate-600 text-sm">Loading...</p>
                             ) : myTasks?.length === 0 ? (
-                                <p className="text-slate-600 text-sm">Belum ada tugas.</p>
+                                <p className="text-slate-500 text-sm">Belum ada tugas untuk kelas ini.</p>
                             ) : (
                                 myTasks?.map((task: Task) => (
                                     <div
@@ -131,8 +168,9 @@ const TeacherGrades: React.FC = () => {
                                         <h4 className="font-medium text-slate-900">{task.title}</h4>
                                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                                             <Calendar size={12} />
-                                            {new Date(task.deadline).toLocaleDateString()}
+                                            {new Date(task.deadline).toLocaleDateString('id-ID')}
                                         </div>
+                                        <div className="text-xs text-slate-400 mt-0.5">{task.subject?.name}</div>
                                     </div>
                                 ))
                             )}
@@ -147,7 +185,7 @@ const TeacherGrades: React.FC = () => {
                             <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <h3 className="text-xl font-bold text-slate-900">{selectedTask.title}</h3>
-                                    <p className="text-slate-600 text-sm mt-1">Submissions</p>
+                                    <p className="text-slate-600 text-sm mt-1">Pengumpulan tugas</p>
                                 </div>
                             </div>
 
@@ -178,15 +216,19 @@ const TeacherGrades: React.FC = () => {
                                                             <User size={14} />
                                                         </div>
                                                         <div>
-                                                            <div className="font-medium text-slate-900">{sub.student.user.name}</div>
-                                                            <div className="text-xs text-slate-500">{sub.student.nisn}</div>
+                                                            <div className="font-medium text-slate-900">{sub.student?.user?.name}</div>
+                                                            <div className="text-xs text-slate-500">{sub.student?.nisn}</div>
                                                         </div>
                                                     </div>
                                                 </TableCellGlass>
                                                 <TableCellGlass>
-                                                    <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm">
-                                                        Lihat File
-                                                    </a>
+                                                    {sub.file_url ? (
+                                                        <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm">
+                                                            Lihat File
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-sm">-</span>
+                                                    )}
                                                 </TableCellGlass>
                                                 <TableCellGlass>
                                                     {sub.grade > 0 ? (
@@ -200,7 +242,7 @@ const TeacherGrades: React.FC = () => {
                                                         className="py-1 px-3 text-xs"
                                                         onClick={() => {
                                                             setGradingSubmission(sub);
-                                                            setGradeInput(sub.grade.toString());
+                                                            setGradeInput(sub.grade > 0 ? sub.grade.toString() : '');
                                                         }}
                                                     >
                                                         Nilai
@@ -213,7 +255,7 @@ const TeacherGrades: React.FC = () => {
                             </TableGlass>
                         </CardGlass>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-slate-500">
+                        <div className="h-full flex items-center justify-center text-slate-500 bg-white/30 rounded-2xl border border-slate-200/50 p-12">
                             Pilih tugas untuk melihat pengumpulan.
                         </div>
                     )}
@@ -228,7 +270,7 @@ const TeacherGrades: React.FC = () => {
             >
                 <div className="space-y-4">
                     <p className="text-slate-600">
-                        Input nilai untuk <span className="font-bold text-slate-900">{gradingSubmission?.student.user.name}</span>
+                        Input nilai untuk <span className="font-bold text-slate-900">{gradingSubmission?.student?.user?.name}</span>
                     </p>
                     <InputGlass
                         type="number"

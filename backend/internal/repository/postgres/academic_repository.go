@@ -21,7 +21,7 @@ func (r *AcademicRepository) CreateClass(class *domain.Class) error {
 
 func (r *AcademicRepository) GetAllClasses(unitID uint) ([]domain.Class, error) {
 	var classes []domain.Class
-	query := r.db
+	query := r.db.Preload("HomeroomTeacher.User")
 	if unitID != 0 {
 		query = query.Where("unit_id = ?", unitID)
 	}

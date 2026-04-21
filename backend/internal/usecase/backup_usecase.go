@@ -86,6 +86,20 @@ func findPgBinary(name string) (string, error) {
 	return "", fmt.Errorf("%s not found in PATH or common locations. Install PostgreSQL client tools or set PATH", name)
 }
 
+// findDockerBinary locates the docker executable
+func findDockerBinary() (string, error) {
+	if path, err := exec.LookPath("docker"); err == nil {
+		return path, nil
+	}
+	// Common locations
+	for _, p := range []string{"/opt/homebrew/bin/docker", "/usr/local/bin/docker", "/usr/bin/docker"} {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("docker not found in PATH or common locations")
+}
+
 // getBackupDir returns the configured backup directory, creating it if needed
 func getBackupDir(cfg *config.Config) (string, error) {
 	dir := cfg.BackupDir
@@ -98,15 +112,11 @@ func getBackupDir(cfg *config.Config) (string, error) {
 	return dir, nil
 }
 
-// CreateBackup runs pg_dump and saves the backup file + record
+// CreateBackup runs pg_dump and saves the backup file + record.
+// If DBDockerContainer is configured, it uses 'docker exec' to run pg_dump
+// inside the container (avoids pg_dump version mismatch).
 func (u *BackupUsecase) CreateBackup(label, notes string, userID uuid.UUID, cfg *config.Config) (*domain.DatabaseBackup, error) {
 	backupDir, err := getBackupDir(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Find pg_dump binary
-	pgDumpPath, err := findPgBinary("pg_dump")
 	if err != nil {
 		return nil, err
 	}
@@ -116,23 +126,15 @@ func (u *BackupUsecase) CreateBackup(label, notes string, userID uuid.UUID, cfg 
 	filename := fmt.Sprintf("backup_%s.sql", timestamp)
 	filePath := filepath.Join(backupDir, filename)
 
-	// Build pg_dump command
-	pgDumpArgs := []string{
-		"-h", cfg.DBHost,
-		"-p", cfg.DBPort,
-		"-U", cfg.DBUser,
-		"-d", cfg.DBName,
-		"-F", "c", // custom format for pg_restore
-		"-f", filePath,
+	if cfg.DBDockerContainer != "" {
+		// ── Docker exec mode: run pg_dump inside the Postgres container ──
+		err = u.dumpViaDocker(cfg, filePath)
+	} else {
+		// ── Local mode: run pg_dump on the host ──
+		err = u.dumpLocal(cfg, filePath)
 	}
-
-	cmd := exec.Command(pgDumpPath, pgDumpArgs...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", cfg.DBPassword))
-
-	output, err := cmd.CombinedOutput()
 	if err != nil {
-		errMsg := strings.TrimSpace(string(output))
-		return nil, fmt.Errorf("pg_dump failed: %s — %w", errMsg, err)
+		return nil, err
 	}
 
 	// Get file size
@@ -159,6 +161,78 @@ func (u *BackupUsecase) CreateBackup(label, notes string, userID uuid.UUID, cfg 
 	return backup, nil
 }
 
+// dumpLocal runs pg_dump directly on the host machine
+func (u *BackupUsecase) dumpLocal(cfg *config.Config, filePath string) error {
+	pgDumpPath, err := findPgBinary("pg_dump")
+	if err != nil {
+		return err
+	}
+
+	pgDumpArgs := []string{
+		"-h", cfg.DBHost,
+		"-p", cfg.DBPort,
+		"-U", cfg.DBUser,
+		"-d", cfg.DBName,
+		"-F", "c",
+		"-f", filePath,
+	}
+
+	cmd := exec.Command(pgDumpPath, pgDumpArgs...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", cfg.DBPassword))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		errMsg := strings.TrimSpace(string(output))
+		return fmt.Errorf("pg_dump failed: %s — %w", errMsg, err)
+	}
+	return nil
+}
+
+// dumpViaDocker runs pg_dump inside the Docker container and pipes output to local file
+func (u *BackupUsecase) dumpViaDocker(cfg *config.Config, filePath string) error {
+	dockerPath, err := findDockerBinary()
+	if err != nil {
+		return err
+	}
+
+	// Run pg_dump inside the container, output to stdout, write to local file
+	// Inside the container, Postgres is on localhost:5432 (internal port)
+	args := []string{
+		"exec",
+		"-e", fmt.Sprintf("PGPASSWORD=%s", cfg.DBPassword),
+		cfg.DBDockerContainer,
+		"pg_dump",
+		"-h", "localhost",
+		"-U", cfg.DBUser,
+		"-d", cfg.DBName,
+		"-F", "c",
+	}
+
+	cmd := exec.Command(dockerPath, args...)
+
+	// Create output file
+	outFile, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create backup file: %w", err)
+	}
+	defer outFile.Close()
+
+	cmd.Stdout = outFile
+
+	// Capture stderr for error messages
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Run(); err != nil {
+		// Clean up failed file
+		os.Remove(filePath)
+		errMsg := strings.TrimSpace(stderrBuf.String())
+		return fmt.Errorf("pg_dump (docker) failed: %s — %w", errMsg, err)
+	}
+
+	return nil
+}
+
 // ListBackups returns all backups ordered by time (for timeline)
 func (u *BackupUsecase) ListBackups() ([]domain.DatabaseBackup, error) {
 	return u.repo.GetAll()
@@ -182,16 +256,32 @@ func (u *BackupUsecase) RestoreBackup(id uuid.UUID, cfg *config.Config) error {
 		return fmt.Errorf("backup file not found: %s", backup.Filename)
 	}
 
-	// Find pg_restore binary
+	// Update status to Restoring
+	u.repo.UpdateStatus(id, "Restoring")
+
+	if cfg.DBDockerContainer != "" {
+		err = u.restoreViaDocker(cfg, filePath)
+	} else {
+		err = u.restoreLocal(cfg, filePath)
+	}
+
+	if err != nil {
+		u.repo.UpdateStatus(id, "Failed")
+		return err
+	}
+
+	// Mark as restored
+	u.repo.MarkRestored(id)
+	return nil
+}
+
+// restoreLocal runs pg_restore directly on the host machine
+func (u *BackupUsecase) restoreLocal(cfg *config.Config, filePath string) error {
 	pgRestorePath, err := findPgBinary("pg_restore")
 	if err != nil {
 		return err
 	}
 
-	// Update status to Restoring
-	u.repo.UpdateStatus(id, "Restoring")
-
-	// Run pg_restore with --clean to drop existing objects first
 	pgRestoreArgs := []string{
 		"-h", cfg.DBHost,
 		"-p", cfg.DBPort,
@@ -208,12 +298,51 @@ func (u *BackupUsecase) RestoreBackup(id uuid.UUID, cfg *config.Config) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		errMsg := strings.TrimSpace(string(output))
-		u.repo.UpdateStatus(id, "Failed")
 		return fmt.Errorf("pg_restore failed: %s — %w", errMsg, err)
 	}
+	return nil
+}
 
-	// Mark as restored
-	u.repo.MarkRestored(id)
+// restoreViaDocker runs pg_restore inside the Docker container, piping the local file via stdin
+func (u *BackupUsecase) restoreViaDocker(cfg *config.Config, filePath string) error {
+	dockerPath, err := findDockerBinary()
+	if err != nil {
+		return err
+	}
+
+	// Open the backup file to pipe into docker exec
+	inFile, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open backup file: %w", err)
+	}
+	defer inFile.Close()
+
+	args := []string{
+		"exec", "-i",
+		"-e", fmt.Sprintf("PGPASSWORD=%s", cfg.DBPassword),
+		cfg.DBDockerContainer,
+		"pg_restore",
+		"-h", "localhost",
+		"-U", cfg.DBUser,
+		"-d", cfg.DBName,
+		"--clean",
+		"--if-exists",
+	}
+
+	cmd := exec.Command(dockerPath, args...)
+	cmd.Stdin = inFile
+
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Run(); err != nil {
+		errMsg := strings.TrimSpace(stderrBuf.String())
+		// pg_restore often exits with warnings even on success; check if it's a real error
+		if !strings.Contains(errMsg, "WARNING") || strings.Contains(errMsg, "FATAL") || strings.Contains(errMsg, "could not connect") {
+			return fmt.Errorf("pg_restore (docker) failed: %s — %w", errMsg, err)
+		}
+	}
+
 	return nil
 }
 

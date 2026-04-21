@@ -304,16 +304,18 @@ func main() {
 
 		// Seed Payroll (Bendahara / SuperAdmin) for first teacher
 		if len(createdTeachers) > 0 {
+			now := time.Now()
 			payroll := domain.Payroll{
-				UserID:        createdTeachers[0].UserID,
-				MonthYear:     time.Now().Format("01-2006"),
-				BasicSalary:   3000000,
-				Allowances:    500000,
-				Deductions:    100000,
-				Total:         3400000,
-				Status:        "Paid",
-				PaymentDate:   time.Now(),
-				ProcessedByID: bendahara.ID,
+				UserID:              createdTeachers[0].UserID,
+				PeriodMonth:         int(now.Month()),
+				PeriodYear:          now.Year(),
+				BaseSalary:          3000000,
+				FunctionalAllowance: 500000,
+				TotalIncome:         3500000,
+				TotalDeduction:      100000,
+				NetSalary:           3400000,
+				Status:              "Paid",
+				PaidAt:              &now,
 			}
 			db.Create(&payroll)
 		}

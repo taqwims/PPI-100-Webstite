@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, School, Phone, CreditCard, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
@@ -13,11 +14,21 @@ const PPDB: React.FC = () => {
         origin_school: '',
         parent_name: '',
         phone: '',
-        unit_id: 1, // Default to MTS
+        unit_id: 0,
     });
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Fetch units dynamically
+    const { data: units } = useQuery({
+        queryKey: ['public_units'],
+        queryFn: async () => {
+            const res = await api.get('/public/units');
+            return res.data;
+        },
+        staleTime: 1000 * 60 * 30,
+    });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -143,15 +154,23 @@ const PPDB: React.FC = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Unit Tujuan</label>
                                         <div className="relative">
-                                            <School className="absolute left-3 top-3 text-slate-300-400" size={18} />
+                                            <School className="absolute left-3 top-3 text-slate-400" size={18} />
                                             <select
-                                                className="w-full glass-input pl-10 text-slate-300-900"
+                                                className="w-full glass-input pl-10 text-slate-900"
                                                 value={formData.unit_id}
                                                 onChange={(e) => setFormData({ ...formData, unit_id: Number(e.target.value) })}
                                                 required
                                             >
-                                                <option value={1}>MTS</option>
-                                                <option value={2}>MA</option>
+                                                <option value={0}>Pilih Unit Tujuan</option>
+                                                {units?.map((unit: any) => (
+                                                    <option key={unit.id} value={unit.id}>{unit.name}</option>
+                                                ))}
+                                                {!units && (
+                                                    <>
+                                                        <option value={1}>MTS</option>
+                                                        <option value={2}>MA</option>
+                                                    </>
+                                                )}
                                             </select>
                                         </div>
                                     </div>

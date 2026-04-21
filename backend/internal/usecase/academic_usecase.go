@@ -35,12 +35,13 @@ func (u *AcademicUsecase) GetAllClasses(unitID uint) ([]domain.Class, error) {
 	return u.academicRepo.GetAllClasses(unitID)
 }
 
-func (u *AcademicUsecase) UpdateClass(id uint, name string) error {
+func (u *AcademicUsecase) UpdateClass(id uint, name string, homeroomTeacherID *uuid.UUID) error {
 	class, err := u.academicRepo.GetClassByID(id)
 	if err != nil {
 		return err
 	}
 	class.Name = name
+	class.HomeroomTeacherID = homeroomTeacherID
 	return u.academicRepo.UpdateClass(class)
 }
 

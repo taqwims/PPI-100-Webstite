@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import type { User } from '../types';
+
 
 /**
  * useAuth — hook untuk mengakses state autentikasi dan user profile.
@@ -11,13 +12,20 @@ export const useAuth = () => {
     const { user, token, login, logout, setUser, isAuthenticated } = useAuthStore();
 
     // Fetch user profile jika token ada
-    const { isLoading: isLoadingProfile } = useQuery<User>({
+    const { data: profileData, isLoading: isLoadingProfile, isError } = useQuery({
         queryKey: ['profile'],
         queryFn: () => api.get('/profile').then((r) => r.data),
         enabled: !!token && !user,
-        onSuccess: (data) => setUser(data),
-        onError: () => logout(),
-    } as Parameters<typeof useQuery>[0]);
+    });
+
+    useEffect(() => {
+        if (profileData) {
+            setUser(profileData);
+        }
+        if (isError) {
+            logout();
+        }
+    }, [profileData, isError, setUser, logout]);
 
     return {
         user,

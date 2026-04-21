@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Search, DollarSign, FileText, Eye, Plus } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Search, DollarSign, FileText, Eye, Plus, Edit, Trash2, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
@@ -41,8 +42,10 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
-const PPDBPayment: React.FC = () => {
+const PPDBPaymentPage: React.FC = () => {
+    const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedPayment, setSelectedPayment] = useState<PPDBPayment | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -54,6 +57,17 @@ const PPDBPayment: React.FC = () => {
             const res = await api.get('/ppdb/payments');
             return res.data;
         },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => api.delete(`/ppdb/payments/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['ppdb-payments'] });
+            toast.success('Pembayaran berhasil dihapus');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Gagal menghapus pembayaran');
+        }
     });
 
     const handleViewDetail = (payment: PPDBPayment) => {
@@ -71,28 +85,107 @@ const PPDBPayment: React.FC = () => {
         setShowPaymentForm(true);
     };
 
+    const handleDeletePayment = (payment: PPDBPayment) => {
+        if (confirm(`Apakah Anda yakin ingin menghapus pembayaran ${payment.invoice_number}?`)) {
+            deleteMutation.mutate(payment.id);
+        }
+    };
+
     const handleCloseForm = () => {
         setShowPaymentForm(false);
         setEditPayment(null);
     };
 
-    const filteredPayments = payments?.filter((payment: PPDBPayment) =>
-        payment.ppdb_registration?.name.toLowerCase().includes(search.toLowerCase()) ||
-        payment.ppdb_registration?.nisn.includes(search) ||
-        payment.invoice_number.includes(search)
-    );
+    const filteredPayments = payments?.filter((payment: PPDBPayment) => {
+        const matchesSearch =
+            payment.ppdb_registration?.name.toLowerCase().includes(search.toLowerCase()) ||
+            payment.ppdb_registration?.nisn.includes(search) ||
+            payment.invoice_number.includes(search);
+
+        const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    // Summary calculations
+    const totalRegistrants = payments?.length || 0;
+    const totalExpected = payments?.reduce((sum: number, p: PPDBPayment) => sum + p.total_amount, 0) || 0;
+    const totalPaid = payments?.reduce((sum: number, p: PPDBPayment) => sum + p.paid_amount, 0) || 0;
+    const totalOutstanding = totalExpected - totalPaid;
+    const lunasCount = payments?.filter((p: PPDBPayment) => p.status === 'Lunas').length || 0;
 
     return (
         <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <CardGlass className="p-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                            <Users size={20} className="text-indigo-600" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 font-medium">Total Pendaftar</p>
+                            <p className="text-xl font-bold text-slate-900">{totalRegistrants}</p>
+                        </div>
+                    </div>
+                </CardGlass>
+                <CardGlass className="p-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                            <DollarSign size={20} className="text-blue-600" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 font-medium">Total Tagihan</p>
+                            <p className="text-lg font-bold text-slate-900">{formatCurrency(totalExpected)}</p>
+                        </div>
+                    </div>
+                </CardGlass>
+                <CardGlass className="p-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                            <TrendingUp size={20} className="text-green-600" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 font-medium">Total Terbayar</p>
+                            <p className="text-lg font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                        </div>
+                    </div>
+                </CardGlass>
+                <CardGlass className="p-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                            <AlertTriangle size={20} className="text-amber-600" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 font-medium">Sisa Piutang</p>
+                            <p className="text-lg font-bold text-amber-600">{formatCurrency(totalOutstanding)}</p>
+                            <p className="text-[10px] text-slate-400">{lunasCount} dari {totalRegistrants} Lunas</p>
+                        </div>
+                    </div>
+                </CardGlass>
+            </div>
+
             <CardGlass className="p-6 space-y-4">
                 <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-                    <div className="flex-1">
-                        <InputGlass
-                            placeholder="Cari nama, NISN, atau nomor invoice..."
-                            icon={Search}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                    <div className="flex-1 flex gap-3 items-center">
+                        <div className="flex-1">
+                            <InputGlass
+                                placeholder="Cari nama, NISN, atau nomor invoice..."
+                                icon={Search}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-slate-700"
+                        >
+                            <option value="all">Semua Status</option>
+                            <option value="Belum Bayar">Belum Bayar</option>
+                            <option value="DP Terpenuhi">DP Terpenuhi</option>
+                            <option value="Lunas">Lunas</option>
+                        </select>
                     </div>
                     <ButtonGlass
                         variant="primary"
@@ -172,13 +265,29 @@ const PPDBPayment: React.FC = () => {
                                             <PPDBPaymentStatusBadge status={payment.status} />
                                         </TableCellGlass>
                                         <TableCellGlass className="text-right">
-                                            <button
-                                                onClick={() => handleViewDetail(payment)}
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
-                                            >
-                                                <Eye size={14} />
-                                                Detail
-                                            </button>
+                                            <div className="flex justify-end gap-1">
+                                                <button
+                                                    onClick={() => handleViewDetail(payment)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                                                    title="Detail"
+                                                >
+                                                    <Eye size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEditPayment(payment)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Edit size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeletePayment(payment)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                                    title="Hapus"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </TableCellGlass>
                                     </TableRowGlass>
                                 );
@@ -278,8 +387,14 @@ const PPDBPayment: React.FC = () => {
                     </div>
                 )}
             </ModalGlass>
+
+            <PPDBPaymentForm 
+                isOpen={showPaymentForm}
+                editPayment={editPayment} 
+                onClose={handleCloseForm} 
+            />
         </div>
     );
 };
 
-export default PPDBPayment;
+export default PPDBPaymentPage;

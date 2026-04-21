@@ -1,122 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { DollarSign, CheckCircle, Clock, AlertTriangle, Upload, CreditCard, X, Landmark, Copy, Send, Download, PieChart, Smartphone, ArrowUpDown, Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { generateBillReceipt } from '../../utils/pdfUtils';
-import { useSchoolBank } from '../../hooks/useFeature';
-
-interface Bill {
-    id: string;
-    title: string;
-    amount: number;
-    due_date: string;
-    created_at: string;
-    status: string;
-    bill_type: string;
-    academic_year_id?: number;
-    academic_year?: {
-        name: string;
-    };
-    payment_link?: string;
-    is_installment?: boolean;
-    invoice_number?: string;
-    verification_code?: string;
-    payments?: { amount: number; status: string; payment_method: string; proof_url?: string; paid_at: string; transaction_id?: string; created_at: string; }[];
-}
-
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    }).format(amount);
-};
-
-const getRemainingAmount = (bill: Bill) => {
-    if (bill.status === 'Paid') return 0;
-    const totalPaid = (bill.payments || []).reduce((sum, p) => p.status === 'Success' ? sum + p.amount : sum, 0);
-    return bill.amount - totalPaid;
-};
-
-const hasPendingTransfer = (bill: Bill) => {
-    return bill.status !== 'Paid' && (bill.payments || []).some(p => p.payment_method === 'Transfer' && p.proof_url && p.status !== 'Success');
-};
-
-const formatPaymentDate = (p: any) => {
-    if (p.status === 'Success' && p.paid_at && !p.paid_at.startsWith('0001-01-01')) {
-        return new Date(p.paid_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
-    if (p.created_at && !p.created_at.startsWith('0001-01-01')) {
-        return new Date(p.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
-    return '-';
-};
-
-/** Reusable bank info component — renders dynamic bank data from feature store */
-const BankAccountInfo: React.FC = () => {
-    const bankAccounts = useSchoolBank();
-    if (bankAccounts.length === 0) {
-        return (
-            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-sm text-amber-700">
-                Belum ada rekening bank untuk transfer. Hubungi admin sekolah.
-            </div>
-        );
-    }
-    return (
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-3">
-            <p className="text-xs text-blue-600 font-medium">Transfer ke rekening berikut:</p>
-            {bankAccounts.map((acc) => (
-                <div key={acc.id} className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                            <Landmark size={20} className="text-white" />
-                        </div>
-                        <div>
-                            <p className="font-semibold text-slate-800">{acc.bank_name}{acc.is_primary ? ' ⭐' : ''}</p>
-                            <p className="text-xs text-slate-500">a.n. {acc.account_holder}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="font-mono text-slate-800">{acc.account_number}</p>
-                        <button
-                            className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1 justify-end mt-1"
-                            onClick={() => {
-                                navigator.clipboard.writeText(acc.account_number);
-                                toast.success('Nomor rekening disalin!');
-                            }}
-                        >
-                            <Copy size={12} /> Salin
-                        </button>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-};
+import { Bill, formatCurrency, getRemainingAmount, hasPendingTransfer, getStatusInfo } from '../../components/finance/Billing/BillingUtils';
+import { useBillingPayment } from '../../hooks/useBillingPayment';
+import BillingPaymentModal from '../../components/finance/Billing/BillingPaymentModal';
+import BillingMultiPaymentModal from '../../components/finance/Billing/BillingMultiPaymentModal';
 
 const StudentBills: React.FC = () => {
     const { user } = useAuth();
-
-    const [showPayModal, setShowPayModal] = useState(false);
-    const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<'Transfer' | 'Midtrans'>('Midtrans');
-    const [paymentAmount, setPaymentAmount] = useState<number>(0);
-    const [proofFile, setProofFile] = useState<File | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-    const [loadingSnap, setLoadingSnap] = useState(false);
-    const [successMsg, setSuccessMsg] = useState('');
-    const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
-    const [showMultiPayModal, setShowMultiPayModal] = useState(false);
-    const [multiPayMethod, setMultiPayMethod] = useState<'Transfer' | 'Midtrans'>('Midtrans');
-    const [isSubmittingMulti, setIsSubmittingMulti] = useState(false);
-
     const [selectedYear, setSelectedYear] = useState<string>('all');
     const [sortConfig, setSortConfig] = useState<{ key: keyof Bill | 'remaining'; direction: 'asc' | 'desc' | null }>({
-        key: 'created_at',
-        direction: 'desc'
+        key: 'created_at', direction: 'desc'
     });
 
     const { data: academicYears } = useQuery({
@@ -136,13 +35,12 @@ const StudentBills: React.FC = () => {
         enabled: !!user,
     });
 
+    const bp = useBillingPayment(refetch, bills);
+
     const handleSort = (key: keyof Bill | 'remaining') => {
         let direction: 'asc' | 'desc' | null = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
-            direction = null;
-        }
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        else if (sortConfig.key === key && sortConfig.direction === 'desc') direction = null;
         setSortConfig({ key, direction });
     };
 
@@ -158,16 +56,8 @@ const StudentBills: React.FC = () => {
 
     const sortedBills = [...filteredBills].sort((a, b) => {
         if (!sortConfig.direction) return 0;
-
-        let aVal: any, bVal: any;
-        if (sortConfig.key === 'remaining') {
-            aVal = getRemainingAmount(a);
-            bVal = getRemainingAmount(b);
-        } else {
-            aVal = a[sortConfig.key as keyof Bill];
-            bVal = b[sortConfig.key as keyof Bill];
-        }
-
+        let aVal: any = sortConfig.key === 'remaining' ? getRemainingAmount(a) : a[sortConfig.key as keyof Bill];
+        let bVal: any = sortConfig.key === 'remaining' ? getRemainingAmount(b) : b[sortConfig.key as keyof Bill];
         if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -177,229 +67,8 @@ const StudentBills: React.FC = () => {
     const paidBills = sortedBills.filter((b: Bill) => b.status === 'Paid');
     const totalUnpaid = unpaidBills.reduce((acc: number, b: Bill) => acc + getRemainingAmount(b), 0);
 
-    const selectedBills = unpaidBills.filter(b => selectedBillIds.includes(b.id));
+    const selectedBills = unpaidBills.filter(b => bp.selectedBillIds.includes(b.id));
     const selectedTotal = selectedBills.reduce((sum, b) => sum + getRemainingAmount(b), 0);
-
-    const toggleBillSelection = (billId: string) => {
-        setSelectedBillIds(prev =>
-            prev.includes(billId)
-                ? prev.filter(id => id !== billId)
-                : [...prev, billId]
-        );
-    };
-
-    const handleMultiPayment = async () => {
-        if (selectedBillIds.length < 2) return;
-        setIsSubmittingMulti(true);
-        try {
-            const res = await api.post('/finance/bills/multi-payment', {
-                bill_ids: selectedBillIds,
-                amount: selectedTotal,
-                payment_method: multiPayMethod
-            });
-
-            if (multiPayMethod === 'Midtrans') {
-                const snapToken = res.data.snap_token;
-                const invoiceNumber = res.data.invoice_number;
-
-                const verifyAndRefresh = (delay = 2000) => {
-                    setTimeout(() => {
-                        api.post('/finance/midtrans/check-status', { order_id: invoiceNumber })
-                            .then(() => refetch())
-                            .catch((e) => {
-                                console.error('Failed to verify Midtrans multi-payment status:', e);
-                                refetch();
-                            });
-                    }, delay);
-                };
-
-                // @ts-ignore
-                window.snap.pay(snapToken, {
-                    onSuccess: () => {
-                        verifyAndRefresh(1000);
-                        toast.success('Pembayaran sukses!');
-                        setSelectedBillIds([]);
-                        setShowMultiPayModal(false);
-                    },
-                    onPending: () => {
-                        verifyAndRefresh(1000);
-                        toast.success('Pembayaran pending, silakan selesaikan transaksi.');
-                        setSelectedBillIds([]);
-                        setShowMultiPayModal(false);
-                    },
-                    onError: () => {
-                        toast.error('Pembayaran gagal');
-                        setIsSubmittingMulti(false);
-                    },
-                    onClose: () => {
-                        verifyAndRefresh(1000);
-                        setIsSubmittingMulti(false);
-                    }
-                });
-            } else {
-                toast.success(`Berhasil mengirim permintaan pembayaran untuk ${selectedBillIds.length} tagihan. Silakan hubungi admin.`);
-                setSelectedBillIds([]);
-                setShowMultiPayModal(false);
-                refetch();
-            }
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal memproses pembayaran');
-            setIsSubmittingMulti(false);
-        } finally {
-            if (multiPayMethod !== 'Midtrans') {
-                setIsSubmittingMulti(false);
-            }
-        }
-    };
-
-    const openPayModal = (bill: Bill) => {
-        setSelectedBill(bill);
-        setPaymentMethod('Midtrans');
-        setProofFile(null);
-        setSuccessMsg('');
-        setLoadingSnap(false);
-        setPaymentAmount(getRemainingAmount(bill));
-        setShowPayModal(true);
-    };
-
-    const handleMidtransPayment = async () => {
-        if (!selectedBill || paymentAmount <= 0) return;
-        setLoadingSnap(true);
-        try {
-            const res = await api.post('/finance/midtrans/create-transaction', {
-                bill_id: selectedBill.id,
-                amount: paymentAmount,
-            });
-            const snapToken = res.data.snap_token;
-            const orderID = res.data.order_id;
-
-            // Helper: verify payment status with backend (calls Midtrans API directly)
-            const verifyAndRefresh = (delay = 2000) => {
-                setTimeout(() => {
-                    api.post('/finance/midtrans/check-status', { order_id: orderID })
-                        .then(() => refetch())
-                        .catch((e) => {
-                            console.error('Failed to verify Midtrans status:', e);
-                            refetch();
-                        });
-                }, delay);
-            };
-
-            // @ts-ignore - snap is loaded globally from Midtrans Snap.js
-            window.snap.pay(snapToken, {
-                onSuccess: () => {
-                    verifyAndRefresh(1000);
-                    setSuccessMsg('Pembayaran berhasil! Terima kasih.');
-                    setTimeout(() => {
-                        setShowPayModal(false);
-                        setSuccessMsg('');
-                    }, 3500);
-                },
-                onPending: () => {
-                    verifyAndRefresh(1000);
-                    setSuccessMsg('Pembayaran sedang diproses. Status akan diperbarui otomatis.');
-                    setTimeout(() => {
-                        setShowPayModal(false);
-                        setSuccessMsg('');
-                    }, 3500);
-                },
-                onError: () => {
-                    alert('Pembayaran gagal. Silakan coba lagi.');
-                    setLoadingSnap(false);
-                },
-                onClose: () => {
-                    verifyAndRefresh(1000);
-                    setLoadingSnap(false);
-                },
-            });
-        } catch (error: any) {
-            alert(error.response?.data?.error || 'Gagal membuat transaksi Midtrans');
-            setLoadingSnap(false);
-        }
-    };
-
-    // Auto-check pending midtrans payments on load
-    useEffect(() => {
-        if (!bills) return;
-        let shouldRefetch = false;
-
-        const checkPending = async () => {
-            const promises: Promise<any>[] = [];
-            bills.forEach((b: Bill) => {
-                if (b.payments) {
-                    b.payments.forEach(p => {
-                        if (p.payment_method === 'Midtrans' && p.status === 'Pending' && p.transaction_id) {
-                            promises.push(
-                                api.post('/finance/midtrans/check-status', { order_id: p.transaction_id })
-                                    .then(res => {
-                                        // If backend says it became Success, mark for refetch
-                                        if (res.data.status === 'Success') shouldRefetch = true;
-                                    })
-                                    .catch(e => console.error(e))
-                            );
-                        }
-                    });
-                }
-            });
-            if (promises.length > 0) {
-                await Promise.all(promises);
-                if (shouldRefetch) refetch();
-            }
-        };
-
-        checkPending();
-    }, [bills, refetch]);
-
-    const handleSubmitPayment = async () => {
-        if (!selectedBill) return;
-
-        if (paymentAmount <= 0 || paymentAmount > getRemainingAmount(selectedBill)) {
-            alert('Jumlah pembayaran tidak valid.');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            if (paymentMethod === 'Transfer' && proofFile) {
-                const formData = new FormData();
-                formData.append('file', proofFile);
-                formData.append('bill_id', selectedBill.id);
-                formData.append('amount', paymentAmount.toString());
-                formData.append('method', 'Transfer');
-
-                await api.post('/finance/payment-proof', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-            } else {
-                await api.post('/finance/payments', {
-                    bill_id: selectedBill.id,
-                    amount: paymentAmount,
-                    method: 'Cash',
-                });
-            }
-
-            setSuccessMsg('Pembayaran berhasil dikirim! Bendahara akan memverifikasi.');
-            refetch();
-
-            setTimeout(() => {
-                setShowPayModal(false);
-                setSuccessMsg('');
-            }, 2500);
-        } catch (error: any) {
-            alert(error.response?.data?.error || 'Gagal mengirim pembayaran');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const getStatusInfo = (bill: Bill) => {
-        if (bill.status === 'Paid') return { color: 'emerald', icon: CheckCircle, label: 'Lunas' };
-        if (bill.status === 'Partial') return { color: 'amber', icon: PieChart, label: 'Sebagian/Dicicil' };
-        if (hasPendingTransfer(bill)) return { color: 'blue', icon: Clock, label: 'Menunggu Verifikasi' };
-        const overdue = new Date(bill.due_date) < new Date();
-        if (overdue) return { color: 'red', icon: AlertTriangle, label: 'Terlambat' };
-        return { color: 'amber', icon: Clock, label: 'Belum Lunas' };
-    };
 
     return (
         <div className="space-y-6">
@@ -408,7 +77,6 @@ const StudentBills: React.FC = () => {
                 <p className="text-slate-500 mt-1">Lihat dan bayar tagihan sekolah Anda.</p>
             </div>
 
-            {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500">Total Sisa Tagihan</p>
@@ -422,36 +90,37 @@ const StudentBills: React.FC = () => {
                 </div>
             </div>
 
-            {/* Bills List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="font-semibold text-slate-800">Daftar Tagihan</h2>
-
+                    <div className="flex items-center gap-3">
+                        <h2 className="font-semibold text-slate-800">Daftar Tagihan</h2>
+                        {bp.selectedBillIds.length >= 2 && (
+                            <button
+                                onClick={() => bp.setShowMultiPayModal(true)}
+                                className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition"
+                            >
+                                Bayar Terpilih ({bp.selectedBillIds.length})
+                            </button>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2">
                         <Filter size={14} className="text-slate-700" />
                         <select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(e.target.value)}
-                            className="text-sm border-slate-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-1.5 pl-2 pr-8 bg-white"
+                            className="text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-1.5 pl-2 pr-8 bg-white"
                         >
                             <option value="all">Semua Tahun Ajaran</option>
-                        {academicYears?.map((year: any) => (
-                            <option
-                                key={year.id}
-                                value={year.id.toString()}
-                                className="bg-white text-black"
-                            >
-                                {year.name}
-                            </option>
-                        ))}
+                            {academicYears?.map((year: any) => (
+                                <option key={year.id} value={year.id.toString()}>{year.name}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
+
                 {isLoading ? (
-                    <div className="p-12 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mx-auto"></div>
-                    </div>
-                ) : bills?.length === 0 ? (
+                    <div className="p-12 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mx-auto"></div></div>
+                ) : !bills?.length ? (
                     <div className="p-12 text-center text-slate-500">
                         <DollarSign size={40} className="mx-auto text-slate-300 mb-3" />
                         <p className="text-lg font-medium text-slate-700">Belum Ada Tagihan</p>
@@ -466,46 +135,23 @@ const StudentBills: React.FC = () => {
                                             type="checkbox"
                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                             onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    setSelectedBillIds(unpaidBills.filter(b => !hasPendingTransfer(b)).map(b => b.id));
-                                                } else {
-                                                    setSelectedBillIds([]);
-                                                }
+                                                const validBills = unpaidBills.filter(b => !hasPendingTransfer(b));
+                                                bp.setSelectedBillIds(e.target.checked ? validBills.map(b => b.id) : []);
                                             }}
-                                            checked={unpaidBills.length > 0 && selectedBillIds.length === unpaidBills.filter(b => !hasPendingTransfer(b)).length}
+                                            checked={unpaidBills.length > 0 && bp.selectedBillIds.length === unpaidBills.filter(b => !hasPendingTransfer(b)).length}
                                         />
                                     </th>
-                                    <th
-                                        className="p-4 font-semibold cursor-pointer hover:bg-slate-50 transition-colors"
-                                        onClick={() => handleSort('created_at')}
-                                    >
-                                        <div className="flex items-center gap-1">
-                                            Info Tagihan {getSortIcon('created_at')}
-                                        </div>
+                                    <th className="p-4 font-semibold cursor-pointer" onClick={() => handleSort('created_at')}>
+                                        <div className="flex items-center gap-1">Info Tagihan {getSortIcon('created_at')}</div>
                                     </th>
-                                    <th
-                                        className="p-4 font-semibold text-right cursor-pointer hover:bg-slate-50 transition-colors"
-                                        onClick={() => handleSort('amount')}
-                                    >
-                                        <div className="flex items-center justify-end gap-1">
-                                            Total {getSortIcon('amount')}
-                                        </div>
+                                    <th className="p-4 font-semibold text-right cursor-pointer" onClick={() => handleSort('amount')}>
+                                        <div className="flex items-center justify-end gap-1">Total {getSortIcon('amount')}</div>
                                     </th>
-                                    <th
-                                        className="p-4 font-semibold text-right cursor-pointer hover:bg-slate-50 transition-colors"
-                                        onClick={() => handleSort('remaining')}
-                                    >
-                                        <div className="flex items-center justify-end gap-1">
-                                            Sisa {getSortIcon('remaining')}
-                                        </div>
+                                    <th className="p-4 font-semibold text-right cursor-pointer" onClick={() => handleSort('remaining')}>
+                                        <div className="flex items-center justify-end gap-1">Sisa {getSortIcon('remaining')}</div>
                                     </th>
-                                    <th
-                                        className="p-4 font-semibold text-center cursor-pointer hover:bg-slate-50 transition-colors"
-                                        onClick={() => handleSort('due_date')}
-                                    >
-                                        <div className="flex items-center justify-center gap-1">
-                                            Jatuh Tempo {getSortIcon('due_date')}
-                                        </div>
+                                    <th className="p-4 font-semibold text-center cursor-pointer" onClick={() => handleSort('due_date')}>
+                                        <div className="flex items-center justify-center gap-1">Jatuh Tempo {getSortIcon('due_date')}</div>
                                     </th>
                                     <th className="p-4 font-semibold text-center">Status</th>
                                     <th className="p-4 font-semibold text-center">Aksi</th>
@@ -517,88 +163,58 @@ const StudentBills: React.FC = () => {
                                     const StatusIcon = status.icon;
                                     const remainingAmount = getRemainingAmount(bill);
                                     return (
-                                        <tr key={bill.id} className={clsx("hover:bg-slate-50/50 transition-colors", selectedBillIds.includes(bill.id) && "bg-indigo-50/30")}>
+                                        <tr key={bill.id} className={clsx("hover:bg-slate-50/50 transition-colors", bp.selectedBillIds.includes(bill.id) && "bg-indigo-50/30")}>
                                             <td className="p-4">
-                                                {bill.status !== 'Paid' && !hasPendingTransfer(bill) ? (
+                                                {bill.status !== 'Paid' && !hasPendingTransfer(bill) && (
                                                     <input
                                                         type="checkbox"
                                                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                        checked={selectedBillIds.includes(bill.id)}
-                                                        onChange={() => toggleBillSelection(bill.id)}
+                                                        checked={bp.selectedBillIds.includes(bill.id)}
+                                                        onChange={() => bp.toggleBillSelection(bill.id)}
                                                     />
-                                                ) : null}
+                                                )}
                                             </td>
                                             <td className="p-4">
                                                 <p className="font-semibold text-slate-800">{bill.title}</p>
                                                 <div className="mt-1 flex items-center gap-2">
-                                                    <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded inline-block">
-                                                        {bill.bill_type || 'SPP'}
-                                                    </span>
-                                                    {bill.academic_year && (
-                                                        <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded inline-block">
-                                                            {bill.academic_year.name}
-                                                        </span>
-                                                    )}
-                                                    {bill.is_installment && (
-                                                        <span className="text-[10px] font-semibold uppercase bg-blue-50 text-blue-600 px-2 py-0.5 rounded inline-block border border-blue-100">
-                                                            Dapat Dicicil
-                                                        </span>
-                                                    )}
+                                                    <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded inline-block">{bill.bill_type || 'SPP'}</span>
+                                                    {bill.academic_year && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded inline-block">{bill.academic_year.name}</span>}
+                                                    {bill.is_installment && <span className="text-[10px] font-semibold uppercase bg-blue-50 text-blue-600 px-2 py-0.5 rounded inline-block border border-blue-100">Dapat Dicicil</span>}
                                                 </div>
                                             </td>
-                                            <td className="p-4 text-right text-slate-500 text-sm whitespace-nowrap">
-                                                {formatCurrency(bill.amount)}
-                                            </td>
-                                            <td className="p-4 text-right font-semibold text-slate-800 whitespace-nowrap">
-                                                {remainingAmount > 0 ? formatCurrency(remainingAmount) : '-'}
-                                            </td>
-                                            <td className="p-4 text-center text-sm text-slate-500">
-                                                {new Date(bill.due_date).toLocaleDateString('id-ID')}
-                                            </td>
+                                            <td className="p-4 text-right text-slate-500 text-sm whitespace-nowrap">{formatCurrency(bill.amount)}</td>
+                                            <td className="p-4 text-right font-semibold text-slate-800 whitespace-nowrap">{remainingAmount > 0 ? formatCurrency(remainingAmount) : '-'}</td>
+                                            <td className="p-4 text-center text-sm text-slate-500">{new Date(bill.due_date).toLocaleDateString('id-ID')}</td>
                                             <td className="p-4 text-center">
                                                 <span className={clsx(
                                                     "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium gap-1",
                                                     status.color === 'emerald' && "bg-emerald-100 text-emerald-800",
                                                     status.color === 'amber' && "bg-amber-100 text-amber-800",
                                                     status.color === 'blue' && "bg-blue-100 text-blue-800",
-                                                    status.color === 'red' && "bg-red-100 text-red-800",
+                                                    status.color === 'red' && "bg-red-100 text-red-800"
                                                 )}>
                                                     <StatusIcon size={12} /> {status.label}
                                                 </span>
                                             </td>
                                             <td className="p-4 text-center">
                                                 {bill.status !== 'Paid' && !hasPendingTransfer(bill) ? (
-                                                    <button
-                                                        onClick={() => openPayModal(bill)}
-                                                        className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition flex items-center gap-1.5 mx-auto"
-                                                    >
+                                                    <button onClick={() => bp.openPayModal(bill)} className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition flex items-center gap-1.5 mx-auto">
                                                         <DollarSign size={14} /> Bayar
                                                     </button>
                                                 ) : bill.status === 'Paid' ? (
                                                     <div className="flex flex-col gap-1 items-center">
                                                         <button
                                                             onClick={async () => {
-                                                                try {
-                                                                    await generateBillReceipt(bill);
-                                                                    toast.success('Kuitansi berhasil diunduh');
-                                                                } catch (err) {
-                                                                    console.error(err);
-                                                                    toast.error('Gagal membuat kuitansi');
-                                                                }
+                                                                try { await generateBillReceipt(bill); toast.success('Kuitansi diunduh'); }
+                                                                catch { toast.error('Gagal unduh kuitansi'); }
                                                             }}
                                                             className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition flex items-center gap-1.5 mx-auto"
                                                         >
                                                             <Download size={13} /> Kuitansi
                                                         </button>
-                                                        {bill.invoice_number && (
-                                                            <span className="text-[9px] text-slate-400 font-mono tracking-tighter" title="Nomor Invoice">
-                                                                {bill.invoice_number}
-                                                            </span>
-                                                        )}
+                                                        {bill.invoice_number && <span className="text-[9px] text-slate-400 font-mono tracking-tighter" title="Nomor Invoice">{bill.invoice_number}</span>}
                                                     </div>
-                                                ) : (
-                                                    <span className="text-xs text-slate-500">Menunggu</span>
-                                                )}
+                                                ) : <span className="text-xs text-slate-500">Menunggu</span>}
                                             </td>
                                         </tr>
                                     );
@@ -609,300 +225,22 @@ const StudentBills: React.FC = () => {
                 )}
             </div>
 
-            {/* Payment Modal */}
-            {showPayModal && selectedBill && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
-                            <h2 className="text-lg font-bold flex items-center text-slate-800">
-                                <DollarSign className="text-indigo-600 mr-2" size={22} /> Bayar Tagihan
-                            </h2>
-                            <button onClick={() => setShowPayModal(false)} className="text-slate-400 hover:text-slate-600 transition">
-                                <X size={20} />
-                            </button>
-                        </div>
+            <BillingPaymentModal
+                showPayModal={bp.showPayModal} setShowPayModal={bp.setShowPayModal}
+                selectedBill={bp.selectedBill}
+                paymentMethod={bp.paymentMethod} setPaymentMethod={bp.setPaymentMethod}
+                paymentAmount={bp.paymentAmount} setPaymentAmount={bp.setPaymentAmount}
+                proofFile={bp.proofFile} setProofFile={bp.setProofFile}
+                submitting={bp.submitting} loadingSnap={bp.loadingSnap} successMsg={bp.successMsg}
+                handleMidtransPayment={bp.handleMidtransPayment} handleSubmitPayment={bp.handleSubmitPayment}
+            />
 
-                        {successMsg ? (
-                            <div className="p-8 text-center">
-                                <CheckCircle size={56} className="mx-auto text-emerald-500 mb-4" />
-                                <p className="text-lg font-semibold text-slate-800">{successMsg}</p>
-                            </div>
-                        ) : (
-                            <div className="p-6 space-y-5">
-                                {/* Bill Info */}
-                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                    <p className="text-sm text-slate-500">{selectedBill.title}</p>
-                                    <div className="flex justify-between items-end mt-2">
-                                        <p className="text-xs font-medium text-slate-500">Sisa Tagihan:</p>
-                                        <p className="text-2xl font-bold text-slate-800">{formatCurrency(getRemainingAmount(selectedBill))}</p>
-                                    </div>
-                                    <p className="text-xs text-slate-400 mt-2">Jatuh tempo: {new Date(selectedBill.due_date).toLocaleDateString('id-ID')}</p>
-                                </div>
-
-                                {/* Riwayat Pembayaran */}
-                                {selectedBill.payments && selectedBill.payments.length > 0 && (
-                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                                        <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">Riwayat Pembayaran</p>
-                                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
-                                            {selectedBill.payments.map((p, i) => (
-                                                <div key={i} className="flex justify-between items-center text-sm border-b border-slate-200 pb-1.5 last:border-0 last:pb-0">
-                                                    <div>
-                                                        <span className={clsx("text-[10px] px-1.5 py-0.5 rounded font-medium",
-                                                            p.status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                                        )}>{p.status}</span>
-                                                        <span className="text-xs text-slate-500 ml-2">{formatPaymentDate(p)}</span>
-                                                    </div>
-                                                    <span className="font-semibold text-slate-700">{formatCurrency(p.amount)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Jumlah Pembayaran</label>
-                                    {selectedBill.is_installment ? (
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">Rp</span>
-                                            <input
-                                                type="number"
-                                                value={paymentAmount}
-                                                onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                                                max={getRemainingAmount(selectedBill)}
-                                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 text-lg font-bold"
-                                            />
-                                            <p className="text-xs text-blue-600 mt-1">Tagihan ini dapat dibayar sebagian (cicil).</p>
-                                        </div>
-                                    ) : (
-                                        <div className="px-4 py-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-800 font-bold text-lg">
-                                            {formatCurrency(paymentAmount)}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Payment Method Toggle */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
-                                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod('Midtrans')}
-                                            className={clsx(
-                                                "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                                paymentMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
-                                            )}
-                                        >
-                                            <Smartphone size={14} /> Online
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod('Transfer')}
-                                            className={clsx(
-                                                "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                                paymentMethod === 'Transfer' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
-                                            )}
-                                        >
-                                            <CreditCard size={14} /> Transfer
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {paymentMethod === 'Midtrans' && (
-                                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
-                                                <Smartphone size={20} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-slate-800">Pembayaran Online</p>
-                                                <p className="text-xs text-slate-500">QRIS, E-Wallet, Bank Transfer, Kartu Kredit</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-indigo-600 mt-2">
-                                            💡 Klik tombol bayar di bawah untuk membuka halaman pembayaran. Status akan diperbarui otomatis.
-                                        </p>
-                                    </div>
-                                )}
-
-                                {paymentMethod === 'Transfer' && (
-                                    <>
-                                        {/* Bank Details */}
-                                        <BankAccountInfo />
-
-                                        {/* Upload Proof */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">Upload Bukti Transfer</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                                                    className="hidden"
-                                                    id="proof-upload"
-                                                />
-                                                <label
-                                                    htmlFor="proof-upload"
-                                                    className={clsx(
-                                                        "w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed rounded-xl cursor-pointer transition",
-                                                        proofFile ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-300 bg-slate-50 text-slate-500 hover:border-blue-400 hover:bg-blue-50"
-                                                    )}
-                                                >
-                                                    <Upload size={20} />
-                                                    {proofFile ? proofFile.name : 'Klik untuk upload bukti transfer'}
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-
-
-                                {paymentMethod === 'Midtrans' ? (
-                                    <button
-                                        onClick={handleMidtransPayment}
-                                        disabled={loadingSnap || paymentAmount <= 0}
-                                        className={clsx(
-                                            "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
-                                            (loadingSnap || paymentAmount <= 0)
-                                                ? "bg-slate-300 cursor-not-allowed"
-                                                : "bg-indigo-600 hover:bg-indigo-700"
-                                        )}
-                                    >
-                                        <Smartphone size={16} />
-                                        {loadingSnap ? 'Memproses...' : 'Bayar via Midtrans'}
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleSubmitPayment}
-                                        disabled={submitting || paymentAmount <= 0 || (paymentMethod === 'Transfer' && !proofFile)}
-                                        className={clsx(
-                                            "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
-                                            (submitting || paymentAmount <= 0 || (paymentMethod === 'Transfer' && !proofFile))
-                                                ? "bg-slate-300 cursor-not-allowed"
-                                                : "bg-indigo-600 hover:bg-indigo-700"
-                                        )}
-                                    >
-                                        <Send size={16} />
-                                        {submitting ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Multi-Payment Modal */}
-            {showMultiPayModal && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
-                            <h2 className="text-lg font-bold flex items-center text-slate-800">
-                                <CreditCard className="text-indigo-600 mr-2" size={22} /> Bayar Tagihan Terpilih
-                            </h2>
-                            <button onClick={() => setShowMultiPayModal(false)} className="text-slate-400 hover:text-slate-600 transition">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Tagihan Yang Dipilih ({selectedBillIds.length})</p>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                    {selectedBills.map(b => (
-                                        <div key={b.id} className="flex justify-between items-center text-sm bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
-                                            <span className="text-slate-700 font-medium truncate pr-4">{b.title}</span>
-                                            <span className="font-bold text-slate-900 shrink-0">{formatCurrency(getRemainingAmount(b))}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
-                                    <span className="text-sm font-bold text-slate-600">Total Pembayaran</span>
-                                    <span className="text-xl font-bold text-indigo-600 font-mono">{formatCurrency(selectedTotal)}</span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
-                                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setMultiPayMethod('Midtrans')}
-                                        className={clsx(
-                                            "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                            multiPayMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
-                                        )}
-                                    >
-                                        <Smartphone size={14} /> Online
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setMultiPayMethod('Transfer')}
-                                        className={clsx(
-                                            "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                            multiPayMethod === 'Transfer' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
-                                        )}
-                                    >
-                                        <CreditCard size={14} /> Transfer
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                <p className="text-xs text-blue-700 leading-relaxed italic text-center font-medium">
-                                    💡 Seluruh tagihan di atas akan dibayarkan secara kolektif dengan satu bukti atau satu kali transaksi.
-                                </p>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowMultiPayModal(false)}
-                                    className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    onClick={handleMultiPayment}
-                                    disabled={isSubmittingMulti}
-                                    className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {isSubmittingMulti ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <CreditCard size={16} />}
-                                    Konfirmasi Bayar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Floating Selection Bar */}
-            {selectedBillIds.length >= 2 && !showMultiPayModal && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl px-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl shadow-indigo-500/20 border border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-indigo-600 p-2 rounded-xl">
-                                <DollarSign size={20} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-400 font-medium">{selectedBillIds.length} tagihan dipilih</p>
-                                <p className="text-lg font-bold text-white font-mono leading-tight">{formatCurrency(selectedTotal)}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setSelectedBillIds([])}
-                                className="text-sm font-medium text-slate-400 hover:text-white transition px-2"
-                            >
-                                Batal
-                            </button>
-                            <button
-                                onClick={() => setShowMultiPayModal(true)}
-                                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
-                            >
-                                <CreditCard size={16} /> Bayar Sekarang
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <BillingMultiPaymentModal
+                showMultiPayModal={bp.showMultiPayModal} setShowMultiPayModal={bp.setShowMultiPayModal}
+                selectedBillIds={bp.selectedBillIds} selectedTotal={selectedTotal}
+                multiPayMethod={bp.multiPayMethod} setMultiPayMethod={bp.setMultiPayMethod}
+                isSubmittingMulti={bp.isSubmittingMulti} handleMultiPayment={bp.handleMultiPayment}
+            />
         </div>
     );
 };

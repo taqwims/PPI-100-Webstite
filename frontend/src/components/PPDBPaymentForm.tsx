@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { Plus, Trash2, DollarSign } from 'lucide-react';
 import ModalGlass from './ui/glass/ModalGlass';
 import ButtonGlass from './ui/glass/ButtonGlass';
-import InputGlass from './ui/glass/InputGlass';
+
 
 interface PPDBRegistration {
     id: string;
@@ -89,6 +89,15 @@ const PPDBPaymentForm: React.FC<PPDBPaymentFormProps> = ({ isOpen, onClose, edit
             queryClient.invalidateQueries({ queryKey: ['ppdb-payments'] });
             toast.success(editPayment ? 'Pembayaran berhasil diperbarui' : 'Pembayaran berhasil dicatat');
             onClose();
+        },
+        onError: (error: any) => {
+            const message = error.response?.data?.error || 'Gagal menyimpan pembayaran';
+            if (error.response?.status === 422) {
+                // DP validation error — show clearly
+                toast.error(message, { duration: 6000 });
+            } else {
+                toast.error(message);
+            }
         }
     });
 

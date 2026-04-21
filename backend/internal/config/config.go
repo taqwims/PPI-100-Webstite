@@ -13,11 +13,13 @@ type Config struct {
 	DBPassword           string
 	DBName               string
 	DBPort               string
+	DBSSLMode            string
 	JWTSecret            string
 	MidtransServerKey    string
 	MidtransClientKey    string
 	MidtransIsProduction bool
 	FonnteToken          string
+	DefaultPassword      string
 
 	// Feature Flags
 	FeatureBilling            bool
@@ -43,7 +45,8 @@ type Config struct {
 	SchoolAddress string
 
 	// Backup
-	BackupDir string
+	BackupDir          string
+	DBDockerContainer  string // If set, use 'docker exec <container>' for pg_dump/pg_restore
 }
 
 // FeatureMap returns a map of feature flags for the API response
@@ -89,11 +92,13 @@ func LoadConfig() (*Config, error) {
 		DBPassword:           getEnv("DB_PASSWORD", ""),
 		DBName:               getEnv("DB_NAME", "sdit_management"),
 		DBPort:               getEnv("DB_PORT", "5432"),
+		DBSSLMode:            getEnv("DB_SSLMODE", "disable"),
 		JWTSecret:            getEnv("JWT_SECRET", ""),
 		MidtransServerKey:    getEnv("MIDTRANS_SERVER_KEY", ""),
 		MidtransClientKey:    getEnv("MIDTRANS_CLIENT_KEY", ""),
 		MidtransIsProduction: getEnv("MIDTRANS_IS_PRODUCTION", "false") == "true",
 		FonnteToken:          getEnv("FONNTE_TOKEN", ""),
+		DefaultPassword:      getEnv("DEFAULT_PASSWORD", "password123"),
 
 		// Feature Flags — core features default true, premium features default false
 		FeatureBilling:            getEnvBool("FEATURE_BILLING", true),
@@ -119,7 +124,8 @@ func LoadConfig() (*Config, error) {
 		SchoolAddress: getEnv("SCHOOL_ADDRESS", ""),
 
 		// Backup
-		BackupDir: getEnv("BACKUP_DIR", "./backups"),
+		BackupDir:         getEnv("BACKUP_DIR", "./backups"),
+		DBDockerContainer: getEnv("DB_DOCKER_CONTAINER", ""),
 	}, nil
 }
 

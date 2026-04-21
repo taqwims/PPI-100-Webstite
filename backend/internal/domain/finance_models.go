@@ -4,121 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-)
-
-// Core Tables
-
-type User struct {
-	ID                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name              string    `gorm:"not null" json:"name"`
-	Email             string    `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash      string    `gorm:"not null" json:"-"`
-	PhotoURL          string    `json:"photo_url"`
-	RoleID            uint      `gorm:"not null" json:"role_id"`
-	UnitID            uint      `gorm:"not null" json:"unit_id"`
-	BankName          string    `json:"bank_name"`
-	BankAccountNumber string    `json:"bank_account_number"`
-	BankAccountHolder string    `json:"bank_account_holder"`
-	Teacher           *Teacher  `gorm:"foreignKey:UserID" json:"teacher,omitempty"`
-	Parent            *Parent   `gorm:"foreignKey:UserID" json:"parent,omitempty"`
-	Student           *Student  `gorm:"foreignKey:UserID" json:"student,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
-}
-
-type Role struct {
-	ID   uint   `gorm:"primaryKey"`
-	Name string `gorm:"unique;not null"` // Super Admin, Admin MTS, Admin MA, Guru, Wali Kelas, Siswa, Orang Tua
-}
-
-type Unit struct {
-	ID           uint        `gorm:"primaryKey" json:"id"`
-	Name         string      `gorm:"unique;not null" json:"name"` // MTS, MA, PUBLIC
-	FoundationID *uint       `json:"foundation_id"`
-	Foundation   *Foundation `gorm:"foreignKey:FoundationID" json:"foundation,omitempty"`
-	Code         string      `json:"code"`                     // Short code: "mts", "ma"
-	IsActive     bool        `gorm:"default:true" json:"is_active"`
-}
-
-// Akademik
-
-type Student struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	User      User      `gorm:"foreignKey:UserID" json:"user"`
-	NISN      string    `gorm:"unique;not null" json:"nisn"`
-	ClassID   uint      `gorm:"not null" json:"class_id"`
-	Class     Class     `gorm:"foreignKey:ClassID" json:"class"`
-	ParentID  *uuid.UUID `gorm:"type:uuid" json:"parent_id"`
-	UnitID    uint      `gorm:"not null" json:"unit_id"`
-	Status    string    `gorm:"not null;default:'Active'" json:"status"` // Active, Graduated, Transferred
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Parent struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	Phone     string    `json:"phone"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Teacher struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	User      User      `gorm:"foreignKey:UserID" json:"user"`
-	NIP       string    `gorm:"unique" json:"nip"`
-	UnitID    uint      `gorm:"not null" json:"unit_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Class struct {
-	ID                uint       `gorm:"primaryKey" json:"id"`
-	Name              string     `gorm:"not null" json:"name"`
-	UnitID            uint       `gorm:"not null" json:"unit_id"`
-	HomeroomTeacherID *uuid.UUID `gorm:"type:uuid" json:"homeroom_teacher_id"`
-	HomeroomTeacher   *Teacher   `gorm:"foreignKey:HomeroomTeacherID" json:"homeroom_teacher,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
-}
-
-type Subject struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"not null" json:"name"`
-	UnitID    uint      `gorm:"not null" json:"unit_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Schedule struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	ClassID   uint      `gorm:"not null" json:"class_id"`
-	Class     Class     `gorm:"foreignKey:ClassID" json:"class"`
-	SubjectID uint      `gorm:"not null" json:"subject_id"`
-	Subject   Subject   `gorm:"foreignKey:SubjectID" json:"subject"`
-	TeacherID uuid.UUID `gorm:"type:uuid;not null" json:"teacher_id"`
-	Teacher   Teacher   `gorm:"foreignKey:TeacherID" json:"teacher"`
-	Day       string    `gorm:"not null" json:"day"` // Monday, Tuesday, etc.
-	StartTime string    `gorm:"not null" json:"start_time"` // HH:MM
-	EndTime   string    `gorm:"not null" json:"end_time"` // HH:MM
-}
-
-// Presensi
-
-type Attendance struct {
-	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	StudentID  uuid.UUID `gorm:"type:uuid;not null" json:"student_id"`
-	Student    Student   `gorm:"foreignKey:StudentID" json:"student"`
-	ScheduleID uint      `gorm:"not null" json:"schedule_id"`
-	Schedule   Schedule  `gorm:"foreignKey:ScheduleID" json:"schedule"`
-	Timestamp  time.Time `gorm:"not null" json:"timestamp"`
-	Method     string    `gorm:"not null" json:"method"` // Manual, QR
-	Status     string    `gorm:"not null" json:"status"` // Present, Absent, Late, Permission, Sick
-}
+	)
 
 type Bill struct {
 	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
@@ -222,177 +108,6 @@ type PayrollTemplate struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
-// BK
-
-type Violation struct {
-	ID          uint   `gorm:"primaryKey" json:"id"`
-	Name        string `gorm:"not null" json:"name"`
-	Points      int    `gorm:"not null" json:"points"`
-	Description string `json:"description"`
-}
-
-type BKCall struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	StudentID uuid.UUID `gorm:"type:uuid;not null" json:"student_id"`
-	Student   Student   `gorm:"foreignKey:StudentID" json:"student"`
-	TeacherID uuid.UUID `gorm:"type:uuid;not null" json:"teacher_id"`
-	Teacher   Teacher   `gorm:"foreignKey:TeacherID" json:"teacher"`
-	Reason    string    `gorm:"not null" json:"reason"`
-	Date      time.Time `gorm:"not null" json:"date"`
-	Status    string    `gorm:"not null" json:"status"` // Pending, Resolved
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// E-learning
-
-type Material struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Title       string    `gorm:"not null" json:"title"`
-	Description string    `json:"description"`
-	FileURL     string    `json:"file_url"`
-	ClassID     uint      `gorm:"not null" json:"class_id"`
-	SubjectID   uint      `gorm:"not null" json:"subject_id"`
-	Subject     Subject   `gorm:"foreignKey:SubjectID" json:"subject"`
-	TeacherID   uuid.UUID `gorm:"type:uuid;not null" json:"teacher_id"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-type Task struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Title       string    `gorm:"not null" json:"title"`
-	Description string    `json:"description"`
-	Deadline    time.Time `json:"deadline"`
-	ClassID     uint      `gorm:"not null" json:"class_id"`
-	SubjectID   uint      `gorm:"not null" json:"subject_id"`
-	Subject     Subject   `gorm:"foreignKey:SubjectID" json:"subject"`
-	TeacherID   uuid.UUID `gorm:"type:uuid;not null" json:"teacher_id"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-type TaskSubmission struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TaskID    uint      `gorm:"not null" json:"task_id"`
-	Task      Task      `gorm:"foreignKey:TaskID" json:"task"`
-	StudentID uuid.UUID `gorm:"type:uuid;not null" json:"student_id"`
-	FileURL   string    `json:"file_url"`
-	Grade     float64   `json:"grade"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-
-
-// Notifikasi
-
-type Notification struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID      uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	User        User      `gorm:"foreignKey:UserID" json:"user"`
-	Title       string    `gorm:"not null" json:"title"`
-	Message     string    `gorm:"not null" json:"message"`
-	Type        string    `gorm:"not null" json:"type"` // Bill, BK, Task, etc.
-	ReferenceID string    `json:"reference_id"`
-	IsRead      bool      `gorm:"default:false" json:"is_read"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-type NotificationToken struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	Token     string    `gorm:"not null" json:"token"`
-	Device    string    `json:"device"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// Website Publik
-
-type PublicTeacher struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"not null" json:"name"`
-	Position  string    `json:"position"`
-	PhotoURL  string    `json:"photo_url"`
-	Bio       string    `json:"bio"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type Download struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Title     string    `gorm:"not null" json:"title"`
-	Category  string    `json:"category"` // Brosur, Kalender
-	FileURL   string    `gorm:"not null" json:"file_url"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type Alumni struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	Name           string    `gorm:"not null" json:"name"`
-	GraduationYear int       `json:"graduation_year"`
-	Profession     string    `json:"profession"`
-	Testimony      string    `json:"testimony"`
-	PhotoURL       string    `json:"photo_url"`
-	CreatedAt      time.Time `json:"created_at"`
-}
-
-type PPDBRegistration struct {
-	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name         string    `gorm:"not null" json:"name"`
-	NISN         string    `json:"nisn"`
-	OriginSchool string    `json:"origin_school"`
-	ParentName   string    `json:"parent_name"`
-	Phone        string    `json:"phone"`
-	Status       string    `json:"status"` // Pending, Accepted, Rejected
-	UnitID       uint      `gorm:"not null" json:"unit_id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type PPDBPayment struct {
-	ID                 uuid.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	PPDBRegistrationID uuid.UUID          `gorm:"type:uuid;not null" json:"ppdb_registration_id"`
-	PPDBRegistration   PPDBRegistration   `gorm:"foreignKey:PPDBRegistrationID" json:"ppdb_registration"`
-	InvoiceNumber      string             `gorm:"unique;not null" json:"invoice_number"`
-	TotalAmount        float64            `gorm:"not null;default:0" json:"total_amount"`
-	PaidAmount         float64            `gorm:"not null;default:0" json:"paid_amount"`
-	Status             string             `gorm:"not null;default:'Belum Bayar'" json:"status"` // Belum Bayar, DP Terpenuhi, Lunas
-	Items              []PPDBPaymentItem  `gorm:"foreignKey:PPDBPaymentID" json:"items,omitempty"`
-	CreatedAt          time.Time          `json:"created_at"`
-	UpdatedAt          time.Time          `json:"updated_at"`
-}
-
-type PPDBPaymentItem struct {
-	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	PPDBPaymentID  uuid.UUID `gorm:"type:uuid;not null" json:"ppdb_payment_id"`
-	ItemName       string    `gorm:"not null" json:"item_name"`        // "Uang Bangunan", "Uang Tes Kemampuan"
-	ExpectedAmount float64   `gorm:"not null" json:"expected_amount"`  // Nominal yang seharusnya dibayar
-	PaidAmount     float64   `gorm:"not null;default:0" json:"paid_amount"` // Nominal yang sudah dibayar
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type ContactMessage struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name      string    `gorm:"not null" json:"name"`
-	Email     string    `gorm:"not null" json:"email"`
-	Subject   string    `gorm:"not null" json:"subject"`
-	Message   string    `gorm:"not null" json:"message"`
-	IsRead    bool      `gorm:"default:false" json:"is_read"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// ------------------- New Financial & Admin Models -------------------
-
-type AcademicYear struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"unique;not null" json:"name"` // e.g. "2023/2024"
-	IsActive  bool      `gorm:"default:false" json:"is_active"`
-	StartDate time.Time `json:"start_date"`
-	EndDate   time.Time `json:"end_date"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-
-
 type SavingAccount struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	StudentID uuid.UUID `gorm:"type:uuid;unique;not null" json:"student_id"`
@@ -460,7 +175,6 @@ type DailyInfaq struct {
 }
 
 // ------------------- Jenis Infaq -------------------
-
 type InfaqType struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"unique;not null" json:"name"` // "Infaq Jumat", "Infaq Ramadhan", etc.
@@ -471,7 +185,6 @@ type InfaqType struct {
 }
 
 // ------------------- Savings Operational (Pool-level) -------------------
-
 type SavingsOperationalWithdrawal struct {
 	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Amount         float64   `gorm:"not null" json:"amount"`
@@ -498,19 +211,7 @@ type SavingsOperationalReturn struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// ------------------- WhatsApp Template -------------------
-
-type WATemplate struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
-	Name         string    `gorm:"not null" json:"name"`                  // "Template Tagihan", "Template Reminder"
-	BodyTemplate string    `gorm:"type:text;not null" json:"body_template"` // Template with {nama_siswa}, {total_tagihan}, {rincian}
-	IsDefault    bool      `gorm:"default:false" json:"is_default"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
 // ------------------- Transaction Code & Categorization -------------------
-
 type TransactionCode struct {
 	ID            uint              `gorm:"primaryKey" json:"id"`
 	Code          string            `gorm:"unique;not null" json:"code"`        // A1, B1, C1, etc.
@@ -527,7 +228,6 @@ type TransactionCode struct {
 }
 
 // ------------------- Bill Item (Itemized Billing) -------------------
-
 type BillItem struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	BillID    uuid.UUID `gorm:"type:uuid;not null" json:"bill_id"`
@@ -537,7 +237,6 @@ type BillItem struct {
 }
 
 // ------------------- RAB / RKAS (Budget) -------------------
-
 type BudgetCategory struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"not null" json:"name"`
@@ -575,7 +274,6 @@ type Budget struct {
 }
 
 // ------------------- Jenis Pembayaran -------------------
-
 type PaymentType struct {
 	ID                uint             `gorm:"primaryKey" json:"id"`
 	Code              string           `gorm:"unique;not null" json:"code"`             // SPP-01
@@ -594,7 +292,6 @@ type PaymentType struct {
 }
 
 // ------------------- Tanggungan Siswa -------------------
-
 type StudentObligation struct {
 	ID                uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	StudentID         uuid.UUID      `gorm:"type:uuid;not null" json:"student_id"`
@@ -616,7 +313,6 @@ type StudentObligation struct {
 }
 
 // ------------------- External Debt (Catatan Hutang) -------------------
-
 type ExternalDebt struct {
 	ID               uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	CreditorName     string    `gorm:"not null" json:"creditor_name"`     // Nama pihak ketiga / vendor
@@ -644,33 +340,7 @@ type ExternalDebtPayment struct {
 	CreatedAt      time.Time    `json:"created_at"`
 }
 
-// ------------------- Bulk User Import -------------------
-
-type BulkUserImportRow struct {
-	Name     string `csv:"name"`
-	Email    string `csv:"email"`
-	Password string `csv:"password"`
-	RoleID   uint   `csv:"role_id"`
-	UnitID   uint   `csv:"unit_id"`
-	NISN     string `csv:"nisn"`
-	ClassID  *uint  `csv:"class_id"`
-}
-
-type BulkImportResult struct {
-	TotalRows int                  `json:"total_rows"`
-	Success   int                  `json:"success"`
-	Failed    int                  `json:"failed"`
-	Errors    []BulkImportRowError `json:"errors"`
-}
-
-type BulkImportRowError struct {
-	Row    int    `json:"row"`
-	Email  string `json:"email"`
-	Reason string `json:"reason"`
-}
-
 // ------------------- Multi-Bill Payment -------------------
-
 // MultiBillPaymentRequest is used as request body only, not persisted to DB
 type MultiBillPaymentRequest struct {
 	BillIDs       []string `json:"bill_ids" binding:"required,min=2"`
@@ -685,7 +355,6 @@ type MultiPaymentResult struct {
 }
 
 // ------------------- Savings Recap -------------------
-
 type SavingsRecapParams struct {
 	PeriodType string    // monthly, range, semester, yearly
 	StartDate  time.Time
@@ -712,100 +381,3 @@ type SavingsRecapResponse struct {
 	GrandBalance  float64           `json:"grand_balance"`
 }
 
-// ------------------- Asset Management -------------------
-
-type Asset struct {
-	ID               uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name             string     `gorm:"not null" json:"name"`
-	Category         string     `gorm:"not null" json:"category"`          // Elektronik, Furnitur, Kendaraan, Bangunan, Perlengkapan
-	Condition        string     `gorm:"not null" json:"condition"`         // Baik, Rusak Ringan, Rusak Berat
-	Location         string     `gorm:"not null" json:"location"`
-	AcquisitionValue float64    `gorm:"not null" json:"acquisition_value"`
-	AcquisitionDate  time.Time  `gorm:"not null" json:"acquisition_date"`
-	Status           string     `gorm:"not null;default:'Aktif'" json:"status"` // Aktif, Dalam Perbaikan, Dihapuskan
-	DeletedAt        *time.Time `json:"deleted_at"`                        // Diisi otomatis saat status = Dihapuskan
-	Notes            string     `json:"notes"`
-	CreatedByID      uuid.UUID  `gorm:"type:uuid;not null" json:"created_by_id"`
-	CreatedBy        User       `gorm:"foreignKey:CreatedByID" json:"created_by"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-}
-
-type AssetRecap struct {
-	ByCategory  []AssetCategoryCount `json:"by_category"`
-	ByStatus    []AssetStatusCount   `json:"by_status"`
-	TotalValue  float64              `json:"total_value"`
-	TotalAssets int                  `json:"total_assets"`
-}
-
-type AssetCategoryCount struct {
-	Category string  `json:"category"`
-	Count    int     `json:"count"`
-	Value    float64 `json:"value"`
-}
-
-type AssetStatusCount struct {
-	Status string `json:"status"`
-	Count  int    `json:"count"`
-}
-
-type AssetCategory struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"uniqueIndex;not null" json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// ------------------- School Bank Account -------------------
-
-type SchoolBankAccount struct {
-	ID            uint      `gorm:"primaryKey" json:"id"`
-	BankName      string    `gorm:"not null" json:"bank_name"`       // BSI, BCA, Mandiri
-	AccountNumber string    `gorm:"not null" json:"account_number"`  // 7123456789
-	AccountHolder string    `gorm:"not null" json:"account_holder"`  // Yayasan PPI 100
-	IsPrimary     bool      `gorm:"default:false" json:"is_primary"` // Rekening utama
-	IsActive      bool      `gorm:"default:true" json:"is_active"`   // Tampil/Tidak
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-}
-
-// ------------------- Foundation (Yayasan) -------------------
-
-type Foundation struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"not null" json:"name"` // "Yayasan PPI 100"
-	Address   string    `json:"address"`
-	Phone     string    `json:"phone"`
-	Email     string    `json:"email"`
-	LogoURL   string    `json:"logo_url"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// ------------------- School Settings -------------------
-
-type SchoolSetting struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Key         string    `gorm:"uniqueIndex;not null" json:"key"` // "school_name", "school_address", etc.
-	Value       string    `gorm:"type:text" json:"value"`
-	Description string    `json:"description"`
-	IsAdminEdit bool      `gorm:"default:true" json:"is_admin_edit"` // true = admin can edit
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// ------------------- Database Backup (Timeline) -------------------
-
-type DatabaseBackup struct {
-	ID            uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Filename      string     `gorm:"not null" json:"filename"`
-	FileSizeBytes int64      `json:"file_size_bytes"`
-	Label         string     `json:"label"`       // User label: "Sebelum Migrasi"
-	Notes         string     `json:"notes"`       // Extra notes
-	Status        string     `gorm:"default:'Success'" json:"status"` // Success, Failed, Restoring
-	CreatedByID   uuid.UUID  `gorm:"type:uuid;not null" json:"created_by_id"`
-	CreatedBy     User       `gorm:"foreignKey:CreatedByID" json:"created_by"`
-	RestoredAt    *time.Time `json:"restored_at"`
-	CreatedAt     time.Time  `json:"created_at"`
-}

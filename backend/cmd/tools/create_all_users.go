@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
@@ -37,7 +40,7 @@ func main() {
 	fmt.Println("------------------------------------------------")
 
 	// 2. Create User for each Role if not exists
-	password := "password123"
+	password := cfg.DefaultPassword
 	hashedPassword, _ := utils.HashPassword(password)
 
 	for _, role := range roles {

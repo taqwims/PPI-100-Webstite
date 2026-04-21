@@ -1,194 +1,12 @@
 package usecase
 
 import (
-	"errors"
 	"fmt"
 	"ppi-100-sis/internal/domain"
-	"ppi-100-sis/internal/repository/postgres"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-type FinanceUsecase struct {
-	financeRepo           *postgres.FinanceRepository
-	notificationUsecase   *NotificationUsecase
-	userRepo              *postgres.UserRepository
-	studentRepo           *postgres.StudentRepository
-	budgetRepo            *postgres.BudgetRepository
-	studentObligationRepo *postgres.StudentObligationRepository
-	activityRepo          *postgres.ActivityRepository
-	invoiceUsecase        InvoiceSignatureUsecase
-}
-
-func NewFinanceUsecase(
-	financeRepo *postgres.FinanceRepository,
-	notificationUsecase *NotificationUsecase,
-	userRepo *postgres.UserRepository,
-	studentRepo *postgres.StudentRepository,
-	budgetRepo *postgres.BudgetRepository,
-	studentObligationRepo *postgres.StudentObligationRepository,
-	activityRepo *postgres.ActivityRepository,
-	invoiceUsecase InvoiceSignatureUsecase,
-) *FinanceUsecase {
-	return &FinanceUsecase{
-		financeRepo:           financeRepo,
-		notificationUsecase:   notificationUsecase,
-		userRepo:              userRepo,
-		studentRepo:           studentRepo,
-		budgetRepo:            budgetRepo,
-		studentObligationRepo: studentObligationRepo,
-		activityRepo:          activityRepo,
-		invoiceUsecase:        invoiceUsecase,
-	}
-}
-
-func (u *FinanceUsecase) CreateBill(studentID uuid.UUID, title string, amount float64, dueDate time.Time, billType string, academicYearID *uint, transactionCodeID *uint, isInstallment bool, obligationID *uuid.UUID, activityObligationID *uuid.UUID) error {
-	if billType == "" {
-		billType = "SPP"
-	}
-	bill := &domain.Bill{
-		StudentID:            studentID,
-		Title:                title,
-		Amount:               amount,
-		DueDate:              dueDate,
-		Status:               "Unpaid",
-		BillType:             billType,
-		AcademicYearID:       academicYearID,
-		TransactionCodeID:    transactionCodeID,
-		IsInstallment:        isInstallment,
-		ObligationID:         obligationID,
-		ActivityObligationID: activityObligationID,
-		InvoiceNumber:        fmt.Sprintf("INV-%d-%s", time.Now().UnixMilli(), studentID.String()[:8]),
-	}
-	if err := u.financeRepo.CreateBill(bill); err != nil {
-		return err
-	}
-
-	// Send notification to student (via student's UserID)
-	student, err := u.studentRepo.GetByID(studentID.String())
-	if err == nil {
-		_ = u.notificationUsecase.SendNotification(
-			student.UserID,
-			"Tagihan Baru",
-			"Anda memiliki tagihan baru: "+title,
-			"bill",
-			bill.ID.String(),
-		)
-
-		// Also notify parent if linked
-		if student.ParentID != nil {
-			parent, err := u.getParentByID(*student.ParentID)
-			if err == nil {
-				_ = u.notificationUsecase.SendNotification(
-					parent.UserID,
-					"Tagihan Baru untuk Anak Anda",
-					"Tagihan baru untuk "+student.User.Name+": "+title,
-					"bill",
-					bill.ID.String(),
-				)
-
-				// WhatsApp Auto Notification
-				u.triggerAutoWA(student, parent, bill)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill) {
-	if parent.Phone == "" {
-		return
-	}
-
-	// Get Config for the bill type
-	cfg, err := u.financeRepo.GetInvoiceConfigByType(bill.BillType)
-	if err != nil || cfg == nil || !cfg.AutoNotifyWA {
-		return
-	}
-
-	// Get Template
-	var template *domain.WATemplate
-	if cfg.WATemplateID != nil {
-		template, _ = u.notificationUsecase.GetWATemplateByID(*cfg.WATemplateID)
-	}
-	if template == nil {
-		template, _ = u.notificationUsecase.GetDefaultWATemplate()
-	}
-
-	if template == nil {
-		return // No template found
-	}
-
-	// Format message
-	msg := u.processWATemplate(template.BodyTemplate, student, bill)
-	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
-}
-
-func (u *FinanceUsecase) processWATemplate(body string, student *domain.Student, bill *domain.Bill) string {
-	res := body
-	res = strings.ReplaceAll(res, "{nama_siswa}", student.User.Name)
-	res = strings.ReplaceAll(res, "{nis}", student.NISN)
-	res = strings.ReplaceAll(res, "{kelas}", student.Class.Name)
-	res = strings.ReplaceAll(res, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
-	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
-	res = strings.ReplaceAll(res, "{tanggal}", time.Now().Format("02 January 2006"))
-	return res
-}
-
-// helper: get parent record by parent.ID
-func (u *FinanceUsecase) getParentByID(parentID uuid.UUID) (*domain.Parent, error) {
-	return u.studentRepo.GetParentByID(parentID.String())
-}
-
-func (u *FinanceUsecase) GetAllBills(unitID uint) ([]domain.Bill, error) {
-	return u.financeRepo.GetAllBills(unitID)
-}
-
-func (u *FinanceUsecase) GetStudentBills(studentID string) ([]domain.Bill, error) {
-	return u.financeRepo.GetBillsByStudent(studentID)
-}
-
-func (u *FinanceUsecase) GetBillsByIDsOrObligationIDs(ids []string) ([]domain.Bill, error) {
-	return u.financeRepo.GetBillsByIDsOrObligationIDs(ids)
-}
-
-func (u *FinanceUsecase) GetStudentBillsByUserID(userID string) ([]domain.Bill, error) {
-	user, err := u.userRepo.FindByID(userID)
-	if err != nil {
-		return nil, err
-	}
-	if user.Student != nil {
-		return u.GetStudentBills(user.Student.ID.String())
-	}
-	return nil, errors.New("user is not a student")
-}
-
-func (u *FinanceUsecase) GetParentBills(userID string) ([]domain.Bill, error) {
-	user, err := u.userRepo.FindByID(userID)
-	if err != nil {
-		return nil, err
-	}
-	if user.Parent == nil {
-		return nil, errors.New("user is not a parent")
-	}
-
-	// Get all children for this parent
-	children, err := u.studentRepo.GetByParent(user.Parent.ID.String())
-	if err != nil {
-		return nil, err
-	}
-
-	// Collect all student IDs
-	var studentIDs []uuid.UUID
-	for _, child := range children {
-		studentIDs = append(studentIDs, child.ID)
-	}
-
-	return u.financeRepo.GetBillsByStudentIDs(studentIDs)
-}
 
 func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method string, proofURL string) error {
 	status := "Success"
@@ -232,8 +50,6 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 	}
 
 	// Sync to CashLedger
-	// Only add to CashLedger if it's a new successful payment. 
-	// To avoid duplicates we sync the current `amount` being paid, not `totalPaid`.
 	// Skip for Kegiatan, they have their own ledger.
 	if bill.BillType != "Kegiatan" {
 		category := "Lain-lain"
@@ -301,89 +117,6 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 	return nil
 }
 
-// syncObligationStatus syncs payment status from a Bill back to the linked obligation
-func (u *FinanceUsecase) syncObligationStatus(bill *domain.Bill, totalPaid float64, currentPaymentAmount float64) {
-	if bill.ObligationID != nil && u.studentObligationRepo != nil {
-		ob, err := u.studentObligationRepo.GetByID(*bill.ObligationID)
-		if err == nil {
-			ob.PaidAmount = totalPaid
-			if totalPaid >= ob.Amount {
-				ob.Status = "Paid"
-			} else if totalPaid > 0 {
-				ob.Status = "Partial"
-			}
-			_ = u.studentObligationRepo.Update(ob)
-		}
-	}
-
-	if bill.ActivityObligationID != nil && u.activityRepo != nil {
-		ob, err := u.activityRepo.GetObligationByID(*bill.ActivityObligationID)
-		if err == nil {
-			ob.PaidAmount = totalPaid
-			if totalPaid >= ob.Amount {
-				ob.Status = "Paid"
-			} else if totalPaid > 0 {
-				ob.Status = "Partial"
-			}
-			_ = u.activityRepo.UpdateObligation(ob)
-
-			// Record Income Transaction for Activity
-			if currentPaymentAmount > 0 {
-				tx := &domain.ActivityTransaction{
-					ActivityID:      ob.ActivityID,
-					TransactionType: "Income",
-					Amount:          currentPaymentAmount,
-					Date:            time.Now(),
-					Description:     "Pembayaran Kegiatan dari: " + bill.Student.User.Name,
-					CreatedByID:     ob.CreatedByID,
-				}
-				_ = u.activityRepo.CreateTransaction(tx)
-			}
-		}
-	}
-}
-// Update/Delete Bill
-func (u *FinanceUsecase) UpdateBill(bill *domain.Bill) error {
-	return u.financeRepo.UpdateBill(bill)
-}
-
-func (u *FinanceUsecase) GetBillByID(id string) (*domain.Bill, error) {
-	return u.financeRepo.GetBillByID(id)
-}
-
-func (u *FinanceUsecase) DeleteBill(id string) error {
-	return u.financeRepo.DeleteBill(id)
-}
-
-// Update/Delete Payment
-func (u *FinanceUsecase) UpdatePayment(payment *domain.Payment) error {
-	return u.financeRepo.UpdatePayment(payment)
-}
-
-func (u *FinanceUsecase) DeletePayment(id string) error {
-	return u.financeRepo.DeletePayment(id)
-}
-
-// NotifyBendahara sends a notification to all users with role_id 9 (Bendahara)
-func (u *FinanceUsecase) NotifyBendahara(title string, message string, referenceID string) {
-	// Get all bendahara users (role_id=9)
-	users, err := u.userRepo.GetUsersByRole(9)
-	if err != nil {
-		return
-	}
-	for _, bendahara := range users {
-		_ = u.notificationUsecase.SendNotification(
-			bendahara.ID,
-			title,
-			message,
-			"payment",
-			referenceID,
-		)
-	}
-}
-
-// ProcessMultiPayment processes payment for multiple bills in a single atomic transaction.
-// Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.9
 func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest) (*domain.MultiPaymentResult, error) {
 	// Fetch all bills (can be by Bill ID or Obligation ID)
 	bills, err := u.financeRepo.GetBillsByIDsOrObligationIDs(req.BillIDs)
@@ -424,8 +157,6 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 		invoiceNumber = fmt.Sprintf("MULTI-%s-%d", time.Now().Format("200601"), time.Now().UnixMilli()%10000)
 	}
 
-	// Distribute amount across bills proportionally (or per-bill full amount)
-	// Each bill gets paid up to its remaining amount; leftover goes to next bill
 	remaining := req.Amount
 	payments := make([]domain.Payment, 0, len(bills))
 	billStatusUpdates := make(map[string]string)
@@ -435,7 +166,6 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 			break
 		}
 
-		// Calculate already paid for this bill
 		alreadyPaid := float64(0)
 		for _, p := range bill.Payments {
 			if p.Status == "Success" {
@@ -469,8 +199,6 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 		}
 		payments = append(payments, payment)
 
-		// Determine new bill status
-		// For Pending payments, we don't update the bill status yet until it's Success
 		if status == "Success" {
 			totalPaid := alreadyPaid + payAmount
 			if totalPaid >= bill.Amount {
@@ -525,19 +253,12 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 		}
 
 		// 3. Sync Obligation Statuses
-		// We need to calculate totalPaid for this bill to sync back to obligations
 		alreadyPaid := float64(0)
 		for _, p := range bill.Payments {
 			if p.Status == "Success" {
 				alreadyPaid += p.Amount
 			}
 		}
-		// totalPaid including the new payment (which might already be in bill.Payments if the repo refreshed it, 
-		// but typically it's not until next fetch. However, in this transaction context,
-		// we know the current payment amount.)
-		// If payment.Amount is already in bill.Payments, we don't add it again.
-		// For safety, let's use the totalPaid calculation from the first loop if possible, 
-		// or just recalculate here from the current state.
 		
 		u.syncObligationStatus(bill, alreadyPaid + payment.Amount, payment.Amount)
 	}
@@ -571,18 +292,6 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 	}, nil
 }
 
-// Bill Templates
-func (u *FinanceUsecase) CreateBillTemplate(template *domain.BillTemplate) error {
-	return u.financeRepo.CreateBillTemplate(template)
-}
-
-func (u *FinanceUsecase) GetBillTemplates(unitID uint) ([]domain.BillTemplate, error) {
-	return u.financeRepo.GetBillTemplates(unitID)
-}
-
-func (u *FinanceUsecase) DeleteBillTemplate(id string) error {
-	return u.financeRepo.DeleteBillTemplate(id)
-}
 func (u *FinanceUsecase) GetPendingPayments() ([]domain.Payment, error) {
 	return u.financeRepo.GetPendingPayments()
 }
@@ -673,4 +382,12 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 	u.syncObligationStatus(bill, totalPaid, payment.Amount)
 
 	return nil
+}
+
+func (u *FinanceUsecase) UpdatePayment(payment *domain.Payment) error {
+	return u.financeRepo.UpdatePayment(payment)
+}
+
+func (u *FinanceUsecase) DeletePayment(id string) error {
+	return u.financeRepo.DeletePayment(id)
 }

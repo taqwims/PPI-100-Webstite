@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
-import toast from 'react-hot-toast';
+
 import SavingsRecap from './SavingsRecap';
 
 import { SavingsAccountTab } from '../../components/finance/Savings/SavingsAccountTab';
@@ -264,7 +264,7 @@ const Savings = () => {
                 )}
                 {activeTab === 'recap' && (
                     <div className="bg-white/40 backdrop-blur-xl rounded-[2.5rem] border border-white/60 shadow-xl shadow-slate-200/50 p-6 overflow-hidden">
-                        <SavingsRecap classList={classList} unitID={unitID} />
+                        <SavingsRecap classList={classList}  />
                     </div>
                 )}
             </div>

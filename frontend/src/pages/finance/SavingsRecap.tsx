@@ -31,10 +31,9 @@ const currentYear = new Date().getFullYear();
 
 interface SavingsRecapProps {
     classList: ClassData[];
-    unitID: number;
 }
 
-const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList, unitID }) => {
+const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
     const [periodType, setPeriodType] = useState<'monthly' | 'range' | 'semester' | 'yearly'>('monthly');
     const [year, setYear] = useState<number>(currentYear);
     const [semester, setSemester] = useState<1 | 2>(1);

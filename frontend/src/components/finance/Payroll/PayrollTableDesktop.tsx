@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Pencil, Trash2, CheckCircle, Printer } from 'lucide-react';
 import { PayrollRecord } from './types';
 

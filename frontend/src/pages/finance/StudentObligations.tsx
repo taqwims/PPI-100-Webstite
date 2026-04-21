@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Search, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 import { ObligationsTable } from '../../components/finance/StudentObligations/ObligationsTable';
 import { BulkAssignModal } from '../../components/finance/StudentObligations/BulkAssignModal';

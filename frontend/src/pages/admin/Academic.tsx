@@ -8,6 +8,16 @@ import { TableGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
+
+const DAYS = [
+    { value: 'Monday', label: 'Senin' },
+    { value: 'Tuesday', label: 'Selasa' },
+    { value: 'Wednesday', label: 'Rabu' },
+    { value: 'Thursday', label: 'Kamis' },
+    { value: 'Friday', label: 'Jumat' },
+    { value: 'Saturday', label: 'Sabtu' },
+];
 
 const Academic = () => {
     const { user } = useAuth();
@@ -20,6 +30,16 @@ const Academic = () => {
     // Form States
     const [formData, setFormData] = useState<any>({});
     const [editingId, setEditingId] = useState<number | null>(null);
+
+    // --- Fetch Units dynamically ---
+    const { data: units } = useQuery({
+        queryKey: ['school_units'],
+        queryFn: async () => {
+            const res = await api.get('/admin/units');
+            return res.data || [];
+        },
+        enabled: user?.role_id === 1,
+    });
 
     // --- Data Fetching with React Query ---
 
@@ -50,7 +70,6 @@ const Academic = () => {
     const { data: teachers } = useQuery({
         queryKey: ['teachers_list', unitID],
         queryFn: async () => {
-            // Pass unit_id to get teachers for the specific unit
             const res = await api.get(`/teachers?unit_id=${unitID}`);
             return res.data || [];
         },
@@ -64,10 +83,10 @@ const Academic = () => {
             queryClient.invalidateQueries({ queryKey: ['academic_subjects'] });
             queryClient.invalidateQueries({ queryKey: ['academic_schedules'] });
             handleCloseModal();
+            toast.success('Data berhasil disimpan');
         },
         onError: (error: any) => {
-            console.error('Error saving data:', error);
-            alert('Failed to save data');
+            toast.error(error.response?.data?.error || 'Gagal menyimpan data');
         }
     };
 
@@ -83,7 +102,13 @@ const Academic = () => {
 
     const deleteClassMutation = useMutation({
         mutationFn: (id: number) => api.delete(`/academic/classes/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['academic_classes'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['academic_classes'] });
+            toast.success('Kelas berhasil dihapus');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Gagal menghapus kelas');
+        }
     });
 
     const createSubjectMutation = useMutation({
@@ -98,18 +123,19 @@ const Academic = () => {
 
     const deleteSubjectMutation = useMutation({
         mutationFn: (id: number) => api.delete(`/academic/subjects/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['academic_subjects'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['academic_subjects'] });
+            toast.success('Mata pelajaran berhasil dihapus');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Gagal menghapus mata pelajaran');
+        }
     });
 
     const createScheduleMutation = useMutation({
         mutationFn: (data: any) => api.post('/academic/schedules', data),
         ...mutationOptions
     });
-
-    // Note: Update schedule might not be implemented in backend based on previous file view, 
-    // but we'll keep the structure ready or use create for now if update is missing.
-    // Checking the handler file again, there is NO UpdateSchedule handler. 
-    // So we will only support Create and Delete for Schedules for now, or handle it gracefully.
 
     const updateScheduleMutation = useMutation({
         mutationFn: (data: any) => api.put(`/academic/schedules/${editingId}`, data),
@@ -118,7 +144,13 @@ const Academic = () => {
 
     const deleteScheduleMutation = useMutation({
         mutationFn: (id: number) => api.delete(`/academic/schedules/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['academic_schedules'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['academic_schedules'] });
+            toast.success('Jadwal berhasil dihapus');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Gagal menghapus jadwal');
+        }
     });
 
     // --- Handlers ---
@@ -126,7 +158,6 @@ const Academic = () => {
     const handleOpenModal = (item?: any) => {
         if (item) {
             setEditingId(item.id);
-            // For schedules, we need to ensure we map nested objects to IDs for the form
             if (activeTab === 'schedules') {
                 setFormData({
                     ...item,
@@ -161,11 +192,14 @@ const Academic = () => {
         const payload = { ...formData, unit_id: unitID };
         if (payload.unit_id) payload.unit_id = Number(payload.unit_id);
 
-        // Convert IDs to numbers for classes and subjects if they are strings
         if (payload.class_id) payload.class_id = Number(payload.class_id);
         if (payload.subject_id) payload.subject_id = Number(payload.subject_id);
 
         if (activeTab === 'classes') {
+            // Include homeroom_teacher_id if set
+            if (payload.homeroom_teacher_id === '') {
+                payload.homeroom_teacher_id = null;
+            }
             if (editingId) updateClassMutation.mutate(payload);
             else createClassMutation.mutate(payload);
         } else if (activeTab === 'subjects') {
@@ -183,6 +217,27 @@ const Academic = () => {
         if (activeTab === 'classes') deleteClassMutation.mutate(id);
         else if (activeTab === 'subjects') deleteSubjectMutation.mutate(id);
         else if (activeTab === 'schedules') deleteScheduleMutation.mutate(id);
+    };
+
+    // --- Search Filtering ---
+    const filterData = (data: any[]) => {
+        if (!searchTerm || !data) return data;
+        const term = searchTerm.toLowerCase();
+        return data.filter((item: any) => {
+            if (activeTab === 'classes') {
+                return item.name?.toLowerCase().includes(term);
+            } else if (activeTab === 'subjects') {
+                return item.name?.toLowerCase().includes(term);
+            } else if (activeTab === 'schedules') {
+                return (
+                    item.class?.name?.toLowerCase().includes(term) ||
+                    item.subject?.name?.toLowerCase().includes(term) ||
+                    item.teacher?.user?.name?.toLowerCase().includes(term) ||
+                    item.day?.toLowerCase().includes(term)
+                );
+            }
+            return true;
+        });
     };
 
     // --- Renderers ---
@@ -211,6 +266,11 @@ const Academic = () => {
         </div>
     );
 
+    const getDayLabel = (day: string) => {
+        const found = DAYS.find(d => d.value === day);
+        return found ? found.label : day;
+    };
+
     const renderContent = () => {
         const isLoading = isLoadingClasses || isLoadingSubjects || isLoadingSchedules;
 
@@ -222,11 +282,11 @@ const Academic = () => {
             case 'classes':
                 return (
                     <TableGlass
-                        headers={['ID', 'Nama Kelas', 'Unit ID', 'Aksi']}
-                        data={classes?.map((cls: any) => ({
+                        headers={['ID', 'Nama Kelas', 'Wali Kelas', 'Aksi']}
+                        data={filterData(classes)?.map((cls: any) => ({
                             id: cls.id,
                             name: cls.name,
-                            unit: cls.unit_id,
+                            homeroom: cls.homeroom_teacher?.user?.name || <span className="text-slate-400 italic text-xs">Belum ditentukan</span>,
                             actions: (
                                 <div className="flex space-x-2">
                                     <button onClick={() => handleOpenModal(cls)} className="text-blue-600 hover:text-blue-500"><Edit size={16} /></button>
@@ -239,11 +299,10 @@ const Academic = () => {
             case 'subjects':
                 return (
                     <TableGlass
-                        headers={['ID', 'Nama Mapel', 'Unit ID', 'Aksi']}
-                        data={subjects?.map((subj: any) => ({
+                        headers={['ID', 'Nama Mapel', 'Aksi']}
+                        data={filterData(subjects)?.map((subj: any) => ({
                             id: subj.id,
                             name: subj.name,
-                            unit: subj.unit_id,
                             actions: (
                                 <div className="flex space-x-2">
                                     <button onClick={() => handleOpenModal(subj)} className="text-blue-600 hover:text-blue-500"><Edit size={16} /></button>
@@ -257,12 +316,12 @@ const Academic = () => {
                 return (
                     <TableGlass
                         headers={['ID', 'Kelas', 'Mapel', 'Guru', 'Hari', 'Jam', 'Aksi']}
-                        data={schedules?.map((sch: any) => ({
+                        data={filterData(schedules)?.map((sch: any) => ({
                             id: sch.id,
                             class: sch.class?.name || sch.class_id,
                             subject: sch.subject?.name || sch.subject_id,
-                            teacher: sch.teacher?.user?.name || sch.teacher?.name || sch.teacher_id, // Display teacher name
-                            day: sch.day,
+                            teacher: sch.teacher?.user?.name || sch.teacher?.name || sch.teacher_id,
+                            day: getDayLabel(sch.day),
                             time: `${sch.start_time} - ${sch.end_time}`,
                             actions: (
                                 <div className="flex space-x-2">
@@ -290,6 +349,20 @@ const Academic = () => {
                             onChange={handleInputChange}
                             placeholder="Contoh: 7A"
                         />
+                        <div className="space-y-2">
+                            <label className="text-sm text-slate-600">Wali Kelas (Opsional)</label>
+                            <select
+                                name="homeroom_teacher_id"
+                                value={formData.homeroom_teacher_id || ''}
+                                onChange={handleInputChange}
+                                className="w-full bg-white/40 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 focus:outline-none focus:border-blue-500/50"
+                            >
+                                <option value="" className="bg-white text-slate-900">Tanpa Wali Kelas</option>
+                                {teachers?.map((t: any) => (
+                                    <option key={t.id} value={t.id} className="bg-white text-slate-900">{t.user?.name || t.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 );
             case 'subjects':
@@ -352,13 +425,21 @@ const Academic = () => {
                             </select>
                         </div>
 
-                        <InputGlass
-                            label="Hari"
-                            name="day"
-                            value={formData.day || ''}
-                            onChange={handleInputChange}
-                            placeholder="Monday"
-                        />
+                        <div className="space-y-2">
+                            <label className="text-sm text-slate-600">Hari</label>
+                            <select
+                                name="day"
+                                value={formData.day || ''}
+                                onChange={handleInputChange}
+                                className="w-full bg-white/40 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 focus:outline-none focus:border-blue-500/50"
+                            >
+                                <option value="" className="bg-white text-slate-900">Pilih Hari</option>
+                                {DAYS.map((d) => (
+                                    <option key={d.value} value={d.value} className="bg-white text-slate-900">{d.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <InputGlass
                                 label="Jam Mulai"
@@ -390,18 +471,27 @@ const Academic = () => {
                     <p className="text-slate-600">Manajemen data akademik sekolah</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {/* Unit Switcher */}
-                    {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3) && (
+                    {/* Unit Switcher — Dynamic */}
+                    {user?.role_id === 1 && units && units.length > 0 ? (
                         <select
                             value={unitID}
                             onChange={(e) => setUnitID(Number(e.target.value))}
                             className="bg-white/40 border border-slate-200 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            disabled={user?.role_id !== 1}
+                        >
+                            {units.map((unit: any) => (
+                                <option key={unit.id} value={unit.id} className="bg-white">{unit.name}</option>
+                            ))}
+                        </select>
+                    ) : (user?.role_id === 1) ? (
+                        <select
+                            value={unitID}
+                            onChange={(e) => setUnitID(Number(e.target.value))}
+                            className="bg-white/40 border border-slate-200 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                             <option value={1} className="bg-white">MTS</option>
                             <option value={2} className="bg-white">MA</option>
                         </select>
-                    )}
+                    ) : null}
                     <ButtonGlass onClick={() => handleOpenModal()} icon={Plus}>
                         Tambah Data
                     </ButtonGlass>
