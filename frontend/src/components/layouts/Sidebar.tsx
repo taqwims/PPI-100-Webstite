@@ -47,6 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
+                { icon: GraduationCap, label: 'Kenaikan Kelas', path: '/dashboard/admin/promotions' },
                 { icon: AlertTriangle, label: 'BK', path: '/dashboard/bk', feature: 'bk' },
                 { icon: Package, label: 'Aset Sekolah', path: '/dashboard/admin/assets', feature: 'assets' },
                 { icon: Building2, label: 'Pengaturan Sekolah', path: '/dashboard/admin/school-settings' },

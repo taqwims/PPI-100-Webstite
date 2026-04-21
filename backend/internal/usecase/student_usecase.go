@@ -142,3 +142,26 @@ func (u *StudentUsecase) GetChildrenByUserID(userID string) ([]domain.Student, e
 	}
 	return u.studentRepo.GetByParent(user.Parent.ID.String())
 }
+
+func (u *StudentUsecase) PromoteStudents(studentIDs []uuid.UUID, action string, nextClassID uint) (int, error) {
+	successCount := 0
+	for _, id := range studentIDs {
+		var err error
+		if action == "graduate" {
+			// For graduation, keep current class but change status
+			student, getErr := u.studentRepo.GetByID(id.String())
+			if getErr != nil {
+				return successCount, errors.New("gagal menemukan siswa: " + id.String())
+			}
+			err = u.studentRepo.UpdateClassAndStatus(id.String(), student.ClassID, "Graduated")
+		} else if action == "promote" {
+			err = u.studentRepo.UpdateClassAndStatus(id.String(), nextClassID, "Active")
+		}
+
+		if err != nil {
+			return successCount, errors.New("gagal update siswa " + id.String() + ": " + err.Error())
+		}
+		successCount++
+	}
+	return successCount, nil
+}

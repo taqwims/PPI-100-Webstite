@@ -1,6 +1,7 @@
 import React from 'react';
 import { DollarSign, X, CheckCircle, Smartphone, CreditCard, Upload, Send } from 'lucide-react';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import { Bill, formatCurrency, getRemainingAmount, formatPaymentDate } from './BillingUtils';
 import BankAccountInfo from './BankAccountInfo';
 
@@ -153,7 +154,19 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                                             <input
                                                 type="file"
                                                 accept="image/*"
-                                                onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                                                onChange={(e) => {
+                                                    const f = e.target.files?.[0];
+                                                    if (f) {
+                                                        if (f.size > 3 * 1024 * 1024) {
+                                                            toast.error("Maksimal ukuran file 3MB");
+                                                            e.target.value = '';
+                                                            return;
+                                                        }
+                                                        setProofFile(f);
+                                                    } else {
+                                                        setProofFile(null);
+                                                    }
+                                                }}
                                                 className="hidden"
                                                 id="proof-upload"
                                             />

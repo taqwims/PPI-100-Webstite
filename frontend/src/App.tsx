@@ -6,6 +6,7 @@ import DashboardLayout from './components/layouts/DashboardLayout';
 import Academic from './pages/admin/Academic';
 import UserManagement from './pages/admin/UserManagement';
 import Students from './pages/admin/Students';
+import GradePromotion from './pages/admin/GradePromotion';
 import Settings from './pages/Settings';
 import Finance from './pages/admin/Finance';
 import Attendance from './pages/admin/Attendance';
@@ -111,6 +112,7 @@ function App() {
 
                                     {/* Consolidated Routes */}
                                     <Route path="students" element={<Students />} />
+                                    <Route path="admin/promotions" element={<GradePromotion />} />
                                     <Route path="attendance" element={<Attendance />} />
                                     <Route path="finance" element={<Finance />} />
                                     <Route path="bk" element={<BK />} />

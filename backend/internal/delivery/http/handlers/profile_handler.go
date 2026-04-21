@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"ppi-100-sis/internal/usecase"
 	"ppi-100-sis/pkg/utils"
 
@@ -190,8 +192,11 @@ func (h *ProfileHandler) UploadPhoto(c *gin.Context) {
 
 	// For now, we'll just save to a static folder
 	// In production, you'd upload to S3 or similar
+	uploadDir := "./uploads/profiles"
+	os.MkdirAll(uploadDir, os.ModePerm)
+	
 	filename := userID + "_" + file.Filename
-	savePath := "./uploads/profiles/" + filename
+	savePath := filepath.Join(uploadDir, filename)
 
 	if err := c.SaveUploadedFile(file, savePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})

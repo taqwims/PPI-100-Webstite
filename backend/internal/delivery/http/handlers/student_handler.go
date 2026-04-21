@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
@@ -13,12 +14,17 @@ import (
 )
 
 type StudentHandler struct {
-	studentUsecase *usecase.StudentUsecase
-	userRepo       *postgres.UserRepository
+	studentUsecase           *usecase.StudentUsecase
+	userRepo                 *postgres.UserRepository
+	studentObligationUsecase *usecase.StudentObligationUsecase
 }
 
 func NewStudentHandler(studentUsecase *usecase.StudentUsecase, userRepo *postgres.UserRepository) *StudentHandler {
 	return &StudentHandler{studentUsecase: studentUsecase, userRepo: userRepo}
+}
+
+func (h *StudentHandler) SetStudentObligationUsecase(u *usecase.StudentObligationUsecase) {
+	h.studentObligationUsecase = u
 }
 
 func (h *StudentHandler) GetAllStudents(c *gin.Context) {
@@ -215,4 +221,77 @@ func (h *StudentHandler) GetStudentAttendance(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, attendances)
+}
+
+type BulkPromoteRequest struct {
+	StudentIDs     []string `json:"student_ids" binding:"required"`
+	Action         string   `json:"action" binding:"required"` // "promote" or "graduate"
+	NextClassID    uint     `json:"next_class_id"`             // required if action is "promote"
+	AutoBill       bool     `json:"auto_bill"`
+	PaymentTypeID  uint     `json:"payment_type_id"`
+	AcademicYearID uint     `json:"academic_year_id"`
+	Months         []int    `json:"months"` // Optional for monthly payment
+}
+
+func (h *StudentHandler) HandleBulkPromote(c *gin.Context) {
+	var req BulkPromoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Action == "promote" && req.NextClassID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "next_class_id is required for promotion"})
+		return
+	}
+
+	// Parse student IDs
+	var studentUUIDs []uuid.UUID
+	for _, idStr := range req.StudentIDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student ID: " + idStr})
+			return
+		}
+		studentUUIDs = append(studentUUIDs, id)
+	}
+
+	// Promote/Graduate students via StudentUsecase
+	count, err := h.studentUsecase.PromoteStudents(studentUUIDs, req.Action, req.NextClassID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses siswa: " + err.Error(), "processed": count})
+		return
+	}
+
+	// Generate auto bill if requested
+	billCount := 0
+	if req.AutoBill && req.Action == "promote" {
+		if req.PaymentTypeID == 0 || req.AcademicYearID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "payment_type_id and academic_year_id are required for auto billing"})
+			return
+		}
+
+		if h.studentObligationUsecase == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Billing service unavailable"})
+			return
+		}
+
+		bc, err := h.studentObligationUsecase.AssignToStudents(studentUUIDs, req.PaymentTypeID, req.AcademicYearID, req.Months, 1)
+		if err != nil {
+			// Students already promoted, but billing failed — inform but don't rollback
+			c.JSON(http.StatusOK, gin.H{
+				"message":    "Kenaikan kelas berhasil, tetapi gagal membuat tagihan: " + err.Error(),
+				"promoted":   count,
+				"billed":     0,
+			})
+			return
+		}
+		billCount = bc
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Berhasil memproses " + fmt.Sprintf("%d", count) + " siswa",
+		"promoted": count,
+		"billed":   billCount,
+	})
 }

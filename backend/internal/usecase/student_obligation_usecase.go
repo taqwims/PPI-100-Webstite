@@ -171,6 +171,122 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 	return len(obligations), nil
 }
 
+// AssignToStudents is similar to BulkAssign but for a specific list of student IDs
+func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paymentTypeID uint, academicYearID uint, selectedMonths []int, installmentCount int) (int, error) {
+	// Get payment type to determine amount and schedule
+	pt, err := u.paymentRepo.GetByID(paymentTypeID)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(studentIDs) == 0 {
+		return 0, nil
+	}
+
+	var obligations []domain.StudentObligation
+	now := time.Now()
+
+	for _, studentID := range studentIDs {
+		switch pt.PaymentSchedule {
+		case "Bulanan":
+			months := selectedMonths
+			if len(months) == 0 {
+				months = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+			}
+			for _, month := range months {
+				dueDate := time.Date(now.Year(), time.Month(month), 10, 0, 0, 0, 0, time.Local)
+				if dueDate.Before(now) {
+					dueDate = dueDate.AddDate(1, 0, 0)
+				}
+				obligations = append(obligations, domain.StudentObligation{
+					StudentID:      studentID,
+					PaymentTypeID:  paymentTypeID,
+					AcademicYearID: academicYearID,
+					Amount:         pt.Amount,
+					PaidAmount:     0,
+					Status:         "Unpaid",
+					BillingMonth:   month,
+					DueDate:        &dueDate,
+				})
+			}
+
+		case "Tahunan":
+			if installmentCount > 1 {
+				installmentAmount := pt.Amount / float64(installmentCount)
+				for i := 1; i <= installmentCount; i++ {
+					dueDate := now.AddDate(0, i*3, 0)
+					obligations = append(obligations, domain.StudentObligation{
+						StudentID:         studentID,
+						PaymentTypeID:     paymentTypeID,
+						AcademicYearID:    academicYearID,
+						Amount:            installmentAmount,
+						PaidAmount:        0,
+						Status:            "Unpaid",
+						InstallmentNumber: i,
+						TotalInstallments: installmentCount,
+						DueDate:           &dueDate,
+					})
+				}
+			} else {
+				dueDate := now.AddDate(0, 1, 0)
+				obligations = append(obligations, domain.StudentObligation{
+					StudentID:      studentID,
+					PaymentTypeID:  paymentTypeID,
+					AcademicYearID: academicYearID,
+					Amount:         pt.Amount,
+					PaidAmount:     0,
+					Status:         "Unpaid",
+					DueDate:        &dueDate,
+				})
+			}
+
+		default:
+			dueDate := now.AddDate(0, 1, 0)
+			obligations = append(obligations, domain.StudentObligation{
+				StudentID:      studentID,
+				PaymentTypeID:  paymentTypeID,
+				AcademicYearID: academicYearID,
+				Amount:         pt.Amount,
+				PaidAmount:     0,
+				Status:         "Unpaid",
+				DueDate:        &dueDate,
+			})
+		}
+	}
+
+	if len(obligations) == 0 {
+		return 0, nil
+	}
+
+	if err := u.repo.BulkCreate(obligations); err != nil {
+		return 0, err
+	}
+
+	for i, ob := range obligations {
+		if i < len(obligations) {
+			obID := ob.ID
+			var billDueDate time.Time
+			if ob.DueDate != nil {
+				billDueDate = *ob.DueDate
+			} else {
+				billDueDate = now.AddDate(0, 1, 0)
+			}
+
+			title := pt.Name
+			if ob.BillingMonth > 0 {
+				monthNames := []string{"", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"}
+				title = pt.Name + " - " + monthNames[ob.BillingMonth]
+			} else if ob.TotalInstallments > 0 {
+				title = pt.Name + " - Cicilan " + strconv.Itoa(ob.InstallmentNumber) + "/" + strconv.Itoa(ob.TotalInstallments)
+			}
+
+			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, nil, false, &obID, nil)
+		}
+	}
+
+	return len(obligations), nil
+}
+
 func (u *StudentObligationUsecase) GetAll(academicYearID uint, classID uint) ([]domain.StudentObligation, error) {
 	return u.repo.GetAll(academicYearID, classID)
 }

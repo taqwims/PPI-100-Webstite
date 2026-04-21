@@ -105,7 +105,7 @@ func (r *invoiceSignatureRepository) GetInvoiceHistory(userIDStr string, roleID 
 		payrollSub := r.db.Table("payrolls").Select("CAST(id AS TEXT)").Where("user_id = ?", userIDStr)
 
 		paymentSub := r.db.Table("payments").
-			Select("CAST(payments.id AS TEXT)").
+			Select("CAST(bills.id AS TEXT)").
 			Joins("JOIN bills ON payments.bill_id = bills.id").
 			Joins("JOIN students ON bills.student_id = students.id").
 			Joins("LEFT JOIN parents ON students.parent_id = parents.id").

@@ -233,7 +233,14 @@ const ProfileTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                             accept="image/*"
                             onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) logoMutation.mutate(file);
+                                if (file) {
+                                    if (file.size > 3 * 1024 * 1024) {
+                                        alert("Maksimal ukuran file adalah 3MB");
+                                        e.target.value = '';
+                                        return;
+                                    }
+                                    logoMutation.mutate(file);
+                                }
                             }}
                         />
                     </label>

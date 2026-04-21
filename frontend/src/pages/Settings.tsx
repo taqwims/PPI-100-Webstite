@@ -125,6 +125,11 @@ const Settings: React.FC = () => {
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
                                         if (file) {
+                                            if (file.size > 3 * 1024 * 1024) {
+                                                alert("Maksimal ukuran file adalah 3MB");
+                                                e.target.value = '';
+                                                return;
+                                            }
                                             const formData = new FormData();
                                             formData.append('file', file);
                                             api.post('/profile/photo', formData, {

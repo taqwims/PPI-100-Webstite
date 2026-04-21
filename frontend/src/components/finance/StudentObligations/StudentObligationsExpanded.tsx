@@ -117,10 +117,14 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                         <p className={clsx('text-[10px] font-bold mt-0.5', isPaid ? 'text-emerald-600' : isPartial ? 'text-amber-600' : 'text-red-600')}>
                                                             {isPaid ? '✓' : isPartial ? `${Math.round((ob.paid_amount / ob.amount) * 100)}%` : '✗'}
                                                         </p>
-                                                        {canManage && !isPaid && (
+                                                        {canManage && (
                                                             <div className="flex items-center justify-center gap-1 mt-1">
-                                                                <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="text-[9px] text-green-600 hover:text-green-700 font-medium" title="Bayar">💵</button>
-                                                                <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[9px] text-blue-600 hover:text-blue-700 font-medium" title="Ubah Nominal">✏️</button>
+                                                                {!isPaid && (
+                                                                    <>
+                                                                        <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="text-[9px] text-green-600 hover:text-green-700 font-medium" title="Bayar">💵</button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[9px] text-blue-600 hover:text-blue-700 font-medium" title="Ubah Nominal">✏️</button>
+                                                                    </>
+                                                                )}
                                                                 <button onClick={(e) => handleDelete(ob.id, e)} className="text-[9px] text-red-600 hover:text-red-700 font-medium" title="Hapus">🗑️</button>
                                                             </div>
                                                         )}
@@ -149,10 +153,14 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                 <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(ob.status))}>{statusLabel(ob.status)}</span>
                                                 {isPartial && <span className="text-xs text-slate-500">Terbayar: {formatCurrency(ob.paid_amount)}</span>}
                                             </div>
-                                            {canManage && !isPaid && (
+                                            {canManage && (
                                                 <div className="mt-2 flex gap-1">
-                                                    <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="flex-1 text-xs bg-green-600 text-white py-1.5 rounded-lg hover:bg-green-700 font-medium transition">Bayar</button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="bg-blue-100 text-blue-600 px-2 py-1.5 rounded-lg hover:bg-blue-200 transition" title="Edit Nominal"><Edit2 size={14} /></button>
+                                                    {!isPaid && (
+                                                        <>
+                                                            <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="flex-1 text-xs bg-green-600 text-white py-1.5 rounded-lg hover:bg-green-700 font-medium transition">Bayar</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="bg-blue-100 text-blue-600 px-2 py-1.5 rounded-lg hover:bg-blue-200 transition" title="Edit Nominal"><Edit2 size={14} /></button>
+                                                        </>
+                                                    )}
                                                     <button onClick={(e) => handleDelete(ob.id, e)} className="bg-red-100 text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-200 transition" title="Hapus"><Trash2 size={14} /></button>
                                                 </div>
                                             )}
@@ -180,10 +188,14 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                 <p className="text-xs font-bold text-slate-600">Cicilan {ob.installment_number}/{ob.total_installments}</p>
                                                 <p className="text-sm font-bold text-slate-900 mt-1">{formatCurrency(ob.amount)}</p>
                                                 <span className={clsx('inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(ob.status))}>{statusLabel(ob.status)}</span>
-                                                {canManage && !isPaid && (
+                                                {canManage && (
                                                     <div className="mt-2 flex gap-1 justify-center">
-                                                        <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200" title="Bayar">Bayar</button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-1 rounded hover:bg-blue-200" title="Edit Nominal"><Edit2 size={10} /></button>
+                                                        {!isPaid && (
+                                                            <>
+                                                                <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200" title="Bayar">Bayar</button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-1 rounded hover:bg-blue-200" title="Edit Nominal"><Edit2 size={10} /></button>
+                                                            </>
+                                                        )}
                                                         <button onClick={(e) => handleDelete(ob.id, e)} className="text-[10px] bg-red-100 text-red-700 px-1.5 py-1 rounded hover:bg-red-200" title="Hapus"><Trash2 size={10} /></button>
                                                     </div>
                                                 )}

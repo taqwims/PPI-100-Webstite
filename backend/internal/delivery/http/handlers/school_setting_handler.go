@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
 
@@ -84,8 +86,11 @@ func (h *SchoolSettingHandler) UploadLogo(c *gin.Context) {
 	}
 
 	// Save to uploads directory
+	uploadDir := "./uploads"
+	os.MkdirAll(uploadDir, os.ModePerm)
+	
 	filename := "school_logo_" + file.Filename
-	dst := "./uploads/" + filename
+	dst := filepath.Join(uploadDir, filename)
 	if err := c.SaveUploadedFile(file, dst); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan file"})
 		return

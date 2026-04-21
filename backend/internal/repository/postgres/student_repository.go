@@ -40,6 +40,17 @@ func (r *StudentRepository) Update(student *domain.Student) error {
 	return r.db.Save(student).Error
 }
 
+// UpdateClassAndStatus performs a targeted update on only class_id and status columns.
+// This avoids issues with GORM's Save() conflicting with preloaded associations.
+func (r *StudentRepository) UpdateClassAndStatus(studentID string, classID uint, status string) error {
+	return r.db.Model(&domain.Student{}).
+		Where("id = ?", studentID).
+		Updates(map[string]interface{}{
+			"class_id": classID,
+			"status":   status,
+		}).Error
+}
+
 func (r *StudentRepository) Delete(id string) error {
 	return r.db.Delete(&domain.Student{}, "id = ?", id).Error
 }

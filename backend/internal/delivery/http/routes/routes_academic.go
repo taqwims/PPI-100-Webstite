@@ -45,6 +45,7 @@ func RegisterAcademicRoutes(
 		students.POST("/", studentHandler.CreateStudent)
 		students.PUT("/:id", studentHandler.UpdateStudent)
 		students.DELETE("/:id", studentHandler.DeleteStudent)
+		students.POST("/bulk-promote", studentHandler.HandleBulkPromote)
 		students.GET("/children", studentHandler.GetChildren)
 		students.POST("/attendance", studentHandler.RecordAttendance)
 		students.GET("/attendance/:schedule_id", studentHandler.GetScheduleAttendance)

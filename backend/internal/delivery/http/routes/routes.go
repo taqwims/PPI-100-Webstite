@@ -108,6 +108,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	// Student Obligations (Tanggungan Siswa) - Continued
 	studentObligationUsecase := usecase.NewStudentObligationUsecase(studentObligationRepo, paymentTypeRepo, financeUsecase, financeRepo)
 	studentObligationHandler := handlers.NewStudentObligationHandler(studentObligationUsecase)
+	
+	// Inject StudentObligationUsecase into StudentHandler for Grade Promotion
+	studentHandler.SetStudentObligationUsecase(studentObligationUsecase)
 
 	// Profile Handler
 	profileHandler := handlers.NewProfileHandler(userUsecase)
