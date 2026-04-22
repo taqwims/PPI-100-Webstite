@@ -51,6 +51,64 @@ func (r *financeExtendedRepository) SetActiveAcademicYear(id uint) error {
 	return r.db.Model(&domain.AcademicYear{}).Where("id = ?", id).Update("is_active", true).Error
 }
 
+func (r *financeExtendedRepository) GetAcademicYearByID(id uint) (*domain.AcademicYear, error) {
+	var year domain.AcademicYear
+	if err := r.db.Where("id = ?", id).First(&year).Error; err != nil {
+		return nil, err
+	}
+	return &year, nil
+}
+
+// RolloverAcademicYear copies all unpaid/partial student obligations from the old year to the new year
+// as "Tunggakan" (arrears). Only the remaining unpaid amount is carried over.
+func (r *financeExtendedRepository) RolloverAcademicYear(fromYearID, toYearID uint) (int, error) {
+	var unpaidObligations []domain.StudentObligation
+	if err := r.db.
+		Preload("PaymentType").
+		Where("academic_year_id = ? AND status IN ?", fromYearID, []string{"Unpaid", "Partial"}).
+		Find(&unpaidObligations).Error; err != nil {
+		return 0, err
+	}
+
+	if len(unpaidObligations) == 0 {
+		return 0, nil
+	}
+
+	var newObligations []domain.StudentObligation
+	now := time.Now()
+	dueDate := now.AddDate(0, 1, 0)
+
+	for _, ob := range unpaidObligations {
+		remaining := ob.Amount - ob.PaidAmount
+		if remaining <= 0 {
+			continue
+		}
+
+		newOb := domain.StudentObligation{
+			StudentID:      ob.StudentID,
+			PaymentTypeID:  ob.PaymentTypeID,
+			AcademicYearID: toYearID,
+			Amount:         remaining,
+			PaidAmount:     0,
+			Status:         "Unpaid",
+			BillingMonth:   ob.BillingMonth,
+			DueDate:        &dueDate,
+			Notes:          fmt.Sprintf("Tunggakan dari tahun ajaran sebelumnya (sisa: Rp %.0f)", remaining),
+		}
+		newObligations = append(newObligations, newOb)
+	}
+
+	if len(newObligations) == 0 {
+		return 0, nil
+	}
+
+	if err := r.db.Create(&newObligations).Error; err != nil {
+		return 0, err
+	}
+
+	return len(newObligations), nil
+}
+
 // ------------------- Savings -------------------
 
 func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error {

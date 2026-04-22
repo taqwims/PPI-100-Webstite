@@ -33,6 +33,8 @@ export interface User {
     id: string;
     name: string;
     email: string;
+    phone?: string;
+    address?: string;
     role_id: number;
     unit_id: number;
     photo_url?: string;

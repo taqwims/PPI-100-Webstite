@@ -288,7 +288,7 @@ export async function drawVerificationFooter(
         year: 'numeric', month: 'long', day: '2-digit',
         hour: '2-digit', minute: '2-digit'
     });
-    doc.text(`Dicetak oleh sistem keuangan SDIT PPI 100 pada: ${printedDate}`, 38, startY + 20);
+    doc.text(`Dicetak oleh sistem keuangan SDIT pada: ${printedDate}`, 38, startY + 20);
 
     return startY + 25;
 }

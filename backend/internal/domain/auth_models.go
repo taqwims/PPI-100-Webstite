@@ -14,6 +14,8 @@ type User struct {
 	Email             string    `gorm:"uniqueIndex;not null" json:"email"`
 	PasswordHash      string    `gorm:"not null" json:"-"`
 	PhotoURL          string    `json:"photo_url"`
+	Phone             string    `json:"phone"`
+	Address           string    `json:"address"`
 	RoleID            uint      `gorm:"not null" json:"role_id"`
 	UnitID            uint      `gorm:"not null" json:"unit_id"`
 	BankName          string    `json:"bank_name"`

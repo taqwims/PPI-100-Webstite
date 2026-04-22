@@ -49,6 +49,8 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 type ProfileUpdateRequest struct {
 	Name              string `json:"name"`
 	Email             string `json:"email"`
+	Phone             string `json:"phone"`
+	Address           string `json:"address"`
 	BankName          string `json:"bank_name"`
 	BankAccountNumber string `json:"bank_account_number"`
 	BankAccountHolder string `json:"bank_account_holder"`
@@ -95,6 +97,8 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	user.ID = uuid
 	user.Name = req.Name
 	user.Email = req.Email
+	user.Phone = req.Phone
+	user.Address = req.Address
 	user.BankName = req.BankName
 	user.BankAccountNumber = req.BankAccountNumber
 	user.BankAccountHolder = req.BankAccountHolder

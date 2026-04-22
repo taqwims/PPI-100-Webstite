@@ -15,6 +15,7 @@ type Student struct {
 	ClassID   uint      `gorm:"not null" json:"class_id"`
 	Class     Class     `gorm:"foreignKey:ClassID" json:"class"`
 	ParentID  *uuid.UUID `gorm:"type:uuid" json:"parent_id"`
+	Parent    *Parent    `gorm:"foreignKey:ParentID" json:"parent,omitempty"`
 	UnitID    uint      `gorm:"not null" json:"unit_id"`
 	Status    string    `gorm:"not null;default:'Active'" json:"status"` // Active, Graduated, Transferred
 	CreatedAt time.Time `json:"created_at"`
@@ -24,6 +25,7 @@ type Student struct {
 type Parent struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	User      User      `gorm:"foreignKey:UserID" json:"user"`
 	Phone     string    `json:"phone"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

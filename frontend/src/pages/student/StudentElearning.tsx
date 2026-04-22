@@ -5,7 +5,7 @@ import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
-import { BookOpen, FileText, Download, Upload, Clock } from 'lucide-react';
+import { BookOpen, FileText, Download, Upload, Clock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface Material {
@@ -31,50 +31,41 @@ const StudentElearning: React.FC = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [submissionFile, setSubmissionFile] = useState('');
 
+    // Get student data directly from user profile (loaded via /profile endpoint)
+    const studentProfile = user?.student;
+    const classID = studentProfile?.class_id;
+    const studentID = studentProfile?.id;
 
-    // Fetch Student Profile to get Class ID
-    const { data: students } = useQuery({
-        queryKey: ['students'],
-        queryFn: async () => {
-            const res = await api.get('/students/');
-            return res.data;
-        }
-    });
-    const currentStudent = students?.find((s: any) => s.user.id === user?.id);
-
-    // Fetch Materials
+    // Fetch Materials — uses class_id from profile
     const { data: materials, isLoading: isLoadingMaterials } = useQuery({
-        queryKey: ['materials', currentStudent?.class_id],
+        queryKey: ['materials', classID],
         queryFn: async () => {
-            if (!currentStudent?.class_id) return [];
-            const response = await api.get(`/elearning/materials?class_id=${currentStudent.class_id}`);
+            const response = await api.get(`/elearning/materials?class_id=${classID}`);
             return response.data;
         },
-        enabled: !!currentStudent?.class_id
+        enabled: !!classID
     });
 
-    // Fetch Tasks
+    // Fetch Tasks — uses class_id from profile
     const { data: tasks, isLoading: isLoadingTasks } = useQuery({
-        queryKey: ['tasks', currentStudent?.class_id],
+        queryKey: ['tasks', classID],
         queryFn: async () => {
-            if (!currentStudent?.class_id) return [];
-            const response = await api.get(`/elearning/tasks?class_id=${currentStudent.class_id}`);
+            const response = await api.get(`/elearning/tasks?class_id=${classID}`);
             return response.data;
         },
-        enabled: !!currentStudent?.class_id
+        enabled: !!classID
     });
 
     // Submit Task Mutation
     const submitTaskMutation = useMutation({
         mutationFn: (data: { task_id: number, file_url: string }) => api.post('/elearning/submissions', {
             ...data,
-            student_id: currentStudent?.id
+            student_id: studentID
         }),
         onSuccess: () => {
             alert('Tugas berhasil dikumpulkan!');
             setSelectedTask(null);
             setSubmissionFile('');
-            // Ideally invalidate query to show "Submitted" status if we fetched it
         },
         onError: (error: any) => {
             alert('Gagal mengumpulkan tugas: ' + (error.response?.data?.error || error.message));
@@ -87,13 +78,22 @@ const StudentElearning: React.FC = () => {
         }
     };
 
-    if (!currentStudent) return <div className="text-slate-900 p-6">Loading data siswa...</div>;
+    // Show message if user profile doesn't have student data yet
+    if (!studentProfile) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <AlertCircle size={48} className="text-yellow-500 mb-4" />
+                <h2 className="text-xl font-semibold text-slate-900 mb-2">Data Siswa Tidak Ditemukan</h2>
+                <p className="text-slate-600">Pastikan akun Anda sudah terdaftar sebagai siswa. Hubungi admin jika masalah berlanjut.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">E-Learning</h1>
-                <p className="text-slate-600">Materi pelajaran dan tugas kelas {currentStudent?.class?.name}</p>
+                <p className="text-slate-600">Materi pelajaran dan tugas kelas Anda</p>
             </div>
 
             {/* Tabs */}
@@ -129,7 +129,7 @@ const StudentElearning: React.FC = () => {
                                         <BookOpen size={24} />
                                     </div>
                                     <span className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                                        {material.subject.name}
+                                        {material.subject?.name || 'Umum'}
                                     </span>
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-900 mb-2">{material.title}</h3>
@@ -160,7 +160,7 @@ const StudentElearning: React.FC = () => {
                                         <div className="flex items-center gap-2 mb-1">
                                             <h3 className="text-lg font-bold text-slate-900">{task.title}</h3>
                                             <span className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                                                {task.subject.name}
+                                                {task.subject?.name || 'Umum'}
                                             </span>
                                         </div>
                                         <p className="text-slate-600 text-sm mb-2">{task.description}</p>

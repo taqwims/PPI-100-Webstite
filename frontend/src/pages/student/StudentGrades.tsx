@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
-import { BookOpen, Calendar, CheckCircle, Clock } from 'lucide-react';
+import { BookOpen, Calendar, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface Submission {
@@ -19,19 +19,32 @@ interface Submission {
 
 const StudentGrades: React.FC = () => {
     const { user } = useAuth();
+    const studentProfile = user?.student;
 
-    // Fetch Student Profile to get ID (or use user ID if backend supports it)
-    // We need student ID for GetStudentSubmissions
-    const { data: submissions, isLoading } = useQuery({
-        queryKey: ['my-submissions'],
+    // Fetch submissions — backend auto-detects student from JWT token
+    const { data: submissions, isLoading, isError } = useQuery({
+        queryKey: ['my-submissions', studentProfile?.id],
         queryFn: async () => {
             const response = await api.get(`/elearning/submissions`);
             return response.data;
         },
+        enabled: !!studentProfile?.id  // Only fetch when student profile is loaded
     });
 
-    if (!user?.student && !isLoading) {
-        return <div className="text-slate-900 p-6">Data siswa tidak ditemukan. Hubungi admin.</div>;
+    // Wait for user profile to load
+    if (!user) {
+        return <div className="text-slate-600 p-6">Memuat profil...</div>;
+    }
+
+    // User is not a student
+    if (user && !studentProfile) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <AlertCircle size={48} className="text-yellow-500 mb-4" />
+                <h2 className="text-xl font-semibold text-slate-900 mb-2">Data Siswa Tidak Ditemukan</h2>
+                <p className="text-slate-600">Pastikan akun Anda sudah terdaftar sebagai siswa. Hubungi admin jika masalah berlanjut.</p>
+            </div>
+        );
     }
 
     return (
@@ -57,7 +70,11 @@ const StudentGrades: React.FC = () => {
                             <TableRowGlass>
                                 <TableCellGlass colSpan={5} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
-                        ) : submissions?.length === 0 ? (
+                        ) : isError ? (
+                            <TableRowGlass>
+                                <TableCellGlass colSpan={5} className="text-center py-8 text-red-500">Gagal memuat data nilai.</TableCellGlass>
+                            </TableRowGlass>
+                        ) : !submissions || submissions?.length === 0 ? (
                             <TableRowGlass>
                                 <TableCellGlass colSpan={5} className="text-center py-8 text-slate-600">Belum ada tugas yang dikumpulkan.</TableCellGlass>
                             </TableRowGlass>
@@ -67,16 +84,16 @@ const StudentGrades: React.FC = () => {
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 font-medium text-slate-900">
                                             <BookOpen size={14} className="text-indigo-600" />
-                                            {sub.task.subject.name}
+                                            {sub.task?.subject?.name || '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-slate-600">{sub.task.title}</span>
+                                        <span className="text-slate-600">{sub.task?.title || '-'}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <Calendar size={14} />
-                                            {new Date(sub.created_at).toLocaleDateString()}
+                                            {sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>

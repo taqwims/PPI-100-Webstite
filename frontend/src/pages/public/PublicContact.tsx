@@ -44,7 +44,7 @@ const PublicContact: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Kami siap membantu menjawab pertanyaan Anda seputar Pesantren Persis 100 Banjar­sari.
+                        Kami siap membantu menjawab pertanyaan Anda seputar SDIT An-Nur.
                     </motion.p>
                 </div>
             </section>
@@ -114,7 +114,7 @@ const PublicContact: React.FC = () => {
                         {/* Map Placeholder */}
                         <div className="h-64 rounded-3xl overflow-hidden glass-panel border border-white/10 relative">
                             <iframe
-                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3955.7378014202213!2d108.6224934!3d-7.4941743999999995!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e658590ffe2d211%3A0x4d5fb76b12a19284!2sPondok%20Pesantren%20Persis%20100!5e0!3m2!1sen!2sid!4v1764957418772!5m2!1sen!2sid"
+                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3955.8361602579007!2d108.6082958!3d-7.4833368!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e658ff346b000e5%3A0x1474cc840c47253f!2sSDIT%20AN-NUR%20BANJARSARI!5e0!3m2!1sen!2sid!4v1776839051104!5m2!1sen!2sid"
                                 width="100%"
                                 height="100%"
                                 style={{ border: 0 }}

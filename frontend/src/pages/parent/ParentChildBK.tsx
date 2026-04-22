@@ -20,7 +20,7 @@ const ParentChildBK: React.FC = () => {
     const { studentId } = useParams<{ studentId: string }>();
     const navigate = useNavigate();
 
-    const { data: bkCalls, isLoading } = useQuery({
+    const { data: bkCalls, isLoading, isError } = useQuery({
         queryKey: ['bk-calls', studentId],
         queryFn: async () => {
             const res = await api.get(`/bk/calls?student_id=${studentId}`);
@@ -56,7 +56,11 @@ const ParentChildBK: React.FC = () => {
                             <TableRowGlass>
                                 <TableCellGlass colSpan={4} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
-                        ) : bkCalls?.length === 0 ? (
+                        ) : isError ? (
+                            <TableRowGlass>
+                                <TableCellGlass colSpan={4} className="text-center py-8 text-red-500">Gagal memuat data BK.</TableCellGlass>
+                            </TableRowGlass>
+                        ) : !bkCalls || bkCalls?.length === 0 ? (
                             <TableRowGlass>
                                 <TableCellGlass colSpan={4} className="text-center py-8 text-slate-600">Tidak ada catatan BK.</TableCellGlass>
                             </TableRowGlass>
@@ -66,24 +70,28 @@ const ParentChildBK: React.FC = () => {
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <Calendar size={14} />
-                                            {new Date(call.date).toLocaleDateString()}
+                                            {call.date ? new Date(call.date).toLocaleDateString() : '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 font-medium text-slate-900">
                                             <AlertTriangle size={14} className="text-orange-600" />
-                                            {call.reason}
+                                            {call.reason || '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <User size={14} />
-                                            {call.teacher.user.name}
+                                            {call.teacher?.user?.name || '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-600 text-xs font-medium">
-                                            {call.status || 'Terjadwal'}
+                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                            call.status === 'Resolved'
+                                                ? 'bg-green-100 text-green-600'
+                                                : 'bg-yellow-100 text-yellow-600'
+                                        }`}>
+                                            {call.status || 'Pending'}
                                         </span>
                                     </TableCellGlass>
                                 </TableRowGlass>

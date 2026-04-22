@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { generateStudentBillPDF } from '../../utils/pdfUtils';
 import MultiBillSelector from '../../components/finance/MultiBillSelector';
 import { generateMultiPaymentInvoice } from '../../utils/invoiceTemplate';
+import { useAcademicYear } from '../../context/AcademicYearContext';
 
 interface Student {
     id: string;
@@ -48,6 +49,7 @@ const StudentBillSummary: React.FC = () => {
     const queryClient = useQueryClient();
 
     const [searchQuery, setSearchQuery] = useState('');
+    const { academicYears, selectedYear, setSelectedYear } = useAcademicYear();
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [waModal, setWaModal] = useState<{ student: Student; obligations: Obligation[] } | null>(null);
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -62,6 +64,8 @@ const StudentBillSummary: React.FC = () => {
     const [multiPayTotal, setMultiPayTotal] = useState(0);
     const [multiPayMethod, setMultiPayMethod] = useState<'Cash' | 'Transfer'>('Cash');
     const [isSubmittingMultiPay, setIsSubmittingMultiPay] = useState(false);
+    const [isBulkSending, setIsBulkSending] = useState(false);
+    const [bulkSendModal, setBulkSendModal] = useState(false);
     const [lastMultiPayResult, setLastMultiPayResult] = useState<{
         invoiceNumber: string;
         studentName: string;
@@ -77,8 +81,11 @@ const StudentBillSummary: React.FC = () => {
     });
 
     const { data: allObligations = [] } = useQuery<Obligation[]>({
-        queryKey: ['student-obligations'],
-        queryFn: async () => (await api.get('/finance/student-obligations')).data || [],
+        queryKey: ['student-obligations', selectedYear?.id],
+        queryFn: async () => {
+            const params = selectedYear?.id ? `?academic_year_id=${selectedYear.id}` : '';
+            return (await api.get(`/finance/student-obligations${params}`)).data || [];
+        },
     });
 
     // Also fetch activity obligations
@@ -265,6 +272,42 @@ const StudentBillSummary: React.FC = () => {
         }
     };
 
+    const handleBulkSendWA = async () => {
+        const template = waTemplates.find(t => t.id === Number(selectedTemplateId)) || waTemplates.find(t => t.is_default);
+        if (!template) {
+            toast.error('Template WA belum dipilih atau tidak ada template default');
+            return;
+        }
+
+        const studentsWithDebt = filteredStudents.filter(e => e.totalDebt > 0 && e.student.parent?.phone);
+        if (studentsWithDebt.length === 0) {
+            toast.error('Tidak ada siswa dengan tunggakan dan nomor HP orang tua');
+            setBulkSendModal(false);
+            return;
+        }
+
+        setIsBulkSending(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const { student, obligations } of studentsWithDebt) {
+            const message = buildWAMessage(template, student, obligations);
+            try {
+                await api.post('/notifications/wa', {
+                    phone: student.parent!.phone,
+                    message: message
+                });
+                successCount++;
+            } catch (error) {
+                failCount++;
+            }
+        }
+
+        setIsBulkSending(false);
+        setBulkSendModal(false);
+        toast.success(`Berhasil mengirim ${successCount} pesan. Gagal: ${failCount}`);
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -272,6 +315,14 @@ const StudentBillSummary: React.FC = () => {
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Surat Tagihan Siswa</h1>
                     <p className="text-slate-500 mt-1">Ringkasan tunggakan per siswa — untuk keperluan surat tagihan & WhatsApp</p>
                 </div>
+                {canManage && (
+                    <button
+                        onClick={() => setBulkSendModal(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-200 transition-all font-medium text-sm"
+                    >
+                        <Send size={18} /> Kirim Notifikasi Massal
+                    </button>
+                )}
             </div>
 
             {/* Summary Cards */}
@@ -290,16 +341,33 @@ const StudentBillSummary: React.FC = () => {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                    type="text"
-                    placeholder="Cari siswa berdasarkan nama, NIS, atau kelas..."
-                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm bg-white/80 backdrop-blur-sm"
-                    value={searchQuery}
-                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                />
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Cari siswa berdasarkan nama, NIS, atau kelas..."
+                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm bg-white/80 backdrop-blur-sm"
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    />
+                </div>
+                <select
+                    value={selectedYear?.id || ''}
+                    onChange={e => {
+                        const yearId = parseInt(e.target.value);
+                        const year = academicYears.find(y => y.id === yearId) || null;
+                        setSelectedYear(year);
+                        setCurrentPage(1);
+                    }}
+                    className="px-4 py-3 rounded-xl border border-slate-200 text-sm bg-white/80 backdrop-blur-sm min-w-[180px]"
+                >
+                    <option value="">Semua Tahun Ajaran</option>
+                    {academicYears.map(y => (
+                        <option key={y.id} value={y.id}>{y.name} {y.is_active ? '✓' : ''}</option>
+                    ))}
+                </select>
             </div>
 
             <div className="flex justify-end gap-3 sm:gap-4 flex-wrap">
@@ -587,6 +655,55 @@ const StudentBillSummary: React.FC = () => {
                                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                     ) : <Send size={16} />} 
                                     {isSending ? 'Mengirim...' : 'Kirim WhatsApp'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk Send WA Modal */}
+            {bulkSendModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-emerald-50">
+                            <h2 className="text-xl font-bold text-emerald-800 flex items-center gap-2">
+                                <Send className="text-emerald-600" size={22} /> Kirim Notifikasi Massal
+                            </h2>
+                            <p className="text-sm text-emerald-600 mt-1">Kirim otomatis ke semua siswa tertampil yang memiliki tunggakan.</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Template</label>
+                                <select
+                                    value={selectedTemplateId}
+                                    onChange={e => setSelectedTemplateId(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 text-sm"
+                                >
+                                    <option value="">-- Pilih Template --</option>
+                                    {waTemplates.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} {t.is_default ? '(Default)' : ''}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                                <p className="text-sm text-emerald-700 font-medium">
+                                    Total target pengiriman: {filteredStudents.filter(e => e.totalDebt > 0 && e.student.parent?.phone).length} orang tua siswa
+                                </p>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button onClick={() => setBulkSendModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50">
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleBulkSendWA}
+                                    disabled={isBulkSending}
+                                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isBulkSending ? (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    ) : <Send size={16} />} 
+                                    {isBulkSending ? 'Memproses...' : 'Kirim Massal Sekarang'}
                                 </button>
                             </div>
                         </div>

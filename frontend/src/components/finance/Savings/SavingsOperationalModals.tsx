@@ -57,18 +57,18 @@ export const SavingsOperationalModals: React.FC<Props> = ({
         e.preventDefault();
         setSubmitting(true);
         try {
-            await api.post('/finance/savings/operational/withdraw', { 
-                amount: parseFloat(opWithdrawAmount), 
+            await api.post('/finance/savings/operational/withdraw', {
+                amount: parseFloat(opWithdrawAmount),
                 purpose: opWithdrawPurpose,
                 unit_id: unitID
             });
             toast.success('Dana operasional berhasil diambil');
             onSuccess();
             onCloseWithdraw();
-        } catch (error: any) { 
+        } catch (error: any) {
             console.error(error);
-        } finally { 
-            setSubmitting(false); 
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -76,9 +76,9 @@ export const SavingsOperationalModals: React.FC<Props> = ({
         e.preventDefault();
         setSubmitting(true);
         try {
-            await api.post('/finance/savings/operational/return', { 
-                withdrawal_id: returnWithdrawalId, 
-                amount: parseFloat(returnAmount), 
+            await api.post('/finance/savings/operational/return', {
+                withdrawal_id: returnWithdrawalId,
+                amount: parseFloat(returnAmount),
                 notes: returnNotes,
                 source: returnSource,
                 unit_id: unitID
@@ -86,10 +86,10 @@ export const SavingsOperationalModals: React.FC<Props> = ({
             toast.success('Dana berhasil dikembalikan');
             onSuccess();
             onCloseReturn();
-        } catch (error: any) { 
+        } catch (error: any) {
             console.error(error);
-        } finally { 
-            setSubmitting(false); 
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -160,7 +160,7 @@ export const SavingsOperationalModals: React.FC<Props> = ({
                                 </select>
                                 {outstandingWithdrawals.length === 0 && <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-2 flex items-center gap-1"><ShieldCheck size={14} /> Tidak ada utang operasional aktif.</p>}
                             </div>
-                            
+
                             {returnWithdrawalId && (() => {
                                 const w = outstandingWithdrawals.find(w => w.id === returnWithdrawalId);
                                 if (!w) return null;
@@ -179,12 +179,12 @@ export const SavingsOperationalModals: React.FC<Props> = ({
                                     <input type="number" required min="1000" className="w-full pl-16 pr-5 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-blue-500/30 bg-slate-50/50 font-black text-3xl tracking-tight text-slate-900" value={returnAmount} onChange={e => setReturnAmount(e.target.value)} />
                                 </div>
                             </div>
-                            
+
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Sumber Dana Pengembalian <span className="text-red-500">*</span></label>
                                 <div className="flex bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
                                     <button type="button" onClick={() => setReturnSource('CashLedger')} className={clsx("flex-1 py-3 text-sm font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2", returnSource === 'CashLedger' ? "bg-white text-blue-600 shadow-sm scale-[1.02]" : "text-slate-500")}>Kas Tunai (BKU)</button>
-                                    <button type="button" onClick={() => setReturnSource('Infaq')} className={clsx("flex-1 py-3 text-sm font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2", returnSource === 'Infaq' ? "bg-white text-blue-600 shadow-sm scale-[1.02]" : "text-slate-500")}>Infaq Yayasan</button>
+                                    <button type="button" onClick={() => setReturnSource('Infaq')} className={clsx("flex-1 py-3 text-sm font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2", returnSource === 'Infaq' ? "bg-white text-blue-600 shadow-sm scale-[1.02]" : "text-slate-500")}>Infaq Sekolah</button>
                                 </div>
                                 <p className="text-[10px] mt-2 text-slate-500 font-medium">Buku kas BKU atau Infaq akan tercatat sebagai PENGELUARAN secara otomatis.</p>
                             </div>

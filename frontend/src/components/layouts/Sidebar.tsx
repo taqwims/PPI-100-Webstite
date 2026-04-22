@@ -113,7 +113,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Settings, label: 'Kuitansi & TTD', path: '/dashboard/finance/invoice-config' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
-                { icon: Building2, label: 'Rekening Bank', path: '/dashboard/finance/bank-accounts' },
             ]
         };
 

@@ -131,11 +131,10 @@ const SchoolBankAccounts: React.FC = () => {
                     {accounts.map((account) => (
                         <div
                             key={account.id}
-                            className={`relative bg-white rounded-2xl border p-6 transition-all duration-200 hover:shadow-lg ${
-                                account.is_primary
+                            className={`relative bg-white rounded-2xl border p-6 transition-all duration-200 hover:shadow-lg ${account.is_primary
                                     ? 'border-green-300 ring-2 ring-green-100 shadow-md shadow-green-50'
                                     : 'border-slate-200 hover:border-slate-300'
-                            } ${!account.is_active ? 'opacity-60' : ''}`}
+                                } ${!account.is_active ? 'opacity-60' : ''}`}
                         >
                             {/* Primary Badge */}
                             {account.is_primary && (
@@ -240,7 +239,7 @@ const SchoolBankAccounts: React.FC = () => {
                                     type="text"
                                     value={form.account_holder}
                                     onChange={(e) => setForm({ ...form, account_holder: e.target.value })}
-                                    placeholder="Yayasan PPI 100"
+                                    placeholder="SDIT An-Nur"
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-400 focus:border-green-400 text-sm"
                                     required
                                 />

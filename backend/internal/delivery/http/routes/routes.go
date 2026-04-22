@@ -54,12 +54,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	userHandler := handlers.NewUserHandler(userUsecase)
 
 	bkRepo := postgres.NewBKRepository(db)
-	bkUsecase := usecase.NewBKUsecase(bkRepo)
-	bkHandler := handlers.NewBKHandler(bkUsecase)
+	bkUsecase := usecase.NewBKUsecase(bkRepo, userRepo)
+	bkHandler := handlers.NewBKHandler(bkUsecase, academicUsecase)
 
 	// elearningRepo already declared above
 	elearningUsecase := usecase.NewElearningUsecase(elearningRepo, notificationUsecase, userRepo)
-	elearningHandler := handlers.NewElearningHandler(elearningUsecase)
+	elearningHandler := handlers.NewElearningHandler(elearningUsecase, academicUsecase)
 
 	// Payment Types (Jenis Pembayaran)
 	paymentTypeRepo := postgres.NewPaymentTypeRepository(db)

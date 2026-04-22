@@ -14,6 +14,8 @@ const Settings: React.FC = () => {
     // Profile State
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
+    const [phone, setPhone] = useState(user?.phone || '');
+    const [address, setAddress] = useState(user?.address || '');
 
     // Bank Account State
     const [bankName, setBankName] = useState(user?.bank_name || '');
@@ -29,7 +31,7 @@ const Settings: React.FC = () => {
     const isStaff = user?.role_id !== 6 && user?.role_id !== 7;
 
     const updateProfileMutation = useMutation({
-        mutationFn: async (data: { name: string; email: string; bank_name: string; bank_account_number: string; bank_account_holder: string }) => {
+        mutationFn: async (data: { name: string; email: string; phone: string; address: string; bank_name: string; bank_account_number: string; bank_account_holder: string }) => {
             return await api.put('/profile', data);
         },
         onSuccess: () => {
@@ -60,6 +62,8 @@ const Settings: React.FC = () => {
         updateProfileMutation.mutate({
             name,
             email,
+            phone,
+            address,
             bank_name: bankName,
             bank_account_number: bankAccountNumber,
             bank_account_holder: bankAccountHolder
@@ -179,11 +183,19 @@ const Settings: React.FC = () => {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-slate-600">Nomor Telepon</label>
-                                        <InputGlass placeholder="0812..." disabled className="opacity-50 cursor-not-allowed" />
+                                        <InputGlass 
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                            placeholder="0812..." 
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-slate-600">Alamat</label>
-                                        <InputGlass placeholder="Jl. ..." disabled className="opacity-50 cursor-not-allowed" />
+                                        <InputGlass 
+                                            value={address}
+                                            onChange={(e) => setAddress(e.target.value)}
+                                            placeholder="Jl. ..." 
+                                        />
                                     </div>
                                 </div>
 

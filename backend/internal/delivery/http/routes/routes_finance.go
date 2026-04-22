@@ -64,6 +64,7 @@ func RegisterFinanceRoutes(
 		finance.PUT("/academic-years/:id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.UpdateAcademicYear)
 		finance.DELETE("/academic-years/:id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.DeleteAcademicYear)
 		finance.PUT("/academic-years/:id/set-active", middleware.RoleMiddleware(1, 9), financeExtendedHandler.SetActiveAcademicYear)
+		finance.POST("/academic-years/rollover", middleware.RoleMiddleware(1, 9), financeExtendedHandler.RolloverAcademicYear)
 
 		// ── Student Obligations (Tanggungan Siswa) ──
 		if cfg.FeatureStudentObligations {

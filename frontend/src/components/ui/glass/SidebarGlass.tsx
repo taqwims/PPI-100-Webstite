@@ -85,7 +85,7 @@ const SidebarGlass: React.FC = () => {
                             e.currentTarget.parentElement!.innerText = 'P';
                         }} />
                     </div>
-                    <span className="text-xl font-bold text-slate-800 tracking-tight">PPI 100</span>
+                    <span className="text-xl font-bold text-slate-800 tracking-tight">SDIT AN-Nur</span>
                 </div>
 
                 {/* Navigation */}

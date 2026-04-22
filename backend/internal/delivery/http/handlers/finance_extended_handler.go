@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
@@ -118,6 +119,35 @@ func (h *FinanceExtendedHandler) SetActiveAcademicYear(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Academic year set as active"})
+}
+
+type RolloverRequest struct {
+	FromYearID uint `json:"from_year_id" binding:"required"`
+	ToYearID   uint `json:"to_year_id" binding:"required"`
+}
+
+func (h *FinanceExtendedHandler) RolloverAcademicYear(c *gin.Context) {
+	var req RolloverRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.FromYearID == req.ToYearID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tahun ajaran asal dan tujuan tidak boleh sama"})
+		return
+	}
+
+	count, err := h.financeExtendedUsecase.RolloverAcademicYear(req.FromYearID, req.ToYearID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Berhasil memindahkan %d tunggakan ke tahun ajaran baru", count),
+		"count":   count,
+	})
 }
 
 // ------------------- Savings -------------------

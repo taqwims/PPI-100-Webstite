@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const slides = [
+import { useFeatureStore } from '../../store/featureStore';
+
+const defaultSlides = [
     {
         id: 1,
         image: '/images/slider_1.png',
@@ -26,12 +28,21 @@ const slides = [
         title: 'Ekstrakurikuler Unggulan',
         subtitle: 'Mengembangkan minat dan bakat santri melalui berbagai kegiatan positif dan berprestasi.',
         cta: 'Kegiatan Kami',
-        link: '/profile' // Or a specific activities page if it existed
+        link: '/profile'
     }
 ];
 
 const HeroSlider: React.FC = () => {
+    const { school } = useFeatureStore();
     const [currentIndex, setCurrentIndex] = useState(0);
+
+    const slides = [...defaultSlides];
+    if (school.landing_hero_title) {
+        slides[0].title = school.landing_hero_title;
+    }
+    if (school.landing_hero_subtitle) {
+        slides[0].subtitle = school.landing_hero_subtitle;
+    }
 
     useEffect(() => {
         const timer = setInterval(() => {

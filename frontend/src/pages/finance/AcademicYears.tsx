@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Edit, Trash2, Calendar, X, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, X, CheckCircle, ArrowRightLeft, AlertTriangle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface AcademicYear {
@@ -21,6 +21,12 @@ const AcademicYears = () => {
     const [showModal, setShowModal] = useState(false);
     const [editItem, setEditItem] = useState<AcademicYear | null>(null);
     const [form, setForm] = useState({ name: '', start_date: '', end_date: '', is_active: false });
+
+    // Rollover state
+    const [showRollover, setShowRollover] = useState(false);
+    const [rolloverFrom, setRolloverFrom] = useState('');
+    const [rolloverTo, setRolloverTo] = useState('');
+    const [isRollingOver, setIsRollingOver] = useState(false);
 
     useEffect(() => { fetchData(); }, []);
 
@@ -84,18 +90,59 @@ const AcademicYears = () => {
         } catch (err: any) { }
     };
 
+    const handleRollover = async () => {
+        if (!rolloverFrom || !rolloverTo || rolloverFrom === rolloverTo) {
+            toast.error('Pilih tahun ajaran asal dan tujuan yang berbeda');
+            return;
+        }
+        setIsRollingOver(true);
+        try {
+            const res = await api.post('/finance/academic-years/rollover', {
+                from_year_id: parseInt(rolloverFrom),
+                to_year_id: parseInt(rolloverTo),
+            });
+            toast.success(res.data.message || 'Rollover berhasil');
+            setShowRollover(false);
+            setRolloverFrom('');
+            setRolloverTo('');
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Gagal melakukan rollover');
+        } finally {
+            setIsRollingOver(false);
+        }
+    };
+
+    const fromYear = years.find(y => y.id === parseInt(rolloverFrom));
+    const toYear = years.find(y => y.id === parseInt(rolloverTo));
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Tahun Ajaran</h1>
-                    <p className="text-slate-500 mt-1">Kelola periode tahun ajaran sekolah.</p>
+                    <p className="text-slate-500 mt-1">Kelola periode tahun ajaran dan transisi data keuangan.</p>
                 </div>
                 {canEdit && (
-                    <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition">
-                        <Plus size={18} /> Tambah Tahun Ajaran
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={() => setShowRollover(true)} className="flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-xl hover:bg-amber-700 shadow-sm transition">
+                            <ArrowRightLeft size={18} /> Rollover Tunggakan
+                        </button>
+                        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition">
+                            <Plus size={18} /> Tambah Tahun Ajaran
+                        </button>
+                    </div>
                 )}
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
+                <div className="flex gap-3">
+                    <AlertTriangle size={20} className="text-amber-600 mt-0.5 shrink-0" />
+                    <div className="text-sm text-amber-800">
+                        <p className="font-semibold mb-1">Tentang Rollover Tunggakan</p>
+                        <p>Fitur <b>Rollover</b> akan menyalin semua tanggungan siswa yang belum lunas (Unpaid/Partial) dari tahun ajaran lama ke tahun ajaran baru. Hanya sisa hutang yang dipindahkan, bukan jumlah penuh. Tanggungan yang sudah lunas <b>tidak</b> akan ikut dipindahkan.</p>
+                    </div>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -152,6 +199,7 @@ const AcademicYears = () => {
                 </div>
             </div>
 
+            {/* Add/Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
@@ -183,6 +231,85 @@ const AcademicYears = () => {
                                 <button type="submit" className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm">Simpan</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Rollover Modal */}
+            {showRollover && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-amber-50 to-orange-50">
+                            <h2 className="text-xl font-bold text-amber-900 flex items-center gap-2">
+                                <ArrowRightLeft size={20} /> Rollover Tunggakan
+                            </h2>
+                            <button onClick={() => setShowRollover(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <p className="text-sm text-slate-600">
+                                Pindahkan seluruh tunggakan siswa yang <b>belum lunas</b> (Unpaid/Partial) dari tahun ajaran lama ke tahun ajaran baru. 
+                                Hanya <b>sisa hutang</b> yang akan dipindahkan.
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-sm font-medium text-slate-700">Dari Tahun Ajaran</label>
+                                    <select
+                                        value={rolloverFrom}
+                                        onChange={(e) => setRolloverFrom(e.target.value)}
+                                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                                    >
+                                        <option value="">-- Pilih Asal --</option>
+                                        {years.map(y => (
+                                            <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Aktif)' : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="block text-sm font-medium text-slate-700">Ke Tahun Ajaran</label>
+                                    <select
+                                        value={rolloverTo}
+                                        onChange={(e) => setRolloverTo(e.target.value)}
+                                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                                    >
+                                        <option value="">-- Pilih Tujuan --</option>
+                                        {years.filter(y => y.id !== parseInt(rolloverFrom)).map(y => (
+                                            <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Aktif)' : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {fromYear && toYear && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+                                    <p className="font-semibold">Konfirmasi:</p>
+                                    <p className="mt-1">
+                                        Semua tunggakan yang belum lunas dari <b>{fromYear.name}</b> akan dipindahkan ke <b>{toYear.name}</b> sebagai tanggungan baru.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowRollover(false)} 
+                                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition text-sm"
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    onClick={handleRollover}
+                                    disabled={isRollingOver || !rolloverFrom || !rolloverTo}
+                                    className="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-medium hover:bg-amber-700 transition text-sm flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isRollingOver ? (
+                                        <><Loader2 size={16} className="animate-spin" /> Memproses...</>
+                                    ) : (
+                                        <><ArrowRightLeft size={16} /> Mulai Rollover</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

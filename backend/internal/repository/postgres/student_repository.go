@@ -20,13 +20,13 @@ func (r *StudentRepository) Create(student *domain.Student) error {
 
 func (r *StudentRepository) GetAll(unitID uint) ([]domain.Student, error) {
 	var students []domain.Student
-	err := r.db.Where("unit_id = ?", unitID).Preload("User").Preload("Class").Find(&students).Error
+	err := r.db.Where("unit_id = ?", unitID).Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").Find(&students).Error
 	return students, err
 }
 
 func (r *StudentRepository) GetByID(id string) (*domain.Student, error) {
 	var student domain.Student
-	err := r.db.Where("id = ?", id).Preload("User").Preload("Class").First(&student).Error
+	err := r.db.Where("id = ?", id).Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").First(&student).Error
 	return &student, err
 }
 

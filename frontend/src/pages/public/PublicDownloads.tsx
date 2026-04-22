@@ -55,7 +55,7 @@ const PublicDownloads: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Akses berbagai dokumen penting, brosur, dan kalender akademik Pesantren Persis 100 Banjar­sari.
+                        Akses berbagai dokumen penting, brosur, dan kalender akademik SDIT An-Nur Banjarsari.
                     </motion.p>
                 </div>
             </section>

@@ -47,7 +47,7 @@ export async function fetchInvoiceSignatures(
             date_str: dateStr
         });
         const data = response.data;
-        
+
         let finalSigs = data.signatures;
         const roleLabels: Record<string, string> = {
             admin_tu: 'Tata Usaha',
@@ -646,7 +646,7 @@ export const generateActivityReportPDF = (options: ActivityReportOptions) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
+    doc.text('SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(16);
     doc.text('LAPORAN PERTANGGUNGJAWABAN', pageWidth / 2, 18, { align: 'center' });
     doc.text('KEGIATAN SISWA (LPJ)', pageWidth / 2, 25, { align: 'center' });
@@ -820,7 +820,7 @@ export const generateStudentBillPDF = async (data: StudentBillPDFData) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const invoiceType = 'Bill';
     const dateStr = new Date().toISOString().split('T')[0];
-    
+
     // Total debt for signing
     const totalAmount = data.obligations.reduce((s, o) => s + o.amount, 0);
     const totalPaid = data.obligations.reduce((s, o) => s + o.paid_amount, 0);
@@ -1142,7 +1142,7 @@ export const generateActivityBillPDF = async (items: ActivityBillItem[], activit
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
+    doc.text('SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(16);
     doc.text('SURAT TAGIHAN KEGIATAN', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(10);
@@ -1322,7 +1322,7 @@ export const generateRKASReportPDF = (
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('YAYASAN PPI 100 — SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
+    doc.text('SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
     doc.setFontSize(14);
     doc.text('RENCANA ANGGARAN KAS SEKOLAH (RKAS)', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(8);

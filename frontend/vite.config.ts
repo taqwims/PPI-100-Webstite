@@ -10,9 +10,9 @@ export default defineConfig({
             registerType: 'autoUpdate',
             includeAssets: ['favicon.ico', 'images/logo.png', 'images/logo.jpeg'],
             manifest: {
-                name: 'SDIT PPI 100 - Sistem Keuangan',
+                name: 'SDIT AN-NUR - Sistem Keuangan',
                 short_name: 'SDIT Keuangan',
-                description: 'Sistem Manajemen Keuangan SDIT Pondok Pesantren Islam PPI 100',
+                description: 'Sistem Manajemen Keuangan SDIT Pondok Pesantren Islam AN-NUR',
                 theme_color: '#059669',
                 background_color: '#ffffff',
                 display: 'standalone',

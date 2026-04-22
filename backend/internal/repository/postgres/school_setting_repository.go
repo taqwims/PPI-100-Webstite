@@ -66,6 +66,12 @@ func (r *SchoolSettingRepository) Seed(defaults map[string]string) error {
 		{Key: "school_email", Value: "", Description: "Email Sekolah", IsAdminEdit: true},
 		{Key: "school_npsn", Value: "", Description: "NPSN Sekolah", IsAdminEdit: true},
 		{Key: "foundation_name", Value: "", Description: "Nama Yayasan (Developer Only)", IsAdminEdit: true}, // initially true, updated below
+		{Key: "landing_hero_title", Value: "Masa Depan Cerah Dimulai dari Sini", Description: "Judul Hero Landing Page", IsAdminEdit: true},
+		{Key: "landing_hero_subtitle", Value: "Mendidik generasi unggul dengan akhlak islami, penguasaan sains, dan kecakapan masa depan.", Description: "Sub-judul Hero Landing Page", IsAdminEdit: true},
+		{Key: "landing_about_title", Value: "Keunggulan Kami", Description: "Judul Bagian Tentang Kami", IsAdminEdit: true},
+		{Key: "landing_about_desc", Value: "Fasilitas modern dan kurikulum terintegrasi untuk mendukung perkembangan santri secara holistik.", Description: "Deskripsi Bagian Tentang Kami", IsAdminEdit: true},
+		{Key: "landing_cta_title", Value: "Siap Bergabung Menjadi Bagian dari Keluarga Besar Kami?", Description: "Judul Call to Action (CTA)", IsAdminEdit: true},
+		{Key: "landing_cta_desc", Value: "Pendaftaran Santri Baru Tahun Ajaran 2025/2026 telah dibuka. Segera daftarkan putra-putri Anda.", Description: "Deskripsi Call to Action (CTA)", IsAdminEdit: true},
 	}
 
 	for _, s := range seedSettings {

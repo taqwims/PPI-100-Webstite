@@ -30,7 +30,7 @@ const Profile: React.FC = () => {
                         className="text-5xl lg:text-7xl font-bold mb-6"
                     >
                         <span className="text-slate-900">Mengenal Lebih Dekat</span> <br />
-                        <span className="text-gradient-primary">Pesantren Persis 100</span>
+                        <span className="text-gradient-primary">SDIT AN-NUR</span>
                     </motion.h1>
 
                     <motion.p
@@ -121,7 +121,7 @@ const Profile: React.FC = () => {
                                 <h2 className="text-4xl font-bold text-slate-900">Dedikasi Untuk Umat Sejak Awal Berdiri</h2>
                                 <div className="space-y-4 text-slate-600 text-lg leading-relaxed">
                                     <p>
-                                        Pesantren Persis 100 Banjar­sari didirikan dengan semangat untuk mencerdaskan kehidupan bangsa dan menegakkan syariat Islam.
+                                        SDIT An-Nur didirikan dengan semangat untuk mencerdaskan kehidupan bangsa dan menegakkan syariat Islam.
                                     </p>
                                     <p>
                                         Sejak awal berdirinya, pesantren ini telah berkontribusi dalam melahirkan lulusan yang berkiprah di berbagai bidang, baik keagamaan maupun kemasyarakatan. Kami terus berkomitmen untuk menjaga tradisi keilmuan Islam sambil beradaptasi dengan perkembangan zaman.

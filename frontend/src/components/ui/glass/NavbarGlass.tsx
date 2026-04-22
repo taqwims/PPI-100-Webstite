@@ -38,8 +38,8 @@ const NavbarGlass: React.FC = () => {
                 >
                     {/* Logo */}
                     <Link to="/" className="flex items-center gap-2">
-                        <img src="/images/logo.jpeg" alt="PPI 100 Logo" className="w-10 h-10 rounded-xl shadow-lg shadow-green-500/30" />
-                        <span className="text-xl font-bold text-slate-800 tracking-tight">PPI 100 Banjarsari</span>
+                        <img src="/images/logo.jpeg" alt="SDIT AN-NUR Logo" className="w-10 h-10 rounded-xl shadow-lg shadow-green-500/30" />
+                        <span className="text-xl font-bold text-slate-800 tracking-tight">SDIT AN-NUR</span>
                     </Link>
 
                     {/* Desktop Menu */}

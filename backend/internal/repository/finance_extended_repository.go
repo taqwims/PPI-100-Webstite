@@ -11,6 +11,8 @@ type FinanceExtendedRepository interface {
 	UpdateAcademicYear(year *domain.AcademicYear) error
 	DeleteAcademicYear(id uint) error
 	SetActiveAcademicYear(id uint) error
+	GetAcademicYearByID(id uint) (*domain.AcademicYear, error)
+	RolloverAcademicYear(fromYearID, toYearID uint) (int, error)
 	TransferSavings(studentID, handledByID uuid.UUID, module string, direction string, amount float64, notes string) error
 
 

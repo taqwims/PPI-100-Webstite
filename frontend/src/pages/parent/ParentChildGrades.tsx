@@ -22,7 +22,7 @@ const ParentChildGrades: React.FC = () => {
     const { studentId } = useParams<{ studentId: string }>();
     const navigate = useNavigate();
 
-    const { data: submissions, isLoading } = useQuery({
+    const { data: submissions, isLoading, isError } = useQuery({
         queryKey: ['grades', studentId],
         queryFn: async () => {
             const res = await api.get(`/elearning/submissions?student_id=${studentId}`);
@@ -59,7 +59,11 @@ const ParentChildGrades: React.FC = () => {
                             <TableRowGlass>
                                 <TableCellGlass colSpan={5} className="text-center py-8 text-slate-600">Loading...</TableCellGlass>
                             </TableRowGlass>
-                        ) : submissions?.length === 0 ? (
+                        ) : isError ? (
+                            <TableRowGlass>
+                                <TableCellGlass colSpan={5} className="text-center py-8 text-red-500">Gagal memuat data nilai.</TableCellGlass>
+                            </TableRowGlass>
+                        ) : !submissions || submissions?.length === 0 ? (
                             <TableRowGlass>
                                 <TableCellGlass colSpan={5} className="text-center py-8 text-slate-600">Belum ada data nilai.</TableCellGlass>
                             </TableRowGlass>
@@ -69,16 +73,16 @@ const ParentChildGrades: React.FC = () => {
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 font-medium text-slate-900">
                                             <BookOpen size={14} className="text-indigo-600" />
-                                            {sub.task.subject.name}
+                                            {sub.task?.subject?.name || '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="text-slate-600">{sub.task.title}</span>
+                                        <span className="text-slate-600">{sub.task?.title || '-'}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <Calendar size={14} />
-                                            {new Date(sub.created_at).toLocaleDateString()}
+                                            {sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '-'}
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>

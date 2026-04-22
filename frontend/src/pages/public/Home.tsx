@@ -4,8 +4,25 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import HeroSlider from '../../components/public/HeroSlider';
+import { useFeatureStore } from '../../store/featureStore';
 
 const Home: React.FC = () => {
+    const { school } = useFeatureStore();
+    
+    // Parse titles to colorize the last word
+    const parseTitle = (title: string, fallback1: string, fallback2: string) => {
+        if (!title) return { main: fallback1, highlight: fallback2 };
+        const words = title.split(' ');
+        if (words.length <= 1) return { main: title, highlight: '' };
+        const highlight = words.pop() || '';
+        return { main: words.join(' '), highlight };
+    };
+
+    const aboutTitleParts = parseTitle(school.landing_about_title || '', 'Keunggulan', 'Kami');
+    const ctaTitle = school.landing_cta_title || "Siap Bergabung Menjadi Bagian dari Keluarga Besar Kami?";
+    const ctaDesc = school.landing_cta_desc || "Pendaftaran Santri Baru Tahun Ajaran 2025/2026 telah dibuka. Segera daftarkan putra-putri Anda.";
+    const aboutDesc = school.landing_about_desc || "Fasilitas modern dan kurikulum terintegrasi untuk mendukung perkembangan santri secara holistik.";
+
     return (
         <div className="space-y-0 pb-24">
             {/* Hero Section with Slider */}
@@ -20,8 +37,8 @@ const Home: React.FC = () => {
                     transition={{ duration: 0.8 }}
                     className="text-center max-w-3xl mx-auto mb-20 space-y-4"
                 >
-                    <h2 className="text-4xl lg:text-5xl font-bold text-slate-900">Keunggulan <span className="text-gradient-primary">Kami</span></h2>
-                    <p className="text-slate-600 text-lg">Fasilitas modern dan kurikulum terintegrasi untuk mendukung perkembangan santri secara holistik.</p>
+                    <h2 className="text-4xl lg:text-5xl font-bold text-slate-900">{aboutTitleParts.main} {aboutTitleParts.highlight && <span className="text-gradient-primary">{aboutTitleParts.highlight}</span>}</h2>
+                    <p className="text-slate-600 text-lg">{aboutDesc}</p>
                 </motion.div>
 
                 <div className="grid md:grid-cols-3 gap-8">
@@ -64,8 +81,8 @@ const Home: React.FC = () => {
                     <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5" />
 
                     <div className="max-w-4xl mx-auto space-y-8 relative z-10">
-                        <h2 className="text-4xl lg:text-6xl font-bold text-slate-900 tracking-tight">Siap Bergabung Menjadi Bagian dari Keluarga Besar Kami?</h2>
-                        <p className="text-xl text-slate-600">Pendaftaran Santri Baru Tahun Ajaran 2025/2026 telah dibuka. Segera daftarkan putra-putri Anda.</p>
+                        <h2 className="text-4xl lg:text-6xl font-bold text-slate-900 tracking-tight">{ctaTitle}</h2>
+                        <p className="text-xl text-slate-600">{ctaDesc}</p>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
                             <Link to="/ppdb">

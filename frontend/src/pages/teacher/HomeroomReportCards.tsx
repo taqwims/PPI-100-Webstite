@@ -72,7 +72,7 @@ const HomeroomReportCards: React.FC = () => {
                 {/* Print Header */}
                 <div className="hidden print:block mb-8 text-center text-black">
                     <h2 className="text-2xl font-bold uppercase">Laporan Hasil Belajar Siswa</h2>
-                    <h3 className="text-xl font-semibold">Pesantren Persis 100 Banjarsari</h3>
+                    <h3 className="text-xl font-semibold">SDIT An-Nur Banjarsari</h3>
                     <p className="text-sm mt-2">Jl. Raya Banjarsari No. 100, Ciamis, Jawa Barat</p>
                     <div className="w-full h-0.5 bg-black mt-4 mb-6"></div>
                 </div>

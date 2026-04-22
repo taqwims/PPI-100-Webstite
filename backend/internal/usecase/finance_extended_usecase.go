@@ -41,6 +41,24 @@ func (u *FinanceExtendedUsecase) SetActiveAcademicYear(id uint) error {
 	return u.financeRepo.SetActiveAcademicYear(id)
 }
 
+func (u *FinanceExtendedUsecase) GetAcademicYearByID(id uint) (*domain.AcademicYear, error) {
+	return u.financeRepo.GetAcademicYearByID(id)
+}
+
+func (u *FinanceExtendedUsecase) RolloverAcademicYear(fromYearID, toYearID uint) (int, error) {
+	// Validate both years exist
+	from, err := u.financeRepo.GetAcademicYearByID(fromYearID)
+	if err != nil || from == nil {
+		return 0, fmt.Errorf("tahun ajaran asal (ID: %d) tidak ditemukan", fromYearID)
+	}
+	to, err := u.financeRepo.GetAcademicYearByID(toYearID)
+	if err != nil || to == nil {
+		return 0, fmt.Errorf("tahun ajaran tujuan (ID: %d) tidak ditemukan", toYearID)
+	}
+
+	return u.financeRepo.RolloverAcademicYear(fromYearID, toYearID)
+}
+
 // ------------------- Savings -------------------
 
 func (u *FinanceExtendedUsecase) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error {

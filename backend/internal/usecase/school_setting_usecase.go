@@ -37,6 +37,12 @@ func (u *SchoolSettingUsecase) GetSchoolInfo() map[string]string {
 		"school_phone":    "phone",
 		"school_email":    "email",
 		"school_npsn":     "npsn",
+		"landing_hero_title": "landing_hero_title",
+		"landing_hero_subtitle": "landing_hero_subtitle",
+		"landing_about_title": "landing_about_title",
+		"landing_about_desc": "landing_about_desc",
+		"landing_cta_title": "landing_cta_title",
+		"landing_cta_desc": "landing_cta_desc",
 	}
 
 	for _, s := range settings {

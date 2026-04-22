@@ -29,7 +29,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                 <div className="container mx-auto px-6 py-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="text-slate-500 text-sm">
-                            © 2025 Pesantren Persis 100 Banjar­sari. All rights reserved.
+                            © 2026 SDIT An-Nur Banjar­sari. All rights reserved.
                         </div>
                         <div className="flex gap-6">
                             <a href="https://www.instagram.com/ppi100banjarsari_?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank" className="text-slate-400 hover:text-green-600 transition-colors">Instagram</a>
@@ -39,7 +39,7 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                     </div>
                 </div>
             </footer>
-            
+
             <PWAPrompt />
         </div>
     );

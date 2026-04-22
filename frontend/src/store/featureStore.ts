@@ -17,6 +17,12 @@ interface SchoolInfo {
     phone: string;
     email: string;
     npsn: string;
+    landing_hero_title?: string;
+    landing_hero_subtitle?: string;
+    landing_about_title?: string;
+    landing_about_desc?: string;
+    landing_cta_title?: string;
+    landing_cta_desc?: string;
 }
 
 interface FeatureState {

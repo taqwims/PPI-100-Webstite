@@ -80,7 +80,7 @@ const PPDB: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.4 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Isi formulir di bawah ini untuk mendaftarkan putra-putri Anda di Pesantren Persis 100 Banjar­sari.
+                        Isi formulir di bawah ini untuk mendaftarkan putra-putri Anda di SDIT An-Nur.
                     </motion.p>
                 </div>
             </section>

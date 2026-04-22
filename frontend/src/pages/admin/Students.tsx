@@ -20,6 +20,14 @@ interface Student {
         id: number;
         name: string;
     };
+    parent?: {
+        id: string;
+        phone: string;
+        user?: {
+            name: string;
+            phone: string;
+        }
+    };
     unit_id: number;
 }
 
@@ -206,6 +214,7 @@ const Students: React.FC = () => {
                             <TableHeadGlass>NISN</TableHeadGlass>
                             <TableHeadGlass>Nama</TableHeadGlass>
                             <TableHeadGlass>Kelas</TableHeadGlass>
+                            <TableHeadGlass>Orang Tua</TableHeadGlass>
                             <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
                         </TableRowGlass>
                     </TableHeaderGlass>
@@ -236,6 +245,14 @@ const Students: React.FC = () => {
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-slate-900 border border-white/10">
                                             {student.class?.name || '-'}
                                         </span>
+                                    </TableCellGlass>
+                                    <TableCellGlass>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium text-slate-900">{student.parent?.user?.name || '-'}</span>
+                                            {student.parent?.user?.phone && (
+                                                <span className="text-xs text-slate-500">{student.parent.user.phone}</span>
+                                            )}
+                                        </div>
                                     </TableCellGlass>
                                     <TableCellGlass className="text-right">
                                         <div className="flex justify-end gap-2">

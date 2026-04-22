@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 	"time"
@@ -9,11 +10,12 @@ import (
 )
 
 type BKUsecase struct {
-	bkRepo *postgres.BKRepository
+	bkRepo   *postgres.BKRepository
+	userRepo *postgres.UserRepository
 }
 
-func NewBKUsecase(bkRepo *postgres.BKRepository) *BKUsecase {
-	return &BKUsecase{bkRepo: bkRepo}
+func NewBKUsecase(bkRepo *postgres.BKRepository, userRepo *postgres.UserRepository) *BKUsecase {
+	return &BKUsecase{bkRepo: bkRepo, userRepo: userRepo}
 }
 
 func (u *BKUsecase) CreateViolation(name string, points int, description string) error {
@@ -46,6 +48,17 @@ func (u *BKUsecase) GetAllBKCalls(unitID uint) ([]domain.BKCall, error) {
 
 func (u *BKUsecase) GetStudentBKCalls(studentID string) ([]domain.BKCall, error) {
 	return u.bkRepo.GetBKCallsByStudent(studentID)
+}
+
+func (u *BKUsecase) GetStudentBKCallsByUserID(userID string) ([]domain.BKCall, error) {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Student == nil {
+		return nil, errors.New("user is not a student")
+	}
+	return u.bkRepo.GetBKCallsByStudent(user.Student.ID.String())
 }
 
 // Update/Delete Violation

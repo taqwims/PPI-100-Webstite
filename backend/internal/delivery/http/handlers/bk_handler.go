@@ -12,11 +12,15 @@ import (
 )
 
 type BKHandler struct {
-	bkUsecase *usecase.BKUsecase
+	bkUsecase       *usecase.BKUsecase
+	academicUsecase *usecase.AcademicUsecase
 }
 
-func NewBKHandler(bkUsecase *usecase.BKUsecase) *BKHandler {
-	return &BKHandler{bkUsecase: bkUsecase}
+func NewBKHandler(bkUsecase *usecase.BKUsecase, academicUsecase *usecase.AcademicUsecase) *BKHandler {
+	return &BKHandler{
+		bkUsecase:       bkUsecase,
+		academicUsecase: academicUsecase,
+	}
 }
 
 type CreateViolationRequest struct {
@@ -102,6 +106,34 @@ func (h *BKHandler) GetAllBKCalls(c *gin.Context) {
 	}
 
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
+
+	// Auto-detect: if no student_id or unit_id, try to resolve from JWT
+	if unitID == 0 {
+		userIDVal, exists := c.Get("userID")
+		if exists && h.academicUsecase != nil {
+			var userID string
+			if id, ok := userIDVal.(string); ok {
+				userID = id
+			} else if id, ok := userIDVal.(uuid.UUID); ok {
+				userID = id.String()
+			}
+			if userID != "" {
+				// Try to get student profile from user
+				_, err := h.academicUsecase.GetStudentClassIDByUserID(userID)
+				if err == nil {
+					// User is a student — fetch their BK calls using the user-resolved student ID
+					// GetStudentClassIDByUserID internally loads User.Student, so we know user has student record
+					// We need the student.ID, so let's use the BK handler's own method
+					calls, err := h.bkUsecase.GetStudentBKCallsByUserID(userID)
+					if err == nil {
+						c.JSON(http.StatusOK, calls)
+						return
+					}
+				}
+			}
+		}
+	}
+
 	calls, err := h.bkUsecase.GetAllBKCalls(uint(unitID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -5,11 +5,12 @@ import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import {
     Building2, MapPin, Phone, Mail, Hash, Save, Camera,
     Database, Download, Trash2, RotateCcw, Clock, CheckCircle2,
-    XCircle, AlertTriangle, Info, Shield, HardDrive, FileText
+    XCircle, AlertTriangle, Info, Shield, HardDrive, FileText, CreditCard
 } from 'lucide-react';
 import api from '../../services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFeatureStore } from '../../store/featureStore';
+import SchoolBankAccounts from '../finance/SchoolBankAccounts';
 
 // ─── Types ───
 interface SchoolSetting {
@@ -54,7 +55,7 @@ interface BackupData {
     created_at: string;
 }
 
-type TabKey = 'profile' | 'units' | 'backup';
+type TabKey = 'profile' | 'units' | 'backup' | 'bank_accounts' | 'landing_page';
 
 // ─── Helpers ───
 function formatBytes(bytes: number): string {
@@ -107,6 +108,8 @@ const SchoolSettings: React.FC = () => {
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: 'profile', label: 'Profil Sekolah', icon: <Building2 size={16} /> },
         { key: 'units', label: 'Unit Sekolah', icon: <Shield size={16} /> },
+        { key: 'bank_accounts', label: 'Rekening Bank', icon: <CreditCard size={16} /> },
+        { key: 'landing_page', label: 'Landing Page', icon: <FileText size={16} /> },
         { key: 'backup', label: 'Backup & Restore', icon: <Database size={16} /> },
     ];
 
@@ -139,6 +142,12 @@ const SchoolSettings: React.FC = () => {
             {activeTab === 'profile' && <ProfileTab onSaved={fetchFeatures} />}
             {activeTab === 'units' && <UnitsTab />}
             {activeTab === 'backup' && <BackupTab />}
+            {activeTab === 'bank_accounts' && (
+                <div className="bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-200">
+                    <SchoolBankAccounts />
+                </div>
+            )}
+            {activeTab === 'landing_page' && <LandingPageTab onSaved={fetchFeatures} />}
         </div>
     );
 };
@@ -326,6 +335,134 @@ const ProfileTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                 </form>
             </CardGlass>
         </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab: Landing Page ───
+// ═══════════════════════════════════════════
+const LandingPageTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
+    const queryClient = useQueryClient();
+
+    const { data: settings, isLoading } = useQuery<SchoolSetting[]>({
+        queryKey: ['school-settings'],
+        queryFn: async () => {
+            const res = await api.get('/admin/settings');
+            return res.data;
+        },
+    });
+
+    const [form, setForm] = useState<Record<string, string>>({});
+
+    React.useEffect(() => {
+        if (settings && Object.keys(form).length === 0) {
+            const f: Record<string, string> = {};
+            settings.forEach(s => { 
+                if (s.key.startsWith('landing_') && s.is_admin_edit) {
+                    f[s.key] = s.value;
+                }
+            });
+            setForm(f);
+        }
+    }, [settings]);
+
+    const updateField = (key: string, value: string) => {
+        setForm(prev => ({ ...prev, [key]: value }));
+    };
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            const updates = Object.entries(form).map(([key, value]) => ({ key, value }));
+            return api.put('/admin/settings', { settings: updates });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['school-settings'] });
+            onSaved();
+            alert('Pengaturan Landing Page berhasil disimpan!');
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.error || 'Gagal menyimpan');
+        },
+    });
+
+    if (isLoading) {
+        return <CardGlass className="p-8 text-center text-slate-500">Memuat pengaturan...</CardGlass>;
+    }
+
+    return (
+        <CardGlass className="p-6 space-y-6">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <FileText size={20} className="text-green-600" />
+                Konten Teks Landing Page
+            </h3>
+
+            <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="space-y-5">
+                <div className="grid md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Judul Hero (Slider)</label>
+                        <InputGlass
+                            value={form.landing_hero_title || ''}
+                            onChange={(e) => updateField('landing_hero_title', e.target.value)}
+                            placeholder="Masa Depan Cerah Dimulai dari Sini"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Sub-Judul Hero</label>
+                        <InputGlass
+                            value={form.landing_hero_subtitle || ''}
+                            onChange={(e) => updateField('landing_hero_subtitle', e.target.value)}
+                            placeholder="Mendidik generasi unggul dengan akhlak islami"
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-sm text-slate-600 font-medium">Judul Tentang Kami</label>
+                    <InputGlass
+                        value={form.landing_about_title || ''}
+                        onChange={(e) => updateField('landing_about_title', e.target.value)}
+                        placeholder="Keunggulan Kami"
+                    />
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-sm text-slate-600 font-medium">Deskripsi Tentang Kami</label>
+                    <textarea
+                        value={form.landing_about_desc || ''}
+                        onChange={(e) => updateField('landing_about_desc', e.target.value)}
+                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+                        rows={3}
+                        placeholder="Fasilitas modern dan kurikulum terintegrasi..."
+                    />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Judul Ajakan (CTA)</label>
+                        <InputGlass
+                            value={form.landing_cta_title || ''}
+                            onChange={(e) => updateField('landing_cta_title', e.target.value)}
+                            placeholder="Siap Bergabung Bersama Kami?"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-sm text-slate-600 font-medium">Deskripsi Ajakan (CTA)</label>
+                        <InputGlass
+                            value={form.landing_cta_desc || ''}
+                            onChange={(e) => updateField('landing_cta_desc', e.target.value)}
+                            placeholder="Pendaftaran Santri Baru Tahun Ajaran..."
+                        />
+                    </div>
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                    <ButtonGlass type="submit" className="flex items-center gap-2" disabled={saveMutation.isPending}>
+                        <Save size={18} />
+                        {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Konten'}
+                    </ButtonGlass>
+                </div>
+            </form>
+        </CardGlass>
     );
 };
 

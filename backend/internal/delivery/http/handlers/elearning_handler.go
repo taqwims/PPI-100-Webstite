@@ -13,10 +13,14 @@ import (
 
 type ElearningHandler struct {
 	elearningUsecase *usecase.ElearningUsecase
+	academicUsecase  *usecase.AcademicUsecase
 }
 
-func NewElearningHandler(elearningUsecase *usecase.ElearningUsecase) *ElearningHandler {
-	return &ElearningHandler{elearningUsecase: elearningUsecase}
+func NewElearningHandler(elearningUsecase *usecase.ElearningUsecase, academicUsecase *usecase.AcademicUsecase) *ElearningHandler {
+	return &ElearningHandler{
+		elearningUsecase: elearningUsecase,
+		academicUsecase:  academicUsecase,
+	}
 }
 
 type CreateMaterialRequest struct {
@@ -53,6 +57,25 @@ func (h *ElearningHandler) GetMaterials(c *gin.Context) {
 	classID, _ := strconv.Atoi(c.Query("class_id"))
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
 
+	// Auto-detect classID from JWT if not provided
+	if classID == 0 && unitID == 0 {
+		userIDVal, exists := c.Get("userID")
+		if exists {
+			var userID string
+			if id, ok := userIDVal.(string); ok {
+				userID = id
+			} else if id, ok := userIDVal.(uuid.UUID); ok {
+				userID = id.String()
+			}
+			if userID != "" && h.academicUsecase != nil {
+				cid, err := h.academicUsecase.GetStudentClassIDByUserID(userID)
+				if err == nil {
+					classID = int(cid)
+				}
+			}
+		}
+	}
+
 	var materials []domain.Material
 	var err error
 
@@ -61,11 +84,7 @@ func (h *ElearningHandler) GetMaterials(c *gin.Context) {
 	} else if unitID != 0 {
 		materials, err = h.elearningUsecase.GetMaterialsByUnit(uint(unitID))
 	} else {
-		// If no filter, maybe return empty or all? For now, let's return all if no filter (or handle in usecase)
-		// But usecase GetMaterials takes classID.
-		// We need to update usecase interface too.
-		// For now let's assume usecase has GetMaterialsByUnit.
-		materials, err = h.elearningUsecase.GetMaterialsByUnit(uint(unitID)) // Default to unit filter if provided
+		materials = []domain.Material{}
 	}
 
 	if err != nil {
@@ -115,6 +134,25 @@ func (h *ElearningHandler) GetTasks(c *gin.Context) {
 	classID, _ := strconv.Atoi(c.Query("class_id"))
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
 
+	// Auto-detect classID from JWT if not provided
+	if classID == 0 && unitID == 0 {
+		userIDVal, exists := c.Get("userID")
+		if exists {
+			var userID string
+			if id, ok := userIDVal.(string); ok {
+				userID = id
+			} else if id, ok := userIDVal.(uuid.UUID); ok {
+				userID = id.String()
+			}
+			if userID != "" && h.academicUsecase != nil {
+				cid, err := h.academicUsecase.GetStudentClassIDByUserID(userID)
+				if err == nil {
+					classID = int(cid)
+				}
+			}
+		}
+	}
+
 	var tasks []domain.Task
 	var err error
 
@@ -123,7 +161,7 @@ func (h *ElearningHandler) GetTasks(c *gin.Context) {
 	} else if unitID != 0 {
 		tasks, err = h.elearningUsecase.GetTasksByUnit(uint(unitID))
 	} else {
-		tasks, err = h.elearningUsecase.GetTasksByUnit(uint(unitID))
+		tasks = []domain.Task{}
 	}
 
 	if err != nil {
