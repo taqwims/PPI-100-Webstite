@@ -60,7 +60,7 @@ const NavbarGlass: React.FC = () => {
                     <div className="hidden md:block">
                         <Link to="/login">
                             <ButtonGlass variant="primary" className="px-6 py-2 text-sm">
-                                Login SIS
+                                Login
                             </ButtonGlass>
                         </Link>
                     </div>
@@ -91,7 +91,7 @@ const NavbarGlass: React.FC = () => {
                             ))}
                             <hr className="border-white/10 my-2" />
                             <Link to="/login" onClick={() => setIsOpen(false)}>
-                                <ButtonGlass className="w-full">Login SIS</ButtonGlass>
+                                <ButtonGlass className="w-full">Login</ButtonGlass>
                             </Link>
                         </div>
                     </div>

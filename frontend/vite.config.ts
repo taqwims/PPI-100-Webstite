@@ -8,11 +8,11 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'images/logo.png', 'images/logo.jpeg'],
+            includeAssets: ['favicon.ico', 'images/logo.jpeg', 'images/logo.jpeg'],
             manifest: {
                 name: 'SDIT AN-NUR - Sistem Keuangan',
                 short_name: 'SDIT Keuangan',
-                description: 'Sistem Manajemen Keuangan SDIT Pondok Pesantren Islam AN-NUR',
+                description: 'Sistem Manajemen Keuangan SDIT AN-NUR',
                 theme_color: '#059669',
                 background_color: '#ffffff',
                 display: 'standalone',
@@ -21,13 +21,13 @@ export default defineConfig({
                 scope: '/',
                 icons: [
                     {
-                        src: '/images/logo.png',
+                        src: '/images/logo.jpeg',
                         sizes: '192x192',
                         type: 'image/png',
                         purpose: 'any maskable'
                     },
                     {
-                        src: '/images/logo.png',
+                        src: '/images/logo.jpeg',
                         sizes: '512x512',
                         type: 'image/png',
                         purpose: 'any maskable'
