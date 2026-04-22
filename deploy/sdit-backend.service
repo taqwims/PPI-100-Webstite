@@ -5,24 +5,31 @@ After=network.target postgresql.service
 [Service]
 Type=simple
 # Ubah user 'ubuntu' jika sistem VPS Anda menggunakan nama user lain (misalnya 'root' atau 'debian')
-User=ubuntu
-Group=ubuntu
+User=root
+Group=root
 
 # Sesuaikan dengan lokasi folder root / backend project Anda di VPS
-WorkingDirectory=/home/ubuntu/sdit-app/backend
+WorkingDirectory=~/sdit_web/PPI-100-Webstite/backend
 
 # Perintah untuk menjalankan program yang sudah di-build
-ExecStart=/home/ubuntu/sdit-app/backend/main
+ExecStart=~/sdit_web/PPI-100-Webstite/backend/server
 
 # Auto restart jika error/crash
 Restart=always
 RestartSec=5
 
 # Ambil environment file dari .env
-EnvironmentFile=/home/ubuntu/sdit-app/.env
+EnvironmentFile=~/sdit_web/PPI-100-Webstite/.env
 
 # Ganti lokasi path ini agar Go bisa menemukan binary pg_dump dan command exec lainnya jika di butuhkan
 Environment="PATH=/usr/local/go/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin"
 
 [Install]
 WantedBy=multi-user.target
+
+
+sudo cp ~/root/sdit_web/PPI-100-Webstite/deploy/sdit-backend.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable sdit-backend
+sudo systemctl start sdit-backend
+
