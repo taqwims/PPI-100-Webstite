@@ -9,13 +9,13 @@ import { useAuthStore } from '../store/authStore';
  * Menggunakan React Query untuk fetch dan cache user profile.
  */
 export const useAuth = () => {
-    const { user, token, login, logout, setUser, isAuthenticated } = useAuthStore();
+    const { user, login, logout, setUser, isAuthenticated } = useAuthStore();
 
-    // Fetch user profile jika token ada
+    // Fetch user profile jika sudah terautentikasi tapi data user belum ada
     const { data: profileData, isLoading: isLoadingProfile, isError } = useQuery({
         queryKey: ['profile'],
         queryFn: () => api.get('/profile').then((r) => r.data),
-        enabled: !!token && !user,
+        enabled: isAuthenticated && !user,
     });
 
     useEffect(() => {
@@ -29,7 +29,6 @@ export const useAuth = () => {
 
     return {
         user,
-        token,
         isAuthenticated,
         isLoadingProfile,
         login,
