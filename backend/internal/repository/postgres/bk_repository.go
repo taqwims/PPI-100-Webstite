@@ -26,6 +26,20 @@ func (r *BKRepository) GetAllViolations() ([]domain.Violation, error) {
 }
 
 // BK Calls
+func (r *BKRepository) RecordStudentViolation(sv *domain.StudentViolation) error {
+	return r.db.Create(sv).Error
+}
+
+func (r *BKRepository) GetTotalViolationPoints(studentID string) (int, error) {
+	var totalPoints int64
+	err := r.db.Model(&domain.StudentViolation{}).
+		Joins("JOIN violations ON violations.id = student_violations.violation_id").
+		Where("student_violations.student_id = ?", studentID).
+		Select("COALESCE(SUM(violations.points), 0)").
+		Scan(&totalPoints).Error
+	return int(totalPoints), err
+}
+
 func (r *BKRepository) CreateBKCall(call *domain.BKCall) error {
 	return r.db.Create(call).Error
 }

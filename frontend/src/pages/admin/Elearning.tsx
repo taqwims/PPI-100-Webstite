@@ -8,6 +8,7 @@ import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 
 interface Material {
     id: string;
@@ -62,6 +63,7 @@ interface Teacher {
 
 const Elearning: React.FC = () => {
     const { user } = useAuth();
+    const { units: activeUnits } = useUnits();
     const [activeTab, setActiveTab] = useState<'materials' | 'tasks'>('materials');
     const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -427,8 +429,9 @@ const Elearning: React.FC = () => {
                             className="bg-transparent text-slate-900 border-none focus:ring-0 text-sm border-r border-white/20 pr-2 mr-2"
                             disabled={user?.role_id !== 1}
                         >
-                            <option value={1} className="bg-gray-900">MTS</option>
-                            <option value={2} className="bg-gray-900">MA</option>
+                            {activeUnits.map(u => (
+                                <option key={u.id} value={u.id} className="bg-gray-900">{u.name}</option>
+                            ))}
                         </select>
                     )}
                     <Filter size={18} className="text-slate-300-400" />

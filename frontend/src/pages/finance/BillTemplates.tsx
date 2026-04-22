@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 import { FileStack, Plus, Users, GraduationCap, Tag, CheckSquare, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ const formatCurrency = (amount: number) =>
 
 const BillTemplates = () => {
     const { user } = useAuth();
+    const { units: activeUnits } = useUnits();
     const [unitID, setUnitID] = useState(user?.unit_id || 1);
     const [classes, setClasses] = useState<ClassData[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -186,14 +188,12 @@ const BillTemplates = () => {
             {/* Unit Switcher */}
             {[1, 9, 10].includes(user?.role_id || 0) && (
                 <div className="p-1 bg-slate-100 rounded-lg inline-flex shadow-sm border border-slate-200">
-                    <button onClick={() => setUnitID(1)}
-                        className={clsx("px-4 py-1.5 text-sm font-medium rounded-md transition", unitID === 1 ? "bg-white text-blue-700 shadow" : "text-slate-500 hover:text-slate-700")}>
-                        MTS
-                    </button>
-                    <button onClick={() => setUnitID(2)}
-                        className={clsx("px-4 py-1.5 text-sm font-medium rounded-md transition", unitID === 2 ? "bg-white text-blue-700 shadow" : "text-slate-500 hover:text-slate-700")}>
-                        MA
-                    </button>
+                    {activeUnits.map(u => (
+                        <button key={u.id} onClick={() => setUnitID(u.id)}
+                            className={clsx("px-4 py-1.5 text-sm font-medium rounded-md transition", unitID === u.id ? "bg-white text-blue-700 shadow" : "text-slate-500 hover:text-slate-700")}>
+                            {u.name}
+                        </button>
+                    ))}
                 </div>
             )}
 

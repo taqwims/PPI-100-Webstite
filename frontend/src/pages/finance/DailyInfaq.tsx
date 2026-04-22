@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 import { useDailyInfaq } from '../../hooks/useDailyInfaq';
+import { useUnits } from '../../hooks/useUnits';
 
 import DailyInfaqStats from '../../components/finance/DailyInfaq/DailyInfaqStats';
 import DailyInfaqFilter from '../../components/finance/DailyInfaq/DailyInfaqFilter';
@@ -25,6 +26,8 @@ const DailyInfaq = () => {
         classList, staffList, transactionCodes, infaqTypes
     } = useDailyInfaq();
 
+    const { units: activeUnits } = useUnits();
+
     return (
         <div className="space-y-6">
             <div className="space-y-6">
@@ -45,24 +48,18 @@ const DailyInfaq = () => {
                         </button>
                         {[1, 9, 10].includes(user?.role_id || 0) && (
                             <div className="p-1 bg-slate-100 rounded-lg hidden sm:flex shadow-sm border border-slate-200">
-                                <button
-                                    onClick={() => setUnitID(1)}
-                                    className={clsx(
-                                        "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                                        unitID === 1 ? "bg-white text-emerald-700 shadow flex items-center" : "text-slate-500 hover:text-slate-700"
-                                    )}
-                                >
-                                    MTS
-                                </button>
-                                <button
-                                    onClick={() => setUnitID(2)}
-                                    className={clsx(
-                                        "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                                        unitID === 2 ? "bg-white text-emerald-700 shadow flex items-center" : "text-slate-500 hover:text-slate-700"
-                                    )}
-                                >
-                                    MA
-                                </button>
+                                {activeUnits.map(u => (
+                                    <button
+                                        key={u.id}
+                                        onClick={() => setUnitID(u.id)}
+                                        className={clsx(
+                                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                            unitID === u.id ? "bg-white text-emerald-700 shadow flex items-center" : "text-slate-500 hover:text-slate-700"
+                                        )}
+                                    >
+                                        {u.name}
+                                    </button>
+                                ))}
                             </div>
                         )}
                         {canManage && (

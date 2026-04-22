@@ -142,6 +142,46 @@ func (h *BKHandler) GetAllBKCalls(c *gin.Context) {
 	c.JSON(http.StatusOK, calls)
 }
 
+type RecordStudentViolationRequest struct {
+	StudentID   string `json:"student_id" binding:"required"`
+	TeacherID   string `json:"teacher_id" binding:"required"`
+	ViolationID uint   `json:"violation_id" binding:"required"`
+	Date        string `json:"date" binding:"required"`
+}
+
+func (h *BKHandler) RecordStudentViolation(c *gin.Context) {
+	var req RecordStudentViolationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	studentUUID, err := uuid.Parse(req.StudentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student ID"})
+		return
+	}
+
+	teacherUUID, err := uuid.Parse(req.TeacherID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher ID"})
+		return
+	}
+
+	date, err := time.Parse("2006-01-02", req.Date)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format (YYYY-MM-DD)"})
+		return
+	}
+
+	if err := h.bkUsecase.RecordStudentViolation(studentUUID, teacherUUID, req.ViolationID, date); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Student violation recorded successfully"})
+}
+
 // Update/Delete Violation
 func (h *BKHandler) UpdateViolation(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))

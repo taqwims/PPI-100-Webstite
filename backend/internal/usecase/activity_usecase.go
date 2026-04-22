@@ -34,6 +34,10 @@ func (u *ActivityUsecase) GetAllByAcademicYear(academicYearID uint) ([]domain.Ac
 	return u.activityRepo.GetAllByAcademicYear(academicYearID)
 }
 
+func (u *ActivityUsecase) GetAll() ([]domain.Activity, error) {
+	return u.activityRepo.GetAll()
+}
+
 func (u *ActivityUsecase) GetByID(id uuid.UUID) (*domain.Activity, error) {
 	return u.activityRepo.GetByID(id)
 }

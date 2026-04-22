@@ -8,6 +8,7 @@ import { TableGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 import toast from 'react-hot-toast';
 
 const DAYS = [
@@ -21,6 +22,7 @@ const DAYS = [
 
 const Academic = () => {
     const { user } = useAuth();
+    const { units } = useUnits();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<'classes' | 'subjects' | 'schedules'>('classes');
     const [unitID, setUnitID] = useState(user?.unit_id || 1);
@@ -30,16 +32,6 @@ const Academic = () => {
     // Form States
     const [formData, setFormData] = useState<any>({});
     const [editingId, setEditingId] = useState<number | null>(null);
-
-    // --- Fetch Units dynamically ---
-    const { data: units } = useQuery({
-        queryKey: ['school_units'],
-        queryFn: async () => {
-            const res = await api.get('/admin/units');
-            return res.data || [];
-        },
-        enabled: user?.role_id === 1,
-    });
 
     // --- Data Fetching with React Query ---
 
@@ -488,8 +480,9 @@ const Academic = () => {
                             onChange={(e) => setUnitID(Number(e.target.value))}
                             className="bg-white/40 border border-slate-200 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
-                            <option value={1} className="bg-white">MTS</option>
-                            <option value={2} className="bg-white">MA</option>
+                            {units.map((unit: any) => (
+                                <option key={unit.id} value={unit.id} className="bg-white">{unit.name}</option>
+                            ))}
                         </select>
                     ) : null}
                     <ButtonGlass onClick={() => handleOpenModal()} icon={Plus}>

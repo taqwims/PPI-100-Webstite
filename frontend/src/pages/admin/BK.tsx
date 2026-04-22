@@ -8,6 +8,7 @@ import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 
 interface Violation {
     id: string;
@@ -47,6 +48,7 @@ interface Teacher {
 
 const BK: React.FC = () => {
     const { user } = useAuth();
+    const { units: activeUnits } = useUnits();
     const [activeTab, setActiveTab] = useState<'violations' | 'calls'>('violations');
     const [unitID, setUnitID] = useState(user?.unit_id || 1);
     const [isViolationModalOpen, setIsViolationModalOpen] = useState(false);
@@ -222,8 +224,9 @@ const BK: React.FC = () => {
                             className="bg-white/10 border border-white/20 text-slate-900 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             disabled={user?.role_id !== 1} // Only Super Admin can switch
                         >
-                            <option value={1} className="bg-gray-900">MTS</option>
-                            <option value={2} className="bg-gray-900">MA</option>
+                            {activeUnits.map(u => (
+                                <option key={u.id} value={u.id} className="bg-gray-900">{u.name}</option>
+                            ))}
                         </select>
                     </div>
                 )}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
+	"ppi-100-sis/pkg/utils"
 	"strconv"
 	"strings"
 	"time"
@@ -80,7 +81,8 @@ func (h *FinanceHandler) GetAllBills(c *gin.Context) {
 	unitIDStr := c.Query("unit_id")
 	if unitIDStr != "" {
 		unitID, _ := strconv.Atoi(unitIDStr)
-		bills, err := h.financeUsecase.GetAllBills(uint(unitID))
+		securedUnitID := utils.EnforceUnitID(c, uint(unitID))
+		bills, err := h.financeUsecase.GetAllBills(securedUnitID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -518,6 +520,7 @@ func (h *FinanceHandler) CreateBillTemplate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.UnitID = utils.EnforceUnitID(c, req.UnitID)
 
 	template := &domain.BillTemplate{
 		TemplateName:      req.TemplateName,
@@ -548,8 +551,9 @@ func (h *FinanceHandler) GetBillTemplates(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid unit_id"})
 		return
 	}
+	securedUnitID := utils.EnforceUnitID(c, uint(unitID))
 
-	templates, err := h.financeUsecase.GetBillTemplates(uint(unitID))
+	templates, err := h.financeUsecase.GetBillTemplates(securedUnitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

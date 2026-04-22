@@ -20,6 +20,7 @@ func RegisterAdminRoutes(
 	backupHandler *handlers.BackupHandler,
 	publicHandler *handlers.PublicHandler,
 	ppdbPaymentHandler *handlers.PPDBPaymentHandler,
+	parentHandler *handlers.ParentHandler,
 ) {
 	// ── Profile ──
 	rg.GET("/profile", profileHandler.GetProfile)
@@ -35,6 +36,18 @@ func RegisterAdminRoutes(
 		users.POST("/bulk", middleware.RoleMiddleware(1, 2, 3), userHandler.BulkCreateUsers)
 		users.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.UpdateUser)
 		users.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.DeleteUser)
+	}
+
+	// ── Parents ──
+	parents := rg.Group("/parents")
+	{
+		parents.GET("/", middleware.RoleMiddleware(1, 2, 3, 9), parentHandler.GetAllParents)
+		parents.GET("/:id", middleware.RoleMiddleware(1, 2, 3, 9), parentHandler.GetParentByID)
+		parents.POST("/", middleware.RoleMiddleware(1, 2, 3), parentHandler.CreateParent)
+		parents.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), parentHandler.UpdateParent)
+		parents.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3), parentHandler.DeleteParent)
+		parents.POST("/:id/assign", middleware.RoleMiddleware(1, 2, 3), parentHandler.AssignChild)
+		parents.DELETE("/:id/remove/:student_id", middleware.RoleMiddleware(1, 2, 3), parentHandler.RemoveChild)
 	}
 
 	// ── Notifications ──

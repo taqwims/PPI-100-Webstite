@@ -22,10 +22,14 @@ func RegisterPublicRoutes(
 	api.GET("/config/features", func(c *gin.Context) {
 		bankAccounts, _ := schoolBankUsecase.GetActive()
 		schoolInfo := schoolSettingUsecase.GetSchoolInfo()
+		units, _ := schoolSettingUsecase.GetActiveUnits()
+		foundations, _ := schoolSettingUsecase.GetFoundations()
 		c.JSON(200, gin.H{
 			"features":      cfg.FeatureMap(),
 			"school":        schoolInfo,
 			"bank_accounts": bankAccounts,
+			"units":         units,
+			"foundations":   foundations,
 		})
 	})
 
@@ -43,9 +47,9 @@ func RegisterPublicRoutes(
 		api.Group("/public").POST("/ppdb", publicHandler.RegisterPPDB)
 	}
 
-	// Public Units (for PPDB form and other public pages)
+	// Public Units (for PPDB form and other public pages) — only active units
 	api.GET("/public/units", func(c *gin.Context) {
-		units, err := schoolSettingUsecase.GetUnits()
+		units, err := schoolSettingUsecase.GetActiveUnits()
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return

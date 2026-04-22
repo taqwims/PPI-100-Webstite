@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -43,6 +45,10 @@ type Config struct {
 	SchoolName    string
 	SchoolLogoURL string
 	SchoolAddress string
+
+	// Unit & Foundation (Developer-only via ENV)
+	EnabledUnitIDs []uint  // Parsed from ENABLED_UNIT_IDS comma-separated
+	FoundationName string  // From FOUNDATION_NAME env
 
 	// Backup
 	BackupDir          string
@@ -123,6 +129,10 @@ func LoadConfig() (*Config, error) {
 		SchoolLogoURL: getEnv("SCHOOL_LOGO_URL", ""),
 		SchoolAddress: getEnv("SCHOOL_ADDRESS", ""),
 
+		// Unit & Foundation (Developer-only)
+		EnabledUnitIDs: getEnvUintSlice("ENABLED_UNIT_IDS"),
+		FoundationName: getEnv("FOUNDATION_NAME", ""),
+
 		// Backup
 		BackupDir:         getEnv("BACKUP_DIR", "./backups"),
 		DBDockerContainer: getEnv("DB_DOCKER_CONTAINER", ""),
@@ -142,4 +152,20 @@ func getEnvBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return val == "true" || val == "1" || val == "yes"
+}
+
+func getEnvUintSlice(key string) []uint {
+	val, exists := os.LookupEnv(key)
+	if !exists || val == "" {
+		return []uint{}
+	}
+	parts := strings.Split(val, ",")
+	result := make([]uint, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if n, err := strconv.ParseUint(p, 10, 32); err == nil {
+			result = append(result, uint(n))
+		}
+	}
+	return result
 }

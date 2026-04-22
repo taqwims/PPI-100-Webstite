@@ -92,6 +92,10 @@ func (u *SchoolSettingUsecase) GetUnits() ([]domain.Unit, error) {
 	return u.repo.GetUnits()
 }
 
+func (u *SchoolSettingUsecase) GetActiveUnits() ([]domain.Unit, error) {
+	return u.repo.GetActiveUnits()
+}
+
 func (u *SchoolSettingUsecase) GetFoundations() ([]domain.Foundation, error) {
 	return u.repo.GetFoundations()
 }

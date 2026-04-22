@@ -26,6 +26,10 @@ func main() {
 
 	// Seed default school settings from env vars (only inserts if not exist)
 	postgres.SeedSchoolSettings(db, cfg)
+	// Seed unit activation from ENABLED_UNIT_IDS env
+	postgres.SeedUnitActivation(db, cfg.EnabledUnitIDs)
+	// Seed foundation name from FOUNDATION_NAME env
+	postgres.SeedFoundation(db, cfg.FoundationName)
 
 	r := gin.Default()
 

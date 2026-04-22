@@ -1,22 +1,51 @@
 package usecase
 
 import (
+	"fmt"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/internal/utils"
+	"time"
 
 	"github.com/google/uuid"
 )
 
+type WAJob struct {
+	Phone   string
+	Message string
+}
+
 type NotificationUsecase struct {
 	notificationRepo *postgres.NotificationRepository
 	waService        *utils.WAService
+	waQueue          chan WAJob
 }
 
 func NewNotificationUsecase(notificationRepo *postgres.NotificationRepository, waService *utils.WAService) *NotificationUsecase {
-	return &NotificationUsecase{
+	u := &NotificationUsecase{
 		notificationRepo: notificationRepo,
 		waService:        waService,
+		waQueue:          make(chan WAJob, 1000), // Buffer for up to 1000 messages
+	}
+
+	// Start background worker
+	go u.waWorker()
+
+	return u
+}
+
+// waWorker runs in the background and processes WA messages sequentially
+// to respect API rate limits and avoid blocking main HTTP threads.
+func (u *NotificationUsecase) waWorker() {
+	for job := range u.waQueue {
+		if u.waService != nil {
+			err := u.waService.SendWhatsApp(job.Phone, job.Message)
+			if err != nil {
+				fmt.Printf("[WA Worker] Failed to send WA to %s: %v\n", job.Phone, err)
+			}
+			// Sleep slightly to prevent rate limit issues
+			time.Sleep(500 * time.Millisecond)
+		}
 	}
 }
 
@@ -52,7 +81,14 @@ func (u *NotificationUsecase) SendWhatsApp(phone, message string) error {
 	if u.waService == nil {
 		return nil // Service not initialized
 	}
-	return u.waService.SendWhatsApp(phone, message)
+	
+	// Send to queue instead of blocking
+	select {
+	case u.waQueue <- WAJob{Phone: phone, Message: message}:
+		return nil
+	default:
+		return fmt.Errorf("whatsapp queue is full")
+	}
 }
 
 func (u *NotificationUsecase) GetWATemplateByID(id uint) (*domain.WATemplate, error) {

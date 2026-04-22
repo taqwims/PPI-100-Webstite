@@ -66,6 +66,24 @@ func (u *FinanceUsecase) safeProcessWATemplate(body string, student *domain.Stud
 	return res
 }
 
+func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill, amount float64) {
+	if parent.Phone == "" {
+		return
+	}
+
+	msg := fmt.Sprintf("*BUKTI PEMBAYARAN - SDIT AN-NUR*\n\nTerima kasih, pembayaran sebesar *Rp%.0f* untuk tagihan *%s* an. *%s* telah kami terima dan diverifikasi.\n\nSemoga berkah.", amount, bill.Title, student.User.Name)
+	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
+}
+
+func (u *FinanceUsecase) triggerMultiPaymentWA(student *domain.Student, parent *domain.Parent, count int, amount float64) {
+	if parent.Phone == "" {
+		return
+	}
+
+	msg := fmt.Sprintf("*BUKTI PEMBAYARAN MULTI-TAGIHAN - SDIT AN-NUR*\n\nTerima kasih, pembayaran sebesar *Rp%.0f* untuk *%d tagihan* an. *%s* telah kami terima dan diverifikasi.\n\nSemoga berkah.", amount, count, student.User.Name)
+	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
+}
+
 // helper: get parent record by parent.ID
 func (u *FinanceUsecase) getParentByID(parentID uuid.UUID) (*domain.Parent, error) {
 	return u.studentRepo.GetParentByID(parentID.String())

@@ -7,6 +7,7 @@ import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
+import { useUnits } from '../../hooks/useUnits';
 
 interface Student {
     id: string;
@@ -23,6 +24,7 @@ interface Student {
 }
 
 const HomeroomStudents: React.FC = () => {
+    const { units: activeUnits } = useUnits();
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -264,8 +266,9 @@ const HomeroomStudents: React.FC = () => {
                             className="w-full glass-input"
                             required
                         >
-                            <option value={1} className="bg-gray-900">MTS</option>
-                            <option value={2} className="bg-gray-900">MA</option>
+                            {activeUnits.map(u => (
+                                <option key={u.id} value={u.id} className="bg-gray-900">{u.name}</option>
+                            ))}
                         </select>
                     </div>
 

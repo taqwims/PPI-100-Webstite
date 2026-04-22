@@ -5,11 +5,13 @@ import { Users, BookOpen, DollarSign, Clock, AlertCircle, FileText } from 'lucid
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { Link } from 'react-router-dom';
+import PrincipalDashboard from './finance/PrincipalDashboard';
+import ExecutiveDashboard from './finance/ExecutiveDashboard';
 
 const DashboardHome: React.FC = () => {
     const { user } = useAuth();
 
-    // Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua
+    // Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara, 10=Teller Tabungan, 11=Teller Infaq
 
     if (!user) return null;
 
@@ -19,6 +21,16 @@ const DashboardHome: React.FC = () => {
         return <TeacherDashboard />;
     } else if (user.role_id === 6) {
         return <StudentDashboard />;
+    } else if (user.role_id === 7) {
+        return <ParentDashboard />;
+    } else if (user.role_id === 8) {
+        return <PrincipalDashboard />;
+    } else if (user.role_id === 9) {
+        return <ExecutiveDashboard />;
+    } else if (user.role_id === 10) {
+        return <TellerTabunganDashboard />;
+    } else if (user.role_id === 11) {
+        return <TellerInfaqDashboard />;
     } else {
         return <div className="text-slate-900">Dashboard for role {user.role_id} is under construction.</div>;
     }
@@ -311,6 +323,108 @@ const StudentDashboard = () => {
                             Lihat Tagihan
                         </Link>
                     </div>
+                </CardGlass>
+            </div>
+        </div>
+    );
+};
+
+const ParentDashboard = () => {
+    const { user } = useAuth();
+
+    // Fetch Parent Profile
+    const { data: parents } = useQuery({
+        queryKey: ['parents'],
+        queryFn: async () => {
+            const res = await api.get('/parents/');
+            return res.data;
+        }
+    });
+    
+    const currentParent = parents?.find((p: any) => p.user.id === user?.id);
+    const children = currentParent?.children || [];
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Halo, {user?.name}</h1>
+                <p className="text-slate-600">Pantau perkembangan ananda hari ini.</p>
+            </div>
+
+            {children.length === 0 ? (
+                <CardGlass className="p-6 text-center text-slate-500">
+                    Belum ada data anak yang dihubungkan dengan akun Anda.
+                </CardGlass>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {children.map((child: any) => (
+                        <CardGlass key={child.id} className="p-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <Users size={64} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-1">{child.user?.name}</h3>
+                            <p className="text-sm text-slate-500 mb-4">{child.class?.name || 'Belum ada kelas'} • NISN: {child.nisn}</p>
+                            
+                            <div className="grid grid-cols-2 gap-3 mt-6">
+                                <Link to="/dashboard/children" className="p-3 bg-blue-50/50 hover:bg-blue-50 rounded-xl text-center border border-blue-100 transition">
+                                    <BookOpen className="mx-auto mb-1 text-blue-600" size={20} />
+                                    <span className="text-xs font-medium text-slate-700">Akademik</span>
+                                </Link>
+                                <Link to={`/dashboard/parent/children/${child.id}/bills`} className="p-3 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl text-center border border-emerald-100 transition">
+                                    <DollarSign className="mx-auto mb-1 text-emerald-600" size={20} />
+                                    <span className="text-xs font-medium text-slate-700">Keuangan</span>
+                                </Link>
+                            </div>
+                        </CardGlass>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const TellerTabunganDashboard = () => {
+    const { user } = useAuth();
+    return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Halo, {user?.name}</h1>
+                <p className="text-slate-600">Dashboard Teller Tabungan</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CardGlass className="p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <DollarSign className="text-blue-600" size={20} />
+                        Kelola Tabungan
+                    </h3>
+                    <p className="text-slate-600 mb-4 text-sm">Akses menu tabungan untuk melakukan setoran dan penarikan tabungan siswa.</p>
+                    <Link to="/dashboard/finance/savings" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Buka Menu Tabungan
+                    </Link>
+                </CardGlass>
+            </div>
+        </div>
+    );
+};
+
+const TellerInfaqDashboard = () => {
+    const { user } = useAuth();
+    return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Halo, {user?.name}</h1>
+                <p className="text-slate-600">Dashboard Teller Infaq</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CardGlass className="p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <DollarSign className="text-emerald-600" size={20} />
+                        Kelola Infaq Harian
+                    </h3>
+                    <p className="text-slate-600 mb-4 text-sm">Akses menu infaq harian untuk mencatat penerimaan infaq siswa.</p>
+                    <Link to="/dashboard/finance/daily-infaq" className="inline-block px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition">
+                        Buka Menu Infaq
+                    </Link>
                 </CardGlass>
             </div>
         </div>

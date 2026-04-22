@@ -23,12 +23,15 @@ type Student struct {
 }
 
 type Parent struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	User      User      `gorm:"foreignKey:UserID" json:"user"`
-	Phone     string    `json:"phone"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID     uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	User       User      `gorm:"foreignKey:UserID" json:"user"`
+	Phone      string    `json:"phone"`
+	Address    string    `json:"address"`
+	Occupation string    `json:"occupation"`
+	Relation   string    `json:"relation"` // e.g. Ayah, Ibu, Wali
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type Teacher struct {
@@ -93,5 +96,17 @@ type AcademicYear struct {
 	EndDate   time.Time `json:"end_date"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type StudentClassHistory struct {
+	ID             uuid.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	StudentID      uuid.UUID    `gorm:"type:uuid;not null" json:"student_id"`
+	Student        Student      `gorm:"foreignKey:StudentID" json:"student"`
+	ClassID        uint         `gorm:"not null" json:"class_id"`
+	Class          Class        `gorm:"foreignKey:ClassID" json:"class"`
+	AcademicYearID uint         `gorm:"not null" json:"academic_year_id"`
+	AcademicYear   AcademicYear `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
 }
 

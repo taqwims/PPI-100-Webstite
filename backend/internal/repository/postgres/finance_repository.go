@@ -243,3 +243,81 @@ func (r *FinanceRepository) CreatePaymentsInTransaction(payments []domain.Paymen
 		return nil
 	})
 }
+
+// RecordPaymentAtomically handles the entire payment cycle in a single DB transaction.
+func (r *FinanceRepository) RecordPaymentAtomically(
+	payment *domain.Payment,
+	newStatus string,
+	ledgerEntry *domain.CashLedger,
+	tcID *uint,
+	realizeAmount float64,
+) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if payment != nil {
+			if err := tx.Create(payment).Error; err != nil {
+				return err
+			}
+		}
+
+		if newStatus != "" && payment != nil {
+			if err := tx.Model(&domain.Bill{}).Where("id = ?", payment.BillID.String()).Update("status", newStatus).Error; err != nil {
+				return err
+			}
+		}
+
+		if ledgerEntry != nil {
+			if err := tx.Create(ledgerEntry).Error; err != nil {
+				return err
+			}
+		}
+
+		if tcID != nil && *tcID > 0 {
+			if err := tx.Model(&domain.Budget{}).
+				Where("transaction_code_id = ?", *tcID).
+				Update("realized_amount", gorm.Expr("realized_amount + ?", realizeAmount)).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// ApprovePaymentAtomically handles the payment approval cycle in a single DB transaction.
+func (r *FinanceRepository) ApprovePaymentAtomically(
+	payment *domain.Payment,
+	newStatus string,
+	ledgerEntry *domain.CashLedger,
+	tcID *uint,
+	realizeAmount float64,
+) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if payment != nil {
+			if err := tx.Save(payment).Error; err != nil {
+				return err
+			}
+		}
+
+		if newStatus != "" && payment != nil {
+			if err := tx.Model(&domain.Bill{}).Where("id = ?", payment.BillID.String()).Update("status", newStatus).Error; err != nil {
+				return err
+			}
+		}
+
+		if ledgerEntry != nil {
+			if err := tx.Create(ledgerEntry).Error; err != nil {
+				return err
+			}
+		}
+
+		if tcID != nil && *tcID > 0 {
+			if err := tx.Model(&domain.Budget{}).
+				Where("transaction_code_id = ?", *tcID).
+				Update("realized_amount", gorm.Expr("realized_amount + ?", realizeAmount)).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}

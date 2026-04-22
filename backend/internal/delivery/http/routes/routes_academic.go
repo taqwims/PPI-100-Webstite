@@ -60,6 +60,7 @@ func RegisterAcademicRoutes(
 			bk.GET("/violations", bkHandler.GetAllViolations)
 			bk.PUT("/violations/:id", bkHandler.UpdateViolation)
 			bk.DELETE("/violations/:id", bkHandler.DeleteViolation)
+			bk.POST("/student-violations", bkHandler.RecordStudentViolation)
 			bk.POST("/calls", bkHandler.CreateBKCall)
 			bk.GET("/calls", bkHandler.GetAllBKCalls)
 			bk.PUT("/calls/:id", bkHandler.UpdateBKCall)

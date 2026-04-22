@@ -60,3 +60,56 @@ func (r *StudentRepository) GetParentByID(parentID string) (*domain.Parent, erro
 	err := r.db.Where("id = ?", parentID).First(&parent).Error
 	return &parent, err
 }
+
+func (r *StudentRepository) PromoteStudentAtomically(studentID string, nextClassID uint, status string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var activeYear domain.AcademicYear
+		if err := tx.Where("is_active = ?", true).First(&activeYear).Error; err != nil {
+			// If no active year, just skip inserting history and update directly
+			return tx.Model(&domain.Student{}).
+				Where("id = ?", studentID).
+				Updates(map[string]interface{}{
+					"class_id": nextClassID,
+					"status":   status,
+				}).Error
+		}
+
+		var student domain.Student
+		if err := tx.Where("id = ?", studentID).First(&student).Error; err != nil {
+			return err
+		}
+
+		// Prevent duplicate history for the same year and class
+		var existingHistory domain.StudentClassHistory
+		err := tx.Where("student_id = ? AND academic_year_id = ? AND class_id = ?", student.ID, activeYear.ID, student.ClassID).First(&existingHistory).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+
+		if err == gorm.ErrRecordNotFound {
+			// Insert history
+			history := domain.StudentClassHistory{
+				StudentID:      student.ID,
+				ClassID:        student.ClassID, // Record the OLD class
+				AcademicYearID: activeYear.ID,
+			}
+			if err := tx.Create(&history).Error; err != nil {
+				return err
+			}
+		}
+
+		// Update student
+		updateData := map[string]interface{}{
+			"status": status,
+		}
+		if nextClassID > 0 {
+			updateData["class_id"] = nextClassID
+		}
+
+		if err := tx.Model(&domain.Student{}).Where("id = ?", studentID).Updates(updateData).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}

@@ -49,6 +49,12 @@ func (r *SchoolSettingRepository) GetUnits() ([]domain.Unit, error) {
 	return units, err
 }
 
+func (r *SchoolSettingRepository) GetActiveUnits() ([]domain.Unit, error) {
+	var units []domain.Unit
+	err := r.db.Preload("Foundation").Where("is_active = ?", true).Find(&units).Error
+	return units, err
+}
+
 func (r *SchoolSettingRepository) GetFoundations() ([]domain.Foundation, error) {
 	var foundations []domain.Foundation
 	err := r.db.Find(&foundations).Error

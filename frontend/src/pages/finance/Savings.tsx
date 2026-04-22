@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
@@ -18,12 +19,12 @@ const formatDate = (d: string) => new Intl.DateTimeFormat('id-ID', { day: 'numer
 
 const Savings = () => {
     const { user } = useAuth();
+    const { units: activeUnits } = useUnits();
     const canManage = [1, 9, 10].includes(user?.role_id || 0);
 
     const getDefaultUnitID = () => {
-        if (user?.role_id === 2 || user?.role_id === 4 || user?.role_id === 6 || user?.role_id === 13) return 2;
-        if (user?.role_id === 3 || user?.role_id === 5 || user?.role_id === 7 || user?.role_id === 12) return 1;
-        return 1;
+        if (user?.unit_id) return user.unit_id;
+        return activeUnits[0]?.id || 1;
     };
     
     const [unitID, setUnitID] = useState<number>(getDefaultUnitID());
@@ -155,8 +156,9 @@ const Savings = () => {
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                     {[1, 9, 10].includes(user?.role_id || 0) && (
                         <div className="p-1.5 bg-slate-100/80 backdrop-blur rounded-2xl flex shadow-inner border border-slate-200 w-full sm:w-auto">
-                            <button onClick={() => { setUnitID(1); setClassFilter(''); }} className={clsx("px-5 py-2 text-sm font-bold rounded-xl transition-all flex-1 justify-center flex", unitID === 1 ? "bg-white text-emerald-700 shadow-sm scale-105" : "text-slate-500 hover:text-slate-700 hover:bg-white/50")}>MTS</button>
-                            <button onClick={() => { setUnitID(2); setClassFilter(''); }} className={clsx("px-5 py-2 text-sm font-bold rounded-xl transition-all flex-1 justify-center flex", unitID === 2 ? "bg-white text-emerald-700 shadow-sm scale-105" : "text-slate-500 hover:text-slate-700 hover:bg-white/50")}>MA</button>
+                            {activeUnits.map(u => (
+                                <button key={u.id} onClick={() => { setUnitID(u.id); setClassFilter(''); }} className={clsx("px-5 py-2 text-sm font-bold rounded-xl transition-all flex-1 justify-center flex", unitID === u.id ? "bg-white text-emerald-700 shadow-sm scale-105" : "text-slate-500 hover:text-slate-700 hover:bg-white/50")}>{u.name}</button>
+                            ))}
                         </div>
                     )}
                     <div className="flex gap-2 w-full sm:w-auto">

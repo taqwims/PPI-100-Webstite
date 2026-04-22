@@ -70,7 +70,7 @@ const PWAPrompt: React.FC = () => {
                         <Download size={24} />
                     </div>
                     <div>
-                        <h4 className="font-bold text-slate-800 text-sm">Aplikasi SIS-Keuangan</h4>
+                        <h4 className="font-bold text-slate-800 text-sm">Aplikasi SIARKAN</h4>
                         <p className="text-xs text-slate-500 mt-0.5">Install untuk akses lebih cepat</p>
                     </div>
                 </div>

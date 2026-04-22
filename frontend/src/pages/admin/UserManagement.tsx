@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 import clsx from 'clsx';
+import { ParentManagement } from '../../components/admin/UserManagement/ParentManagement';
 
 interface User {
     id: string;
@@ -65,17 +67,11 @@ const roleColor = (roleId: number) => {
     return m[roleId] || 'bg-slate-100 text-slate-600';
 };
 
-const getUnitName = (unitId: number) => {
-    switch (unitId) {
-        case 1: return 'MTS';
-        case 2: return 'MA';
-        case 3: return 'Public';
-        default: return '-';
-    }
-};
+// getUnitName is now provided by useUnits hook inside component
 
 const UserManagement: React.FC = () => {
     const { user } = useAuth();
+    const { units: activeUnits, getUnitName } = useUnits();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -299,9 +295,11 @@ const UserManagement: React.FC = () => {
                 })}
             </div>
 
-            {/* Search */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 bg-slate-50 border-b border-slate-200">
+            {activeTab === 7 ? (
+                <ParentManagement />
+            ) : (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200">
                     <div className="relative max-w-sm">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input type="text" placeholder="Cari nama atau email..." value={searchQuery}
@@ -357,6 +355,7 @@ const UserManagement: React.FC = () => {
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Modal */}
             {isModalOpen && (
@@ -413,7 +412,10 @@ const UserManagement: React.FC = () => {
                                         {user?.role_id === 1 ? (
                                             <select value={formData.unit_id} onChange={e => setFormData({ ...formData, unit_id: Number(e.target.value) })}
                                                 className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm appearance-none">
-                                                <option value={1}>MTS</option><option value={2}>MA</option><option value={3}>Public</option>
+                                                {activeUnits.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                                ))}
+                                                <option value={3}>Public</option>
                                             </select>
                                         ) : (
                                             <div className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-500">{getUnitName(formData.unit_id)}</div>

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 	"time"
@@ -10,12 +11,19 @@ import (
 )
 
 type BKUsecase struct {
-	bkRepo   *postgres.BKRepository
-	userRepo *postgres.UserRepository
+	bkRepo             *postgres.BKRepository
+	userRepo           *postgres.UserRepository
+	studentRepo        *postgres.StudentRepository
+	notificationUsecase *NotificationUsecase
 }
 
-func NewBKUsecase(bkRepo *postgres.BKRepository, userRepo *postgres.UserRepository) *BKUsecase {
-	return &BKUsecase{bkRepo: bkRepo, userRepo: userRepo}
+func NewBKUsecase(bkRepo *postgres.BKRepository, userRepo *postgres.UserRepository, studentRepo *postgres.StudentRepository, notificationUsecase *NotificationUsecase) *BKUsecase {
+	return &BKUsecase{
+		bkRepo:             bkRepo,
+		userRepo:           userRepo,
+		studentRepo:        studentRepo,
+		notificationUsecase: notificationUsecase,
+	}
 }
 
 func (u *BKUsecase) CreateViolation(name string, points int, description string) error {
@@ -39,7 +47,46 @@ func (u *BKUsecase) CreateBKCall(studentID, teacherID uuid.UUID, reason string, 
 		Date:      date,
 		Status:    "Pending",
 	}
-	return u.bkRepo.CreateBKCall(call)
+	err := u.bkRepo.CreateBKCall(call)
+	if err != nil {
+		return err
+	}
+
+	// Send notification if parent exists
+	student, _ := u.studentRepo.GetByID(studentID.String())
+	if student != nil && student.ParentID != nil {
+		parent, _ := u.studentRepo.GetParentByID(student.ParentID.String())
+		if parent != nil {
+			_ = u.notificationUsecase.SendWhatsApp(
+				parent.Phone,
+				"Pemberitahuan Bimbingan Konseling:\nAnak anda "+student.User.Name+" diminta menemui BK pada "+date.Format("02 Jan 2006")+" dengan alasan: "+reason,
+			)
+		}
+	}
+	return nil
+}
+
+func (u *BKUsecase) RecordStudentViolation(studentID, teacherID uuid.UUID, violationID uint, date time.Time) error {
+	sv := &domain.StudentViolation{
+		StudentID:   studentID,
+		TeacherID:   teacherID,
+		ViolationID: violationID,
+		Date:        date,
+	}
+	
+	if err := u.bkRepo.RecordStudentViolation(sv); err != nil {
+		return err
+	}
+
+	// Check total points
+	totalPoints, _ := u.bkRepo.GetTotalViolationPoints(studentID.String())
+	if totalPoints >= 50 {
+		// Automatically create a BKCall
+		reason := fmt.Sprintf("Akumulasi Poin Pelanggaran mencapai %d poin.", totalPoints)
+		_ = u.CreateBKCall(studentID, teacherID, reason, time.Now().AddDate(0, 0, 1))
+	}
+
+	return nil
 }
 
 func (u *BKUsecase) GetAllBKCalls(unitID uint) ([]domain.BKCall, error) {

@@ -23,35 +23,32 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 		PaidAt:        time.Now(),
 	}
 
-	if err := u.financeRepo.CreatePayment(payment); err != nil {
-		return err
-	}
-
-	// Calculate total paid to determine status (Partial vs Paid)
 	bill, err := u.financeRepo.GetBillByID(billID.String())
 	if err != nil {
-		// Fallback: just mark as Paid (only if success)
-		if status == "Success" {
-			return u.financeRepo.UpdateBillStatus(billID.String(), "Paid")
-		}
-		return nil
+		// Fallback to basic creation if bill doesn't exist (shouldn't happen)
+		return u.financeRepo.CreatePayment(payment)
 	}
 
-	totalPaid := float64(0)
+	totalPaid := amount
 	for _, p := range bill.Payments {
 		if p.Status == "Success" {
 			totalPaid += p.Amount
 		}
 	}
 
-	// For Pending payments, we don't sync to Ledger/RKAS yet
-	if status == "Pending" {
-		return nil
+	var newStatus string
+	if status == "Success" {
+		if totalPaid >= bill.Amount {
+			newStatus = "Paid"
+		} else if totalPaid > 0 {
+			newStatus = "Partial"
+		} else {
+			newStatus = bill.Status
+		}
 	}
 
-	// Sync to CashLedger
-	// Skip for Kegiatan, they have their own ledger.
-	if bill.BillType != "Kegiatan" {
+	var ledgerEntry *domain.CashLedger
+	if status == "Success" && bill.BillType != "Kegiatan" {
 		category := "Lain-lain"
 		if bill.TransactionCode != nil {
 			category = bill.TransactionCode.Category
@@ -59,7 +56,7 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 			category = bill.BillType
 		}
 		
-		cashLedgerEntry := domain.CashLedger{
+		ledgerEntry = &domain.CashLedger{
 			Date:              time.Now(),
 			Source:            bill.Student.User.Name,
 			ItemName:          "Pembayaran " + bill.Title,
@@ -68,51 +65,46 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 			Category:          category,
 			TransactionCodeID: bill.TransactionCodeID,
 		}
-		_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
 	}
 
-	// Auto-realize RKAS if transaction code is linked to a budget
-	if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 {
-		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, amount)
+	var tcID *uint
+	var realizeAmount float64
+	if status == "Success" && bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 {
+		tcID = bill.TransactionCodeID
+		realizeAmount = amount
 	}
 
-	// Notify Student and Parent about successful payment
-	_ = u.notificationUsecase.SendNotification(
-		bill.Student.UserID,
-		"Pembayaran Berhasil",
-		fmt.Sprintf("Pembayaran %s sebesar Rp%.0f telah diverifikasi.", bill.Title, amount),
-		"payment",
-		bill.ID.String(),
-	)
-
-	if bill.Student.ParentID != nil {
-		parent, err := u.getParentByID(*bill.Student.ParentID)
-		if err == nil {
-			_ = u.notificationUsecase.SendNotification(
-				parent.UserID,
-				"Pembayaran Tagihan Anak Berhasil",
-				fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f telah diverifikasi.", bill.Title, bill.Student.User.Name, amount),
-				"payment",
-				bill.ID.String(),
-			)
-		}
-	}
-	// Determine final bill status
-	var newStatus string
-	if totalPaid >= bill.Amount {
-		newStatus = "Paid"
-	} else if totalPaid > 0 {
-		newStatus = "Partial"
-	} else {
-		newStatus = bill.Status // No change
-	}
-
-	if err := u.financeRepo.UpdateBillStatus(billID.String(), newStatus); err != nil {
+	if err := u.financeRepo.RecordPaymentAtomically(payment, newStatus, ledgerEntry, tcID, realizeAmount); err != nil {
 		return err
 	}
 
-	// Sync payment status back to StudentObligation or ActivityObligation
-	u.syncObligationStatus(bill, totalPaid, amount)
+	// Notifications
+	if status == "Success" {
+		_ = u.notificationUsecase.SendNotification(
+			bill.Student.UserID,
+			"Pembayaran Berhasil",
+			fmt.Sprintf("Pembayaran %s sebesar Rp%.0f telah diverifikasi.", bill.Title, amount),
+			"payment",
+			bill.ID.String(),
+		)
+
+		if bill.Student.ParentID != nil {
+			parent, err := u.getParentByID(*bill.Student.ParentID)
+			if err == nil {
+				_ = u.notificationUsecase.SendNotification(
+					parent.UserID,
+					"Pembayaran Tagihan Anak Berhasil",
+					fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f telah diverifikasi.", bill.Title, bill.Student.User.Name, amount),
+					"payment",
+					bill.ID.String(),
+				)
+				u.triggerPaymentWA(&bill.Student, parent, bill, amount)
+			}
+		}
+		
+		// Sync obligation statuses
+		u.syncObligationStatus(bill, totalPaid, amount)
+	}
 
 	return nil
 }
@@ -282,6 +274,7 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 					"payment",
 					invoiceNumber,
 				)
+				u.triggerMultiPaymentWA(&student, parent, len(payments), req.Amount)
 			}
 		}
 	}
@@ -309,51 +302,56 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 	payment.Status = "Success"
 	payment.PaidAt = time.Now()
 
-	if err := u.financeRepo.UpdatePayment(payment); err != nil {
-		return err
-	}
-
-	// Update Bill status
 	bill, err := u.financeRepo.GetBillByID(payment.BillID.String())
 	if err != nil {
 		return err
 	}
 
-	totalPaid := float64(0)
+	totalPaid := payment.Amount
 	for _, p := range bill.Payments {
 		if p.Status == "Success" {
 			totalPaid += p.Amount
 		}
 	}
 
-	newStatus := "Partial"
+	var newStatus string
 	if totalPaid >= bill.Amount {
 		newStatus = "Paid"
-	}
-	_ = u.financeRepo.UpdateBillStatus(bill.ID.String(), newStatus)
-
-	// Sync to cash ledger
-	category := "Lain-lain"
-	if bill.TransactionCode != nil {
-		category = bill.TransactionCode.Category
-	} else if bill.BillType != "" {
-		category = bill.BillType
+	} else if totalPaid > 0 {
+		newStatus = "Partial"
+	} else {
+		newStatus = bill.Status
 	}
 
-	entry := &domain.CashLedger{
-		Date:              time.Now(),
-		Source:            bill.Student.User.Name,
-		ItemName:          fmt.Sprintf("Approval Pembayaran %s - %s", bill.Title, payment.PaymentMethod),
-		Type:              "Income",
-		Amount:            payment.Amount,
-		Category:          category,
-		TransactionCodeID: bill.TransactionCodeID,
-	}
-	_ = u.financeRepo.AddCashLedgerEntry(entry)
+	var ledgerEntry *domain.CashLedger
+	if bill.BillType != "Kegiatan" {
+		category := "Lain-lain"
+		if bill.TransactionCode != nil {
+			category = bill.TransactionCode.Category
+		} else if bill.BillType != "" {
+			category = bill.BillType
+		}
 
-	// Auto-realize RKAS if transaction code is linked to a budget
+		ledgerEntry = &domain.CashLedger{
+			Date:              time.Now(),
+			Source:            bill.Student.User.Name,
+			ItemName:          fmt.Sprintf("Approval Pembayaran %s - %s", bill.Title, payment.PaymentMethod),
+			Type:              "Income",
+			Amount:            payment.Amount,
+			Category:          category,
+			TransactionCodeID: bill.TransactionCodeID,
+		}
+	}
+
+	var tcID *uint
+	var realizeAmount float64
 	if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 {
-		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, payment.Amount)
+		tcID = bill.TransactionCodeID
+		realizeAmount = payment.Amount
+	}
+
+	if err := u.financeRepo.ApprovePaymentAtomically(payment, newStatus, ledgerEntry, tcID, realizeAmount); err != nil {
+		return err
 	}
 
 	// Notify Student and Parent about successful payment
@@ -375,6 +373,7 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 				"payment",
 				bill.ID.String(),
 			)
+			u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount)
 		}
 	}
 

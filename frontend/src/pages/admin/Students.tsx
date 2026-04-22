@@ -8,6 +8,7 @@ import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 
 interface Student {
     id: string;
@@ -33,8 +34,9 @@ interface Student {
 
 const Students: React.FC = () => {
     const { user } = useAuth();
-    // Initialize unitID based on user role. Super Admin (role_id 1) defaults to 1, others use their assigned unit_id.
-    const [unitID, setUnitID] = useState(user?.role_id === 1 ? 1 : user?.unit_id || 1);
+    const { units, getUnitName, defaultUnitId } = useUnits();
+    // Initialize unitID based on user role. Super Admin (role_id 1) defaults to first available unit, others use their assigned unit_id.
+    const [unitID, setUnitID] = useState(user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId);
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -197,12 +199,13 @@ const Students: React.FC = () => {
                                 value={unitID}
                                 onChange={(e) => setUnitID(Number(e.target.value))}
                             >
-                                <option value={1} className="bg-gray-900">MTS</option>
-                                <option value={2} className="bg-gray-900">MA</option>
+                                {units.map(u => (
+                                    <option key={u.id} value={u.id} className="bg-gray-900">{u.name}</option>
+                                ))}
                             </select>
                         ) : (
                             <div className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-900">
-                                {unitID === 1 ? 'MTS' : 'MA'}
+                                {getUnitName(unitID)}
                             </div>
                         )}
                     </div>

@@ -41,7 +41,13 @@ func (h *ActivityHandler) Create(c *gin.Context) {
 func (h *ActivityHandler) GetAllByAcademicYear(c *gin.Context) {
 	yearIDStr := c.Query("academic_year_id")
 	if yearIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "academic_year_id is required"})
+		// Fallback: return all activities when no filter specified
+		activities, err := h.usecase.GetAll()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, activities)
 		return
 	}
 

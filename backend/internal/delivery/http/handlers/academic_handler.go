@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
+	"ppi-100-sis/pkg/utils"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,7 @@ func (h *AcademicHandler) CreateClass(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.UnitID = utils.EnforceUnitID(c, req.UnitID)
 
 	if err := h.academicUsecase.CreateClass(req.Name, req.UnitID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -49,7 +51,8 @@ func (h *AcademicHandler) DeleteClass(c *gin.Context) {
 
 func (h *AcademicHandler) GetAllClasses(c *gin.Context) {
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
-	classes, err := h.academicUsecase.GetAllClasses(uint(unitID))
+	securedUnitID := utils.EnforceUnitID(c, uint(unitID))
+	classes, err := h.academicUsecase.GetAllClasses(securedUnitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -129,6 +132,7 @@ func (h *AcademicHandler) CreateSubject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.UnitID = utils.EnforceUnitID(c, req.UnitID)
 
 	if err := h.academicUsecase.CreateSubject(req.Name, req.UnitID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -140,7 +144,8 @@ func (h *AcademicHandler) CreateSubject(c *gin.Context) {
 
 func (h *AcademicHandler) GetAllSubjects(c *gin.Context) {
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
-	subjects, err := h.academicUsecase.GetAllSubjects(uint(unitID))
+	securedUnitID := utils.EnforceUnitID(c, uint(unitID))
+	subjects, err := h.academicUsecase.GetAllSubjects(securedUnitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -166,6 +171,7 @@ func (h *AcademicHandler) CreateSchedule(c *gin.Context) {
 
 func (h *AcademicHandler) GetAllSchedules(c *gin.Context) {
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
+	securedUnitID := utils.EnforceUnitID(c, uint(unitID))
 	classID, _ := strconv.Atoi(c.Query("class_id"))
 	teacherID := c.Query("teacher_id")
 
@@ -195,7 +201,7 @@ func (h *AcademicHandler) GetAllSchedules(c *gin.Context) {
 		}
 	}
 
-	schedules, err := h.academicUsecase.GetAllSchedules(uint(unitID), uint(classID), teacherID)
+	schedules, err := h.academicUsecase.GetAllSchedules(securedUnitID, uint(classID), teacherID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

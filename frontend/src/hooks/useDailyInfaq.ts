@@ -43,8 +43,7 @@ export const useDailyInfaq = () => {
     const canManage = [1, 9, 11].includes(user?.role_id || 0);
 
     const getDefaultUnitID = () => {
-        if (user?.role_id === 2 || user?.role_id === 4 || user?.role_id === 6 || user?.role_id === 13) return 2; // MA
-        if (user?.role_id === 3 || user?.role_id === 5 || user?.role_id === 7 || user?.role_id === 12) return 1; // MTS
+        if (user?.unit_id) return user.unit_id;
         return 1; // Default
     };
     const [unitID, setUnitID] = useState<number>(getDefaultUnitID());

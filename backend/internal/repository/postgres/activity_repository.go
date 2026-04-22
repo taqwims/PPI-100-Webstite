@@ -33,6 +33,14 @@ func (r *ActivityRepository) GetAllByAcademicYear(academicYearID uint) ([]domain
 	return activities, err
 }
 
+func (r *ActivityRepository) GetAll() ([]domain.Activity, error) {
+	var activities []domain.Activity
+	err := r.db.Preload("AcademicYear").Preload("CreatedBy").
+		Order("created_at desc").
+		Find(&activities).Error
+	return activities, err
+}
+
 func (r *ActivityRepository) GetByID(id uuid.UUID) (*domain.Activity, error) {
 	var activity domain.Activity
 	err := r.db.Preload("AcademicYear").Preload("CreatedBy").First(&activity, "id = ?", id).Error

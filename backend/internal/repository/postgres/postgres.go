@@ -42,6 +42,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.Schedule{},
 		&domain.Attendance{},
 		&domain.Violation{},
+		&domain.StudentViolation{},
 		&domain.BKCall{},
 		&domain.Material{},
 		&domain.Task{},
@@ -56,6 +57,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.PPDBRegistration{},
 		&domain.ContactMessage{},
 		&domain.AcademicYear{},
+		&domain.StudentClassHistory{},
 		&domain.Payroll{},
 		&domain.PayrollTemplate{},
 		&domain.SavingAccount{},
@@ -120,4 +122,33 @@ func SeedSchoolSettings(db *gorm.DB, cfg *config.Config) {
 		"school_logo_url": cfg.SchoolLogoURL,
 	}
 	repo.Seed(defaults)
+}
+
+// SeedUnitActivation syncs unit is_active status based on ENABLED_UNIT_IDS env config.
+// Should be called after AutoMigrate.
+func SeedUnitActivation(db *gorm.DB, enabledIDs []uint) {
+	if len(enabledIDs) == 0 {
+		return // No config = don't change anything
+	}
+	// Deactivate all units first
+	db.Model(&domain.Unit{}).Where("1=1").Update("is_active", false)
+	// Activate only the enabled ones
+	db.Model(&domain.Unit{}).Where("id IN ?", enabledIDs).Update("is_active", true)
+}
+
+// SeedFoundation upserts the foundation name from FOUNDATION_NAME env config.
+// Should be called after AutoMigrate.
+func SeedFoundation(db *gorm.DB, name string) {
+	if name == "" {
+		return
+	}
+	var foundation domain.Foundation
+	result := db.First(&foundation)
+	if result.Error != nil {
+		// Create first foundation
+		db.Create(&domain.Foundation{Name: name})
+	} else if foundation.Name != name {
+		// Update name only if different
+		db.Model(&foundation).Update("name", name)
+	}
 }

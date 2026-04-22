@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { Plus, DollarSign, Edit, Trash2, Filter, GraduationCap, Eye, ShieldCheck, X, Image, Tag, Download, Settings, PieChart, Wallet, CreditCard, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -85,11 +86,11 @@ interface BillFormData {
 }
 
 // Determine default unit_id based on role
-function getDefaultUnitID(roleId?: number, unitId?: number): number {
+function getDefaultUnitID(roleId?: number, unitId?: number, defaultId?: number): number {
     if (unitId) return unitId;
     if (roleId === 2) return 1;
     if (roleId === 3) return 2;
-    return 1; // default MTS
+    return defaultId || 1;
 }
 
 const formatCurrency = (amount: number) => {
@@ -113,7 +114,8 @@ const hasPendingTransfer = (bill: Bill) => {
 
 const Finance: React.FC = () => {
     const { user } = useAuth();
-    const [unitID, setUnitID] = useState(getDefaultUnitID(user?.role_id, user?.unit_id));
+    const { units, defaultUnitId } = useUnits();
+    const [unitID, setUnitID] = useState(getDefaultUnitID(user?.role_id, user?.unit_id, defaultUnitId));
     const queryClient = useQueryClient();
     
     // UI States
@@ -347,8 +349,9 @@ const Finance: React.FC = () => {
 
                     {(user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 3 || user?.role_id === 9) && (
                         <div className="flex items-center bg-white rounded-xl shadow-sm border border-slate-200 p-1">
-                            <button onClick={() => setUnitID(1)} className={clsx("px-4 py-1.5 text-sm font-medium rounded-lg transition", unitID === 1 ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50")}>MTS</button>
-                            <button onClick={() => setUnitID(2)} className={clsx("px-4 py-1.5 text-sm font-medium rounded-lg transition", unitID === 2 ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50")}>MA</button>
+                            {units.map(u => (
+                                <button key={u.id} onClick={() => setUnitID(u.id)} className={clsx("px-4 py-1.5 text-sm font-medium rounded-lg transition", unitID === u.id ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50")}>{u.name}</button>
+                            ))}
                         </div>
                     )}
 

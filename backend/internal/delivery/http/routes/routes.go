@@ -54,7 +54,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	userHandler := handlers.NewUserHandler(userUsecase)
 
 	bkRepo := postgres.NewBKRepository(db)
-	bkUsecase := usecase.NewBKUsecase(bkRepo, userRepo)
+	bkUsecase := usecase.NewBKUsecase(bkRepo, userRepo, studentRepo, notificationUsecase)
 	bkHandler := handlers.NewBKHandler(bkUsecase, academicUsecase)
 
 	// elearningRepo already declared above
@@ -115,6 +115,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	// Profile Handler
 	profileHandler := handlers.NewProfileHandler(userUsecase)
 
+	// Parent Handler
+	parentRepo := postgres.NewParentRepository(db)
+	parentUsecase := usecase.NewParentUsecase(parentRepo, userRepo, studentRepo)
+	parentHandler := handlers.NewParentHandler(parentUsecase)
+
 	// Activities (Fase 3) - Continued
 	activityUsecase := usecase.NewActivityUsecase(activityRepo, financeRepo)
 	activityHandler := handlers.NewActivityHandler(activityUsecase)
@@ -174,7 +179,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	// Register modular mapped routes
 	RegisterAcademicRoutes(protectedGroup, academicHandler, teacherHandler, studentHandler, bkHandler, elearningHandler, cfg.FeatureBK, cfg.FeatureElearning)
 	
-	RegisterAdminRoutes(protectedGroup, cfg, userHandler, profileHandler, notificationHandler, assetHandler, assetCategoryHandler, schoolSettingHandler, backupHandler, publicHandler, ppdbPaymentHandler)
+	RegisterAdminRoutes(protectedGroup, cfg, userHandler, profileHandler, notificationHandler, assetHandler, assetCategoryHandler, schoolSettingHandler, backupHandler, publicHandler, ppdbPaymentHandler, parentHandler)
 
 	RegisterFinanceRoutes(
 		protectedGroup, cfg, financeHandler, midtransHandler, financeExtendedHandler,

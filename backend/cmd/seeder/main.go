@@ -52,6 +52,7 @@ func main() {
 		{ID: 1, Name: "MTS"},
 		{ID: 2, Name: "MA"},
 		{ID: 3, Name: "PUBLIC"},
+		{ID: 4, Name: "SDIT"},
 	}
 
 	for _, unit := range units {

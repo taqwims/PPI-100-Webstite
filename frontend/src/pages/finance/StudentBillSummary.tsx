@@ -90,11 +90,15 @@ const StudentBillSummary: React.FC = () => {
 
     // Also fetch activity obligations
     const { data: activities = [] } = useQuery<any[]>({
-        queryKey: ['activities-all'],
+        queryKey: ['activities-all', selectedYear?.id],
         queryFn: async () => {
-            try { return (await api.get('/finance/activities')).data || []; }
+            try {
+                if (!selectedYear?.id) return [];
+                return (await api.get(`/finance/activities?academic_year_id=${selectedYear.id}`)).data || [];
+            }
             catch { return []; }
         },
+        enabled: !!selectedYear?.id,
     });
 
     // Fetch all activity obligations

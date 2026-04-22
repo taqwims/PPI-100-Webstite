@@ -153,9 +153,9 @@ func (u *StudentUsecase) PromoteStudents(studentIDs []uuid.UUID, action string, 
 			if getErr != nil {
 				return successCount, errors.New("gagal menemukan siswa: " + id.String())
 			}
-			err = u.studentRepo.UpdateClassAndStatus(id.String(), student.ClassID, "Graduated")
+			err = u.studentRepo.PromoteStudentAtomically(id.String(), student.ClassID, "Graduated")
 		} else if action == "promote" {
-			err = u.studentRepo.UpdateClassAndStatus(id.String(), nextClassID, "Active")
+			err = u.studentRepo.PromoteStudentAtomically(id.String(), nextClassID, "Active")
 		}
 
 		if err != nil {

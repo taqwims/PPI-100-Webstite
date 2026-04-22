@@ -165,12 +165,6 @@ const PPDB: React.FC = () => {
                                                 {units?.map((unit: any) => (
                                                     <option key={unit.id} value={unit.id}>{unit.name}</option>
                                                 ))}
-                                                {!units && (
-                                                    <>
-                                                        <option value={1}>MTS</option>
-                                                        <option value={2}>MA</option>
-                                                    </>
-                                                )}
                                             </select>
                                         </div>
                                     </div>

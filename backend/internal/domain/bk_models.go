@@ -14,6 +14,19 @@ type Violation struct {
 	Description string `json:"description"`
 }
 
+type StudentViolation struct {
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	StudentID   uuid.UUID `gorm:"type:uuid;not null" json:"student_id"`
+	Student     Student   `gorm:"foreignKey:StudentID" json:"student"`
+	ViolationID uint      `gorm:"not null" json:"violation_id"`
+	Violation   Violation `gorm:"foreignKey:ViolationID" json:"violation"`
+	TeacherID   uuid.UUID `gorm:"type:uuid;not null" json:"teacher_id"`
+	Teacher     Teacher   `gorm:"foreignKey:TeacherID" json:"teacher"`
+	Date        time.Time `gorm:"not null" json:"date"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type BKCall struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	StudentID uuid.UUID `gorm:"type:uuid;not null" json:"student_id"`

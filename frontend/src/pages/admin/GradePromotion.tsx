@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useUnits } from '../../hooks/useUnits';
 import { Search, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
@@ -10,7 +11,8 @@ import toast from 'react-hot-toast';
 
 const GradePromotion: React.FC = () => {
     const { user } = useAuth();
-    const [unitID, setUnitID] = useState(user?.role_id === 1 ? 1 : user?.unit_id || 1);
+    const { units, defaultUnitId } = useUnits();
+    const [unitID, setUnitID] = useState(user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId);
     const [sourceClassID, setSourceClassID] = useState<number | ''>('');
     const [targetClassID, setTargetClassID] = useState<number | ''>('');
     const [action, setAction] = useState<'promote' | 'graduate'>('promote');
@@ -166,8 +168,9 @@ const GradePromotion: React.FC = () => {
                             setSelectedStudents([]);
                         }}
                     >
-                        <option value={1} className="bg-white">MTS</option>
-                        <option value={2} className="bg-white">MA</option>
+                        {units.map(u => (
+                            <option key={u.id} value={u.id} className="bg-white">{u.name}</option>
+                        ))}
                     </select>
                 )}
             </div>

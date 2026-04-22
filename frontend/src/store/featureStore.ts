@@ -10,6 +10,24 @@ export interface SchoolBankAccount {
     is_active: boolean;
 }
 
+export interface UnitInfo {
+    id: number;
+    name: string;
+    code: string;
+    is_active: boolean;
+    foundation_id?: number;
+    foundation?: { id: number; name: string; address?: string; phone?: string; email?: string };
+}
+
+export interface FoundationInfo {
+    id: number;
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    logo_url?: string;
+}
+
 interface SchoolInfo {
     name: string;
     logo_url: string;
@@ -29,15 +47,20 @@ interface FeatureState {
     features: Record<string, boolean>;
     school: SchoolInfo;
     bankAccounts: SchoolBankAccount[];
+    units: UnitInfo[];
+    foundations: FoundationInfo[];
     loaded: boolean;
     fetchFeatures: () => Promise<void>;
     isEnabled: (key: string) => boolean;
+    getUnitName: (id: number) => string;
 }
 
 export const useFeatureStore = create<FeatureState>((set, get) => ({
     features: {},
     school: { name: 'Sekolah', logo_url: '', address: '', phone: '', email: '', npsn: '' },
     bankAccounts: [],
+    units: [],
+    foundations: [],
     loaded: false,
 
     fetchFeatures: async () => {
@@ -47,6 +70,8 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
                 features: res.data.features || {},
                 school: res.data.school || { name: 'Sekolah', logo_url: '', address: '', phone: '', email: '', npsn: '' },
                 bankAccounts: res.data.bank_accounts || [],
+                units: res.data.units || [],
+                foundations: res.data.foundations || [],
                 loaded: true,
             });
         } catch (err) {
@@ -60,4 +85,10 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
         // Default to true if the feature is not found in the config
         return features[key] !== undefined ? features[key] : true;
     },
+
+    getUnitName: (id: number) => {
+        const { units } = get();
+        return units.find(u => u.id === id)?.name || `Unit ${id}`;
+    },
 }));
+
