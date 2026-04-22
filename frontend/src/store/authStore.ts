@@ -1,39 +1,37 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { User } from '../types';
 
 interface AuthState {
     user: User | null;
-    token: string | null;
     isAuthenticated: boolean;
-    login: (token: string) => void;
+    isInitialized: boolean;
+    login: () => void;
     logout: () => void;
     setUser: (user: User) => void;
+    setInitialized: (val: boolean) => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-    persist(
-        (set) => ({
-            user: null,
-            token: localStorage.getItem('token'),
-            isAuthenticated: !!localStorage.getItem('token'),
+export const useAuthStore = create<AuthState>((set) => ({
+    user: null,
+    isAuthenticated: false,
+    isInitialized: false,
 
-            login: (token: string) => {
-                localStorage.setItem('token', token);
-                set({ token, isAuthenticated: true });
-            },
+    login: () => {
+        set({ isAuthenticated: true });
+    },
 
-            logout: () => {
-                localStorage.removeItem('token');
-                set({ user: null, token: null, isAuthenticated: false });
-            },
+    logout: () => {
+        set({ user: null, isAuthenticated: false, isInitialized: true });
+    },
 
-            setUser: (user: User) => set({ user }),
-        }),
-        {
-            name: 'auth-storage',
-            // Hanya persist token, bukan user object (user di-fetch ulang saat app load)
-            partialize: (state) => ({ token: state.token }),
-        }
-    )
-);
+    setUser: (user: User) => set({ user, isAuthenticated: true, isInitialized: true }),
+    setInitialized: (val: boolean) => set({ isInitialized: val }),
+}));
+
+// Bersihkan token sisa versi lama di localStorage
+try {
+    localStorage.removeItem('token');
+    localStorage.removeItem('auth-storage');
+} catch (e) {
+    // Ignore errors
+}

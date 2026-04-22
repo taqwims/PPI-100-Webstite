@@ -31,7 +31,16 @@ import PublicContact from './pages/public/PublicContact';
 import VerifyInvoice from './pages/public/VerifyInvoice';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isInitialized } = useAuth();
+    
+    if (!isInitialized) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+            </div>
+        );
+    }
+    
     return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 

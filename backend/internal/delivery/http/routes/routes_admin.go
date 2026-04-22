@@ -31,7 +31,7 @@ func RegisterAdminRoutes(
 	// ── Users ──
 	users := rg.Group("/users")
 	{
-		users.GET("/", middleware.RoleMiddleware(1, 2, 3, 9), userHandler.GetAllUsers)
+		users.GET("/", middleware.RoleMiddleware(1, 2, 3, 4, 5, 8, 9, 10, 11), userHandler.GetAllUsers)
 		users.POST("/", middleware.RoleMiddleware(1, 2, 3), userHandler.CreateUser)
 		users.POST("/bulk", middleware.RoleMiddleware(1, 2, 3), userHandler.BulkCreateUsers)
 		users.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.UpdateUser)

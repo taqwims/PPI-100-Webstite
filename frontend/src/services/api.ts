@@ -17,12 +17,8 @@ const api = axios.create({
 });
 
 // ─── Request Interceptor ───
-// Tambahkan Authorization header dari localStorage (backward compatibility)
+// Request interceptor bisa ditambahkan di sini jika dibutuhkan di masa depan.
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
     return config;
 });
 

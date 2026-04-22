@@ -11,16 +11,16 @@ import type { User } from '../types';
 
 interface AuthContextType {
     user: User | null;
-    token: string | null;
-    login: (token: string) => void;
+    login: () => void;
     logout: () => void;
     isAuthenticated: boolean;
+    isInitialized: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, token, login, logout, setUser, isAuthenticated } = useAuthStore();
+    const { user, login, logout, setUser, isAuthenticated, isInitialized } = useAuthStore();
     const fetchFeatures = useFeatureStore((s) => s.fetchFeatures);
     const featuresLoaded = useFeatureStore((s) => s.loaded);
 
@@ -29,19 +29,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!featuresLoaded) {
             fetchFeatures();
         }
-    }, []);
+    }, [featuresLoaded, fetchFeatures]);
 
-    // Fetch user profile saat token ada tapi user belum di-load
+    // Fetch user profile on mount to check cookie session
     useEffect(() => {
-        if (token && !user) {
+        if (!isInitialized) {
             api.get('/profile')
                 .then((response) => setUser(response.data))
-                .catch(() => logout());
+                .catch(() => {
+                    logout(); // This will set isInitialized = true
+                });
         }
-    }, [token]);
+    }, [isInitialized, setUser, logout]);
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
+        <AuthContext.Provider value={{ user, login, logout, isAuthenticated, isInitialized }}>
             {children}
         </AuthContext.Provider>
     );
@@ -54,4 +56,3 @@ export const useAuth = () => {
     }
     return context;
 };
-

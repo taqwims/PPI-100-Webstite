@@ -21,6 +21,10 @@ interface PendingPayment {
     };
     bill?: {
         title: string;
+        student?: {
+            user: { name: string };
+            class?: { name: string };
+        };
     };
 }
 
@@ -69,7 +73,7 @@ const PaymentVerification: React.FC = () => {
 
     const filteredKeys = Object.keys(groupedPayments).filter(key => {
         const payments = groupedPayments[key];
-        const studentName = payments[0].student?.user?.name?.toLowerCase() || '';
+        const studentName = payments[0].bill?.student?.user?.name?.toLowerCase() || '';
         return studentName.includes(searchQuery.toLowerCase()) || key.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
@@ -123,9 +127,9 @@ const PaymentVerification: React.FC = () => {
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="font-bold text-slate-900 text-lg leading-none">{first.student?.user?.name}</h3>
+                                                <h3 className="font-bold text-slate-900 text-lg leading-none">{first.bill?.student?.user?.name}</h3>
                                                 <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                                                    {first.student?.class?.name || 'No Class'}
+                                                    {first.bill?.student?.class?.name || 'No Class'}
                                                 </span>
                                             </div>
                                             <p className="text-xs text-slate-500 flex items-center gap-1.5 font-medium">
@@ -198,8 +202,8 @@ const PaymentVerification: React.FC = () => {
                                 <div className="space-y-6">
                                     <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Informasi Siswa</p>
-                                        <p className="font-bold text-slate-800 text-lg">{selectedPayment.student?.user?.name}</p>
-                                        <p className="text-xs font-semibold text-indigo-600 mt-0.5">{selectedPayment.student?.class?.name || 'No Class'}</p>
+                                        <p className="font-bold text-slate-800 text-lg">{selectedPayment.bill?.student?.user?.name}</p>
+                                        <p className="text-xs font-semibold text-indigo-600 mt-0.5">{selectedPayment.bill?.student?.class?.name || 'No Class'}</p>
                                     </div>
 
                                     <div className="bg-indigo-600 p-6 rounded-[28px] text-white shadow-xl shadow-indigo-600/20 relative overflow-hidden group">

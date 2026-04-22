@@ -332,17 +332,15 @@ const StudentDashboard = () => {
 const ParentDashboard = () => {
     const { user } = useAuth();
 
-    // Fetch Parent Profile
-    const { data: parents } = useQuery({
-        queryKey: ['parents'],
+    const { data: childrenData } = useQuery({
+        queryKey: ['parent-children'],
         queryFn: async () => {
-            const res = await api.get('/parents/');
+            const res = await api.get('/students/children');
             return res.data;
         }
     });
     
-    const currentParent = parents?.find((p: any) => p.user.id === user?.id);
-    const children = currentParent?.children || [];
+    const children = childrenData || [];
 
     return (
         <div className="space-y-6">

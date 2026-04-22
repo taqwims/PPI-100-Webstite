@@ -95,9 +95,9 @@ func RegisterFinanceRoutes(
 			// Savings Operational (Pool-level)
 			finance.POST("/savings/operational/withdraw", middleware.RoleMiddleware(1, 9), financeExtendedHandler.WithdrawSavingsOperational)
 			finance.POST("/savings/operational/return", middleware.RoleMiddleware(1, 9), financeExtendedHandler.ReturnSavingsOperational)
-			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalHistory)
+			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingsOperationalHistory)
 			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalReturns)
-			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsPoolSummary)
+			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingsPoolSummary)
 			finance.GET("/savings/recap", middleware.RoleMiddleware(1, 9, 10), financeExtendedHandler.GetSavingsRecap)
 		}
 

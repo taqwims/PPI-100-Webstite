@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import InputGlass from '../components/ui/glass/InputGlass';
 import ButtonGlass from '../components/ui/glass/ButtonGlass';
 import { ArrowRight, Lock, Mail, ShieldCheck, GraduationCap, Building } from 'lucide-react';
 import api from '../services/api';
+import { useAuthStore } from '../store/authStore';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -19,8 +18,12 @@ const Login: React.FC = () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await api.post('/auth/login', { email, password });
-            login(response.data.token);
+            await api.post('/auth/login', { email, password });
+            
+            // Fetch user profile to populate the user object before navigating
+            const profileRes = await api.get('/profile');
+            useAuthStore.getState().setUser(profileRes.data);
+            
             navigate('/dashboard');
         } catch (err) {
             setError('Email atau password tidak valid');
