@@ -9,7 +9,7 @@ export const options = {
   ],
 };
 
-const BASE_URL = 'http://localhost:8082';
+const BASE_URL = 'http://localhost:8081';
 
 export default function () {
   // 1. Authenticate to get JWT token
@@ -48,7 +48,7 @@ export default function () {
 
     const notifRes = http.get(`${BASE_URL}/api/notifications`, authHeaders);
     check(notifRes, { 'notifications fetched': (r) => r.status === 200 });
-    
+
     // Academic features
     const teachersRes = http.get(`${BASE_URL}/api/academic/dashboard/stats`, authHeaders);
     check(teachersRes, { 'dashboard stats fetched': (r) => r.status === 200 || r.status === 404 });

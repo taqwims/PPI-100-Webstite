@@ -14,7 +14,7 @@ const VerifyInvoice: React.FC = () => {
     const [result, setResult] = useState<any>(null);
     const [searched, setSearched] = useState(false);
 
-    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8082/api';
+    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8081/api';
 
     const verifyCode = async (codeToVerify: string) => {
         if (!codeToVerify.trim()) return;
