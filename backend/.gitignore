@@ -5,6 +5,7 @@
 /backend/vendor/
 /backend/tmp/
 /backend/api
+/backend/main
 *.exe
 *.exe~
 *.dll
