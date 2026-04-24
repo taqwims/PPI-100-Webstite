@@ -19,6 +19,9 @@ interface User {
         class_id: number;
         parent_id?: string;
     };
+    parent?: {
+        id: string;
+    };
 }
 
 interface Class { id: number; name: string; }
@@ -71,7 +74,7 @@ const roleColor = (roleId: number) => {
 
 const UserManagement: React.FC = () => {
     const { user } = useAuth();
-    const { units: activeUnits, getUnitName } = useUnits();
+    const { units: activeUnits, getUnitName, defaultUnitId } = useUnits();
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -79,7 +82,7 @@ const UserManagement: React.FC = () => {
     const [activeTab, setActiveTab] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const initialUnitId = user?.role_id === 1 ? 1 : user?.unit_id || 1;
+    const initialUnitId = user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId;
 
     const [formData, setFormData] = useState({
         name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId,
@@ -114,6 +117,14 @@ const UserManagement: React.FC = () => {
 
     const parentUsers = users.filter((u: User) => u.role_id === 7);
 
+    // Helper: resolve Parent table ID -> User ID for the dropdown
+    // Student.parent_id is a Parent table UUID, but dropdown uses User.id
+    const resolveParentIdToUserId = (parentTableId: string): string => {
+        if (!parentTableId) return '';
+        const parentUser = parentUsers.find((u: User) => u.parent?.id === parentTableId);
+        return parentUser?.id || '';
+    };
+
     useEffect(() => {
         if (editingUser && editingUser.role_id === 6 && allStudents) {
             const studentRec = allStudents.find((s: StudentRecord) => s.user_id === editingUser.id);
@@ -123,11 +134,11 @@ const UserManagement: React.FC = () => {
                     ...prev,
                     nisn: studentRec.nisn || '',
                     class_id: studentRec.class_id || 0,
-                    parent_id: studentRec.parent_id || '',
+                    parent_id: resolveParentIdToUserId(studentRec.parent_id || ''),
                 }));
             }
         }
-    }, [editingUser, allStudents]);
+    }, [editingUser, allStudents, parentUsers]);
 
     // Filter & sort
     const filteredUsers = users
@@ -174,6 +185,7 @@ const UserManagement: React.FC = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['parents'] });
             handleCloseModal();
         },
         onError: (err: any) => alert(err.response?.data?.error || 'Gagal membuat user'),
@@ -198,6 +210,7 @@ const UserManagement: React.FC = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['parents'] });
             handleCloseModal();
         },
         onError: (err: any) => alert(err.response?.data?.error || 'Gagal mengupdate user'),
@@ -205,7 +218,10 @@ const UserManagement: React.FC = () => {
 
     const deleteUserMutation = useMutation({
         mutationFn: (id: string) => api.delete(`/users/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['parents'] });
+        },
     });
 
     const handleCloseModal = () => {
@@ -222,7 +238,7 @@ const UserManagement: React.FC = () => {
             name: u.name, email: u.email, password: '',
             role_id: u.role_id, unit_id: u.unit_id,
             nisn: u.student?.nisn || '', class_id: u.student?.class_id || 0,
-            parent_id: u.student?.parent_id || '',
+            parent_id: resolveParentIdToUserId(u.student?.parent_id || ''),
         });
         setIsModalOpen(true);
     };

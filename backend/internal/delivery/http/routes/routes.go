@@ -21,16 +21,16 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	userRepo := postgres.NewUserRepository(db)
 	academicRepo := postgres.NewAcademicRepository(db)
 	elearningRepo := postgres.NewElearningRepository(db)
+	teacherRepo := postgres.NewTeacherRepository(db)
 
 	// Usecases
 	authUsecase := usecase.NewAuthUsecase(userRepo, cfg)
-	academicUsecase := usecase.NewAcademicUsecase(academicRepo, elearningRepo, userRepo)
+	academicUsecase := usecase.NewAcademicUsecase(academicRepo, elearningRepo, userRepo, teacherRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authUsecase)
 	academicHandler := handlers.NewAcademicHandler(academicUsecase)
 
-	teacherRepo := postgres.NewTeacherRepository(db)
 	teacherUsecase := usecase.NewTeacherUsecase(teacherRepo)
 	teacherHandler := handlers.NewTeacherHandler(teacherUsecase)
 
@@ -50,7 +50,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	notificationHandler := handlers.NewNotificationHandler(notificationUsecase)
 
 	// Reuse existing userRepo and studentRepo
-	userUsecase := usecase.NewUserUsecase(userRepo, studentRepo)
+	parentRepo := postgres.NewParentRepository(db)
+	userUsecase := usecase.NewUserUsecase(userRepo, studentRepo, parentRepo, teacherRepo)
 	userHandler := handlers.NewUserHandler(userUsecase)
 
 	bkRepo := postgres.NewBKRepository(db)
@@ -116,7 +117,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	profileHandler := handlers.NewProfileHandler(userUsecase)
 
 	// Parent Handler
-	parentRepo := postgres.NewParentRepository(db)
 	parentUsecase := usecase.NewParentUsecase(parentRepo, userRepo, studentRepo)
 	parentHandler := handlers.NewParentHandler(parentUsecase)
 

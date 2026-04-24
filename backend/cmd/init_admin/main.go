@@ -65,6 +65,20 @@ func main() {
 		log.Printf("Failed to seed unit %s: %v", publicUnit.Name, err)
 	}
 
+	units := []domain.Unit{
+		{ID: 1, Name: "MTS"},
+		{ID: 2, Name: "MA"},
+		{ID: 3, Name: "PUBLIC"},
+		{ID: 4, Name: "SDIT"},
+	}
+
+	for _, unit := range units {
+		if err := db.FirstOrCreate(&unit, domain.Unit{ID: unit.ID}).Error; err != nil {
+			log.Printf("Failed to seed unit %s: %v", unit.Name, err)
+		}
+	}
+	
+
 	// Seed Custom Super Admin
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("v@ngroupganti01"), bcrypt.DefaultCost)
 	adminUser := domain.User{

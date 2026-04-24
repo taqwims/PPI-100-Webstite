@@ -43,6 +43,7 @@ export const ParentManagement: React.FC = () => {
         mutationFn: (data: typeof formData) => api.post('/parents/', data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
             handleCloseModal();
         },
         onError: (err: any) => alert(err.response?.data?.error || 'Gagal menyimpan data'),
@@ -52,6 +53,7 @@ export const ParentManagement: React.FC = () => {
         mutationFn: (data: typeof formData) => api.put(`/parents/${editingParent?.id}`, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
             handleCloseModal();
         },
         onError: (err: any) => alert(err.response?.data?.error || 'Gagal mengupdate data'),
@@ -59,7 +61,10 @@ export const ParentManagement: React.FC = () => {
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => api.delete(`/parents/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['parents'] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
     });
 
     const handleCloseModal = () => {

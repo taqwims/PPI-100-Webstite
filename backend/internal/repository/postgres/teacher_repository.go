@@ -27,3 +27,13 @@ func (r *TeacherRepository) GetAll(unitID uint) ([]domain.Teacher, error) {
 	err := query.Find(&teachers).Error
 	return teachers, err
 }
+
+func (r *TeacherRepository) FindByID(id string) (*domain.Teacher, error) {
+	var teacher domain.Teacher
+	err := r.db.Preload("User").First(&teacher, "id = ?", id).Error
+	return &teacher, err
+}
+
+func (r *TeacherRepository) DeleteByUserID(userID string) error {
+	return r.db.Where("user_id = ?", userID).Delete(&domain.Teacher{}).Error
+}

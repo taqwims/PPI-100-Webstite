@@ -22,10 +22,10 @@ const DAYS = [
 
 const Academic = () => {
     const { user } = useAuth();
-    const { units } = useUnits();
+    const { units, defaultUnitId } = useUnits();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<'classes' | 'subjects' | 'schedules'>('classes');
-    const [unitID, setUnitID] = useState(user?.unit_id || 1);
+    const [unitID, setUnitID] = useState(user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -62,7 +62,7 @@ const Academic = () => {
     const { data: teachers } = useQuery({
         queryKey: ['teachers_list', unitID],
         queryFn: async () => {
-            const res = await api.get(`/teachers?unit_id=${unitID}`);
+            const res = await api.get(`/teachers/?unit_id=${unitID}`);
             return res.data || [];
         },
     });
@@ -74,6 +74,9 @@ const Academic = () => {
             queryClient.invalidateQueries({ queryKey: ['academic_classes'] });
             queryClient.invalidateQueries({ queryKey: ['academic_subjects'] });
             queryClient.invalidateQueries({ queryKey: ['academic_schedules'] });
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            queryClient.invalidateQueries({ queryKey: ['all-classes'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
             handleCloseModal();
             toast.success('Data berhasil disimpan');
         },
@@ -96,6 +99,8 @@ const Academic = () => {
         mutationFn: (id: number) => api.delete(`/academic/classes/${id}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['academic_classes'] });
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            queryClient.invalidateQueries({ queryKey: ['all-classes'] });
             toast.success('Kelas berhasil dihapus');
         },
         onError: (error: any) => {
@@ -156,6 +161,11 @@ const Academic = () => {
                     class_id: item.class_id || item.class?.id,
                     subject_id: item.subject_id || item.subject?.id,
                     teacher_id: item.teacher_id || item.teacher?.id
+                });
+            } else if (activeTab === 'classes') {
+                setFormData({
+                    ...item,
+                    homeroom_teacher_id: item.homeroom_teacher_id || item.homeroom_teacher?.id || ''
                 });
             } else {
                 setFormData(item);

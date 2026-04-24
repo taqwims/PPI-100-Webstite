@@ -9,16 +9,18 @@ import (
 )
 
 type AcademicUsecase struct {
-	academicRepo *postgres.AcademicRepository
+	academicRepo  *postgres.AcademicRepository
 	elearningRepo *postgres.ElearningRepository
 	userRepo      *postgres.UserRepository
+	teacherRepo   *postgres.TeacherRepository
 }
 
-func NewAcademicUsecase(academicRepo *postgres.AcademicRepository, elearningRepo *postgres.ElearningRepository, userRepo *postgres.UserRepository) *AcademicUsecase {
+func NewAcademicUsecase(academicRepo *postgres.AcademicRepository, elearningRepo *postgres.ElearningRepository, userRepo *postgres.UserRepository, teacherRepo *postgres.TeacherRepository) *AcademicUsecase {
 	return &AcademicUsecase{
-		academicRepo: academicRepo,
+		academicRepo:  academicRepo,
 		elearningRepo: elearningRepo,
 		userRepo:      userRepo,
+		teacherRepo:   teacherRepo,
 	}
 }
 
@@ -40,9 +42,66 @@ func (u *AcademicUsecase) UpdateClass(id uint, name string, homeroomTeacherID *u
 	if err != nil {
 		return err
 	}
+
+	oldHomeroomTeacherID := class.HomeroomTeacherID
 	class.Name = name
 	class.HomeroomTeacherID = homeroomTeacherID
-	return u.academicRepo.UpdateClass(class)
+
+	if err := u.academicRepo.UpdateClass(class); err != nil {
+		return err
+	}
+
+	// Update teacher roles for homeroom teacher changes
+	// If old teacher was unassigned, revert to Guru (4) if not homeroom teacher of another class
+	if oldHomeroomTeacherID != nil && (homeroomTeacherID == nil || *oldHomeroomTeacherID != *homeroomTeacherID) {
+		u.revertTeacherRole(oldHomeroomTeacherID.String(), id)
+	}
+
+	// If new teacher is assigned, set role to Wali Kelas (5)
+	if homeroomTeacherID != nil && (oldHomeroomTeacherID == nil || *oldHomeroomTeacherID != *homeroomTeacherID) {
+		u.setHomeroomTeacherRole(homeroomTeacherID.String())
+	}
+
+	return nil
+}
+
+// setHomeroomTeacherRole sets the teacher's user role to Wali Kelas (5)
+func (u *AcademicUsecase) setHomeroomTeacherRole(teacherID string) {
+	teacher, err := u.teacherRepo.FindByID(teacherID)
+	if err != nil {
+		return
+	}
+	user, err := u.userRepo.FindByID(teacher.UserID.String())
+	if err != nil {
+		return
+	}
+	if user.RoleID == 4 { // Only update if currently Guru
+		user.RoleID = 5 // Wali Kelas
+		u.userRepo.Update(user)
+	}
+}
+
+// revertTeacherRole reverts the teacher's role to Guru (4) if they're not homeroom teacher of another class
+func (u *AcademicUsecase) revertTeacherRole(teacherID string, excludeClassID uint) {
+	// Check if this teacher is still homeroom teacher of another class
+	_, err := u.academicRepo.GetClassByHomeroomTeacher(teacherID)
+	if err == nil {
+		// Teacher is still homeroom teacher of another class, don't revert
+		return
+	}
+
+	teacher, err := u.teacherRepo.FindByID(teacherID)
+	if err != nil {
+		return
+	}
+	user, err := u.userRepo.FindByID(teacher.UserID.String())
+	if err != nil {
+		return
+	}
+	if user.RoleID == 5 { // Only revert if currently Wali Kelas
+		user.RoleID = 4 // Guru
+		u.userRepo.Update(user)
+	}
 }
 
 func (u *AcademicUsecase) DeleteClass(id uint) error {

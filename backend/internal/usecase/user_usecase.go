@@ -6,17 +6,21 @@ import (
 	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/pkg/utils"
 	"strings"
+	"time"
 )
 
 const studentRoleID = 6
+const parentRoleID = 7
 
 type UserUsecase struct {
 	userRepo    *postgres.UserRepository
 	studentRepo *postgres.StudentRepository
+	parentRepo  *postgres.ParentRepository
+	teacherRepo *postgres.TeacherRepository
 }
 
-func NewUserUsecase(userRepo *postgres.UserRepository, studentRepo *postgres.StudentRepository) *UserUsecase {
-	return &UserUsecase{userRepo: userRepo, studentRepo: studentRepo}
+func NewUserUsecase(userRepo *postgres.UserRepository, studentRepo *postgres.StudentRepository, parentRepo *postgres.ParentRepository, teacherRepo *postgres.TeacherRepository) *UserUsecase {
+	return &UserUsecase{userRepo: userRepo, studentRepo: studentRepo, parentRepo: parentRepo, teacherRepo: teacherRepo}
 }
 
 func (u *UserUsecase) GetAllUsers(roleID uint) ([]domain.User, error) {
@@ -37,7 +41,37 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 		UnitID:       unitID,
 	}
 
-	return u.userRepo.Create(user)
+	if err := u.userRepo.Create(user); err != nil {
+		return err
+	}
+
+	// Auto-create Parent record when role is Orang Tua (7)
+	if roleID == parentRoleID {
+		parent := &domain.Parent{
+			UserID: user.ID,
+		}
+		if err := u.parentRepo.Create(parent); err != nil {
+			// Rollback user creation
+			u.userRepo.Delete(user.ID.String())
+			return fmt.Errorf("gagal membuat data orang tua: %v", err)
+		}
+	}
+
+	// Auto-create Teacher record when role is Guru (4) or Wali Kelas (5)
+	if roleID == 4 || roleID == 5 {
+		teacher := &domain.Teacher{
+			UserID: user.ID,
+			UnitID: unitID,
+			NIP:    fmt.Sprintf("NIP-%d", time.Now().UnixNano()),
+		}
+		if err := u.teacherRepo.Create(teacher); err != nil {
+			// Rollback user creation
+			u.userRepo.Delete(user.ID.String())
+			return fmt.Errorf("gagal membuat data guru: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (u *UserUsecase) UpdateUser(user *domain.User) error {
@@ -59,6 +93,22 @@ func (u *UserUsecase) UpdateUser(user *domain.User) error {
 }
 
 func (u *UserUsecase) DeleteUser(id string) error {
+	// Check if user is a parent — clean up Parent record & unlink children
+	user, err := u.userRepo.FindByID(id)
+	if err == nil && user.RoleID == parentRoleID && user.Parent != nil {
+		parentID := user.Parent.ID.String()
+		// Unlink children
+		children, err := u.studentRepo.GetByParent(parentID)
+		if err == nil {
+			for _, child := range children {
+				child.ParentID = nil
+				u.studentRepo.Update(&child)
+			}
+		}
+		u.parentRepo.Delete(parentID)
+	} else if err == nil && (user.RoleID == 4 || user.RoleID == 5) {
+		u.teacherRepo.DeleteByUserID(id)
+	}
 	return u.userRepo.Delete(id)
 }
 

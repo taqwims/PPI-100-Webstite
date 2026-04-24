@@ -76,16 +76,12 @@ const Students: React.FC = () => {
         },
     });
 
-    // Fetch Parents (Users with role_id 7)
-    // We need an endpoint to get all parents. Assuming /users?role_id=7 exists or we filter client side.
-    // Ideally backend should provide /users/parents endpoint.
-    // Let's use /users and filter for now, or check if there's a better way.
-    // Actually, let's assume we can fetch all users and filter by role 7.
-    const { data: parents } = useQuery({
-        queryKey: ['parents'],
+    // Fetch Parents from /parents/ endpoint
+    const { data: parentsList } = useQuery({
+        queryKey: ['parent-users'],
         queryFn: async () => {
-            const res = await api.get('/users/');
-            return res.data.filter((u: any) => u.role_id === 7);
+            const res = await api.get('/parents/');
+            return res.data || [];
         },
     });
 
@@ -94,6 +90,8 @@ const Students: React.FC = () => {
         mutationFn: (data: any) => api.post('/students/', data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['parent-users'] });
             setIsModalOpen(false);
             resetForm();
         },
@@ -103,6 +101,8 @@ const Students: React.FC = () => {
         mutationFn: (data: any) => api.put(`/students/${editingStudent?.id}`, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['parent-users'] });
             setIsModalOpen(false);
             resetForm();
         },
@@ -130,14 +130,22 @@ const Students: React.FC = () => {
 
     const handleEdit = (student: Student) => {
         setEditingStudent(student);
+        // Resolve parent_id (Parent table ID) back to User ID for the dropdown
+        let parentUserId = '';
+        if ((student as any).parent_id && parentsList) {
+            const parentRecord = parentsList.find((p: any) => p.id === (student as any).parent_id);
+            if (parentRecord) {
+                parentUserId = parentRecord.user?.id || parentRecord.user_id || '';
+            }
+        }
         setFormData({
             name: student.user.name,
             email: student.user.email,
-            password: '', // Password not filled for edit
+            password: '',
             nisn: student.nisn,
             class_id: student.class?.id.toString() || '',
             unit_id: student.unit_id,
-            parent_id: (student as any).parent_id || '', // Need to ensure student object has parent_id
+            parent_id: parentUserId,
         });
         setIsModalOpen(true);
     };
@@ -337,8 +345,8 @@ const Students: React.FC = () => {
                             className="w-full glass-input"
                         >
                             <option value="" className="bg-gray-900">-- Pilih Orang Tua (Opsional) --</option>
-                            {parents?.map((p: any) => (
-                                <option key={p.id} value={p.parent?.id || ''} className="bg-gray-900">{p.name}</option>
+                            {parentsList?.map((p: any) => (
+                                <option key={p.id} value={p.user?.id || p.user_id || ''} className="bg-gray-900">{p.user?.name || 'Unknown'}</option>
                             ))}
                         </select>
                     </div>
