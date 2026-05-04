@@ -14,11 +14,14 @@ func NewPayrollRepository(db *gorm.DB) *PayrollRepository {
 	return &PayrollRepository{db: db}
 }
 
-func (r *PayrollRepository) GetPayrolls(month, year int) ([]domain.Payroll, error) {
+func (r *PayrollRepository) GetPayrolls(month, year int, userID string) ([]domain.Payroll, error) {
 	var payrolls []domain.Payroll
 	query := r.db.Preload("User").Order("created_at desc")
 	if month > 0 && year > 0 {
 		query = query.Where("period_month = ? AND period_year = ?", month, year)
+	}
+	if userID != "" {
+		query = query.Where("user_id = ?", userID)
 	}
 	err := query.Find(&payrolls).Error
 	return payrolls, err
@@ -75,5 +78,7 @@ func (r *PayrollRepository) UpsertPayrollTemplate(template *domain.PayrollTempla
 	existing.FunctionalAllowance = template.FunctionalAllowance
 	existing.TransportAllowance = template.TransportAllowance
 	existing.AdditionalTask = template.AdditionalTask
+	existing.CustomIncomeItems = template.CustomIncomeItems
+	existing.CustomDeductionItems = template.CustomDeductionItems
 	return r.db.Save(&existing).Error
 }

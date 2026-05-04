@@ -14,8 +14,8 @@ import { useAuthStore } from '../store/authStore';
  *   7 = Orang Tua
  *   8 = Pimpinan
  *   9 = Bendahara
- *  10 = Tata Usaha
- *  11 = Petugas Infaq
+ *  10 = Teller Tabungan
+ *  11 = Transactional Teller
  */
 export const getDefaultRoute = (roleId: number): string => {
     const routes: Record<number, string> = {
@@ -29,7 +29,7 @@ export const getDefaultRoute = (roleId: number): string => {
         8: '/dashboard/principal/finance-summary',
         9: '/dashboard/finance/cash-ledger',
         10: '/dashboard',
-        11: '/dashboard/finance/daily-infaq',
+        11: '/dashboard/finance/cash-ledger',
     };
     return routes[roleId] ?? '/dashboard';
 };

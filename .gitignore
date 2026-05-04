@@ -5,7 +5,8 @@
 *.log
 *.swp
 tmp/
-
+.kiro
+*.gomodcache
 # Environment variables
 .env
 .env.local

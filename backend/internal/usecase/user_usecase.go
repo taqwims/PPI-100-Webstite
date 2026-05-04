@@ -33,6 +33,15 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 		return err
 	}
 
+	// Check if email already exists (including soft-deleted)
+	existing, _ := u.userRepo.FindByEmailUnscoped(email)
+	if existing != nil {
+		if existing.DeletedAt.Valid {
+			return fmt.Errorf("email '%s' sudah pernah terdaftar namun telah dihapus. Silakan gunakan email lain atau hubungi administrator untuk memulihkan akun tersebut", email)
+		}
+		return fmt.Errorf("email '%s' sudah terdaftar dan masih aktif. Silakan gunakan email lain", email)
+	}
+
 	user := &domain.User{
 		Name:         name,
 		Email:        email,
@@ -108,6 +117,8 @@ func (u *UserUsecase) DeleteUser(id string) error {
 		u.parentRepo.Delete(parentID)
 	} else if err == nil && (user.RoleID == 4 || user.RoleID == 5) {
 		u.teacherRepo.DeleteByUserID(id)
+	} else if err == nil && user.RoleID == studentRoleID {
+		u.studentRepo.DeleteByUserID(id)
 	}
 	return u.userRepo.Delete(id)
 }
@@ -192,14 +203,18 @@ func (u *UserUsecase) BulkCreateUsers(rows []domain.BulkUserImportRow) (*domain.
 		}
 		seenEmails[lowercaseEmail] = true
 
-		// Check existing email in DB
-		existing, _ := u.userRepo.FindByEmail(lowercaseEmail)
+		// Check existing email in DB (including soft-deleted)
+		existing, _ := u.userRepo.FindByEmailUnscoped(lowercaseEmail)
 		if existing != nil {
 			result.Failed++
+			reason := "Email sudah terdaftar dan aktif"
+			if existing.DeletedAt.Valid {
+				reason = "Email sudah pernah terdaftar (status: dihapus). Gunakan email lain."
+			}
 			result.Errors = append(result.Errors, domain.BulkImportRowError{
 				Row:    rowNum,
 				Email:  row.Email,
-				Reason: "Email sudah terdaftar",
+				Reason: reason,
 			})
 			continue
 		}

@@ -13,7 +13,7 @@ const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'c
 
 const StudentObligations = () => {
     const { user } = useAuth();
-    const canManage = [1, 9].includes(user?.role_id || 0);
+    const canManage = [1, 9, 11].includes(user?.role_id || 0);
 
     const [obligations, setObligations] = useState<Obligation[]>([]);
     const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
@@ -122,7 +122,23 @@ const StudentObligations = () => {
             await api.delete(`/finance/student-obligations/${id}`);
             toast.success('Berhasil dihapus');
             fetchData();
-        } catch (err: any) { console.error(err) }
+        } catch (err: any) { 
+            console.error(err);
+            toast.error(err.response?.data?.error || 'Gagal menghapus tanggungan');
+        }
+    };
+
+    const handleBulkDeleteGroup = async (ids: string[], typeName: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        if (!confirm(`Hapus semua tanggungan ${typeName}?`)) return;
+        try {
+            await Promise.all(ids.map(id => api.delete(`/finance/student-obligations/${id}`)));
+            toast.success(`Berhasil menghapus ${typeName}`);
+            fetchData();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.response?.data?.error || `Gagal menghapus ${typeName}`);
+        }
     };
 
     const handlePrintReceipt = (params: any) => {
@@ -238,6 +254,7 @@ const StudentObligations = () => {
                     setEditingOb={setEditingOb}
                     setEditAmount={setEditAmount}
                     handleDelete={handleDelete}
+                    handleBulkDeleteGroup={handleBulkDeleteGroup}
                     handlePrintReceipt={handlePrintReceipt}
                 />
             </div>

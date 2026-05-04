@@ -34,7 +34,7 @@ interface SavingsRecapProps {
 }
 
 const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
-    const [periodType, setPeriodType] = useState<'monthly' | 'range' | 'semester' | 'yearly'>('monthly');
+    const [periodType, setPeriodType] = useState<'daily' | 'monthly' | 'range' | 'semester' | 'yearly'>('monthly');
     const [year, setYear] = useState<number>(currentYear);
     const [semester, setSemester] = useState<1 | 2>(1);
     const [startDate, setStartDate] = useState('');
@@ -50,7 +50,9 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
             const params = new URLSearchParams();
             params.set('period_type', periodType);
 
-            if (periodType === 'monthly' || periodType === 'yearly') {
+            if (periodType === 'daily') {
+                if (startDate) params.set('start_date', startDate);
+            } else if (periodType === 'monthly' || periodType === 'yearly') {
                 params.set('year', String(year));
             } else if (periodType === 'semester') {
                 params.set('year', String(year));
@@ -77,6 +79,7 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
     };
 
     const periodLabel = () => {
+        if (periodType === 'daily') return `Harian — ${startDate}`;
         if (periodType === 'monthly') return `Bulanan — Tahun ${year}`;
         if (periodType === 'yearly') return `Tahunan — ${year}`;
         if (periodType === 'semester') return `Semester ${semester} — Tahun ${year}`;
@@ -199,6 +202,7 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
                                 onChange={e => setPeriodType(e.target.value as typeof periodType)}
                                 className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                             >
+                                <option value="daily">Harian</option>
                                 <option value="monthly">Bulanan</option>
                                 <option value="range">Rentang Tanggal</option>
                                 <option value="semester">Semester</option>
@@ -233,6 +237,20 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
                                     <option value={1}>Semester 1 (Jul–Des)</option>
                                     <option value={2}>Semester 2 (Jan–Jun)</option>
                                 </select>
+                            </div>
+                        )}
+
+                        {/* Daily date picker */}
+                        {periodType === 'daily' && (
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Tanggal</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={e => setStartDate(e.target.value)}
+                                    required
+                                    className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                />
                             </div>
                         )}
 

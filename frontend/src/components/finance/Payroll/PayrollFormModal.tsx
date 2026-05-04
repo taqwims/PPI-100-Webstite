@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Banknote, CheckCircle } from 'lucide-react';
+import { Banknote, CheckCircle, Plus, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
-import { PayrollRecord, UserData, PayrollTemplate } from './types';
+import { PayrollRecord, UserData, PayrollTemplate, PayrollCustomItem } from './types';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -29,6 +29,8 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({ isOpen, onCl
     };
     
     const [formData, setFormData] = useState(initialFormState);
+    const [customIncomeItems, setCustomIncomeItems] = useState<PayrollCustomItem[]>([]);
+    const [customDeductionItems, setCustomDeductionItems] = useState<PayrollCustomItem[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
@@ -53,8 +55,12 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({ isOpen, onCl
                     bank_account_number: editingPayroll.bank_account_number || '',
                     bank_account_holder: editingPayroll.bank_account_holder || ''
                 });
+                setCustomIncomeItems(editingPayroll.custom_income_items || []);
+                setCustomDeductionItems(editingPayroll.custom_deduction_items || []);
             } else {
                 setFormData(initialFormState);
+                setCustomIncomeItems([]);
+                setCustomDeductionItems([]);
             }
         }
     }, [isOpen, editingPayroll]);
@@ -87,19 +93,42 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({ isOpen, onCl
                     transport_allowance: userTemplate?.transport_allowance || 0,
                     additional_task: userTemplate?.additional_task || 0
                 }));
+                setCustomIncomeItems(userTemplate?.custom_income_items || []);
+                setCustomDeductionItems(userTemplate?.custom_deduction_items || []);
             }
         }
     };
 
-    const formIncome = (formData.base_salary || 0) + (formData.functional_allowance || 0) + (formData.transport_allowance || 0) + (formData.additional_task || 0);
-    const formDeduction = (formData.lateness_penalty || 0) + (formData.infaq_deduction || 0) + (formData.cash_advance || 0);
+    // Custom item handlers
+    const addCustomIncomeItem = () => setCustomIncomeItems(prev => [...prev, { name: '', amount: 0 }]);
+    const addCustomDeductionItem = () => setCustomDeductionItems(prev => [...prev, { name: '', amount: 0 }]);
+    
+    const updateCustomIncomeItem = (idx: number, field: keyof PayrollCustomItem, value: string | number) => {
+        setCustomIncomeItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+    };
+    const updateCustomDeductionItem = (idx: number, field: keyof PayrollCustomItem, value: string | number) => {
+        setCustomDeductionItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+    };
+    
+    const removeCustomIncomeItem = (idx: number) => setCustomIncomeItems(prev => prev.filter((_, i) => i !== idx));
+    const removeCustomDeductionItem = (idx: number) => setCustomDeductionItems(prev => prev.filter((_, i) => i !== idx));
+
+    const customIncomeTotal = customIncomeItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const customDeductionTotal = customDeductionItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+    const formIncome = (formData.base_salary || 0) + (formData.functional_allowance || 0) + (formData.transport_allowance || 0) + (formData.additional_task || 0) + customIncomeTotal;
+    const formDeduction = (formData.lateness_penalty || 0) + (formData.infaq_deduction || 0) + (formData.cash_advance || 0) + customDeductionTotal;
     const formNet = formIncome - formDeduction;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            await onSubmit(formData);
+            await onSubmit({
+                ...formData,
+                custom_income_items: customIncomeItems.filter(i => i.name && i.amount > 0),
+                custom_deduction_items: customDeductionItems.filter(i => i.name && i.amount > 0),
+            });
         } finally {
             setSubmitting(false);
         }
@@ -196,6 +225,32 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({ isOpen, onCl
                                         <label className="text-sm text-slate-600">Tugas Tambahan</label>
                                         <input type="number" name="additional_task" value={formData.additional_task === 0 ? '' : formData.additional_task} placeholder="0" onChange={handleInput} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-emerald-500 transition-all" />
                                     </div>
+
+                                    {/* Custom Income Items */}
+                                    {customIncomeItems.map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 bg-emerald-50/50 p-2 rounded-lg border border-emerald-100">
+                                            <input
+                                                type="text"
+                                                placeholder="Nama komponen"
+                                                value={item.name}
+                                                onChange={e => updateCustomIncomeItem(idx, 'name', e.target.value)}
+                                                className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={item.amount === 0 ? '' : item.amount}
+                                                onChange={e => updateCustomIncomeItem(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                                className="w-28 px-2 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            <button type="button" onClick={() => removeCustomIncomeItem(idx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={addCustomIncomeItem} className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition w-full justify-center border border-emerald-200 border-dashed">
+                                        <Plus size={14} /> Tambah Komponen Pendapatan
+                                    </button>
                                 </div>
                             </div>
 
@@ -215,6 +270,32 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({ isOpen, onCl
                                         <label className="text-sm text-slate-600">Kasbon</label>
                                         <input type="number" name="cash_advance" value={formData.cash_advance === 0 ? '' : formData.cash_advance} placeholder="0" onChange={handleInput} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-red-400 transition-all" />
                                     </div>
+
+                                    {/* Custom Deduction Items */}
+                                    {customDeductionItems.map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 bg-red-50/50 p-2 rounded-lg border border-red-100">
+                                            <input
+                                                type="text"
+                                                placeholder="Nama potongan"
+                                                value={item.name}
+                                                onChange={e => updateCustomDeductionItem(idx, 'name', e.target.value)}
+                                                className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-red-400"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={item.amount === 0 ? '' : item.amount}
+                                                onChange={e => updateCustomDeductionItem(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                                className="w-28 px-2 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-red-400"
+                                            />
+                                            <button type="button" onClick={() => removeCustomDeductionItem(idx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={addCustomDeductionItem} className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition w-full justify-center border border-red-200 border-dashed">
+                                        <Plus size={14} /> Tambah Komponen Potongan
+                                    </button>
                                 </div>
                             </div>
                         </div>

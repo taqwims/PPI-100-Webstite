@@ -30,14 +30,16 @@ func (r *StudentObligationRepository) GetAll(academicYearID uint, classID uint) 
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("PaymentType").
-		Preload("AcademicYear")
+		Preload("AcademicYear").
+		Joins("JOIN students ON students.id = student_obligations.student_id").
+		Joins("JOIN users ON users.id = students.user_id").
+		Where("students.deleted_at IS NULL AND users.deleted_at IS NULL")
 
 	if academicYearID > 0 {
-		query = query.Where("academic_year_id = ?", academicYearID)
+		query = query.Where("student_obligations.academic_year_id = ?", academicYearID)
 	}
 	if classID > 0 {
-		query = query.Joins("JOIN students ON students.id = student_obligations.student_id").
-			Where("students.class_id = ?", classID)
+		query = query.Where("students.class_id = ?", classID)
 	}
 
 	if err := query.Order("created_at desc").Find(&obs).Error; err != nil {
@@ -103,7 +105,8 @@ func (r *StudentObligationRepository) GetStudentsByClassID(classID uint) ([]doma
 	var students []domain.Student
 	if err := r.db.
 		Preload("User").Preload("Class").
-		Where("class_id = ? AND status = ?", classID, "Active").
+		Joins("JOIN users ON users.id = students.user_id").
+		Where("students.class_id = ? AND students.status = ? AND students.deleted_at IS NULL AND users.deleted_at IS NULL", classID, "Active").
 		Find(&students).Error; err != nil {
 		return nil, err
 	}

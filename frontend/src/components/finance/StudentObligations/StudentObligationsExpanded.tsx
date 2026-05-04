@@ -27,12 +27,13 @@ interface Props {
     setEditingOb: (ob: Obligation) => void;
     setEditAmount: (amount: string) => void;
     handleDelete: (id: string, e?: React.MouseEvent) => void;
+    handleBulkDeleteGroup: (ids: string[], typeName: string, e?: React.MouseEvent) => void;
     handlePrintReceipt: (params: any) => void;
 }
 
 export const StudentObligationsExpanded: React.FC<Props> = ({
     group, academicYears, filterYearId, canManage,
-    setPayingOb, setPayAmount, setEditingOb, setEditAmount, handleDelete, handlePrintReceipt
+    setPayingOb, setPayAmount, setEditingOb, setEditAmount, handleDelete, handleBulkDeleteGroup, handlePrintReceipt
 }) => {
     const byType: Record<string, Obligation[]> = {};
     group.obligations.forEach(ob => {
@@ -85,6 +86,15 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                 <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                                 <span className="font-semibold text-slate-800 text-sm">{typeName}</span>
                                 <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium">{schedule}</span>
+                                {canManage && (
+                                    <button 
+                                        onClick={(e) => handleBulkDeleteGroup(obs.map(o => o.id), typeName, e)} 
+                                        className="ml-2 px-2 py-1 flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-100 transition-colors"
+                                        title={`Hapus semua tanggungan ${typeName}`}
+                                    >
+                                        <Trash2 size={10} /> Hapus Semua
+                                    </button>
+                                )}
                             </div>
                             <div className="text-xs text-slate-500">
                                 {formatCurrency(typePaid)} / {formatCurrency(typeTotal)}

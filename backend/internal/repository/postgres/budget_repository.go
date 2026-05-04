@@ -168,10 +168,75 @@ func (r *BudgetRepository) Realize(id uuid.UUID, amount float64, source string, 
 
 // ------------------- Auto Realization -------------------
 
-func (r *BudgetRepository) AddRealizationByTransactionCodeID(tcID uint, amount float64) error {
-	return r.db.Model(&domain.Budget{}).
-		Where("transaction_code_id = ?", tcID).
-		Update("realized_amount", gorm.Expr("realized_amount + ?", amount)).Error
+func (r *BudgetRepository) AddRealizationByTransactionCodeID(tcID uint, amount float64, billingMonth int) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Step 1: Get the transaction code itself
+		var tc domain.TransactionCode
+		if err := tx.First(&tc, "id = ?", tcID).Error; err != nil {
+			return nil // Transaction code not found, skip silently
+		}
+
+		// Step 2: Find all related transaction code IDs
+		// Strategy A: Direct match + children via parent_code_id
+		var tcIDs []uint
+		tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+
+		// Step 3: Find budgets using those transaction code IDs
+		var budgets []domain.Budget
+		tx.Where("transaction_code_id IN ?", tcIDs).Order("month asc, created_at asc").Find(&budgets)
+
+		// Strategy B (fallback): If no budgets found, search by code prefix pattern
+		// e.g., if tc.Code = "C11", find budgets whose transaction_code has code LIKE "C11%"
+		if len(budgets) == 0 {
+			var prefixTCIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("code LIKE ?", tc.Code+"%").Pluck("id", &prefixTCIDs)
+			if len(prefixTCIDs) > 0 {
+				tx.Where("transaction_code_id IN ?", prefixTCIDs).Order("month asc, created_at asc").Find(&budgets)
+			}
+		}
+
+		if len(budgets) == 0 {
+			return nil // No budgets to realize
+		}
+
+		// Step 4: Distribute the amount
+		// If billingMonth is specified, try exact month match first (Precise mode)
+		var targetBudget *domain.Budget
+		if billingMonth > 0 {
+			for i := range budgets {
+				if budgets[i].Month == billingMonth {
+					targetBudget = &budgets[i]
+					break
+				}
+			}
+		}
+
+		if targetBudget != nil {
+			tx.Model(&domain.Budget{}).Where("id = ?", targetBudget.ID).Update("realized_amount", gorm.Expr("realized_amount + ?", amount))
+		} else {
+			// Fallback: Waterfall distribution
+			remaining := amount
+			for _, b := range budgets {
+				if remaining <= 0 {
+					break
+				}
+				space := b.PlannedAmount - b.RealizedAmount
+				if space > 0 {
+					toAdd := remaining
+					if toAdd > space {
+						toAdd = space
+					}
+					tx.Model(&domain.Budget{}).Where("id = ?", b.ID).Update("realized_amount", gorm.Expr("realized_amount + ?", toAdd))
+					remaining -= toAdd
+				}
+			}
+			if remaining > 0 {
+				tx.Model(&domain.Budget{}).Where("id = ?", budgets[len(budgets)-1].ID).Update("realized_amount", gorm.Expr("realized_amount + ?", remaining))
+			}
+		}
+
+		return nil
+	})
 }
 
 // ------------------- Budget Summary -------------------

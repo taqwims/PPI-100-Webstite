@@ -54,7 +54,7 @@ func (u *BudgetUsecase) CreateBudget(b *domain.Budget) error {
 	return u.repo.Create(b)
 }
 
-func (u *BudgetUsecase) CreateBudgetFromTemplate(b *domain.Budget, templateCodeID uint) error {
+func (u *BudgetUsecase) CreateBudgetFromTemplate(b *domain.Budget, templateCodeID uint, months []int) error {
 	template, err := u.tcRepo.GetByID(templateCodeID)
 	if err != nil {
 		return fmt.Errorf("transaction code template not found: %w", err)
@@ -103,6 +103,7 @@ func (u *BudgetUsecase) CreateBudgetFromTemplate(b *domain.Budget, templateCodeI
 		Category: template.Category,
 		Description: "RKAS Item: " + b.ItemName,
 		IsActive: true,
+		ParentCodeID: &template.ID,
 	}
 	
 	if err := u.tcRepo.Create(&newTc); err != nil {
@@ -113,6 +114,19 @@ func (u *BudgetUsecase) CreateBudgetFromTemplate(b *domain.Budget, templateCodeI
 	b.TransactionCodeID = &newTc.ID
 	b.Status = "Approved"
 	
+	if len(months) > 0 {
+		// Bulk create for multiple months
+		for _, m := range months {
+			newB := *b
+			newB.Month = m
+			newB.ID = uuid.Nil // Reset ID for new record
+			if err := u.repo.Create(&newB); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	return u.repo.Create(b)
 }
 

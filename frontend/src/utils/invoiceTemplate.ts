@@ -125,7 +125,8 @@ export function drawStandardHeaderA5(
 
     if (logoBase64) {
         try {
-            doc.addImage(logoBase64, 'PNG', (pageWidth - 14) / 2, 3, 14, 14);
+            // Logo at top right
+            doc.addImage(logoBase64, 'PNG', pageWidth - 26, 6, 16, 16);
         } catch { }
     }
 
@@ -750,7 +751,7 @@ async function renderInvoiceSection(
     // ── Header (Standard White) ──
     const headerH = 36;
     if (logoBase64) {
-        try { doc.addImage(logoBase64, 'PNG', (pageWidth - 14) / 2, yOffset + 3, 11, 11); } catch { }
+        try { doc.addImage(logoBase64, 'PNG', pageWidth - 24, yOffset + 6, 14, 14); } catch { }
     }
 
     doc.setTextColor(...BRAND_GREEN);

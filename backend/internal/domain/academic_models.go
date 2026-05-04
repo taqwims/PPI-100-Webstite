@@ -4,7 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	)
+	"gorm.io/gorm"
+)
 
 // Akademik
 type Student struct {
@@ -20,6 +21,7 @@ type Student struct {
 	Status    string    `gorm:"not null;default:'Active'" json:"status"` // Active, Graduated, Transferred
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Parent struct {
@@ -32,6 +34,7 @@ type Parent struct {
 	Relation   string    `json:"relation"` // e.g. Ayah, Ibu, Wali
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Teacher struct {
@@ -42,6 +45,7 @@ type Teacher struct {
 	UnitID    uint      `gorm:"not null" json:"unit_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Class struct {

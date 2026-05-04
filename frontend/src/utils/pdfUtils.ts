@@ -30,6 +30,9 @@ interface PayrollData {
     net_salary: number;
     status: string;
     paid_at?: string;
+
+    custom_income_items?: { name: string; amount: number }[];
+    custom_deduction_items?: { name: string; amount: number }[];
 }
 
 // ─── Helper: Fetch signatures from backend ───
@@ -197,6 +200,7 @@ export const generatePayrollReceipt = async (payroll: PayrollData, selectedRoles
         { label: 'Tunjangan Fungsional', value: payroll.functional_allowance },
         { label: 'Tunjangan Transport', value: payroll.transport_allowance },
         { label: 'Tugas Tambahan', value: payroll.additional_task },
+        ...(payroll.custom_income_items || []).map(item => ({ label: item.name, value: item.amount })),
     ];
     for (const item of incomeItems) {
         if (item.value > 0) {
@@ -220,6 +224,7 @@ export const generatePayrollReceipt = async (payroll: PayrollData, selectedRoles
         { label: 'Keterlambatan', value: payroll.lateness_penalty },
         { label: 'Infaq', value: payroll.infaq_deduction },
         { label: 'Kasbon', value: payroll.cash_advance },
+        ...(payroll.custom_deduction_items || []).map(item => ({ label: item.name, value: item.amount })),
     ];
     for (const item of deductionItems) {
         if (item.value > 0) {

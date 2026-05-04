@@ -524,6 +524,10 @@ func (r *financeExtendedRepository) GetSavingsRecap(params domain.SavingsRecapPa
 	var periodLabel string
 
 	switch params.PeriodType {
+	case "daily":
+		startDate = time.Date(params.StartDate.Year(), params.StartDate.Month(), params.StartDate.Day(), 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(params.StartDate.Year(), params.StartDate.Month(), params.StartDate.Day(), 23, 59, 59, 0, time.UTC)
+		periodLabel = fmt.Sprintf("Harian: %s", startDate.Format("02 Januari 2006"))
 	case "monthly":
 		startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
 		endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)

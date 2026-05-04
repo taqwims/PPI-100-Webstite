@@ -295,41 +295,80 @@ const Savings = () => {
 
             {/* History Modal */}
             {showHistoryModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">Detail Transaksi Tabungan</h2>
-                                <p className="text-sm text-slate-500 mt-1">{historyAccount?.student?.user?.name} — {historyAccount?.student?.class?.name}</p>
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex justify-center items-start md:items-center p-2 md:p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl my-auto">
+                        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 gap-2 shrink-0">
+                            <div className="min-w-0">
+                                <h2 className="text-base md:text-lg font-bold text-slate-800 flex items-center gap-2 truncate">Detail Transaksi Tabungan</h2>
+                                <p className="text-xs md:text-sm text-slate-500 mt-0.5 truncate">{historyAccount?.student?.user?.name} — {historyAccount?.student?.class?.name}</p>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium">
-                                    <Download size={18} /> Cetak Buku
+                            <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+                                <button onClick={handleExportPDF} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors text-xs md:text-sm font-medium">
+                                    <Download size={16} /> Cetak Buku
                                 </button>
-                                <button onClick={() => setShowHistoryModal(false)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-200 transition-colors"><X size={20} className="text-slate-400" /></button>
+                                <button onClick={() => setShowHistoryModal(false)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-200 transition-colors shrink-0"><X size={18} className="text-slate-400" /></button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-auto p-6 bg-slate-50/50">
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                <table className="w-full text-left max-w-full">
-                                    <thead><tr className="bg-slate-50"><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Tanggal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Jenis</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase w-1/3">Keterangan</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Nominal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Input Oleh</th></tr></thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {loadingHistory ? (<tr><td colSpan={5} className="py-8 text-center text-slate-400">Memuat...</td></tr>) : transactions.length === 0 ? (<tr><td colSpan={5} className="py-8 text-center text-slate-400">Belum ada transaksi</td></tr>) : transactions.map(trx => (
-                                            <tr key={trx.id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-4 py-4 text-sm whitespace-nowrap text-slate-600">{formatDate(trx.date)}</td>
-                                                <td className="px-4 py-4"><span className={clsx("px-2.5 py-1 text-xs font-bold rounded-lg border", trx.type === 'Deposit' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>{trx.type === 'Deposit' ? 'Setoran' : 'Ditarik'}</span></td>
-                                                <td className="px-4 py-4 text-sm text-slate-600 break-words">{trx.notes || '-'}</td>
-                                                <td className={clsx("px-4 py-4 text-sm font-bold text-right whitespace-nowrap border-r border-slate-100", trx.type === 'Deposit' ? "text-green-600" : "text-red-600")}>{trx.type === 'Deposit' ? '+' : '-'}{formatCurrency(trx.amount)}</td>
-                                                <td className="px-4 py-4 text-sm text-slate-500 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>{trx.handled_by?.name}</div></td>
-                                            </tr>
+                        <div className="flex-1 overflow-auto p-3 md:p-6 bg-slate-50/50">
+                            {/* Desktop Table */}
+                            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left min-w-[600px]">
+                                        <thead><tr className="bg-slate-50"><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Tanggal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Jenis</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase w-1/3">Keterangan</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Nominal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Input Oleh</th></tr></thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {loadingHistory ? (<tr><td colSpan={5} className="py-8 text-center text-slate-400">Memuat...</td></tr>) : transactions.length === 0 ? (<tr><td colSpan={5} className="py-8 text-center text-slate-400">Belum ada transaksi</td></tr>) : transactions.map(trx => (
+                                                <tr key={trx.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-4 py-4 text-sm whitespace-nowrap text-slate-600">{formatDate(trx.date)}</td>
+                                                    <td className="px-4 py-4"><span className={clsx("px-2.5 py-1 text-xs font-bold rounded-lg border", trx.type === 'Deposit' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>{trx.type === 'Deposit' ? 'Setoran' : 'Ditarik'}</span></td>
+                                                    <td className="px-4 py-4 text-sm text-slate-600 break-words">{trx.notes || '-'}</td>
+                                                    <td className={clsx("px-4 py-4 text-sm font-bold text-right whitespace-nowrap border-r border-slate-100", trx.type === 'Deposit' ? "text-green-600" : "text-red-600")}>{trx.type === 'Deposit' ? '+' : '-'}{formatCurrency(trx.amount)}</td>
+                                                    <td className="px-4 py-4 text-sm text-slate-500 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>{trx.handled_by?.name}</div></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        {transactions.length > 0 && (
+                                            <tfoot className="bg-slate-50 border-t border-slate-200">
+                                                <tr><td colSpan={3} className="px-4 py-4 text-right font-bold text-slate-700">Saldo Akhir:</td><td colSpan={2} className="px-4 py-4 text-left font-bold text-emerald-600 text-lg">{formatCurrency(historyAccount?.balance || 0)}</td></tr>
+                                            </tfoot>
+                                        )}
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="md:hidden space-y-3">
+                                {loadingHistory ? (
+                                    <div className="py-8 text-center text-slate-400">Memuat...</div>
+                                ) : transactions.length === 0 ? (
+                                    <div className="py-8 text-center text-slate-400">Belum ada transaksi</div>
+                                ) : (
+                                    <>
+                                        {transactions.map(trx => (
+                                            <div key={trx.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="space-y-1">
+                                                        <span className={clsx("px-2.5 py-1 text-xs font-bold rounded-lg border inline-block", trx.type === 'Deposit' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>
+                                                            {trx.type === 'Deposit' ? 'Setoran' : 'Ditarik'}
+                                                        </span>
+                                                        <p className="text-xs text-slate-400">{formatDate(trx.date)}</p>
+                                                    </div>
+                                                    <p className={clsx("text-base font-bold", trx.type === 'Deposit' ? "text-green-600" : "text-red-600")}>
+                                                        {trx.type === 'Deposit' ? '+' : '-'}{formatCurrency(trx.amount)}
+                                                    </p>
+                                                </div>
+                                                {trx.notes && <p className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">{trx.notes}</p>}
+                                                <div className="flex items-center gap-2 text-xs text-slate-400 pt-1 border-t border-slate-100">
+                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>
+                                                    {trx.handled_by?.name}
+                                                </div>
+                                            </div>
                                         ))}
-                                    </tbody>
-                                    {transactions.length > 0 && (
-                                        <tfoot className="bg-slate-50 border-t border-slate-200">
-                                            <tr><td colSpan={3} className="px-4 py-4 text-right font-bold text-slate-700">Saldo Akhir:</td><td colSpan={2} className="px-4 py-4 text-left font-bold text-emerald-600 text-lg">{formatCurrency(historyAccount?.balance || 0)}</td></tr>
-                                        </tfoot>
-                                    )}
-                                </table>
+                                        <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4 text-center">
+                                            <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Saldo Akhir</p>
+                                            <p className="text-xl font-black text-emerald-700 mt-1">{formatCurrency(historyAccount?.balance || 0)}</p>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

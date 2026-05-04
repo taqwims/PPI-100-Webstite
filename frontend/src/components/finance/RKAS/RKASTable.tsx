@@ -60,54 +60,83 @@ export const RKASTable: React.FC<RKASTableProps> = ({
                                         </div>
                                     </td>
                                 </tr>
-                                {expandedGroups[standarName] && items.map(b => {
-                                    const pct = b.planned_amount > 0 ? (b.realized_amount / b.planned_amount) * 100 : 0;
-                                    return (
-                                        <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-5 py-3.5">
-                                                <span className="font-medium text-slate-900 bg-white border border-slate-200 px-2 py-1 rounded text-xs">{b.transaction_code?.code || '-'}</span>
-                                            </td>
-                                            <td className="px-5 py-3.5">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-medium text-slate-900 text-sm">{b.item_name}</p>
-                                                    {b.period === 'Bulanan' && b.month > 0 && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-full font-medium">Bulan {b.month}</span>}
-                                                    {b.period && b.period !== 'Tahunan' && b.period !== 'Bulanan' && <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[10px] rounded-full font-medium">{b.period}</span>}
-                                                </div>
-                                                <p className="text-xs text-slate-400">oleh {b.created_by?.name}</p>
-                                            </td>
-                                            <td className="px-5 py-3.5 text-sm text-slate-600">{b.academic_year?.name}</td>
-                                            <td className="px-5 py-3.5 text-sm text-center text-slate-700">{b.quantity > 0 ? b.quantity : '-'}</td>
-                                            <td className="px-5 py-3.5 text-sm text-right text-slate-600">{b.unit_price > 0 ? formatCurrency(b.unit_price) : '-'}</td>
-                                            <td className="px-5 py-3.5 text-sm text-right font-medium text-slate-900">{formatCurrency(b.planned_amount)}</td>
-                                            <td className="px-5 py-3.5 text-sm text-right font-medium">
-                                                <span className={pct > 100 ? 'text-red-600 flex items-center justify-end gap-1' : 'text-emerald-600'}>
-                                                    {pct > 100 && <span className="flex items-center justify-center w-4 h-4 bg-red-100 rounded-full text-[10px] text-red-600 font-bold" title="Realisasi melebihi anggaran">!</span>}
-                                                    {formatCurrency(b.realized_amount)}
-                                                </span>
-                                                {pct > 100 && <p className="text-[10px] text-red-500 mt-0.5">Overbudget {formatCurrency(b.realized_amount - b.planned_amount)}</p>}
-                                            </td>
-                                            <td className="px-5 py-3.5">
-                                                <div className="w-20 mx-auto">
-                                                    <div className="w-full bg-slate-100 rounded-full h-2">
-                                                        <div className={clsx('h-2 rounded-full', pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${Math.min(pct, 100)}%` }} />
+                                {expandedGroups[standarName] && (() => {
+                                    // Group items by transaction code to merge multi-month budgets visually
+                                    const groupedItems = items.reduce((acc, b) => {
+                                        const key = b.transaction_code?.code || b.id;
+                                        if (!acc[key]) {
+                                            acc[key] = { ...b, total_planned: 0, total_realized: 0, months: [], ids: [] };
+                                        }
+                                        acc[key].total_planned += b.planned_amount;
+                                        acc[key].total_realized += b.realized_amount;
+                                        if (b.month > 0) acc[key].months.push(b.month);
+                                        acc[key].ids.push(b.id);
+                                        return acc;
+                                    }, {} as Record<string, any>);
+
+                                    return Object.values(groupedItems).map((b: any) => {
+                                        const pct = b.total_planned > 0 ? (b.total_realized / b.total_planned) * 100 : 0;
+                                        const isMulti = b.months.length > 1;
+                                        return (
+                                            <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-5 py-3.5">
+                                                    <span className="font-medium text-slate-900 bg-white border border-slate-200 px-2 py-1 rounded text-xs">{b.transaction_code?.code || '-'}</span>
+                                                </td>
+                                                <td className="px-5 py-3.5">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <p className="font-medium text-slate-900 text-sm">{b.item_name}</p>
+                                                        {isMulti ? (
+                                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-full font-medium" title={b.months.join(', ')}>
+                                                                {b.months.length} Bulan
+                                                            </span>
+                                                        ) : (
+                                                            b.period === 'Bulanan' && b.month > 0 && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-full font-medium">Bulan {b.month}</span>
+                                                        )}
+                                                        {b.period && b.period !== 'Tahunan' && b.period !== 'Bulanan' && <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[10px] rounded-full font-medium">{b.period}</span>}
                                                     </div>
-                                                    <p className="text-[10px] text-center text-slate-500 mt-0.5">{pct.toFixed(0)}%</p>
-                                                </div>
-                                            </td>
-                                            <td className="px-5 py-3.5 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {canEdit && (
-                                                        <>
-                                                            <button onClick={() => onEdit(b)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><Edit size={14} /></button>
-                                                            <button onClick={() => { if (window.confirm('Hapus anggaran ini?')) onDelete(b.id); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><Trash2 size={14} /></button>
-                                                            <button onClick={() => onRealize(b.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Input Realisasi"><TrendingUp size={14} /></button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                                    <p className="text-xs text-slate-400 mt-1">oleh {b.created_by?.name}</p>
+                                                </td>
+                                                <td className="px-5 py-3.5 text-sm text-slate-600">{b.academic_year?.name}</td>
+                                                <td className="px-5 py-3.5 text-sm text-center text-slate-700">
+                                                    {isMulti ? `${b.quantity} × ${b.months.length}` : (b.quantity > 0 ? b.quantity : '-')}
+                                                </td>
+                                                <td className="px-5 py-3.5 text-sm text-right text-slate-600">{b.unit_price > 0 ? formatCurrency(b.unit_price) : '-'}</td>
+                                                <td className="px-5 py-3.5 text-sm text-right font-medium text-slate-900">{formatCurrency(b.total_planned)}</td>
+                                                <td className="px-5 py-3.5 text-sm text-right font-medium">
+                                                    <span className={pct > 100 ? 'text-red-600 flex items-center justify-end gap-1' : 'text-emerald-600'}>
+                                                        {pct > 100 && <span className="flex items-center justify-center w-4 h-4 bg-red-100 rounded-full text-[10px] text-red-600 font-bold" title="Realisasi melebihi anggaran">!</span>}
+                                                        {formatCurrency(b.total_realized)}
+                                                    </span>
+                                                    {pct > 100 && <p className="text-[10px] text-red-500 mt-0.5">Overbudget {formatCurrency(b.total_realized - b.total_planned)}</p>}
+                                                </td>
+                                                <td className="px-5 py-3.5">
+                                                    <div className="w-20 mx-auto">
+                                                        <div className="w-full bg-slate-100 rounded-full h-2">
+                                                            <div className={clsx('h-2 rounded-full', pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${Math.min(pct, 100)}%` }} />
+                                                        </div>
+                                                        <p className="text-[10px] text-center text-slate-500 mt-0.5">{pct.toFixed(0)}%</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-3.5 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {canEdit && !isMulti && (
+                                                            <>
+                                                                <button onClick={() => onEdit(b)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><Edit size={14} /></button>
+                                                                <button onClick={() => { if (window.confirm('Hapus anggaran ini?')) onDelete(b.id); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><Trash2 size={14} /></button>
+                                                                <button onClick={() => onRealize(b.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Input Realisasi"><TrendingUp size={14} /></button>
+                                                            </>
+                                                        )}
+                                                        {canEdit && isMulti && (
+                                                            <>
+                                                                <button onClick={() => { if (window.confirm('Hapus semua anggaran bulan ini?')) { b.ids.forEach((id: string) => onDelete(id)); } }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus Semua"><Trash2 size={14} /></button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    });
+                                })()}
                             </React.Fragment>
                         ))}
                     </tbody>

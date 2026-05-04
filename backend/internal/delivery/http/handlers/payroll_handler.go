@@ -23,7 +23,32 @@ func (h *PayrollHandler) GetPayrolls(c *gin.Context) {
 	month, _ := strconv.Atoi(monthStr)
 	year, _ := strconv.Atoi(yearStr)
 
-	payrolls, err := h.payrollUsecase.GetPayrolls(month, year)
+	roleIDVal, exists := c.Get("roleID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var roleID int
+	if id, ok := roleIDVal.(int); ok {
+		roleID = id
+	} else if id, ok := roleIDVal.(float64); ok {
+		roleID = int(id)
+	}
+
+	userID := ""
+	// Jika bukan Super Admin (1) dan bukan Bendahara (9), hanya boleh lihat gajinya sendiri
+	if roleID != 1 && roleID != 9 {
+		uidVal, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+		if idStr, ok := uidVal.(string); ok {
+			userID = idStr
+		}
+	}
+
+	payrolls, err := h.payrollUsecase.GetPayrolls(month, year, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

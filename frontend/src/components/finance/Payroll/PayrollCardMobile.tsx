@@ -51,6 +51,9 @@ export const PayrollCardMobile = ({ payroll, canManage, onEdit, onDelete, onPay,
                                 <div className="flex justify-between"><span className="text-slate-600">Tunj. Fungsional</span><span className="font-medium">{formatCurrency(payroll.functional_allowance)}</span></div>
                                 <div className="flex justify-between"><span className="text-slate-600">Tunj. Transport</span><span className="font-medium">{formatCurrency(payroll.transport_allowance)}</span></div>
                                 <div className="flex justify-between"><span className="text-slate-600">Tugas Tambahan</span><span className="font-medium">{formatCurrency(payroll.additional_task)}</span></div>
+                                {payroll.custom_income_items?.map((item: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between"><span className="text-emerald-600">{item.name}</span><span className="font-medium">{formatCurrency(item.amount)}</span></div>
+                                ))}
                                 <div className="flex justify-between pt-2 border-t border-slate-200 mt-1"><span className="font-semibold text-slate-800">Total Pendapatan</span><span className="font-bold text-slate-800">{formatCurrency(payroll.total_income)}</span></div>
                             </div>
                         </div>
@@ -62,6 +65,9 @@ export const PayrollCardMobile = ({ payroll, canManage, onEdit, onDelete, onPay,
                                 <div className="flex justify-between"><span className="text-slate-600">Keterlambatan</span><span className="text-red-500 font-medium">-{formatCurrency(payroll.lateness_penalty)}</span></div>
                                 <div className="flex justify-between"><span className="text-slate-600">Infaq</span><span className="text-red-500 font-medium">-{formatCurrency(payroll.infaq_deduction)}</span></div>
                                 <div className="flex justify-between"><span className="text-slate-600">Kasbon</span><span className="text-red-500 font-medium">-{formatCurrency(payroll.cash_advance)}</span></div>
+                                {payroll.custom_deduction_items?.map((item: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between"><span className="text-red-500">{item.name}</span><span className="text-red-500 font-medium">-{formatCurrency(item.amount)}</span></div>
+                                ))}
                                 <div className="flex justify-between pt-2 border-t border-slate-200 mt-1"><span className="font-semibold text-slate-800">Total Potongan</span><span className="font-bold text-red-600">-{formatCurrency(payroll.total_deduction)}</span></div>
                             </div>
                         </div>

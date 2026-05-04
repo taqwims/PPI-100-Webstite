@@ -71,7 +71,7 @@ const RKAS: React.FC = () => {
         } else {
             if (isMultiple && months.length > 0) {
                 try {
-                    await Promise.all(months.map((m: number) => api.post('/finance/budgets', { ...data, month: m })));
+                    await api.post('/finance/budgets', { ...data, months: months });
                     queryClient.invalidateQueries({ queryKey: ['budgets'] });
                     setEditItem(null);
                     setShowModal(false);

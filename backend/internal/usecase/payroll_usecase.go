@@ -22,13 +22,25 @@ func NewPayrollUsecase(payrollRepo *postgres.PayrollRepository, userRepo *postgr
 }
 
 func (u *PayrollUsecase) CalculateTotals(payroll *domain.Payroll) {
-	payroll.TotalIncome = payroll.BaseSalary + payroll.FunctionalAllowance + payroll.TransportAllowance + payroll.AdditionalTask
-	payroll.TotalDeduction = payroll.LatenessPenalty + payroll.InfaqDeduction + payroll.CashAdvance
+	fixedIncome := payroll.BaseSalary + payroll.FunctionalAllowance + payroll.TransportAllowance + payroll.AdditionalTask
+	var customIncome float64
+	for _, item := range payroll.CustomIncomeItems {
+		customIncome += item.Amount
+	}
+	payroll.TotalIncome = fixedIncome + customIncome
+
+	fixedDeduction := payroll.LatenessPenalty + payroll.InfaqDeduction + payroll.CashAdvance
+	var customDeduction float64
+	for _, item := range payroll.CustomDeductionItems {
+		customDeduction += item.Amount
+	}
+	payroll.TotalDeduction = fixedDeduction + customDeduction
+
 	payroll.NetSalary = payroll.TotalIncome - payroll.TotalDeduction
 }
 
-func (u *PayrollUsecase) GetPayrolls(month, year int) ([]domain.Payroll, error) {
-	return u.payrollRepo.GetPayrolls(month, year)
+func (u *PayrollUsecase) GetPayrolls(month, year int, userID string) ([]domain.Payroll, error) {
+	return u.payrollRepo.GetPayrolls(month, year, userID)
 }
 
 func (u *PayrollUsecase) CreatePayroll(payroll *domain.Payroll) error {
@@ -72,6 +84,9 @@ func (u *PayrollUsecase) UpdatePayroll(id string, input *domain.Payroll) error {
 	existing.BankName = input.BankName
 	existing.BankAccountNumber = input.BankAccountNumber
 	existing.BankAccountHolder = input.BankAccountHolder
+
+	existing.CustomIncomeItems = input.CustomIncomeItems
+	existing.CustomDeductionItems = input.CustomDeductionItems
 
 	u.CalculateTotals(existing)
 	return u.payrollRepo.UpdatePayroll(existing)

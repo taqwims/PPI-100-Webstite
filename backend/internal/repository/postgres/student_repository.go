@@ -20,7 +20,10 @@ func (r *StudentRepository) Create(student *domain.Student) error {
 
 func (r *StudentRepository) GetAll(unitID uint) ([]domain.Student, error) {
 	var students []domain.Student
-	err := r.db.Where("unit_id = ?", unitID).Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").Find(&students).Error
+	err := r.db.Joins("User").
+		Where("students.unit_id = ? AND \"User\".deleted_at IS NULL", unitID).
+		Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").
+		Find(&students).Error
 	return students, err
 }
 
@@ -112,4 +115,8 @@ func (r *StudentRepository) PromoteStudentAtomically(studentID string, nextClass
 
 		return nil
 	})
+}
+
+func (r *StudentRepository) DeleteByUserID(userID string) error {
+	return r.db.Where("user_id = ?", userID).Delete(&domain.Student{}).Error
 }

@@ -33,10 +33,9 @@ func (r *FinanceRepository) GetBillsByStudent(studentID string) ([]domain.Bill, 
 
 func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 	var bills []domain.Bill
-	// Join with students to filter by unitID if needed, or just return all for now.
-	// Assuming unitID filtering is done via Student relation
 	err := r.db.Joins("JOIN students ON students.id = bills.student_id").
-		Where("students.unit_id = ?", unitID).
+		Joins("JOIN users ON users.id = students.user_id").
+		Where("students.unit_id = ? AND students.deleted_at IS NULL AND users.deleted_at IS NULL", unitID).
 		Preload("Payments").
 		Preload("Student.User").
 		Preload("Student.Class").
@@ -85,6 +84,7 @@ func (r *FinanceRepository) GetBillByID(id string) (*domain.Bill, error) {
 		Preload("Student.Class").
 		Preload("AcademicYear").
 		Preload("TransactionCode").
+		Preload("Obligation").
 		First(&bill).Error
 	if err != nil {
 		return nil, err
@@ -207,6 +207,7 @@ func (r *FinanceRepository) GetBillsByIDsOrObligationIDs(ids []string) ([]domain
 		Preload("Student.Class").
 		Preload("AcademicYear").
 		Preload("TransactionCode").
+		Preload("Obligation").
 		Find(&bills).Error
 	return bills, err
 }
@@ -223,6 +224,7 @@ func (r *FinanceRepository) GetBillsByIDs(ids []string) ([]domain.Bill, error) {
 		Preload("Student.Class").
 		Preload("AcademicYear").
 		Preload("TransactionCode").
+		Preload("Obligation").
 		Find(&bills).Error
 	return bills, err
 }
@@ -272,10 +274,54 @@ func (r *FinanceRepository) RecordPaymentAtomically(
 		}
 
 		if tcID != nil && *tcID > 0 {
-			if err := tx.Model(&domain.Budget{}).
-				Where("transaction_code_id = ?", *tcID).
-				Update("realized_amount", gorm.Expr("realized_amount + ?", realizeAmount)).Error; err != nil {
-				return err
+			var billingMonth int
+			if payment != nil {
+				var bill domain.Bill
+				if err := tx.Where("id = ?", payment.BillID).First(&bill).Error; err == nil && bill.ObligationID != nil {
+					var ob domain.StudentObligation
+					if err := tx.Where("id = ?", *bill.ObligationID).First(&ob).Error; err == nil {
+						billingMonth = ob.BillingMonth
+					}
+				}
+			}
+
+			var tcIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", *tcID, *tcID).Pluck("id", &tcIDs)
+
+			var budgets []domain.Budget
+			if err := tx.Where("transaction_code_id IN ?", tcIDs).Order("month asc, created_at asc").Find(&budgets).Error; err == nil && len(budgets) > 0 {
+				var targetBudget *domain.Budget
+				if billingMonth > 0 {
+					for i := range budgets {
+						if budgets[i].Month == billingMonth {
+							targetBudget = &budgets[i]
+							break
+						}
+					}
+				}
+
+				if targetBudget != nil {
+					tx.Model(&domain.Budget{}).Where("id = ?", targetBudget.ID).Update("realized_amount", gorm.Expr("realized_amount + ?", realizeAmount))
+				} else {
+					remaining := realizeAmount
+					for _, b := range budgets {
+						if remaining <= 0 {
+							break
+						}
+						space := b.PlannedAmount - b.RealizedAmount
+						if space > 0 {
+							toAdd := remaining
+							if toAdd > space {
+								toAdd = space
+							}
+							tx.Model(&domain.Budget{}).Where("id = ?", b.ID).Update("realized_amount", gorm.Expr("realized_amount + ?", toAdd))
+							remaining -= toAdd
+						}
+					}
+					if remaining > 0 {
+						tx.Model(&domain.Budget{}).Where("id = ?", budgets[len(budgets)-1].ID).Update("realized_amount", gorm.Expr("realized_amount + ?", remaining))
+					}
+				}
 			}
 		}
 
@@ -311,10 +357,54 @@ func (r *FinanceRepository) ApprovePaymentAtomically(
 		}
 
 		if tcID != nil && *tcID > 0 {
-			if err := tx.Model(&domain.Budget{}).
-				Where("transaction_code_id = ?", *tcID).
-				Update("realized_amount", gorm.Expr("realized_amount + ?", realizeAmount)).Error; err != nil {
-				return err
+			var billingMonth int
+			if payment != nil {
+				var bill domain.Bill
+				if err := tx.Where("id = ?", payment.BillID).First(&bill).Error; err == nil && bill.ObligationID != nil {
+					var ob domain.StudentObligation
+					if err := tx.Where("id = ?", *bill.ObligationID).First(&ob).Error; err == nil {
+						billingMonth = ob.BillingMonth
+					}
+				}
+			}
+
+			var tcIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", *tcID, *tcID).Pluck("id", &tcIDs)
+
+			var budgets []domain.Budget
+			if err := tx.Where("transaction_code_id IN ?", tcIDs).Order("month asc, created_at asc").Find(&budgets).Error; err == nil && len(budgets) > 0 {
+				var targetBudget *domain.Budget
+				if billingMonth > 0 {
+					for i := range budgets {
+						if budgets[i].Month == billingMonth {
+							targetBudget = &budgets[i]
+							break
+						}
+					}
+				}
+
+				if targetBudget != nil {
+					tx.Model(&domain.Budget{}).Where("id = ?", targetBudget.ID).Update("realized_amount", gorm.Expr("realized_amount + ?", realizeAmount))
+				} else {
+					remaining := realizeAmount
+					for _, b := range budgets {
+						if remaining <= 0 {
+							break
+						}
+						space := b.PlannedAmount - b.RealizedAmount
+						if space > 0 {
+							toAdd := remaining
+							if toAdd > space {
+								toAdd = space
+							}
+							tx.Model(&domain.Budget{}).Where("id = ?", b.ID).Update("realized_amount", gorm.Expr("realized_amount + ?", toAdd))
+							remaining -= toAdd
+						}
+					}
+					if remaining > 0 {
+						tx.Model(&domain.Budget{}).Where("id = ?", budgets[len(budgets)-1].ID).Update("realized_amount", gorm.Expr("realized_amount + ?", remaining))
+					}
+				}
 			}
 		}
 

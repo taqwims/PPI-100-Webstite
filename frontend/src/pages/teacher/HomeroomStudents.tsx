@@ -8,6 +8,7 @@ import InputGlass from '../../components/ui/glass/InputGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { useUnits } from '../../hooks/useUnits';
+import { useAuth } from '../../context/AuthContext';
 
 interface Student {
     id: string;
@@ -41,13 +42,17 @@ const HomeroomStudents: React.FC = () => {
         parent_id: '',
     });
 
+    const { user } = useAuth();
+    
     // Fetch Homeroom Class
     const { data: homeroomClass } = useQuery({
-        queryKey: ['homeroom-class'],
+        queryKey: ['homeroom-class', user?.teacher?.id],
         queryFn: async () => {
-            const res = await api.get('/academic/classes/homeroom');
+            if (!user?.teacher?.id) return null;
+            const res = await api.get(`/academic/classes/homeroom?teacher_id=${user.teacher.id}`);
             return res.data;
         },
+        enabled: !!user?.teacher?.id,
     });
 
     // Fetch Students in Homeroom Class

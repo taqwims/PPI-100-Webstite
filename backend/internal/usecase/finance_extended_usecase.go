@@ -100,7 +100,7 @@ func (u *FinanceExtendedUsecase) AddCashLedgerEntry(req *domain.CashLedger) erro
 	}
 	// Auto-realize RKAS if transaction code is linked to a budget
 	if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 {
-		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount)
+		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount, 0)
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ func (u *FinanceExtendedUsecase) AddDailyInfaqEntry(req *domain.DailyInfaq) erro
 	}
 	// Auto-realize RKAS if transaction code is linked to a budget
 	if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 {
-		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount)
+		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount, 0)
 	}
 	return nil
 }

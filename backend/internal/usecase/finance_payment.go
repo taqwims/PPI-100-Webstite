@@ -241,7 +241,11 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 
 		// 2. Auto-realize RKAS
 		if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 {
-			_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, payment.Amount)
+			var billingMonth int
+			if bill.Obligation != nil {
+				billingMonth = bill.Obligation.BillingMonth
+			}
+			_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, payment.Amount, billingMonth)
 		}
 
 		// 3. Sync Obligation Statuses

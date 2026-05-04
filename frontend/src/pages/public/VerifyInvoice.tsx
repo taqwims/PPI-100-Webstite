@@ -14,15 +14,13 @@ const VerifyInvoice: React.FC = () => {
     const [result, setResult] = useState<any>(null);
     const [searched, setSearched] = useState(false);
 
-    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8081/api';
-
     const verifyCode = async (codeToVerify: string) => {
         if (!codeToVerify.trim()) return;
         setLoading(true);
         setSearched(true);
         try {
             // Using axios directly to bypass the api interceptor which requires token
-            const res = await axios.get(`${API_URL}/invoice/verify?code=${encodeURIComponent(codeToVerify)}`);
+            const res = await axios.get(`/api/invoice/verify?code=${encodeURIComponent(codeToVerify)}`);
             setResult(res.data);
         } catch (error) {
             console.error("Verification failed", error);

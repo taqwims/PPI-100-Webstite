@@ -14,10 +14,11 @@ type StudentObligationUsecase struct {
 	paymentRepo    *postgres.PaymentTypeRepository
 	financeUsecase *FinanceUsecase
 	financeRepo    *postgres.FinanceRepository
+	budgetRepo     *postgres.BudgetRepository
 }
 
-func NewStudentObligationUsecase(repo *postgres.StudentObligationRepository, paymentRepo *postgres.PaymentTypeRepository, financeUsecase *FinanceUsecase, financeRepo *postgres.FinanceRepository) *StudentObligationUsecase {
-	return &StudentObligationUsecase{repo: repo, paymentRepo: paymentRepo, financeUsecase: financeUsecase, financeRepo: financeRepo}
+func NewStudentObligationUsecase(repo *postgres.StudentObligationRepository, paymentRepo *postgres.PaymentTypeRepository, financeUsecase *FinanceUsecase, financeRepo *postgres.FinanceRepository, budgetRepo *postgres.BudgetRepository) *StudentObligationUsecase {
+	return &StudentObligationUsecase{repo: repo, paymentRepo: paymentRepo, financeUsecase: financeUsecase, financeRepo: financeRepo, budgetRepo: budgetRepo}
 }
 
 func (u *StudentObligationUsecase) Create(ob *domain.StudentObligation) error {
@@ -32,7 +33,7 @@ func (u *StudentObligationUsecase) Create(ob *domain.StudentObligation) error {
 	if err == nil {
 		dueDate := time.Now().AddDate(0, 1, 0) // Default 1 month due date
 		obID := ob.ID
-		_ = u.financeUsecase.CreateBill(ob.StudentID, pt.Name, pt.Amount, dueDate, pt.Name, &ob.AcademicYearID, nil, false, &obID, nil)
+		_ = u.financeUsecase.CreateBill(ob.StudentID, pt.Name, pt.Amount, dueDate, pt.Name, &ob.AcademicYearID, pt.TransactionCodeID, false, &obID, nil)
 	}
 	return err
 }
@@ -164,7 +165,7 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 				title = pt.Name + " - Cicilan " + strconv.Itoa(ob.InstallmentNumber) + "/" + strconv.Itoa(ob.TotalInstallments)
 			}
 
-			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, nil, false, &obID, nil)
+			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, pt.TransactionCodeID, false, &obID, nil)
 		}
 	}
 
@@ -280,7 +281,7 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 				title = pt.Name + " - Cicilan " + strconv.Itoa(ob.InstallmentNumber) + "/" + strconv.Itoa(ob.TotalInstallments)
 			}
 
-			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, nil, false, &obID, nil)
+			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, pt.TransactionCodeID, false, &obID, nil)
 		}
 	}
 
@@ -304,6 +305,24 @@ func (u *StudentObligationUsecase) Update(ob *domain.StudentObligation) error {
 }
 
 func (u *StudentObligationUsecase) Delete(id uuid.UUID) error {
+	ob, err := u.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Safety check: Don't delete if payments have been made
+	if ob.PaidAmount > 0 {
+		return domain.ErrExistingPayment
+	}
+
+	// Delete linked bill if exists
+	if u.financeRepo != nil {
+		bill, err := u.financeRepo.GetBillByObligationID(id.String())
+		if err == nil && bill != nil {
+			_ = u.financeRepo.DeleteBill(bill.ID.String())
+		}
+	}
+
 	return u.repo.Delete(id)
 }
 
@@ -318,7 +337,33 @@ func (u *StudentObligationUsecase) RecordPayment(id uuid.UUID, amount float64) e
 	// Auto-create CashLedger entry (BKU)
 	u.autoCashLedgerFromObligation(id, amount)
 
+	// Auto-realize RKAS budget
+	u.autoRealizeRKAS(id, amount)
+
 	return nil
+}
+
+// autoRealizeRKAS updates RKAS realization when a student obligation is paid
+func (u *StudentObligationUsecase) autoRealizeRKAS(obligationID uuid.UUID, amount float64) {
+	if u.budgetRepo == nil {
+		return
+	}
+
+	ob, err := u.repo.GetByID(obligationID)
+	if err != nil || ob == nil {
+		return
+	}
+
+	pt, err := u.paymentRepo.GetByID(ob.PaymentTypeID)
+	if err != nil || pt == nil {
+		return
+	}
+
+	if pt.TransactionCodeID == nil || *pt.TransactionCodeID == 0 {
+		return
+	}
+
+	_ = u.budgetRepo.AddRealizationByTransactionCodeID(*pt.TransactionCodeID, amount, ob.BillingMonth)
 }
 
 // autoCashLedgerFromObligation creates an automatic CashLedger entry when a student obligation is paid

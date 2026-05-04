@@ -8,6 +8,11 @@ export interface UserData {
     bank_account_holder?: string;
 }
 
+export interface PayrollCustomItem {
+    name: string;
+    amount: number;
+}
+
 export interface PayrollTemplate {
     id: string;
     user_id: string;
@@ -15,6 +20,8 @@ export interface PayrollTemplate {
     functional_allowance: number;
     transport_allowance: number;
     additional_task: number;
+    custom_income_items?: PayrollCustomItem[];
+    custom_deduction_items?: PayrollCustomItem[];
 }
 
 export interface PayrollRecord {
@@ -43,4 +50,6 @@ export interface PayrollRecord {
     bank_name: string;
     bank_account_number: string;
     bank_account_holder: string;
+    custom_income_items?: PayrollCustomItem[];
+    custom_deduction_items?: PayrollCustomItem[];
 }

@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import api from '../../services/api';
 import {
     Upload, FileText, Download, CheckCircle, XCircle,
-    AlertCircle, Users, Eye, Play, X
+    AlertCircle, Users, Eye, Play, X, FileSpreadsheet, Info
 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
@@ -12,7 +12,10 @@ import {
     TableRowGlass, TableHeadGlass, TableCellGlass
 } from '../../components/ui/glass/TableGlass';
 import toast from 'react-hot-toast';
-import { parseCSV, downloadCSVTemplate, type ParsedRow } from '../../utils/csvUtils';
+import {
+    parseImportFile, downloadXLSXTemplate, isValidImportFile,
+    type ParsedRow
+} from '../../utils/importUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,14 +32,13 @@ interface BulkImportResult {
     errors: BulkImportRowError[];
 }
 
-const getRoleName = (roleId: string) => {
-    const m: Record<string, string> = {
-        '1': 'Super Admin', '4': 'Guru', '5': 'Wali Kelas',
-        '6': 'Siswa', '7': 'Orang Tua', '9': 'Bendahara',
-        '10': 'Teller Tabungan', '11': 'Teller Infaq',
-    };
-    return m[roleId] || roleId || '-';
+const ROLE_MAP: Record<string, string> = {
+    '1': 'Super Admin', '4': 'Guru', '5': 'Wali Kelas',
+    '6': 'Siswa', '7': 'Orang Tua', '9': 'Bendahara',
+    '10': 'Teller Tabungan', '11': 'Teller Infaq',
 };
+
+const getRoleName = (roleId: string) => ROLE_MAP[roleId] || roleId || '-';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -46,28 +48,31 @@ const BulkImport: React.FC = () => {
     const [fileName, setFileName] = useState<string | null>(null);
     const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
     const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
+    const [showRoleRef, setShowRoleRef] = useState(false);
 
     // ── File handling ──────────────────────────────────────────────────────────
 
-    const handleFile = (file: File) => {
-        if (!file.name.endsWith('.csv')) {
-            toast.error('Hanya file CSV yang didukung.');
+    const handleFile = async (file: File) => {
+        if (!isValidImportFile(file.name)) {
+            toast.error('Format file tidak didukung. Gunakan file .csv atau .xlsx');
             return;
         }
         setFileName(file.name);
         setImportResult(null);
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const text = e.target?.result as string;
-            const rows = parseCSV(text);
+        try {
+            const rows = await parseImportFile(file);
             if (rows.length === 0) {
-                toast.error('File CSV kosong atau format tidak valid.');
+                toast.error('File kosong atau format tidak valid.');
+                setParsedRows([]);
                 return;
             }
             setParsedRows(rows);
-        };
-        reader.readAsText(file);
+            toast.success(`${rows.length} baris data berhasil dimuat.`);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Gagal membaca file.');
+            setParsedRows([]);
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +130,7 @@ const BulkImport: React.FC = () => {
     // ── Download template ──────────────────────────────────────────────────────
 
     const handleDownloadTemplate = () => {
-        downloadCSVTemplate();
+        downloadXLSXTemplate();
     };
 
     // ─── Render ────────────────────────────────────────────────────────────────
@@ -137,23 +142,60 @@ const BulkImport: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Bulk Import Akun</h1>
                     <p className="text-slate-500 text-sm mt-1">
-                        Buat banyak akun pengguna sekaligus melalui file CSV
+                        Buat banyak akun pengguna sekaligus melalui file CSV atau Excel (.xlsx)
                     </p>
                 </div>
-                <ButtonGlass
-                    variant="secondary"
-                    icon={Download}
-                    onClick={handleDownloadTemplate}
-                >
-                    Download Template
-                </ButtonGlass>
+                <div className="flex items-center gap-2">
+                    <ButtonGlass
+                        variant="secondary"
+                        icon={Info}
+                        onClick={() => setShowRoleRef(!showRoleRef)}
+                    >
+                        Role ID
+                    </ButtonGlass>
+                    <ButtonGlass
+                        variant="secondary"
+                        icon={Download}
+                        onClick={handleDownloadTemplate}
+                    >
+                        Download Template (.xlsx)
+                    </ButtonGlass>
+                </div>
             </div>
+
+            {/* Role ID Reference */}
+            {showRoleRef && (
+                <CardGlass>
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <Info size={18} className="text-blue-600" />
+                            <h2 className="font-semibold text-slate-900 text-sm">Referensi Role ID</h2>
+                        </div>
+                        <button onClick={() => setShowRoleRef(false)} className="text-slate-400 hover:text-red-500">
+                            <X size={16} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {Object.entries(ROLE_MAP).map(([id, name]) => (
+                            <div key={id} className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-2">
+                                <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-bold">
+                                    {id}
+                                </span>
+                                <span className="text-slate-700 text-sm">{name}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                        * Untuk role Siswa (6), field <strong>nisn</strong> dan <strong>class_id</strong> wajib diisi.
+                    </p>
+                </CardGlass>
+            )}
 
             {/* Upload Area */}
             <CardGlass>
                 <div className="flex items-center gap-2 mb-4">
                     <Upload size={20} className="text-purple-600" />
-                    <h2 className="font-semibold text-slate-900">Upload File CSV</h2>
+                    <h2 className="font-semibold text-slate-900">Upload File</h2>
                 </div>
 
                 {!fileName ? (
@@ -168,17 +210,20 @@ const BulkImport: React.FC = () => {
                         onDragLeave={() => setIsDragging(false)}
                         onDrop={handleDrop}
                     >
-                        <FileText size={40} className="mx-auto mb-3 text-slate-400" />
+                        <FileSpreadsheet size={40} className="mx-auto mb-3 text-slate-400" />
                         <p className="text-slate-600 font-medium">
-                            Klik atau seret file CSV ke sini
+                            Klik atau seret file ke sini
                         </p>
                         <p className="text-slate-400 text-sm mt-1">
-                            Format: name, email, password, role_id, unit_id, nisn (opsional), class_id (opsional)
+                            Format yang didukung: <strong>.csv</strong> dan <strong>.xlsx</strong> (Excel)
+                        </p>
+                        <p className="text-slate-400 text-xs mt-2">
+                            Kolom: name, email, password, role_id, unit_id, nisn (opsional), class_id (opsional)
                         </p>
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".csv"
+                            accept=".csv,.xlsx"
                             className="hidden"
                             onChange={handleFileChange}
                         />
@@ -186,10 +231,21 @@ const BulkImport: React.FC = () => {
                 ) : (
                     <div className="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
                         <div className="flex items-center gap-3">
-                            <FileText size={20} className="text-purple-600" />
+                            {fileName.endsWith('.xlsx') ? (
+                                <FileSpreadsheet size={20} className="text-green-600" />
+                            ) : (
+                                <FileText size={20} className="text-purple-600" />
+                            )}
                             <span className="text-slate-800 font-medium">{fileName}</span>
                             <span className="text-slate-500 text-sm">
                                 ({parsedRows.length} baris data)
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                fileName.endsWith('.xlsx')
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-blue-100 text-blue-700'
+                            }`}>
+                                {fileName.endsWith('.xlsx') ? 'XLSX' : 'CSV'}
                             </span>
                         </div>
                         <button

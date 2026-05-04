@@ -161,7 +161,7 @@ function App() {
                                         </RoleRoute>
                                     } />
                                     <Route path="finance/savings" element={
-                                        <RoleRoute allowedRoles={[1, 9, 10]}>
+                                        <RoleRoute allowedRoles={[1, 9, 10, 11]}>
                                             <Savings />
                                         </RoleRoute>
                                     } />
@@ -178,7 +178,7 @@ function App() {
                                         </RoleRoute>
                                     } />
                                     <Route path="finance/payroll" element={
-                                        <RoleRoute allowedRoles={[1, 9]}>
+                                        <RoleRoute allowedRoles={[1, 2, 3, 4, 5, 8, 9, 10, 11]}>
                                             <Payroll />
                                         </RoleRoute>
                                     } />
@@ -222,7 +222,7 @@ function App() {
                                     <Route path="finance/invoice-config" element={<InvoiceConfig />} />
                                     <Route path="finance/invoices" element={<InvoiceHistory />} />
                                     <Route path="finance/payments/verify" element={
-                                        <RoleRoute allowedRoles={[1, 9]}>
+                                        <RoleRoute allowedRoles={[1, 9, 11]}>
                                             <PaymentVerification />
                                         </RoleRoute>
                                     } />

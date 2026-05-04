@@ -26,6 +26,14 @@ func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
 	return &user, nil
 }
 
+func (r *UserRepository) FindByEmailUnscoped(email string) (*domain.User, error) {
+	var user domain.User
+	if err := r.db.Unscoped().Where("email = ?", email).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 	var user domain.User
 	if err := r.db.Where("id = ?", id).Preload("Teacher").Preload("Parent").Preload("Student").First(&user).Error; err != nil {

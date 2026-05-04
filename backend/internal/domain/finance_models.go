@@ -1,10 +1,13 @@
 package domain
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	)
+)
 
 type Bill struct {
 	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
@@ -23,6 +26,7 @@ type Bill struct {
 	TransactionCodeID    *uint            `json:"transaction_code_id"`
 	TransactionCode      *TransactionCode `gorm:"foreignKey:TransactionCodeID" json:"transaction_code,omitempty"`
 	ObligationID         *uuid.UUID       `gorm:"type:uuid" json:"obligation_id"`
+	Obligation           *StudentObligation `gorm:"foreignKey:ObligationID" json:"obligation,omitempty"`
 	ActivityObligationID *uuid.UUID       `gorm:"type:uuid" json:"activity_obligation_id"`
 	Items                []BillItem       `gorm:"foreignKey:BillID" json:"items,omitempty"`
 	Payments             []Payment        `gorm:"foreignKey:BillID" json:"payments,omitempty"`
@@ -58,6 +62,43 @@ type Payment struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+// ------------------- Payroll Custom Item (JSONB) -------------------
+type PayrollCustomItem struct {
+	Name   string  `json:"name"`
+	Amount float64 `json:"amount"`
+}
+
+// PayrollCustomItems is a slice of PayrollCustomItem stored as JSONB in Postgres
+type PayrollCustomItems []PayrollCustomItem
+
+func (p PayrollCustomItems) Value() (driver.Value, error) {
+	if p == nil {
+		return "[]", nil
+	}
+	data, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal PayrollCustomItems: %w", err)
+	}
+	return string(data), nil
+}
+
+func (p *PayrollCustomItems) Scan(value interface{}) error {
+	if value == nil {
+		*p = PayrollCustomItems{}
+		return nil
+	}
+	var bytes []byte
+	switch v := value.(type) {
+	case string:
+		bytes = []byte(v)
+	case []byte:
+		bytes = v
+	default:
+		return fmt.Errorf("unsupported type for PayrollCustomItems: %T", value)
+	}
+	return json.Unmarshal(bytes, p)
+}
+
 // Payroll (Penggajian)
 type Payroll struct {
 	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
@@ -69,18 +110,22 @@ type Payroll struct {
 	PeriodMonth         int       `json:"period_month"`  // e.g. 3
 	PeriodYear          int       `json:"period_year"`   // e.g. 2026
 
-	// Pendapatan
+	// Pendapatan (Fixed)
 	BaseSalary          float64   `json:"base_salary"`
 	FunctionalAllowance float64   `json:"functional_allowance"`
 	TransportAllowance  float64   `json:"transport_allowance"`
 	AdditionalTask      float64   `json:"additional_task"`
 	TotalIncome         float64   `json:"total_income"`
 
-	// Potongan
+	// Potongan (Fixed)
 	LatenessPenalty     float64   `json:"lateness_penalty"`
 	InfaqDeduction      float64   `json:"infaq_deduction"`
 	CashAdvance         float64   `json:"cash_advance"`
 	TotalDeduction      float64   `json:"total_deduction"`
+
+	// Custom Components (JSONB)
+	CustomIncomeItems    PayrollCustomItems `gorm:"type:jsonb;default:'[]'" json:"custom_income_items"`
+	CustomDeductionItems PayrollCustomItems `gorm:"type:jsonb;default:'[]'" json:"custom_deduction_items"`
 
 	NetSalary           float64   `json:"net_salary"`
 	Notes               string    `json:"notes"`
@@ -97,15 +142,17 @@ type Payroll struct {
 }
 
 type PayrollTemplate struct {
-	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID              uuid.UUID `gorm:"type:uuid;uniqueIndex;not null" json:"user_id"`
-	User                User      `gorm:"foreignKey:UserID" json:"user"`
-	BaseSalary          float64   `json:"base_salary"`
-	FunctionalAllowance float64   `json:"functional_allowance"`
-	TransportAllowance  float64   `json:"transport_allowance"`
-	AdditionalTask      float64   `json:"additional_task"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	ID                   uuid.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID               uuid.UUID          `gorm:"type:uuid;uniqueIndex;not null" json:"user_id"`
+	User                 User               `gorm:"foreignKey:UserID" json:"user"`
+	BaseSalary           float64            `json:"base_salary"`
+	FunctionalAllowance  float64            `json:"functional_allowance"`
+	TransportAllowance   float64            `json:"transport_allowance"`
+	AdditionalTask       float64            `json:"additional_task"`
+	CustomIncomeItems    PayrollCustomItems `gorm:"type:jsonb;default:'[]'" json:"custom_income_items"`
+	CustomDeductionItems PayrollCustomItems `gorm:"type:jsonb;default:'[]'" json:"custom_deduction_items"`
+	CreatedAt            time.Time          `json:"created_at"`
+	UpdatedAt            time.Time          `json:"updated_at"`
 }
 
 type SavingAccount struct {
@@ -356,7 +403,7 @@ type MultiPaymentResult struct {
 
 // ------------------- Savings Recap -------------------
 type SavingsRecapParams struct {
-	PeriodType string    // monthly, range, semester, yearly
+	PeriodType string    // daily, monthly, range, semester, yearly
 	StartDate  time.Time
 	EndDate    time.Time
 	Year       int

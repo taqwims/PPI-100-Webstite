@@ -130,6 +130,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             ]
         };
 
+        // ── Homeroom Teacher (Wali Kelas) ──
+        const homeroomGroup: MenuGroup = {
+            title: 'Wali Kelas',
+            items: [
+                { icon: Users, label: 'Kelas Saya', path: '/dashboard/homeroom' }
+            ]
+        };
+
         // ── Student ──
         const studentGroup: MenuGroup = {
             title: 'Akademik & Keuangan',
@@ -180,11 +188,44 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Tabungan',
             items: [{ icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' }]
         };
-        const tellerInfaq: MenuGroup = {
-            title: 'Infaq',
+
+
+        // ── Transactional Teller (role 11) ──
+        const transactionalTellerTransaksi: MenuGroup = {
+            title: 'Transaksi',
             items: [
-                { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq' },
-                { icon: Inbox, label: 'Kas Infaq', path: '/dashboard/finance/cash-ledger' },
+                { icon: CreditCard, label: 'SPP & Tagihan', path: '/dashboard/finance', feature: 'billing' },
+                { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify', feature: 'billing' },
+                { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities', feature: 'activities' },
+                { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations', feature: 'student_obligations' },
+                { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary', feature: 'billing' },
+                { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger', feature: 'cash_ledger' },
+                { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq', feature: 'infaq' },
+            ]
+        };
+        const transactionalTellerTabungan: MenuGroup = {
+            title: 'Tabungan',
+            items: [{ icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings', feature: 'savings' }]
+        };
+        const transactionalTellerKonten: MenuGroup = {
+            title: 'Konten & Komunikasi',
+            items: [
+                { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
+                { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
+                { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
+            ]
+        };
+        const transactionalTellerPengaturan: MenuGroup = {
+            title: 'Pengaturan Keuangan',
+            items: [
+                { icon: Tag, label: 'Kode Transaksi', path: '/dashboard/finance/transaction-codes' },
+                { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types', feature: 'student_obligations' },
+                { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types', feature: 'infaq' },
+                { icon: MessageCircle, label: 'Template WA', path: '/dashboard/finance/wa-templates', feature: 'wa_gateway' },
+                { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings', feature: 'savings' },
+                { icon: Calendar, label: 'Tahun Ajaran', path: '/dashboard/finance/academic-years' },
+                { icon: Settings, label: 'Kuitansi & TTD', path: '/dashboard/finance/invoice-config' },
+                { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
             ]
         };
 
@@ -196,8 +237,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             case 3: // Admin MA
                 return [dashboardGroup, adminManagement, adminContent, adminData, adminFinance];
             case 4: // Guru
-            case 5: // Wali Kelas
                 return [dashboardGroup, teacherGroup];
+            case 5: // Wali Kelas
+                return [dashboardGroup, teacherGroup, homeroomGroup];
             case 6: // Siswa
                 return [dashboardGroup, studentGroup];
             case 7: // Orang Tua
@@ -208,8 +250,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 return [dashboardGroup, finTransaksi, finAnggaran, finPengaturan];
             case 10: // Teller Tabungan
                 return [dashboardGroup, tellerTabungan];
-            case 11: // Teller Infaq
-                return [dashboardGroup, tellerInfaq];
+            case 11: // Transactional Teller
+                return [dashboardGroup, transactionalTellerTransaksi, transactionalTellerTabungan, transactionalTellerKonten, transactionalTellerPengaturan];
             default:
                 return [dashboardGroup];
         }
@@ -219,7 +261,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const roles: Record<number, string> = {
             1: 'Super Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
             5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
-            9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Teller Infaq'
+            9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Transactional Teller'
         };
         return roleId && roles[roleId] ? roles[roleId] : 'User';
     };

@@ -6,6 +6,9 @@ declare module 'axios' {
     interface InternalAxiosRequestConfig {
         _suppressToast?: boolean;
     }
+    interface AxiosRequestConfig {
+        _suppressToast?: boolean;
+    }
 }
 
 const api = axios.create({
@@ -35,10 +38,8 @@ api.interceptors.response.use(
             import('../store/authStore').then(({ useAuthStore }) => {
                 useAuthStore.getState().logout();
             });
-            // Redirect ke login jika belum di sana
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
-            }
+            // Let React Router's PrivateRoute handle the actual redirection
+            // to avoid full page reloads and redirecting public pages.
             return Promise.reject(error);
         }
 

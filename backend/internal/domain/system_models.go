@@ -8,13 +8,13 @@ import (
 
 // ------------------- Bulk User Import -------------------
 type BulkUserImportRow struct {
-	Name     string `csv:"name"`
-	Email    string `csv:"email"`
-	Password string `csv:"password"`
-	RoleID   uint   `csv:"role_id"`
-	UnitID   uint   `csv:"unit_id"`
-	NISN     string `csv:"nisn"`
-	ClassID  *uint  `csv:"class_id"`
+	Name     string `json:"name" csv:"name"`
+	Email    string `json:"email" csv:"email"`
+	Password string `json:"password" csv:"password"`
+	RoleID   uint   `json:"role_id" csv:"role_id"`
+	UnitID   uint   `json:"unit_id" csv:"unit_id"`
+	NISN     string `json:"nisn" csv:"nisn"`
+	ClassID  *uint  `json:"class_id" csv:"class_id"`
 }
 
 type BulkImportResult struct {
