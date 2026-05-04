@@ -285,38 +285,65 @@ const ExecutiveDashboard: React.FC = () => {
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                     <button
                         onClick={() => setShowRkasDetail(!showRkasDetail)}
-                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50/50 transition-colors"
+                        className="w-full flex items-center justify-between px-6 py-5 hover:bg-slate-50/50 transition-colors group"
                     >
-                        <div className="flex items-center gap-2">
-                            <BarChart3 size={16} className="text-slate-500" />
-                            <h3 className="font-semibold text-slate-800 text-sm">RKAS Detail per Kategori</h3>
-                            <span className="text-xs text-slate-400 ml-1">({rkasCategoryData.length} kategori)</span>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-50 rounded-lg text-slate-500 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-colors">
+                                <BarChart3 size={18} />
+                            </div>
+                            <div className="text-left">
+                                <h3 className="font-bold text-slate-800 text-base">Realisasi Anggaran per Kategori</h3>
+                                <p className="text-xs text-slate-400 font-medium">Klik untuk melihat detail realisasi {rkasCategoryData.length} kategori RKAS</p>
+                            </div>
                         </div>
-                        {showRkasDetail ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                                {Math.round(totalPengeluaranRealized / totalPengeluaranPlanned * 100) || 0}% Total
+                            </span>
+                            {showRkasDetail ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                        </div>
                     </button>
                     {showRkasDetail && (
-                        <div className="px-5 pb-5 border-t border-slate-100">
-                            <div className="pt-4 space-y-2">
-                                {budgetSummary.map((item, i) => (
-                                    <div key={i} className="flex items-center gap-3 text-sm">
-                                        <span className="w-[180px] text-slate-600 truncate shrink-0" title={item.category}>{item.category}</span>
-                                        <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden relative">
-                                            <div
-                                                className="h-full rounded-full transition-all duration-700"
-                                                style={{
-                                                    width: `${Math.min(item.percentage, 100)}%`,
-                                                    background: item.percentage > 100
-                                                        ? 'linear-gradient(90deg, #ef4444, #dc2626)'
-                                                        : item.percentage > 75
-                                                        ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                                                        : 'linear-gradient(90deg, #10b981, #059669)'
-                                                }}
-                                            />
+                        <div className="px-6 pb-6 border-t border-slate-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                                {budgetSummary.map((item, i) => {
+                                    const pct = Math.round(item.percentage);
+                                    const isOver = pct > 100;
+                                    return (
+                                        <div key={i} className="group py-2">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-semibold text-slate-700 truncate max-w-[200px]" title={item.category}>
+                                                    {item.category}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold ${isOver ? 'text-red-500' : 'text-slate-500'}`}>
+                                                        {pct}%
+                                                    </span>
+                                                    <span className="text-[10px] font-medium text-slate-400">
+                                                        ({formatCompact(item.realized)})
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-1000 ease-out"
+                                                    style={{
+                                                        width: `${Math.min(pct, 100)}%`,
+                                                        background: isOver
+                                                            ? 'linear-gradient(90deg, #ef4444, #b91c1c)'
+                                                            : pct > 85
+                                                            ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                                                            : 'linear-gradient(90deg, #10b981, #059669)'
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between mt-1 text-[10px] text-slate-400 font-medium">
+                                                <span>Anggaran: {formatCompact(item.planned)}</span>
+                                                {isOver && <span className="text-red-500">Over budget!</span>}
+                                            </div>
                                         </div>
-                                        <span className="text-xs font-semibold text-slate-500 w-[45px] text-right">{item.percentage}%</span>
-                                        <span className="text-xs text-slate-400 w-[120px] text-right hidden sm:block">{formatCompact(item.realized)} / {formatCompact(item.planned)}</span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
