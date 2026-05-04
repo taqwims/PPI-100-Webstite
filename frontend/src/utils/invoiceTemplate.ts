@@ -62,58 +62,58 @@ export function drawStandardHeader(
     const pageWidth = doc.internal.pageSize.getWidth();
     // const headerH = 48; // Old height with background
 
-    // Logo (if loaded)
+    // Logo (if loaded) - Positioned at LEFT
     if (logoBase64) {
         try {
-            // Center logo at top
-            doc.addImage(logoBase64, 'PNG', (pageWidth - 20) / 2, 5, 20, 20);
+            // Left-aligned logo
+            doc.addImage(logoBase64, 'JPEG', 18, 10, 28, 28);
         } catch { /* skip logo if error */ }
     }
 
-    // Institution name (Green)
+    // Institution name (Green) - Shifted slightly or keep centered but higher Y
     doc.setTextColor(...BRAND_GREEN);
     doc.setFontSize(14);
     doc.setFont('times', 'bold');
-    doc.text(INST_NAME, pageWidth / 2, 32, { align: 'center' });
+    doc.text(INST_NAME, pageWidth / 2 + 10, 18, { align: 'center' });
 
     // Tagline (Green)
     doc.setFontSize(9);
-    doc.setFont('times', 'bold'); // Slightly bold as in image
-    doc.text(INST_TAGLINE, pageWidth / 2, 37, { align: 'center' });
+    doc.setFont('times', 'bold'); 
+    doc.text(INST_TAGLINE, pageWidth / 2 + 10, 24, { align: 'center' });
 
     // Address & Phone (Blue/Navy)
     doc.setTextColor(...BRAND_BLUE);
     doc.setFontSize(8);
     doc.setFont('times', 'normal');
-    doc.text(INST_ADDRESS, pageWidth / 2, 42, { align: 'center' });
-    doc.text(INST_PHONE, pageWidth / 2, 46, { align: 'center' });
+    doc.text(INST_ADDRESS, pageWidth / 2 + 10, 30, { align: 'center' });
+    doc.text(INST_PHONE, pageWidth / 2 + 10, 34, { align: 'center' });
 
     // Separator line (Double Green line)
     doc.setDrawColor(...BRAND_GREEN);
     doc.setLineWidth(0.8);
-    doc.line(14, 49, pageWidth - 14, 49);
+    doc.line(14, 42, pageWidth - 14, 42);
     doc.setLineWidth(0.2);
-    doc.line(14, 50.5, pageWidth - 14, 50.5);
+    doc.line(14, 43.5, pageWidth - 14, 43.5);
 
     // Document title (Black)
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(options.title.toUpperCase(), pageWidth / 2, 60, { align: 'center' });
+    doc.text(options.title.toUpperCase(), pageWidth / 2, 53, { align: 'center' });
 
     // Subtitle
     if (options.subtitle) {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(options.subtitle, pageWidth / 2, 66, { align: 'center' });
+        doc.text(options.subtitle, pageWidth / 2, 59, { align: 'center' });
     }
 
     // Invoice number
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, options.subtitle ? 72 : 67, { align: 'center' });
+    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, options.subtitle ? 65 : 60, { align: 'center' });
 
-    return options.subtitle ? 78 : 73;
+    return options.subtitle ? 70 : 65;
 }
 
 // ─── A5 Header (for receipts) ───
@@ -125,29 +125,28 @@ export function drawStandardHeaderA5(
 
     if (logoBase64) {
         try {
-            // Logo at top right
-            doc.addImage(logoBase64, 'PNG', pageWidth - 26, 6, 16, 16);
+            // Logo at LEFT side for A5
+            doc.addImage(logoBase64, 'JPEG', 10, 8, 18, 18);
         } catch { }
     }
 
     doc.setTextColor(...BRAND_GREEN);
     doc.setFontSize(10);
     doc.setFont('times', 'bold');
-    doc.text(INST_NAME, pageWidth / 2, 22, { align: 'center' });
+    doc.text(INST_NAME, pageWidth / 2 + 5, 14, { align: 'center' });
 
     doc.setFontSize(6.5);
-    doc.text(INST_TAGLINE, pageWidth / 2, 26, { align: 'center' });
+    doc.text(INST_TAGLINE, pageWidth / 2 + 5, 18, { align: 'center' });
 
     doc.setTextColor(...BRAND_BLUE);
     doc.setFontSize(5.5);
     doc.setFont('times', 'normal');
-    // Reduced address for A5 to fit better
-    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari', pageWidth / 2, 30, { align: 'center' });
-    doc.text('Banjarsari - Ciamis. TLP. 081282109785', pageWidth / 2, 33, { align: 'center' });
+    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari', pageWidth / 2 + 5, 22, { align: 'center' });
+    doc.text('Banjarsari - Ciamis. TLP. 081282109785', pageWidth / 2 + 5, 25, { align: 'center' });
 
     doc.setDrawColor(...BRAND_GREEN);
     doc.setLineWidth(0.5);
-    doc.line(8, 35, pageWidth - 8, 35);
+    doc.line(8, 28, pageWidth - 8, 28);
     doc.setLineWidth(0.15);
     doc.line(8, 36, pageWidth - 8, 36);
 
