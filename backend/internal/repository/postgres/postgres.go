@@ -85,6 +85,10 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.SavingsOperationalWithdrawal{},
 		&domain.SavingsOperationalReturn{},
 
+		// Savings Receivable / Piutang
+		&domain.SavingsReceivableWithdrawal{},
+		&domain.SavingsReceivableReturn{},
+
 		// External Debt (Catatan Hutang)
 		&domain.ExternalDebt{},
 		&domain.ExternalDebtPayment{},

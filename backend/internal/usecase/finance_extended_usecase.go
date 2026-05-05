@@ -227,3 +227,22 @@ func (u *FinanceExtendedUsecase) GetSavingsRecap(params domain.SavingsRecapParam
 	return u.financeRepo.GetSavingsRecap(params)
 }
 
+// ------------------- Savings Receivable / Piutang -------------------
+// NOTE: Piutang does NOT auto-sync to CashLedger (BKU) or DailyInfaq.
+// Transactions are only recorded in the piutang tables themselves.
+
+func (u *FinanceExtendedUsecase) WithdrawSavingsReceivable(handledByID uuid.UUID, amount float64, purpose string, description string, borrowerName string, borrowerID string, dueDate time.Time, returnMethod string, unitID uint) error {
+	return u.financeRepo.WithdrawSavingsReceivable(handledByID, amount, purpose, description, borrowerName, borrowerID, dueDate, returnMethod, unitID)
+}
+
+func (u *FinanceExtendedUsecase) ReturnSavingsReceivable(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string, unitID uint) error {
+	return u.financeRepo.ReturnSavingsReceivable(withdrawalID, handledByID, amount, notes, unitID)
+}
+
+func (u *FinanceExtendedUsecase) GetSavingsReceivableHistory() ([]domain.SavingsReceivableWithdrawal, error) {
+	return u.financeRepo.GetSavingsReceivableHistory()
+}
+
+func (u *FinanceExtendedUsecase) GetSavingsReceivableReturns(withdrawalID uuid.UUID) ([]domain.SavingsReceivableReturn, error) {
+	return u.financeRepo.GetSavingsReceivableReturns(withdrawalID)
+}

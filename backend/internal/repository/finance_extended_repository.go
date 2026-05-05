@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"time"
 	"ppi-100-sis/internal/domain"
 	"github.com/google/uuid"
 )
@@ -46,4 +47,10 @@ type FinanceExtendedRepository interface {
 
 	// Savings Recap
 	GetSavingsRecap(params domain.SavingsRecapParams) (*domain.SavingsRecapResponse, error)
+
+	// Savings Receivable / Piutang (Pool-level)
+	WithdrawSavingsReceivable(handledByID uuid.UUID, amount float64, purpose string, description string, borrowerName string, borrowerID string, dueDate time.Time, returnMethod string, unitID uint) error
+	ReturnSavingsReceivable(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string, unitID uint) error
+	GetSavingsReceivableHistory() ([]domain.SavingsReceivableWithdrawal, error)
+	GetSavingsReceivableReturns(withdrawalID uuid.UUID) ([]domain.SavingsReceivableReturn, error)
 }

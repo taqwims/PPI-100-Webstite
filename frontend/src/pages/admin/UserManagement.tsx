@@ -46,7 +46,7 @@ const roleTabs = [
     { id: 7, label: 'Orang Tua' },
     { id: 9, label: 'Bendahara' },
     { id: 10, label: 'Teller Tabungan' },
-    { id: 11, label: 'Teller Infaq' },
+    { id: 11, label: 'Teller Transaksional' },
     { id: 8, label: 'Pimpinan' },
 ];
 
@@ -54,7 +54,7 @@ const getRoleName = (roleId: number) => {
     const m: Record<number, string> = {
         1: 'Super Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
         5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
-        9: 'Bendahara', 10: 'Teller Tabungan', 11: 'Teller Infaq',
+        9: 'Bendahara', 10: 'Teller Tabungan', 11: 'Teller Transaksional',
     };
     return m[roleId] || 'Unknown';
 };
@@ -263,7 +263,7 @@ const UserManagement: React.FC = () => {
             { id: 1, name: 'Super Admin' }, { id: 2, name: 'Admin MTS' }, { id: 3, name: 'Admin MA' },
             { id: 4, name: 'Guru' }, { id: 5, name: 'Wali Kelas' }, { id: 6, name: 'Siswa' },
             { id: 7, name: 'Orang Tua' }, { id: 8, name: 'Pimpinan' }, { id: 9, name: 'Bendahara' },
-            { id: 10, name: 'Teller Tabungan' }, { id: 11, name: 'Teller Infaq' },
+            { id: 10, name: 'Teller Tabungan' }, { id: 11, name: 'Teller Transaksional' },
         ];
         if (user?.role_id === 1) return allRoles;
         return allRoles.filter(r => [4, 5, 6, 7, 8, 9, 10, 11].includes(r.id));

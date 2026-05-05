@@ -22,7 +22,7 @@ const formatCurrency = (amount: number) => {
 
 const CashLedger = () => {
     const { user } = useAuth();
-    const canManage = [1, 9].includes(user?.role_id || 0);
+    const canManage = [1, 9, 11].includes(user?.role_id || 0);
 
     const {
         loading,

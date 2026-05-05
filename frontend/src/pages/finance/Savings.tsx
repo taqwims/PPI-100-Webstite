@@ -5,14 +5,17 @@ import { useUnits } from '../../hooks/useUnits';
 import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
+import { generatePiutangInvoice } from '../../utils/piutangInvoice';
 
 import SavingsRecap from './SavingsRecap';
 
 import { SavingsAccountTab } from '../../components/finance/Savings/SavingsAccountTab';
 import { SavingsOperationalTab } from '../../components/finance/Savings/SavingsOperationalTab';
+import { SavingsReceivableTab } from '../../components/finance/Savings/SavingsReceivableTab';
 import { SavingsTransactionModal } from '../../components/finance/Savings/SavingsTransactionModal';
 import { SavingsOperationalModals } from '../../components/finance/Savings/SavingsOperationalModals';
-import { SavingAccount, ClassData, Student, PoolSummary, OperationalWithdrawal, SavingTransaction } from '../../components/finance/Savings/types';
+import { SavingsReceivableModals } from '../../components/finance/Savings/SavingsReceivableModals';
+import { SavingAccount, ClassData, Student, PoolSummary, OperationalWithdrawal, ReceivableWithdrawal, SavingTransaction } from '../../components/finance/Savings/types';
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 const formatDate = (d: string) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d));
@@ -20,7 +23,7 @@ const formatDate = (d: string) => new Intl.DateTimeFormat('id-ID', { day: 'numer
 const Savings = () => {
     const { user } = useAuth();
     const { units: activeUnits } = useUnits();
-    const canManage = [1, 9, 10].includes(user?.role_id || 0);
+    const canManage = [1, 9, 10, 11].includes(user?.role_id || 0);
 
     const getDefaultUnitID = () => {
         if (user?.unit_id) return user.unit_id;
@@ -28,7 +31,7 @@ const Savings = () => {
     };
     
     const [unitID, setUnitID] = useState<number>(getDefaultUnitID());
-    const [activeTab, setActiveTab] = useState<'accounts' | 'operational' | 'recap'>('accounts');
+    const [activeTab, setActiveTab] = useState<'accounts' | 'operational' | 'receivable' | 'recap'>('accounts');
 
     const [accounts, setAccounts] = useState<SavingAccount[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -49,6 +52,12 @@ const Savings = () => {
     // Operational Modals
     const [isWithdrawOpOpen, setIsWithdrawOpOpen] = useState(false);
     const [isReturnOpOpen, setIsReturnOpOpen] = useState(false);
+
+    // Receivable Modals
+    const [isWithdrawRecOpen, setIsWithdrawRecOpen] = useState(false);
+    const [isReturnRecOpen, setIsReturnRecOpen] = useState(false);
+    const [recHistory, setRecHistory] = useState<ReceivableWithdrawal[]>([]);
+    const [loadingRecHistory, setLoadingRecHistory] = useState(false);
 
     // History Modal
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -87,6 +96,12 @@ const Savings = () => {
         catch (error) { console.error(error); } finally { setLoadingOpHistory(false); }
     }, []);
 
+    const fetchRecHistory = useCallback(async () => {
+        setLoadingRecHistory(true);
+        try { const res = await api.get('/finance/savings/receivable/history'); setRecHistory(res.data || []); }
+        catch (error) { console.error(error); } finally { setLoadingRecHistory(false); }
+    }, []);
+
     const isFirstRender = React.useRef(true);
 
     useEffect(() => {
@@ -100,7 +115,8 @@ const Savings = () => {
 
     useEffect(() => {
         if (canManage && activeTab === 'operational') fetchOpHistory();
-    }, [canManage, fetchOpHistory, activeTab]);
+        if (canManage && activeTab === 'receivable') fetchRecHistory();
+    }, [canManage, fetchOpHistory, fetchRecHistory, activeTab]);
 
     const openDepositModal = (studentId?: string) => {
         setTrxModalType('Deposit');
@@ -154,21 +170,25 @@ const Savings = () => {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                    {[1, 9, 10].includes(user?.role_id || 0) && (
+                    {[1, 9, 10, 11].includes(user?.role_id || 0) && (
                         <div className="p-1.5 bg-slate-100/80 backdrop-blur rounded-2xl flex shadow-inner border border-slate-200 w-full sm:w-auto">
                             {activeUnits.map(u => (
                                 <button key={u.id} onClick={() => { setUnitID(u.id); setClassFilter(''); }} className={clsx("px-5 py-2 text-sm font-bold rounded-xl transition-all flex-1 justify-center flex", unitID === u.id ? "bg-white text-emerald-700 shadow-sm scale-105" : "text-slate-500 hover:text-slate-700 hover:bg-white/50")}>{u.name}</button>
                             ))}
                         </div>
                     )}
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        <button onClick={() => openDepositModal()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all font-bold group">
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full lg:w-auto">
+                        <button onClick={() => openDepositModal()} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all font-bold group whitespace-nowrap">
                             <Plus size={20} className="group-hover:rotate-90 transition-transform" />
                             <span>Setor</span>
                         </button>
-                        <button onClick={() => setIsWithdrawOpOpen(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white text-amber-600 border-2 border-amber-100 px-5 py-3 rounded-2xl hover:bg-amber-50 shadow-sm transition-all font-bold">
+                        <button onClick={() => setIsWithdrawOpOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-amber-600 border-2 border-amber-100 px-5 py-3 rounded-2xl hover:bg-amber-50 shadow-sm transition-all font-bold whitespace-nowrap">
                             <TrendingDown size={20} />
                             <span>Ambil Operasional</span>
+                        </button>
+                        <button onClick={() => setIsWithdrawRecOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-rose-600 border-2 border-rose-100 px-5 py-3 rounded-2xl hover:bg-rose-50 shadow-sm transition-all font-bold whitespace-nowrap">
+                            <TrendingDown size={20} />
+                            <span>Ambil Piutang</span>
                         </button>
                     </div>
                 </div>
@@ -209,12 +229,22 @@ const Savings = () => {
                 <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Kembali</p>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Kembali Op</p>
                             <h2 className="text-2xl font-black text-blue-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{formatCurrency(poolSummary?.total_returned || 0)}</h2>
                         </div>
                         <div className="p-3 bg-blue-50 text-blue-500 rounded-2xl group-hover:bg-blue-500 group-hover:text-white transition-colors duration-300"><RotateCcw size={20} /></div>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Riwayat Lunas</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Riwayat Lunas Op</p>
+                </div>
+                <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group">
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Piutang</p>
+                            <h2 className="text-2xl font-black text-rose-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{formatCurrency(poolSummary?.outstanding_receivable || 0)}</h2>
+                        </div>
+                        <div className="p-3 bg-rose-50 text-rose-500 rounded-2xl group-hover:bg-rose-500 group-hover:text-white transition-colors duration-300"><TrendingDown size={20} /></div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Luar Operasional</p>
                 </div>
                 <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group md:col-span-2 lg:col-span-1">
                     <div className="flex justify-between items-start">
@@ -229,12 +259,15 @@ const Savings = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex p-1.5 bg-slate-100/50 backdrop-blur rounded-[1.5rem] border border-slate-200/60 w-fit">
+            <div className="flex p-1.5 bg-slate-100/50 backdrop-blur rounded-[1.5rem] border border-slate-200/60 w-full overflow-x-auto hide-scrollbar">
                 <button onClick={() => setActiveTab('accounts')} className={clsx('px-6 py-2.5 text-sm font-bold flex items-center gap-2 rounded-xl transition-all', activeTab === 'accounts' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/40')}>
                     <Users size={18} /> Rekening Siswa
                 </button>
                 <button onClick={() => setActiveTab('operational')} className={clsx('px-6 py-2.5 text-sm font-bold flex items-center gap-2 rounded-xl transition-all', activeTab === 'operational' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/40')}>
                     <ArrowRightLeft size={18} /> Operasional
+                </button>
+                <button onClick={() => setActiveTab('receivable')} className={clsx('px-6 py-2.5 text-sm font-bold flex items-center gap-2 rounded-xl transition-all', activeTab === 'receivable' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/40')}>
+                    <TrendingDown size={18} /> Piutang
                 </button>
                 <button onClick={() => setActiveTab('recap')} className={clsx('px-6 py-2.5 text-sm font-bold flex items-center gap-2 rounded-xl transition-all', activeTab === 'recap' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/40')}>
                     <BarChart3 size={18} /> Rekap
@@ -264,6 +297,15 @@ const Savings = () => {
                         openReturnModal={() => setIsReturnOpOpen(true)}
                     />
                 )}
+                {activeTab === 'receivable' && (
+                    <SavingsReceivableTab 
+                        loading={loadingRecHistory}
+                        recHistory={recHistory}
+                        fetchRecHistory={fetchRecHistory}
+                        openReturnModal={() => setIsReturnRecOpen(true)}
+                        onPrintInvoice={(item) => generatePiutangInvoice(item, 'download')}
+                    />
+                )}
                 {activeTab === 'recap' && (
                     <div className="bg-white/40 backdrop-blur-xl rounded-[2.5rem] border border-white/60 shadow-xl shadow-slate-200/50 p-6 overflow-hidden">
                         <SavingsRecap classList={classList}  />
@@ -291,6 +333,17 @@ const Savings = () => {
                 poolSummary={poolSummary}
                 unitID={unitID}
                 opHistory={opHistory}
+            />
+
+            <SavingsReceivableModals 
+                isWithdrawOpen={isWithdrawRecOpen}
+                onCloseWithdraw={() => setIsWithdrawRecOpen(false)}
+                isReturnOpen={isReturnRecOpen}
+                onCloseReturn={() => setIsReturnRecOpen(false)}
+                onSuccess={() => { fetchPoolSummary(); fetchRecHistory(); }}
+                poolSummary={poolSummary}
+                unitID={unitID}
+                recHistory={recHistory}
             />
 
             {/* History Modal */}

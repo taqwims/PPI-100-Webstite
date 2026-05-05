@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"strconv"
 	"time"
 	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/domain"
@@ -10,6 +12,22 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
+	}
+	return fallback
+}
 
 func main() {
 	cfg, err := config.LoadConfig()
@@ -22,11 +40,14 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	// 1. Run Migrations
+	log.Println("Running migrations...")
 	if err := postgres.AutoMigrate(db); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	// Make sure Roles exist
+	// 2. Seed Roles
+	log.Println("Seeding roles...")
 	roles := []domain.Role{
 		{ID: 1, Name: "Super Admin"},
 		{ID: 2, Name: "Admin MTS"},
@@ -38,16 +59,26 @@ func main() {
 		{ID: 8, Name: "Pimpinan"},
 		{ID: 9, Name: "Bendahara Umum"},
 		{ID: 10, Name: "Teller Tabungan"},
-		{ID: 11, Name: "Teller Infaq"},
+		{ID: 11, Name: "Teller Transaksional"},
 	}
-
 	for _, role := range roles {
-		if err := db.FirstOrCreate(&role, domain.Role{ID: role.ID}).Error; err != nil {
-			log.Printf("Failed to seed role %s: %v", role.Name, err)
-		}
+		db.FirstOrCreate(&role, domain.Role{ID: role.ID})
 	}
 
-	// Make sure Academic Year exists
+	// 3. Seed Units
+	log.Println("Seeding units...")
+	units := []domain.Unit{
+		{ID: 1, Name: "MTS", IsActive: false},
+		{ID: 2, Name: "MA", IsActive: false},
+		{ID: 3, Name: "PUBLIC", IsActive: false},
+		{ID: 4, Name: "SDIT", IsActive: true},
+	}
+	for _, unit := range units {
+		db.FirstOrCreate(&unit, domain.Unit{ID: unit.ID})
+	}
+
+	// 4. Seed Academic Year
+	log.Println("Seeding academic year...")
 	academicYear := domain.AcademicYear{
 		ID:        1,
 		Name:      "2023/2024",
@@ -55,59 +86,39 @@ func main() {
 		StartDate: time.Now(),
 		EndDate:   time.Now().AddDate(1, 0, 0),
 	}
-	if err := db.FirstOrCreate(&academicYear, domain.AcademicYear{ID: 1}).Error; err != nil {
-		log.Printf("Failed to seed academic year: %v", err)
-	}
+	db.FirstOrCreate(&academicYear, domain.AcademicYear{ID: 1})
 
-	// Make sure Public unit exists
-	publicUnit := domain.Unit{ID: 3, Name: "PUBLIC"}
-	if err := db.FirstOrCreate(&publicUnit, domain.Unit{ID: 3}).Error; err != nil {
-		log.Printf("Failed to seed unit %s: %v", publicUnit.Name, err)
-	}
+	// 5. Seed Super Admin
+	log.Println("Seeding super admin...")
+	
+	adminName := getEnv("ADMIN_NAME", "Super Administrator")
+	adminEmail := getEnv("ADMIN_EMAIL", "admin@example.com")
+	adminPass := getEnv("ADMIN_PASSWORD", "password")
+	adminUnitID := uint(getEnvInt("ADMIN_UNIT_ID", 4))
 
-	units := []domain.Unit{
-		{ID: 1, Name: "MTS"},
-		{ID: 2, Name: "MA"},
-		{ID: 3, Name: "PUBLIC"},
-		{ID: 4, Name: "SDIT"},
-	}
-
-	for _, unit := range units {
-		if err := db.FirstOrCreate(&unit, domain.Unit{ID: unit.ID}).Error; err != nil {
-			log.Printf("Failed to seed unit %s: %v", unit.Name, err)
-		}
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(adminPass), bcrypt.DefaultCost)
+	superAdmin := domain.User{
+		Name:         adminName,
+		Email:        adminEmail,
+		PasswordHash: string(hashedPassword),
+		RoleID:       1,
+		UnitID:       adminUnitID,
 	}
 	
-
-	// Seed Custom Super Admin
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("v@ngroupganti01"), bcrypt.DefaultCost)
-	adminUser := domain.User{
-		Name:         "Super Administrator",
-		Email:        "winahsan100@gmail.com",
-		PasswordHash: string(hashedPassword),
-		RoleID:       1, // Super Admin
-		UnitID:       3, // Public
-	}
-
-	seedUser(db, adminUser)
-	log.Println("Administrator account seeded successfully")
-}
-
-func seedUser(db *gorm.DB, user domain.User) domain.User {
 	var existingUser domain.User
-	if err := db.Where("email = ?", user.Email).First(&existingUser).Error; err != nil {
+	if err := db.Where("email = ?", superAdmin.Email).First(&existingUser).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			if err := db.Create(&user).Error; err != nil {
-				log.Printf("Failed to create user %s: %v", user.Name, err)
-			}
-			return user
+			db.Create(&superAdmin)
+			log.Printf("Super Admin created with email: %s\n", adminEmail)
 		}
 	} else {
-		// Update password if user exists
-		existingUser.PasswordHash = user.PasswordHash
-		if err := db.Save(&existingUser).Error; err != nil {
-			log.Printf("Failed to update password for %s: %v", user.Name, err)
-		}
+		// Update password and unit if exists
+		existingUser.Name = adminName
+		existingUser.PasswordHash = string(hashedPassword)
+		existingUser.UnitID = adminUnitID
+		db.Save(&existingUser)
+		log.Printf("Super Admin updated with email: %s\n", adminEmail)
 	}
-	return existingUser
+
+	log.Println("Database initialization completed successfully!")
 }

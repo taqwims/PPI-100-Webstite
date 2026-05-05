@@ -1,7 +1,12 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import CardGlass from '../components/ui/glass/CardGlass';
-import { Users, BookOpen, DollarSign, Clock, AlertCircle, FileText } from 'lucide-react';
+import { 
+    Users, BookOpen, DollarSign, Clock, AlertCircle, FileText, 
+    CreditCard, Activity, Inbox, Wallet, ShieldCheck, TrendingDown,
+    LayoutDashboard
+} from 'lucide-react';
+import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { Link } from 'react-router-dom';
@@ -11,7 +16,7 @@ import ExecutiveDashboard from './finance/ExecutiveDashboard';
 const DashboardHome: React.FC = () => {
     const { user } = useAuth();
 
-    // Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara, 10=Teller Tabungan, 11=Teller Infaq
+    // Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara, 10=Teller Tabungan, 11=Teller Transaksional
 
     if (!user) return null;
 
@@ -30,7 +35,7 @@ const DashboardHome: React.FC = () => {
     } else if (user.role_id === 10) {
         return <TellerTabunganDashboard />;
     } else if (user.role_id === 11) {
-        return <TellerInfaqDashboard />;
+        return <TellerTransactionalDashboard />;
     } else {
         return <div className="text-slate-900">Dashboard for role {user.role_id} is under construction.</div>;
     }
@@ -405,27 +410,156 @@ const TellerTabunganDashboard = () => {
     );
 };
 
-const TellerInfaqDashboard = () => {
+const TellerTransactionalDashboard = () => {
     const { user } = useAuth();
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data: stats, isLoading } = useQuery({
+        queryKey: ['teller-dashboard-stats'],
+        queryFn: async () => {
+            const [txns, pool, pending] = await Promise.all([
+                api.get(`/finance/global-transactions?start_date=${today}&end_date=${today}`),
+                api.get('/finance/savings/operational/summary'),
+                api.get('/finance/payments/pending')
+            ]);
+
+            const todayTxns = txns.data || [];
+            return {
+                income: todayTxns.filter((t: any) => t.type === 'Income').reduce((s: number, t: any) => s + t.amount, 0),
+                expense: todayTxns.filter((t: any) => t.type === 'Expense').reduce((s: number, t: any) => s + t.amount, 0),
+                poolBalance: pool.data?.available_balance || 0,
+                pendingPayments: pending.data?.length || 0
+            };
+        }
+    });
+
+    const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+    const actions = [
+        { label: 'SPP & Tagihan', path: '/dashboard/finance', icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Kegiatan Siswa', path: '/dashboard/finance/activities', icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger', icon: Inbox, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq', icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Kelola Tabungan', path: '/dashboard/finance/savings', icon: Wallet, color: 'text-cyan-600', bg: 'bg-cyan-50' },
+    ];
+
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Halo, {user?.name}</h1>
-                <p className="text-slate-600">Dashboard Teller Infaq</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <CardGlass className="p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <DollarSign className="text-emerald-600" size={20} />
-                        Kelola Infaq Harian
-                    </h3>
-                    <p className="text-slate-600 mb-4 text-sm">Akses menu infaq harian untuk mencatat penerimaan infaq siswa.</p>
-                    <Link to="/dashboard/finance/daily-infaq" className="inline-block px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition">
-                        Buka Menu Infaq
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Halo, {user?.name} 👋</h1>
+                    <p className="text-slate-500 font-medium">Dashboard Teller Transaksional • {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                </div>
+                {stats?.pendingPayments && stats.pendingPayments > 0 ? (
+                    <Link to="/dashboard/finance/payments/verify" className="flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-2 rounded-2xl border border-amber-200 animate-pulse">
+                        <AlertCircle size={18} />
+                        <span className="text-sm font-bold">{stats.pendingPayments} Pembayaran Menunggu Verifikasi</span>
                     </Link>
+                ) : null}
+            </div>
+
+            {/* Main Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    label="Pemasukan Hari Ini" 
+                    value={formatCurrency(stats?.income || 0)} 
+                    icon={<DollarSign size={24} />} 
+                    color="emerald" 
+                    isLoading={isLoading}
+                />
+                <StatCard 
+                    label="Pengeluaran Hari Ini" 
+                    value={formatCurrency(stats?.expense || 0)} 
+                    icon={<TrendingDown size={24} />} 
+                    color="rose" 
+                    isLoading={isLoading}
+                />
+                <StatCard 
+                    label="Saldo Tabungan Tersedia" 
+                    value={formatCurrency(stats?.poolBalance || 0)} 
+                    icon={<Wallet size={24} />} 
+                    color="blue" 
+                    isLoading={isLoading}
+                />
+                <StatCard 
+                    label="Verifikasi Pending" 
+                    value={String(stats?.pendingPayments || 0)} 
+                    icon={<ShieldCheck size={24} />} 
+                    color="amber" 
+                    isLoading={isLoading}
+                />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Quick Actions */}
+                <CardGlass className="lg:col-span-2 p-8">
+                    <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <LayoutDashboard className="text-slate-400" size={22} />
+                        Aksi Cepat Transaksi
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {actions.map((action, i) => {
+                            const Icon = action.icon;
+                            return (
+                                <Link 
+                                    key={i} 
+                                    to={action.path} 
+                                    className="flex flex-col items-center p-6 bg-white/50 rounded-3xl border border-slate-100 hover:border-slate-200 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group"
+                                >
+                                    <div className={clsx("p-4 rounded-2xl mb-4 group-hover:scale-110 transition-transform duration-300", action.bg, action.color)}>
+                                        <Icon size={28} />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-700 text-center">{action.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </CardGlass>
+
+                {/* Helpful Info / Summary Card */}
+                <CardGlass className="p-8 flex flex-col justify-between bg-gradient-to-br from-indigo-600 to-violet-700 text-white border-none shadow-xl shadow-indigo-200">
+                    <div>
+                        <h3 className="text-xl font-bold mb-2">Pusat Bantuan</h3>
+                        <p className="text-indigo-100 text-sm leading-relaxed">Gunakan menu di samping atau aksi cepat di kiri untuk mencatat setiap transaksi keuangan sekolah.</p>
+                    </div>
+                    <div className="mt-8 space-y-4">
+                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200 mb-1">Tips Hari Ini</p>
+                            <p className="text-sm font-medium">Jangan lupa verifikasi bukti transfer siswa secara berkala untuk menjaga akurasi data.</p>
+                        </div>
+                        <Link to="/dashboard/settings" className="w-full py-3 bg-white text-indigo-600 rounded-xl font-bold text-sm text-center block hover:bg-indigo-50 transition-colors">
+                            Buka Pengaturan Akun
+                        </Link>
+                    </div>
                 </CardGlass>
             </div>
         </div>
+    );
+};
+
+const StatCard = ({ label, value, icon, color, isLoading }: { label: string; value: string; icon: React.ReactNode; color: string; isLoading: boolean }) => {
+    const colors: Record<string, string> = {
+        emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+        rose: 'bg-rose-50 text-rose-600 border-rose-100',
+        blue: 'bg-blue-50 text-blue-600 border-blue-100',
+        amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    };
+
+    return (
+        <CardGlass className={clsx("p-6 border-l-4", colors[color])}>
+            <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</p>
+                <div className={clsx("p-2 rounded-lg", colors[color].split(' ')[0])}>
+                    {icon}
+                </div>
+            </div>
+            {isLoading ? (
+                <div className="h-8 w-24 bg-slate-200 animate-pulse rounded-lg"></div>
+            ) : (
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
+            )}
+        </CardGlass>
     );
 };
 

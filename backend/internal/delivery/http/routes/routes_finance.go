@@ -93,12 +93,18 @@ func RegisterFinanceRoutes(
 			finance.GET("/savings/student/:student_id", middleware.RoleMiddleware(1, 6, 7, 9, 10, 11), financeExtendedHandler.GetStudentSavings)
 
 			// Savings Operational (Pool-level)
-			finance.POST("/savings/operational/withdraw", middleware.RoleMiddleware(1, 9), financeExtendedHandler.WithdrawSavingsOperational)
-			finance.POST("/savings/operational/return", middleware.RoleMiddleware(1, 9), financeExtendedHandler.ReturnSavingsOperational)
+			finance.POST("/savings/operational/withdraw", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.WithdrawSavingsOperational)
+			finance.POST("/savings/operational/return", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.ReturnSavingsOperational)
 			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsOperationalHistory)
-			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9), financeExtendedHandler.GetSavingsOperationalReturns)
+			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.GetSavingsOperationalReturns)
 			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsPoolSummary)
 			finance.GET("/savings/recap", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsRecap)
+
+			// Savings Receivable / Piutang (Pool-level)
+			finance.POST("/savings/receivable/withdraw", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.WithdrawSavingsReceivable)
+			finance.POST("/savings/receivable/return", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.ReturnSavingsReceivable)
+			finance.GET("/savings/receivable/history", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsReceivableHistory)
+			finance.GET("/savings/receivable/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.GetSavingsReceivableReturns)
 		}
 
 		// ── Cash Ledger (BKU) ──
@@ -136,7 +142,7 @@ func RegisterFinanceRoutes(
 		}
 
 		// ── Dashboard Analytics ──
-		finance.GET("/dashboard", middleware.RoleMiddleware(1, 8, 9), financeExtendedHandler.GetDashboardAnalytics)
+		finance.GET("/dashboard", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetDashboardAnalytics)
 
 		// ── Transaction Codes ──
 		finance.POST("/transaction-codes", middleware.RoleMiddleware(1, 9, 11), transactionCodeHandler.Create)

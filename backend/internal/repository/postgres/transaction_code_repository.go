@@ -188,6 +188,22 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       'Income' as type, sr.amount, 'Operasional' as category,
 			       0 as code_id, 'SavingsOp' as module
 			FROM savings_operational_returns sr
+
+			UNION ALL
+
+			SELECT sw2.created_at as date, 'Tabungan Piutang' as source,
+			       CONCAT('Piutang: ', sw2.purpose) as description,
+			       'Expense' as type, sw2.amount, 'Piutang' as category,
+			       0 as code_id, 'SavingsReceivable' as module
+			FROM savings_receivable_withdrawals sw2
+
+			UNION ALL
+
+			SELECT sr2.created_at as date, 'Tabungan Piutang' as source,
+			       COALESCE(sr2.notes, 'Pengembalian Piutang') as description,
+			       'Income' as type, sr2.amount, 'Piutang' as category,
+			       0 as code_id, 'SavingsReceivable' as module
+			FROM savings_receivable_returns sr2
 		) t
 		LEFT JOIN transaction_codes tc ON t.code_id = tc.id
 		WHERE 1=1 %s %s %s

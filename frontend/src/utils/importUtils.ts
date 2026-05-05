@@ -373,7 +373,7 @@ function buildXLSXTemplate(): Blob {
         ['7', 'Orang Tua', 'Orang tua/wali murid', '', '', '', ''],
         ['9', 'Bendahara', 'Bendahara keuangan', '', '', '', ''],
         ['10', 'Teller Tabungan', 'Petugas tabungan', '', '', '', ''],
-        ['11', 'Teller Infaq', 'Petugas infaq harian', '', '', '', ''],
+        ['11', 'Teller Transaksional', 'Petugas transaksi harian', '', '', '', ''],
     ];
 
     const headers = ['name', 'email', 'password', 'role_id', 'unit_id', 'nisn', 'class_id'];

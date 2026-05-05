@@ -16,7 +16,7 @@ const ActivityDetail = () => {
     const { id } = useParams();
     const { user } = useAuth();
     const queryClient = useQueryClient();
-    const canManage = [1, 9].includes(user?.role_id || 0);
+    const canManage = [1, 9, 11].includes(user?.role_id || 0);
 
     const [activeTab, setActiveTab] = useState<'obligations' | 'ledger' | 'report'>('obligations');
     const [searchStudent, setSearchStudent] = useState('');
@@ -133,13 +133,19 @@ const ActivityDetail = () => {
         }
     });
 
-    const handleExportPDF = () => {
-        generateActivityReportPDF({
-            activity,
-            obligationsCount: obligations.length,
-            summary,
-            transactions
-        });
+    const handleExportPDF = async () => {
+        try {
+            await generateActivityReportPDF({
+                activity,
+                obligationsCount: obligations.length,
+                summary,
+                transactions
+            });
+            toast.success('Laporan berhasil diunduh');
+        } catch (error) {
+            console.error(error);
+            toast.error('Gagal membuat laporan');
+        }
     };
 
     const handlePrintReceipt = (params: any) => {

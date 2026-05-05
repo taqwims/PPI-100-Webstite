@@ -35,7 +35,7 @@ interface BulkImportResult {
 const ROLE_MAP: Record<string, string> = {
     '1': 'Super Admin', '4': 'Guru', '5': 'Wali Kelas',
     '6': 'Siswa', '7': 'Orang Tua', '9': 'Bendahara',
-    '10': 'Teller Tabungan', '11': 'Teller Infaq',
+    '10': 'Teller Tabungan', '11': 'Teller Transaksional',
 };
 
 const getRoleName = (roleId: string) => ROLE_MAP[roleId] || roleId || '-';

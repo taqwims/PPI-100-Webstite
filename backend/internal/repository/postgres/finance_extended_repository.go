@@ -407,7 +407,14 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 		bkuDebtRemaining = 0
 	}
 
-	analytics["total_school_debt"] = externalDebtRemaining.Float64 + operationalDebtRemaining.Float64 + bkuDebtRemaining
+	// 4. Savings Receivable / Piutang
+	var receivableDebtRemaining sql.NullFloat64
+	r.db.Model(&domain.SavingsReceivableWithdrawal{}).
+		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&receivableDebtRemaining)
+	analytics["total_receivable_debt"] = receivableDebtRemaining.Float64
+
+	analytics["total_school_debt"] = externalDebtRemaining.Float64 + operationalDebtRemaining.Float64 + bkuDebtRemaining + receivableDebtRemaining.Float64
 
 	return analytics, nil
 }
@@ -419,13 +426,19 @@ func (r *financeExtendedRepository) WithdrawSavingsOperational(handledByID uuid.
 	var totalBalance sql.NullFloat64
 	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalBalance)
 
-	// Get total outstanding withdrawals
-	var totalWithdrawn sql.NullFloat64
+	// Get total outstanding operational withdrawals
+	var totalOpWithdrawn sql.NullFloat64
 	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
 		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
-		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&totalWithdrawn)
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&totalOpWithdrawn)
 
-	available := totalBalance.Float64 - totalWithdrawn.Float64
+	// Get total outstanding receivable/piutang withdrawals
+	var totalRecWithdrawn sql.NullFloat64
+	r.db.Model(&domain.SavingsReceivableWithdrawal{}).
+		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&totalRecWithdrawn)
+
+	available := totalBalance.Float64 - totalOpWithdrawn.Float64 - totalRecWithdrawn.Float64
 	if amount > available {
 		return gorm.ErrInvalidData // Not enough available funds
 	}
@@ -499,6 +512,7 @@ func (r *financeExtendedRepository) GetSavingsPoolSummary() (map[string]interfac
 	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalBalance)
 	summary["total_balance"] = totalBalance.Float64
 
+	// Operational stats
 	var totalWithdrawn sql.NullFloat64
 	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
 		Select("COALESCE(sum(amount), 0)").Row().Scan(&totalWithdrawn)
@@ -511,7 +525,23 @@ func (r *financeExtendedRepository) GetSavingsPoolSummary() (map[string]interfac
 
 	outstandingDebt := totalWithdrawn.Float64 - totalReturned.Float64
 	summary["outstanding_debt"] = outstandingDebt
-	summary["available_balance"] = totalBalance.Float64 - outstandingDebt
+
+	// Receivable / Piutang stats
+	var totalRecWithdrawn sql.NullFloat64
+	r.db.Model(&domain.SavingsReceivableWithdrawal{}).
+		Select("COALESCE(sum(amount), 0)").Row().Scan(&totalRecWithdrawn)
+	summary["total_receivable_withdrawn"] = totalRecWithdrawn.Float64
+
+	var totalRecReturned sql.NullFloat64
+	r.db.Model(&domain.SavingsReceivableWithdrawal{}).
+		Select("COALESCE(sum(returned_amount), 0)").Row().Scan(&totalRecReturned)
+	summary["total_receivable_returned"] = totalRecReturned.Float64
+
+	outstandingReceivable := totalRecWithdrawn.Float64 - totalRecReturned.Float64
+	summary["outstanding_receivable"] = outstandingReceivable
+
+	// Available = total pool - operational outstanding - piutang outstanding
+	summary["available_balance"] = totalBalance.Float64 - outstandingDebt - outstandingReceivable
 
 	return summary, nil
 }
@@ -617,3 +647,90 @@ func (r *financeExtendedRepository) GetSavingsRecap(params domain.SavingsRecapPa
 	}, nil
 }
 
+// ------------------- Savings Receivable / Piutang (Pool-level) -------------------
+
+func (r *financeExtendedRepository) WithdrawSavingsReceivable(handledByID uuid.UUID, amount float64, purpose string, description string, borrowerName string, borrowerID string, dueDate time.Time, returnMethod string, unitID uint) error {
+	// Check total pool balance first
+	var totalBalance sql.NullFloat64
+	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalBalance)
+
+	// Get total outstanding operational withdrawals
+	var totalOpWithdrawn sql.NullFloat64
+	r.db.Model(&domain.SavingsOperationalWithdrawal{}).
+		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&totalOpWithdrawn)
+
+	// Get total outstanding receivable withdrawals
+	var totalRecWithdrawn sql.NullFloat64
+	r.db.Model(&domain.SavingsReceivableWithdrawal{}).
+		Where("status IN ?", []string{"Outstanding", "PartialReturn"}).
+		Select("COALESCE(sum(amount - returned_amount), 0)").Row().Scan(&totalRecWithdrawn)
+
+	available := totalBalance.Float64 - totalOpWithdrawn.Float64 - totalRecWithdrawn.Float64
+	if amount > available {
+		return gorm.ErrInvalidData
+	}
+
+	withdrawal := domain.SavingsReceivableWithdrawal{
+		Amount:       amount,
+		Purpose:      purpose,
+		Description:  description,
+		BorrowerName: borrowerName,
+		BorrowerID:   borrowerID,
+		DueDate:      dueDate,
+		ReturnMethod: returnMethod,
+		Status:       "Outstanding",
+		HandledByID:  handledByID,
+		UnitID:       unitID,
+	}
+	return r.db.Create(&withdrawal).Error
+}
+
+func (r *financeExtendedRepository) ReturnSavingsReceivable(withdrawalID uuid.UUID, handledByID uuid.UUID, amount float64, notes string, unitID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var withdrawal domain.SavingsReceivableWithdrawal
+		if err := tx.Where("id = ?", withdrawalID).First(&withdrawal).Error; err != nil {
+			return err
+		}
+
+		remaining := withdrawal.Amount - withdrawal.ReturnedAmount
+		if amount > remaining {
+			return gorm.ErrInvalidData
+		}
+
+		ret := domain.SavingsReceivableReturn{
+			WithdrawalID: withdrawalID,
+			Amount:       amount,
+			Notes:        notes,
+			HandledByID:  handledByID,
+			UnitID:       unitID,
+		}
+		if err := tx.Create(&ret).Error; err != nil {
+			return err
+		}
+
+		withdrawal.ReturnedAmount += amount
+		if withdrawal.ReturnedAmount >= withdrawal.Amount {
+			withdrawal.Status = "Returned"
+		} else {
+			withdrawal.Status = "PartialReturn"
+		}
+		return tx.Save(&withdrawal).Error
+	})
+}
+
+func (r *financeExtendedRepository) GetSavingsReceivableHistory() ([]domain.SavingsReceivableWithdrawal, error) {
+	var withdrawals []domain.SavingsReceivableWithdrawal
+	if err := r.db.Preload("HandledBy").Preload("Returns").Preload("Returns.HandledBy").Order("created_at desc").Find(&withdrawals).Error; err != nil {
+		return nil, err
+	}
+	return withdrawals, nil
+}
+
+func (r *financeExtendedRepository) GetSavingsReceivableReturns(withdrawalID uuid.UUID) ([]domain.SavingsReceivableReturn, error) {
+	var returns []domain.SavingsReceivableReturn
+	if err := r.db.Preload("HandledBy").Where("withdrawal_id = ?", withdrawalID).Order("created_at desc").Find(&returns).Error; err != nil {
+		return nil, err
+	}
+	return returns, nil
+}

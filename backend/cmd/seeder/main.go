@@ -11,6 +11,22 @@ import (
 	"gorm.io/gorm"
 )
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
+	}
+	return fallback
+}
+
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -27,6 +43,7 @@ func main() {
 	}
 
 	// Seed Roles
+	log.Println("Seeding roles...")
 	roles := []domain.Role{
 		{ID: 1, Name: "Super Admin"},
 		{ID: 2, Name: "Admin MTS"},
@@ -38,7 +55,7 @@ func main() {
 		{ID: 8, Name: "Pimpinan"},
 		{ID: 9, Name: "Bendahara Umum"},
 		{ID: 10, Name: "Teller Tabungan"},
-		{ID: 11, Name: "Teller Infaq"},
+		{ID: 11, Name: "Teller Transaksional"},
 	}
 
 	for _, role := range roles {
@@ -48,6 +65,7 @@ func main() {
 	}
 
 	// Seed Units
+	log.Println("Seeding units...")
 	units := []domain.Unit{
 		{ID: 1, Name: "MTS"},
 		{ID: 2, Name: "MA"},
@@ -62,13 +80,20 @@ func main() {
 	}
 
 	// Seed Super Admin
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	log.Println("Seeding super admin...")
+	
+	adminName := getEnv("ADMIN_NAME", "Super Administrator")
+	adminEmail := getEnv("ADMIN_EMAIL", "admin@example.com")
+	adminPass := getEnv("ADMIN_PASSWORD", "password")
+	adminUnitID := uint(getEnvInt("ADMIN_UNIT_ID", 3))
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(adminPass), bcrypt.DefaultCost)
 	superAdmin := domain.User{
-		Name:         "Super Admin",
-		Email:        "admin@example.com",
+		Name:         adminName,
+		Email:        adminEmail,
 		PasswordHash: string(hashedPassword),
 		RoleID:       1,
-		UnitID:       3, // Public
+		UnitID:       adminUnitID,
 	}
 	seedUser(db, superAdmin)
 
@@ -255,7 +280,7 @@ func main() {
 		{Name: "Pimpinan Sekolah", Email: "pimpinan@example.com", RoleID: 8, UnitID: 3},
 		{Name: "Bendahara Umum", Email: "bendahara@example.com", RoleID: 9, UnitID: 3},
 		{Name: "Teller Tabungan", Email: "teller.tabungan@example.com", RoleID: 10, UnitID: 3},
-		{Name: "Teller Infaq", Email: "teller.infaq@example.com", RoleID: 11, UnitID: 3},
+		{Name: "Teller Transaksional", Email: "teller.transaksi@example.com", RoleID: 11, UnitID: 3},
 	}
 	var createdFinanceUsers []domain.User
 	for _, u := range financeUsers {
@@ -266,7 +291,7 @@ func main() {
 	if len(createdFinanceUsers) == 4 {
 		bendahara := createdFinanceUsers[1]
 		tellerTabungan := createdFinanceUsers[2]
-		tellerInfaq := createdFinanceUsers[3]
+		tellerTransaksional := createdFinanceUsers[3]
 
 		// Seed Cash Ledger (Bendahara)
 		ledger := []domain.CashLedger{
@@ -277,10 +302,10 @@ func main() {
 			db.Create(&l)
 		}
 
-		// Seed Daily Infaq (Teller Infaq)
+		// Seed Daily Infaq (Teller Transaksional)
 		infaq := []domain.DailyInfaq{
-			{Date: time.Now(), Source: "Hamba Allah", Type: "Income", Amount: 100000, HandledByID: tellerInfaq.ID, Notes: "Infaq Jumat"},
-			{Date: time.Now(), Source: "Siswa Kelas 7A", Type: "Income", Amount: 50000, HandledByID: tellerInfaq.ID, Notes: "Infaq Harian"},
+			{Date: time.Now(), Source: "Hamba Allah", Type: "Income", Amount: 100000, HandledByID: tellerTransaksional.ID, Notes: "Infaq Jumat"},
+			{Date: time.Now(), Source: "Siswa Kelas 7A", Type: "Income", Amount: 50000, HandledByID: tellerTransaksional.ID, Notes: "Infaq Harian"},
 		}
 		for _, i := range infaq {
 			db.Create(&i)

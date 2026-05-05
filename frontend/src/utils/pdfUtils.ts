@@ -62,18 +62,20 @@ export async function fetchInvoiceSignatures(
             chairman: 'Komite',
         };
 
-        if (!finalSigs && data.existing) {
-            finalSigs = data.existing.map((s: any) => ({
-                role: s.stakeholder_role,
-                name: s.stakeholder_name,
-                role_label: roleLabels[s.stakeholder_role] || s.stakeholder_role,
-                short_code: s.short_code
-            }));
-        } else if (finalSigs) {
-            finalSigs = finalSigs.map((s: any) => ({
-                ...s,
-                role_label: s.role_label || roleLabels[s.role] || s.role
-            }));
+        if (finalSigs && finalSigs.length > 0) {
+            finalSigs = finalSigs.map((s: any) => {
+                const role = s.stakeholder_role || s.role;
+                const name = s.stakeholder_name || s.name;
+                const shortCode = s.short_code;
+                
+                return {
+                    ...s,
+                    role: role,
+                    name: name,
+                    short_code: shortCode,
+                    role_label: s.role_label || roleLabels[role] || role
+                };
+            });
         }
 
         return {
@@ -616,7 +618,7 @@ export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?:
     doc.setFontSize(10);
     doc.setTextColor(30, 41, 59);
     doc.text('Total Dibayar', labelX + 6, y + 74);
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setTextColor(5, 150, 105);
     doc.text(formatCurrency(bill.amount), pageWidth - 20, y + 77, { align: 'right' });
 
@@ -640,37 +642,36 @@ interface ActivityReportOptions {
     transactions: { date: string; description: string; transaction_type: string; amount: number }[];
 }
 
-export const generateActivityReportPDF = (options: ActivityReportOptions) => {
+export const generateActivityReportPDF = async (options: ActivityReportOptions) => {
     const { activity, obligationsCount, summary, transactions } = options;
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
+    const invoiceType = 'Activity';
+    const dateStr = new Date().toISOString().split('T')[0];
+    
+    // Fetch backend signatures
+    const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
+        invoiceType,
+        `LPJ-${activity.name.replace(/[^a-zA-Z0-9]/g, '')}`,
+        summary?.balance || 0,
+        dateStr
+    );
 
-    // Standardized Header
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 42, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
-    doc.setFontSize(16);
-    doc.text('LAPORAN PERTANGGUNGJAWABAN', pageWidth / 2, 18, { align: 'center' });
-    doc.text('KEGIATAN SISWA (LPJ)', pageWidth / 2, 25, { align: 'center' });
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${activity.name} • Tahun Ajaran ${activity.academic_year?.name || '-'}`, pageWidth / 2, 33, { align: 'center' });
-    doc.setFontSize(6);
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 38, { align: 'center' });
+    const headerH = drawStandardHeader(doc, {
+        title: 'LAPORAN PERTANGGUNGJAWABAN',
+        subtitle: `KEGIATAN: ${activity.name} • TA ${activity.academic_year?.name || '-'}`,
+        invoiceNumber: invoiceNumber,
+    });
 
-    doc.setFontSize(12);
-    doc.setTextColor(20);
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'bold');
-    doc.text('Ringkasan Keuangan', 14, 52);
+    doc.text('Ringkasan Keuangan', 14, headerH + 10);
     doc.setFont('helvetica', 'normal');
 
     const totalTargetAmt = obligationsCount * activity.target_amount;
 
     autoTable(doc, {
-        startY: 56,
+        startY: headerH + 14,
         head: [['Keterangan', 'Nominal']],
         body: [
             ['Total Target Pendapatan (Peserta x Tagihan)', formatCurrency(totalTargetAmt)],
@@ -681,25 +682,25 @@ export const generateActivityReportPDF = (options: ActivityReportOptions) => {
         ],
         theme: 'grid',
         headStyles: { fillColor: [71, 85, 105], fontStyle: 'bold' },
-        styles: { fontSize: 9 }
+        styles: { fontSize: 8.5 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY || 56;
+    const finalY = (doc as any).lastAutoTable.finalY || headerH + 50;
 
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('Riwayat Transaksi', 14, finalY + 12);
+    doc.text('Riwayat Transaksi', 14, finalY + 10);
 
     const txData = transactions.map((tx, i) => [
         i + 1,
-        new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(tx.date)),
+        new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(tx.date)),
         tx.description,
         tx.transaction_type === 'Income' ? formatCurrency(tx.amount) : '-',
         tx.transaction_type === 'Expense' ? formatCurrency(tx.amount) : '-'
     ]);
 
     autoTable(doc, {
-        startY: finalY + 16,
+        startY: finalY + 14,
         head: [['No', 'Tanggal', 'Uraian / Keterangan', 'Pemasukan', 'Pengeluaran']],
         body: txData,
         theme: 'striped',
@@ -707,6 +708,12 @@ export const generateActivityReportPDF = (options: ActivityReportOptions) => {
         styles: { fontSize: 8 },
         alternateRowStyles: { fillColor: [248, 250, 252] },
     });
+
+    const lastY = (doc as any).lastAutoTable?.finalY || finalY + 30;
+    
+    // Add Compact Signature Block - restricted to Principal and Treasurer
+    const sigY = await drawSignatureBlockCompact(doc, lastY + 10, signatures, ['principal', 'treasurer']);
+    await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     addPageFooters(doc);
 
@@ -744,56 +751,56 @@ export const generateActivityObligationReceipt = async (data: ActivityObligation
     });
 
     const labelX = 12;
-    const valueX = 55;
-    let y = bodyStart + 4;
+    const valueX = 45; // Move value closer to label
+    let y = bodyStart + 3;
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text('Informasi Siswa', labelX, y);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('Nama', labelX, y + 9);
-    doc.text(`: ${data.studentName}`, valueX, y + 9);
-    doc.text('Kelas', labelX, y + 16);
-    doc.text(`: ${data.className}`, valueX, y + 16);
+    doc.setFontSize(8);
+    doc.text('Nama', labelX, y + 6);
+    doc.text(`: ${data.studentName}`, valueX, y + 6);
+    doc.text('Kelas', labelX, y + 11);
+    doc.text(`: ${data.className}`, valueX, y + 11);
 
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, y + 22, pageWidth - 12, y + 22);
+    doc.line(labelX, y + 15, pageWidth - 12, y + 15);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('Detail Pembayaran', labelX, y + 30);
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
+    doc.text('Detail Pembayaran', labelX, y + 21);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
 
     if (data.activityName) {
-        doc.text('Kegiatan', labelX, y + 39);
-        doc.text(`: ${data.activityName}`, valueX, y + 39);
+        doc.text('Kegiatan', labelX, y + 27);
+        doc.text(`: ${data.activityName}`, valueX, y + 27);
     }
 
-    const dateLabel = data.activityName ? y + 46 : y + 39;
+    const dateLabel = data.activityName ? y + 32 : y + 27;
     doc.text('Tanggal Bayar', labelX, dateLabel);
     doc.text(`: ${formatDate(data.paidAt || dateStr)}`, valueX, dateLabel);
 
-    // Amount box
-    const boxY = dateLabel + 10;
+    // Amount box (Compact)
+    const boxY = dateLabel + 6;
     doc.setFillColor(239, 246, 255); // blue-50
-    doc.roundedRect(labelX, boxY, pageWidth - 24, 20, 3, 3, 'F');
+    doc.roundedRect(labelX, boxY, pageWidth - 24, 14, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setTextColor(30, 41, 59);
-    doc.text('TOTAL DIBAYAR', labelX + 6, boxY + 10);
-    doc.setFontSize(14);
+    doc.text('TOTAL DIBAYAR', labelX + 4, boxY + 8);
+    doc.setFontSize(10);
     doc.setTextColor(37, 99, 235); // blue-600
-    doc.text(formatCurrency(data.amount), pageWidth - 18, boxY + 13, { align: 'right' });
+    doc.text(formatCurrency(data.amount), pageWidth - 16, boxY + 9, { align: 'right' });
 
     doc.setTextColor(16, 185, 129);
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('✓ LUNAS', pageWidth / 2, boxY + 34, { align: 'center' });
+    doc.text('✓ LUNAS', pageWidth / 2, boxY + 22, { align: 'center' });
 
-    const sigY = await drawSignatureBlockCompact(doc, boxY + 44, signatures, selectedRoles);
+    const sigY = await drawSignatureBlockCompact(doc, boxY + 28, signatures, selectedRoles || ['principal', 'treasurer']);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Kwitansi_${data.studentName.replace(/\s+/g, '_')}_${data.id.slice(0, 8)}.pdf`);
@@ -951,7 +958,7 @@ export const generateStudentBillPDF = async (data: StudentBillPDFData) => {
     doc.setFontSize(10);
     doc.setTextColor(185, 28, 28); // red-700
     doc.text('SISA TUNGGAKAN', pageWidth / 2 + 6, finalY + 14);
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.text(formatCurrency(totalUnpaid), pageWidth - 20, finalY + 24, { align: 'right' });
 
     // Signature block & verification
@@ -1099,7 +1106,7 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
     doc.setFontSize(11);
     doc.text('TOTAL DIBAYAR', lX, currentY + 8);
     doc.setTextColor(37, 99, 235);
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.text(formatCurrency(data.paidAmount), pageWidth - 12, currentY + 8, { align: 'right' });
 
     // Status
@@ -1128,7 +1135,6 @@ interface ActivityBillItem {
 
 export const generateActivityBillPDF = async (items: ActivityBillItem[], activityName: string, activityId: string) => {
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
     const invoiceType = 'Activity';
     const dateStr = new Date().toISOString().split('T')[0];
     const totalUnpaid = items.reduce((s, i) => s + (i.amount - i.paidAmount), 0);
@@ -1142,33 +1148,24 @@ export const generateActivityBillPDF = async (items: ActivityBillItem[], activit
     );
 
     // Standardized Header
-    doc.setFillColor(59, 130, 246); // blue-500
-    doc.rect(0, 0, pageWidth, 38, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
-    doc.setFontSize(16);
-    doc.text('SURAT TAGIHAN KEGIATAN', pageWidth / 2, 18, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text(`No: ${invoiceNumber}`, pageWidth / 2, 23.5, { align: 'center' });
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Kegiatan: ${activityName}`, pageWidth / 2, 30, { align: 'center' });
-    doc.setFontSize(6);
-    doc.text('Jl. Pesantren No. 100', pageWidth / 2, 36, { align: 'center' });
+    const headerH = drawStandardHeader(doc, {
+        title: 'SURAT TAGIHAN KEGIATAN',
+        subtitle: `Kegiatan: ${activityName}`,
+        invoiceNumber: invoiceNumber,
+        headerColor: [59, 130, 246], // blue-500
+    });
 
     // Summary
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     // totalUnpaid already calculated above
-    doc.text(`Total Siswa: ${items.length}  |  Total Tunggakan: ${formatCurrency(totalUnpaid)}`, 14, 48);
-    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 55);
+    doc.text(`Total Siswa: ${items.length}  |  Total Tunggakan: ${formatCurrency(totalUnpaid)}`, 14, headerH + 12);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, headerH + 19);
 
     // Table
     autoTable(doc, {
-        startY: 62,
+        startY: headerH + 26,
         head: [['No', 'Nama Siswa', 'Kelas', 'Tagihan', 'Terbayar', 'Sisa', 'Status']],
         body: items.map((item, i) => [
             i + 1,
@@ -1280,7 +1277,7 @@ export const generateSingleActivityBillPDF = async (item: ActivityBillItem, acti
         doc.setFontSize(10);
         doc.setTextColor(185, 28, 28);
         doc.text('SISA TUNGGAKAN', labelX + 6, finalY + 16);
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.text(formatCurrency(unpaid), pageWidth - 20, finalY + 20, { align: 'right' });
     }
 
@@ -1328,7 +1325,7 @@ export const generateRKASReportPDF = (
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.text('SDIT AN-NUR', pageWidth / 2, 8, { align: 'center' });
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.text('RENCANA ANGGARAN KAS SEKOLAH (RKAS)', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');

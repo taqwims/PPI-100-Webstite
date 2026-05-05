@@ -258,6 +258,41 @@ type SavingsOperationalReturn struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// ------------------- Savings Receivable / Piutang (Pool-level) -------------------
+type SavingsReceivableWithdrawal struct {
+	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Amount         float64   `gorm:"not null" json:"amount"`
+	ReturnedAmount float64   `gorm:"default:0" json:"returned_amount"`
+	Purpose        string    `gorm:"not null" json:"purpose"`
+	Description    string    `json:"description"` // Keterangan piutang
+
+	// Borrower Details
+	BorrowerName string    `json:"borrower_name"`
+	BorrowerID   string    `json:"borrower_id"` // NUP / KTP
+	DueDate      time.Time `json:"due_date"`
+	ReturnMethod string    `json:"return_method"` // Cicilan / Sekali Bayar
+
+	Status      string                    `gorm:"default:'Outstanding'" json:"status"` // Outstanding, PartialReturn, Returned
+	HandledByID uuid.UUID                 `gorm:"type:uuid;not null" json:"handled_by_id"`
+	HandledBy   User                      `gorm:"foreignKey:HandledByID" json:"handled_by"`
+	Returns     []SavingsReceivableReturn `gorm:"foreignKey:WithdrawalID" json:"returns"`
+	UnitID      uint                      `json:"unit_id"`
+	CreatedAt   time.Time                 `json:"created_at"`
+	UpdatedAt   time.Time                 `json:"updated_at"`
+}
+
+type SavingsReceivableReturn struct {
+	ID           uuid.UUID                    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	WithdrawalID uuid.UUID                    `gorm:"type:uuid;not null" json:"withdrawal_id"`
+	Withdrawal   SavingsReceivableWithdrawal  `gorm:"foreignKey:WithdrawalID" json:"withdrawal"`
+	Amount       float64                      `gorm:"not null" json:"amount"`
+	Notes        string                       `json:"notes"`
+	HandledByID  uuid.UUID                    `gorm:"type:uuid;not null" json:"handled_by_id"`
+	HandledBy    User                         `gorm:"foreignKey:HandledByID" json:"handled_by"`
+	UnitID       uint                         `json:"unit_id"`
+	CreatedAt    time.Time                    `json:"created_at"`
+}
+
 // ------------------- Transaction Code & Categorization -------------------
 type TransactionCode struct {
 	ID            uint              `gorm:"primaryKey" json:"id"`

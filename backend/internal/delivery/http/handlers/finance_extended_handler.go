@@ -628,3 +628,101 @@ func (h *FinanceExtendedHandler) GetSavingsRecap(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// ------------------- Savings Receivable / Piutang -------------------
+
+type ReceivableWithdrawRequest struct {
+	Amount       float64 `json:"amount" binding:"required"`
+	Purpose      string  `json:"purpose" binding:"required"`
+	Description  string  `json:"description"` // Keterangan piutang
+	BorrowerName string  `json:"borrower_name" binding:"required"`
+	BorrowerID   string  `json:"borrower_id" binding:"required"`
+	DueDate      string  `json:"due_date" binding:"required"`
+	ReturnMethod string  `json:"return_method" binding:"required"`
+	UnitID       uint    `json:"unit_id" binding:"required"`
+}
+
+func (h *FinanceExtendedHandler) WithdrawSavingsReceivable(c *gin.Context) {
+	handledByID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req ReceivableWithdrawRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dueDate, err := time.Parse("2006-01-02", req.DueDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format tanggal jatuh tempo salah (harus YYYY-MM-DD)"})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.WithdrawSavingsReceivable(handledByID, req.Amount, req.Purpose, req.Description, req.BorrowerName, req.BorrowerID, dueDate, req.ReturnMethod, req.UnitID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dana tidak mencukupi atau terjadi kesalahan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Piutang berhasil dicatat"})
+}
+
+type ReceivableReturnRequest struct {
+	WithdrawalID string  `json:"withdrawal_id" binding:"required"`
+	Amount       float64 `json:"amount" binding:"required"`
+	Notes        string  `json:"notes"`
+	UnitID       uint    `json:"unit_id" binding:"required"`
+}
+
+func (h *FinanceExtendedHandler) ReturnSavingsReceivable(c *gin.Context) {
+	handledByID, ok := getUserIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req ReceivableReturnRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	withdrawalUUID, err := uuid.Parse(req.WithdrawalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid withdrawal ID"})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.ReturnSavingsReceivable(withdrawalUUID, handledByID, req.Amount, req.Notes, req.UnitID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengembalikan piutang: jumlah melebihi sisa"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Piutang berhasil dikembalikan"})
+}
+
+func (h *FinanceExtendedHandler) GetSavingsReceivableHistory(c *gin.Context) {
+	history, err := h.financeExtendedUsecase.GetSavingsReceivableHistory()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, history)
+}
+
+func (h *FinanceExtendedHandler) GetSavingsReceivableReturns(c *gin.Context) {
+	withdrawalID := c.Param("withdrawal_id")
+	withdrawalUUID, err := uuid.Parse(withdrawalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid withdrawal ID"})
+		return
+	}
+
+	returns, err := h.financeExtendedUsecase.GetSavingsReceivableReturns(withdrawalUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, returns)
+}

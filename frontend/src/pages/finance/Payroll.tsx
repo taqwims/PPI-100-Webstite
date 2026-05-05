@@ -24,7 +24,7 @@ const getMonthName = (monthNumber: number) => {
 
 const Payroll = () => {
     const { user } = useAuth();
-    const canManage = [1, 9].includes(user?.role_id || 0);
+    const canManage = [1, 9, 11].includes(user?.role_id || 0);
 
     const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
     const [users, setUsers] = useState<UserData[]>([]);

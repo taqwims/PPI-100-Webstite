@@ -46,7 +46,7 @@ const DailyInfaq = () => {
                             <Download size={18} />
                             <span className="hidden sm:inline">Export</span>
                         </button>
-                        {[1, 9, 10].includes(user?.role_id || 0) && (
+                        {[1, 9, 10, 11].includes(user?.role_id || 0) && (
                             <div className="p-1 bg-slate-100 rounded-lg hidden sm:flex shadow-sm border border-slate-200">
                                 {activeUnits.map(u => (
                                     <button

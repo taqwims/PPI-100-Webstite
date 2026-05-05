@@ -190,7 +190,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         };
 
 
-        // ── Transactional Teller (role 11) ──
+        // ── Teller Transaksional (role 11) ──
         const transactionalTellerTransaksi: MenuGroup = {
             title: 'Transaksi',
             items: [
@@ -201,6 +201,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary', feature: 'billing' },
                 { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger', feature: 'cash_ledger' },
                 { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq', feature: 'infaq' },
+                { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll', feature: 'payroll' },
             ]
         };
         const transactionalTellerTabungan: MenuGroup = {
@@ -226,10 +227,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Calendar, label: 'Tahun Ajaran', path: '/dashboard/finance/academic-years' },
                 { icon: Settings, label: 'Kuitansi & TTD', path: '/dashboard/finance/invoice-config' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
+                { icon: FileText, label: 'Laporan', path: '/dashboard/finance/reports' },
             ]
         };
 
-        // Role ID mapping: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara Umum, 10=Teller Tabungan, 11=Teller Infaq
+        // Role ID mapping: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara Umum, 10=Teller Tabungan, 11=Teller Transaksional
         switch (user?.role_id) {
             case 1: // Super Admin
                 return [dashboardGroup, adminManagement, adminContent, adminData, finTransaksi, finAnggaran, finPengaturan];
@@ -250,7 +252,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 return [dashboardGroup, finTransaksi, finAnggaran, finPengaturan];
             case 10: // Teller Tabungan
                 return [dashboardGroup, tellerTabungan];
-            case 11: // Transactional Teller
+            case 11: // Teller Transaksional
                 return [dashboardGroup, transactionalTellerTransaksi, transactionalTellerTabungan, transactionalTellerKonten, transactionalTellerPengaturan];
             default:
                 return [dashboardGroup];
@@ -261,7 +263,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const roles: Record<number, string> = {
             1: 'Super Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
             5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
-            9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Transactional Teller'
+            9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Teller Transaksional'
         };
         return roleId && roles[roleId] ? roles[roleId] : 'User';
     };
@@ -298,7 +300,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                     {/* Global Academic Year Selector */}
-                    {[1, 8, 9].includes(user?.role_id || 0) && academicYears.length > 0 && (
+                    {[1, 8, 9, 11].includes(user?.role_id || 0) && academicYears.length > 0 && (
                         <div className="mb-3 px-1">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 block mb-1">Tahun Ajaran</label>
                             <select

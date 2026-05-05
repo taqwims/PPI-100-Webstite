@@ -25,9 +25,9 @@ const BRAND_GREEN: [number, number, number] = [0, 128, 0];
 const BRAND_BLUE: [number, number, number] = [0, 32, 96];
 
 // ─── Institutional Details ───
-const INST_NAME = 'SEKOLAH DASAR ISLAM TERPADU  AN NUR BANJARSARI';
+const INST_NAME = 'SEKOLAH DASAR ISLAM TERPADU  AN-NUR BANJARSARI';
 const INST_TAGLINE = 'Apply Sunnah in Daily Activity - Caracter Building - Tahfidz With Fun Learning - Life Skill';
-const INST_ADDRESS = 'Alamat: Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari Kecamtan Banjarsari Kabupaten Ciamis';
+const INST_ADDRESS = 'Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari Kecamtan Banjarsari Kabupaten Ciamis';
 const INST_PHONE = 'TLP. 081282109785 Kode Pos 46383';
 
 // ─── Logo as Base64 (loaded once) ───
@@ -72,13 +72,13 @@ export function drawStandardHeader(
 
     // Institution name (Green) - Shifted slightly or keep centered but higher Y
     doc.setTextColor(...BRAND_GREEN);
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont('times', 'bold');
     doc.text(INST_NAME, pageWidth / 2 + 10, 18, { align: 'center' });
 
     // Tagline (Green)
     doc.setFontSize(9);
-    doc.setFont('times', 'bold'); 
+    doc.setFont('times', 'bold');
     doc.text(INST_TAGLINE, pageWidth / 2 + 10, 24, { align: 'center' });
 
     // Address & Phone (Blue/Navy)
@@ -97,7 +97,7 @@ export function drawStandardHeader(
 
     // Document title (Black)
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text(options.title.toUpperCase(), pageWidth / 2, 53, { align: 'center' });
 
@@ -141,8 +141,8 @@ export function drawStandardHeaderA5(
     doc.setTextColor(...BRAND_BLUE);
     doc.setFontSize(5.5);
     doc.setFont('times', 'normal');
-    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari', pageWidth / 2 + 5, 22, { align: 'center' });
-    doc.text('Banjarsari - Ciamis. TLP. 081282109785', pageWidth / 2 + 5, 25, { align: 'center' });
+    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari Banjarsari - Ciamis.', pageWidth / 2 + 5, 22, { align: 'center' });
+    doc.text('TLP. 081282109785', pageWidth / 2 + 5, 25, { align: 'center' });
 
     doc.setDrawColor(...BRAND_GREEN);
     doc.setLineWidth(0.5);
@@ -151,7 +151,7 @@ export function drawStandardHeaderA5(
     doc.line(8, 36, pageWidth - 8, 36);
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text(options.title.toUpperCase(), pageWidth / 2, 45, { align: 'center' });
 
@@ -194,17 +194,26 @@ export async function drawSignatureBlock(
 
     startY += 4;
 
-    const allSigs = signatures || [
-        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha', short_code: '—' },
-        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara', short_code: '—' },
-        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah', short_code: '—' },
-        { role: 'committee', role_label: 'Komite', name: 'Komite', short_code: '—' },
+    const defaults = [
+        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha', short_code: 'SIG-ADM-PLACEHOLDER' },
+        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara', short_code: 'SIG-TRE-PLACEHOLDER' },
+        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah', short_code: 'SIG-PRI-PLACEHOLDER' },
+        { role: 'committee', role_label: 'Komite', name: 'Komite', short_code: 'SIG-COM-PLACEHOLDER' },
     ];
 
+    const allSigs = (signatures && signatures.length > 0) ? signatures : defaults;
+
     // Filter based on selectedRoles if provided
-    const sigs = selectedRoles
+    let sigs = selectedRoles
         ? allSigs.filter(s => selectedRoles.includes(s.role))
         : allSigs;
+
+    // If after filtering we have nothing, but we have selectedRoles, 
+    // it means the provided signatures don't contain the requested roles.
+    // Fallback to defaults for those specific roles.
+    if (sigs.length === 0 && selectedRoles) {
+        sigs = defaults.filter(s => selectedRoles.includes(s.role));
+    }
 
     if (sigs.length === 0) return startY;
 
@@ -347,16 +356,26 @@ export async function drawSignatureBlockCompact(
     doc.line(labelX, startY, pageWidth - 10, startY);
     startY += 4;
 
-    const allSigs = signatures || [
-        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha', short_code: '—' },
-        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara', short_code: '—' },
-        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah', short_code: '—' },
-        { role: 'committee', role_label: 'Komite', name: 'Komite', short_code: '—' },
+    const defaults = [
+        { role: 'admin_tu', role_label: 'Tata Usaha', name: 'Tata Usaha', short_code: 'SIG-ADM-PLACEHOLDER' },
+        { role: 'treasurer', role_label: 'Bendahara', name: 'Bendahara', short_code: 'SIG-TRE-PLACEHOLDER' },
+        { role: 'principal', role_label: 'Kepala Sekolah', name: 'Kepala Sekolah', short_code: 'SIG-PRI-PLACEHOLDER' },
+        { role: 'committee', role_label: 'Komite', name: 'Komite', short_code: 'SIG-COM-PLACEHOLDER' },
     ];
 
-    const sigs = selectedRoles
+    const allSigs = (signatures && signatures.length > 0) ? signatures : defaults;
+
+    // Filter based on selectedRoles if provided
+    let sigs = selectedRoles
         ? allSigs.filter(s => selectedRoles.includes(s.role))
         : allSigs;
+
+    // If after filtering we have nothing, but we have selectedRoles,
+    // it means the provided signatures don't contain the requested roles.
+    // Fallback to defaults for those specific roles.
+    if (sigs.length === 0 && selectedRoles) {
+        sigs = defaults.filter(s => selectedRoles.includes(s.role));
+    }
 
     if (sigs.length === 0) return startY;
 
@@ -764,8 +783,8 @@ async function renderInvoiceSection(
     doc.setTextColor(...BRAND_BLUE);
     doc.setFontSize(5);
     doc.setFont('times', 'normal');
-    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari', pageWidth / 2, yOffset + 25, { align: 'center' });
-    doc.text('Banjarsari - Ciamis. TLP. 081282109785', pageWidth / 2, yOffset + 28, { align: 'center' });
+    doc.text('Dusun Sindanglaya RT.006 RW 001 Desa Sindangsari Banjarsari - Ciamis.', pageWidth / 2, yOffset + 25, { align: 'center' });
+    doc.text('TLP. 081282109785', pageWidth / 2, yOffset + 28, { align: 'center' });
 
     doc.setDrawColor(...BRAND_GREEN);
     doc.setLineWidth(0.5);

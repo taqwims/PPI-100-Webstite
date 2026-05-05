@@ -15,7 +15,7 @@ import { useAuthStore } from '../store/authStore';
  *   8 = Pimpinan
  *   9 = Bendahara
  *  10 = Teller Tabungan
- *  11 = Transactional Teller
+ *  11 = Teller Transaksional
  */
 export const getDefaultRoute = (roleId: number): string => {
     const routes: Record<number, string> = {
