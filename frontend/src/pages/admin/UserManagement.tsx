@@ -24,7 +24,7 @@ interface User {
     };
 }
 
-interface Class { id: number; name: string; }
+interface Class { id: number; name: string; unit_id: number; }
 
 interface StudentRecord {
     id: string;
@@ -81,6 +81,7 @@ const UserManagement: React.FC = () => {
     const [editingStudentRecord, setEditingStudentRecord] = useState<StudentRecord | null>(null);
     const [activeTab, setActiveTab] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedClassId, setSelectedClassId] = useState<number>(0);
 
     const initialUnitId = user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId;
 
@@ -145,6 +146,12 @@ const UserManagement: React.FC = () => {
         .filter((u: User) => {
             if (user?.role_id !== 1 && u.unit_id !== user?.unit_id) return false;
             if (activeTab !== 0 && u.role_id !== activeTab) return false;
+            
+            // Class filter (only for students or in "Semua" tab)
+            if (selectedClassId !== 0) {
+                if (u.role_id !== 6 || u.student?.class_id !== selectedClassId) return false;
+            }
+
             if (searchQuery.trim()) {
                 const q = searchQuery.toLowerCase();
                 return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -152,12 +159,20 @@ const UserManagement: React.FC = () => {
             return true;
         })
         .sort((a: User, b: User) => {
-            // Sort students by class name
+            // If filtering by class or in Siswa tab, prioritize name (abjad)
+            if (activeTab === 6 || selectedClassId !== 0) {
+                return a.name.localeCompare(b.name);
+            }
+
+            // Sort students by class name first if in "Semua" tab
             if (a.role_id === 6 && b.role_id === 6 && a.student && b.student) {
                 const aClass = allClasses.find((c: Class) => c.id === a.student!.class_id);
                 const bClass = allClasses.find((c: Class) => c.id === b.student!.class_id);
-                return (aClass?.name || '').localeCompare(bClass?.name || '');
+                const classCompare = (aClass?.name || '').localeCompare(bClass?.name || '');
+                if (classCompare !== 0) return classCompare;
+                return a.name.localeCompare(b.name);
             }
+            
             // Otherwise sort by role then name
             if (a.role_id !== b.role_id) return a.role_id - b.role_id;
             return a.name.localeCompare(b.name);
@@ -316,11 +331,33 @@ const UserManagement: React.FC = () => {
             ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 bg-slate-50 border-b border-slate-200">
-                    <div className="relative max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" placeholder="Cari nama atau email..." value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm" />
+                    <div className="flex flex-col md:flex-row gap-4 items-center">
+                        <div className="relative flex-1 max-w-sm">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input type="text" placeholder="Cari nama atau email..." value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm" />
+                        </div>
+                        
+                        {(activeTab === 0 || activeTab === 6) && (
+                            <div className="relative w-full md:w-48">
+                                <select 
+                                    value={selectedClassId} 
+                                    onChange={e => setSelectedClassId(Number(e.target.value))}
+                                    className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-sm appearance-none bg-white"
+                                >
+                                    <option value={0}>Semua Kelas</option>
+                                    {allClasses
+                                        .filter((cls: Class) => user?.role_id === 1 || cls.unit_id === user?.unit_id)
+                                        .map((cls: Class) => (
+                                            <option key={cls.id} value={cls.id}>{cls.name}</option>
+                                        ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <Shield size={14} className="text-slate-400" />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
