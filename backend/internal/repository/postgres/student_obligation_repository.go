@@ -128,3 +128,21 @@ func (r *StudentObligationRepository) GetParentByStudentID(parentID *uuid.UUID) 
 	}
 	return &parent, &user, nil
 }
+// GetAcademicYearByID fetches academic year details
+func (r *StudentObligationRepository) GetAcademicYearByID(id uint) (*domain.AcademicYear, error) {
+	var ay domain.AcademicYear
+	if err := r.db.First(&ay, id).Error; err != nil {
+		return nil, err
+	}
+	return &ay, nil
+}
+
+func (r *StudentObligationRepository) BulkDelete(paymentTypeID uint, academicYearID uint, classID uint) error {
+	query := r.db.Where("payment_type_id = ? AND academic_year_id = ?", paymentTypeID, academicYearID)
+	if classID > 0 {
+		query = query.Where("student_id IN (SELECT id FROM students WHERE class_id = ?)", classID)
+	}
+	// Only delete unpaid ones to be safe
+	query = query.Where("paid_amount = 0")
+	return query.Delete(&domain.StudentObligation{}).Error
+}

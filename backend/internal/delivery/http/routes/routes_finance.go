@@ -78,6 +78,7 @@ func RegisterFinanceRoutes(
 			finance.GET("/student-obligations", middleware.RoleMiddleware(1, 8, 9, 11), studentObligationHandler.GetAll)
 			finance.GET("/student-obligations/student/:student_id", middleware.RoleMiddleware(1, 6, 7, 8, 9, 11), studentObligationHandler.GetByStudentID)
 			finance.PUT("/student-obligations/:id", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.Update)
+			finance.DELETE("/student-obligations/bulk", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.BulkDelete)
 			finance.DELETE("/student-obligations/:id", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.Delete)
 			finance.POST("/student-obligations/:id/pay", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.RecordPayment)
 		}

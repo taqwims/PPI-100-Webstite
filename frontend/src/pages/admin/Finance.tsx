@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { generateBillReceipt } from '../../utils/pdfUtils';
+import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
 interface Student {
     id: string;
@@ -143,6 +144,10 @@ const Finance: React.FC = () => {
     // Template Management Modal
     const [showTemplateModal, setShowTemplateModal] = useState(false);
     const [newTemplate, setNewTemplate] = useState({ template_name: '', title: '', amount: '', bill_type: '', transaction_code_id: '', is_installment: false });
+
+    // Print State
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [printBill, setPrintBill] = useState<Bill | null>(null);
 
     const [formData, setFormData] = useState<BillFormData>({
         student_id: '', title: '', amount: '', due_date: '', bill_type: '', academic_year_id: '', transaction_code_id: '', is_installment: false,
@@ -313,6 +318,23 @@ const Finance: React.FC = () => {
         });
     };
 
+    const handlePrintReceipt = (bill: Bill) => {
+        setPrintBill(bill);
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = async (selectedRoles: string[], format: 'A4' | 'A5') => {
+        if (printBill) {
+            try {
+                await generateBillReceipt(printBill, selectedRoles, format);
+                toast.success('Kuitansi berhasil diunduh');
+            } catch (error) {
+                console.error(error);
+                toast.error('Gagal membuat kuitansi');
+            }
+        }
+    };
+
     const filteredBills = bills?.filter((bill: Bill) => {
         const matchYear = filterYear ? bill.academic_year_id?.toString() === filterYear : true;
         const matchType = filterType ? bill.bill_type === filterType || (!bill.bill_type && filterType === 'SPP') : true;
@@ -432,7 +454,7 @@ const Finance: React.FC = () => {
                                             <td className="p-4 text-right">
                                                 <div className="flex justify-end gap-1.5 items-center flex-wrap">
                                                     {['Paid', 'Partial'].includes(bill.status) && (
-                                                        <button onClick={() => generateBillReceipt(bill)} className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition tooltip border border-transparent hover:border-emerald-100" title="Cetak Kwitansi">
+                                                        <button onClick={() => handlePrintReceipt(bill)} className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition tooltip border border-transparent hover:border-emerald-100" title="Cetak Kwitansi">
                                                             <Download size={16} />
                                                         </button>
                                                     )}
@@ -746,6 +768,20 @@ const Finance: React.FC = () => {
                 onConfirm={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}
                 title="Hapus Tagihan"
                 message="Yakin ingin menghapus tagihan ini? Tindakan ini tidak bisa dibatalkan."
+            />
+
+            <PrintOptionsModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                title="Cetak Kuitansi Pembayaran"
+                defaultFormat="A5"
+                defaultRoles={['treasurer', 'admin_tu', 'principal']}
+                availableRoles={[
+                    { id: 'treasurer', label: 'Bendahara' },
+                    { id: 'admin_tu', label: 'Tata Usaha' },
+                    { id: 'principal', label: 'Kepala Sekolah' },
+                ]}
             />
         </div>
     );

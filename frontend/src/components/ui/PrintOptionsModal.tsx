@@ -6,11 +6,31 @@ interface PrintOptionsModalProps {
     onClose: () => void;
     onConfirm: (selectedRoles: string[], format: 'A4' | 'A5') => void;
     title?: string;
+    defaultRoles?: string[];
+    defaultFormat?: 'A4' | 'A5';
+    availableRoles?: { id: string, label: string }[];
 }
 
-const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({ isOpen, onClose, onConfirm, title = "Opsi Cetak & Tanda Tangan" }) => {
-    const [selectedRoles, setSelectedRoles] = useState<string[]>(['principal', 'treasurer', 'admin_tu', 'committee']);
-    const [format, setFormat] = useState<'A4' | 'A5'>('A4');
+const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({ 
+    isOpen, onClose, onConfirm, title = "Opsi Cetak & Tanda Tangan",
+    defaultRoles = ['principal', 'treasurer', 'admin_tu', 'committee'],
+    defaultFormat = 'A4',
+    availableRoles = [
+        { id: 'treasurer', label: 'Bendahara' },
+        { id: 'admin_tu', label: 'Tata Usaha' },
+        { id: 'principal', label: 'Kepala Sekolah' },
+        { id: 'committee', label: 'Komite' },
+    ]
+}) => {
+    const [selectedRoles, setSelectedRoles] = useState<string[]>(defaultRoles);
+    const [format, setFormat] = useState<'A4' | 'A5'>(defaultFormat);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setSelectedRoles(defaultRoles);
+            setFormat(defaultFormat);
+        }
+    }, [isOpen, JSON.stringify(defaultRoles), defaultFormat]); // Using JSON.stringify for array dependency
 
     if (!isOpen) return null;
 
@@ -26,13 +46,6 @@ const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({ isOpen, onClose, 
         onConfirm(selectedRoles, format);
         onClose();
     };
-
-    const roles = [
-        { id: 'treasurer', label: 'Bendahara' },
-        { id: 'admin_tu', label: 'Tata Usaha' },
-        { id: 'principal', label: 'Kepala Sekolah' },
-        { id: 'committee', label: 'Komite' },
-    ];
 
     return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -81,7 +94,7 @@ const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({ isOpen, onClose, 
                     <div className="space-y-3">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Penandatangan</p>
                         <div className="grid grid-cols-1 gap-2">
-                            {roles.map(role => (
+                            {availableRoles.map(role => (
                                 <button
                                     key={role.id}
                                     onClick={() => toggleRole(role.id)}

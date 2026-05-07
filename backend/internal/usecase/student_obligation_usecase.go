@@ -61,6 +61,14 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 
 	var obligations []domain.StudentObligation
 	now := time.Now()
+	
+	// Get academic year to determine correct calendar years for months
+	ay, err := u.repo.GetAcademicYearByID(academicYearID)
+	if err != nil {
+		return 0, err
+	}
+	ayStartYear := ay.StartDate.Year()
+	ayStartMonth := int(ay.StartDate.Month())
 
 	for _, student := range students {
 		switch pt.PaymentSchedule {
@@ -72,12 +80,15 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 				months = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
 			}
 			for _, month := range months {
-				// Due date: 10th of each billing month, based on academic year
-				dueDate := time.Date(now.Year(), time.Month(month), 10, 0, 0, 0, 0, time.Local)
-				// If month is before current month, assume next year
-				if dueDate.Before(now) {
-					dueDate = dueDate.AddDate(1, 0, 0)
+				// Determine correct calendar year based on academic year start
+				// e.g. If AY starts in July (7), then months 7-12 are in start year, 1-6 in next year
+				targetYear := ayStartYear
+				if month < ayStartMonth && ayStartMonth > 1 {
+					targetYear++
 				}
+				
+				dueDate := time.Date(targetYear, time.Month(month), 10, 0, 0, 0, 0, time.Local)
+				
 				obligations = append(obligations, domain.StudentObligation{
 					StudentID:      student.ID,
 					PaymentTypeID:  paymentTypeID,
@@ -94,8 +105,9 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 			if installmentCount > 1 {
 				// Split into N installments
 				installmentAmount := pt.Amount / float64(installmentCount)
+				baseDate := ay.StartDate
 				for i := 1; i <= installmentCount; i++ {
-					dueDate := now.AddDate(0, i*3, 0) // Every 3 months by default
+					dueDate := baseDate.AddDate(0, (i-1)*3, 0) // Spread installments starting from AY start
 					obligations = append(obligations, domain.StudentObligation{
 						StudentID:         student.ID,
 						PaymentTypeID:     paymentTypeID,
@@ -110,7 +122,7 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 				}
 			} else {
 				// Single yearly obligation
-				dueDate := now.AddDate(0, 1, 0)
+				dueDate := ay.StartDate.AddDate(0, 1, 0) // Default 1 month after AY starts
 				obligations = append(obligations, domain.StudentObligation{
 					StudentID:      student.ID,
 					PaymentTypeID:  paymentTypeID,
@@ -186,6 +198,14 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 
 	var obligations []domain.StudentObligation
 	now := time.Now()
+	
+	// Get academic year to determine correct calendar years for months
+	ay, err := u.repo.GetAcademicYearByID(academicYearID)
+	if err != nil {
+		return 0, err
+	}
+	ayStartYear := ay.StartDate.Year()
+	ayStartMonth := int(ay.StartDate.Month())
 
 	for _, studentID := range studentIDs {
 		switch pt.PaymentSchedule {
@@ -195,10 +215,13 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 				months = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
 			}
 			for _, month := range months {
-				dueDate := time.Date(now.Year(), time.Month(month), 10, 0, 0, 0, 0, time.Local)
-				if dueDate.Before(now) {
-					dueDate = dueDate.AddDate(1, 0, 0)
+				targetYear := ayStartYear
+				if month < ayStartMonth && ayStartMonth > 1 {
+					targetYear++
 				}
+				
+				dueDate := time.Date(targetYear, time.Month(month), 10, 0, 0, 0, 0, time.Local)
+				
 				obligations = append(obligations, domain.StudentObligation{
 					StudentID:      studentID,
 					PaymentTypeID:  paymentTypeID,
@@ -214,8 +237,9 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 		case "Tahunan":
 			if installmentCount > 1 {
 				installmentAmount := pt.Amount / float64(installmentCount)
+				baseDate := ay.StartDate
 				for i := 1; i <= installmentCount; i++ {
-					dueDate := now.AddDate(0, i*3, 0)
+					dueDate := baseDate.AddDate(0, (i-1)*3, 0)
 					obligations = append(obligations, domain.StudentObligation{
 						StudentID:         studentID,
 						PaymentTypeID:     paymentTypeID,
@@ -229,7 +253,7 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 					})
 				}
 			} else {
-				dueDate := now.AddDate(0, 1, 0)
+				dueDate := ay.StartDate.AddDate(0, 1, 0)
 				obligations = append(obligations, domain.StudentObligation{
 					StudentID:      studentID,
 					PaymentTypeID:  paymentTypeID,
@@ -436,4 +460,26 @@ func (u *StudentObligationUsecase) GetStudentsByClassID(classID uint) ([]domain.
 
 func (u *StudentObligationUsecase) GetParentByStudentID(parentID *uuid.UUID) (*domain.Parent, *domain.User, error) {
 	return u.repo.GetParentByStudentID(parentID)
+}
+
+func (u *StudentObligationUsecase) BulkDelete(paymentTypeID uint, academicYearID uint, classID uint) error {
+	// Find all matching unpaid obligations to delete linked bills
+	obs, err := u.repo.GetAll(academicYearID, classID)
+	if err != nil {
+		return err
+	}
+
+	for _, ob := range obs {
+		if ob.PaymentTypeID == paymentTypeID && ob.PaidAmount == 0 {
+			// Delete linked bill if exists
+			if u.financeRepo != nil {
+				bill, err := u.financeRepo.GetBillByObligationID(ob.ID.String())
+				if err == nil && bill != nil {
+					_ = u.financeRepo.DeleteBill(bill.ID.String())
+				}
+			}
+		}
+	}
+
+	return u.repo.BulkDelete(paymentTypeID, academicYearID, classID)
 }

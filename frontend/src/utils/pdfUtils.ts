@@ -556,8 +556,8 @@ interface BillReceiptData {
     paid_at?: string;
 }
 
-export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?: string[]) => {
-    const doc = new jsPDF('p', 'mm', 'a5');
+export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?: string[], format: 'A4' | 'A5' = 'A5') => {
+    const doc = new jsPDF('p', 'mm', format.toLowerCase());
     const pageWidth = doc.internal.pageSize.getWidth();
     const name = bill.student?.user?.name || '-';
     const invoiceType = 'Bill';
@@ -572,21 +572,24 @@ export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?:
         dateStr
     );
 
-    const bodyStart = drawStandardHeaderA5(doc, {
+    const headerParams = {
         title: 'KUITANSI PEMBAYARAN',
         invoiceNumber: invoiceNumber,
-    });
+    };
+    const bodyStart = format === 'A4'
+        ? drawStandardHeader(doc, headerParams)
+        : drawStandardHeaderA5(doc, headerParams);
 
-    const labelX = 14;
-    const valueX = 60;
+    const labelX = format === 'A4' ? 20 : 14;
+    const valueX = format === 'A4' ? 80 : 60;
     let y = bodyStart + 4;
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(10);
+    doc.setFontSize(format === 'A4' ? 11 : 10);
     doc.setFont('helvetica', 'bold');
     doc.text('Informasi Siswa', labelX, y);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(format === 'A4' ? 10 : 9);
 
     const className = bill.student?.class?.name || '-';
     doc.text('Nama', labelX, y + 9);
@@ -595,13 +598,13 @@ export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?:
     doc.text(`: ${className}`, valueX, y + 16);
 
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, y + 22, pageWidth - 14, y + 22);
+    doc.line(labelX, y + 22, pageWidth - labelX, y + 22);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(format === 'A4' ? 11 : 10);
     doc.text('Detail Tagihan', labelX, y + 30);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(format === 'A4' ? 10 : 9);
 
     doc.text('Jenis', labelX, y + 39);
     doc.text(`: ${bill.bill_type || 'SPP'}`, valueX, y + 39);
@@ -610,25 +613,32 @@ export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?:
     doc.text('Jatuh Tempo', labelX, y + 53);
     doc.text(`: ${formatDate(bill.due_date)}`, valueX, y + 53);
 
-    doc.line(labelX, y + 59, pageWidth - 14, y + 59);
+    doc.line(labelX, y + 59, pageWidth - labelX, y + 59);
 
     doc.setFillColor(240, 253, 244);
-    doc.roundedRect(labelX, y + 64, pageWidth - 28, 22, 3, 3, 'F');
+    doc.roundedRect(labelX, y + 64, pageWidth - (labelX * 2), 22, 3, 3, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(format === 'A4' ? 11 : 10);
     doc.setTextColor(30, 41, 59);
     doc.text('Total Dibayar', labelX + 6, y + 74);
-    doc.setFontSize(12);
+    doc.setFontSize(format === 'A4' ? 14 : 12);
     doc.setTextColor(5, 150, 105);
-    doc.text(formatCurrency(bill.amount), pageWidth - 20, y + 77, { align: 'right' });
+    doc.text(formatCurrency(bill.amount), pageWidth - (labelX + 6), y + 77, { align: 'right' });
 
     doc.setTextColor(5, 150, 105);
-    doc.setFontSize(12);
+    doc.setFontSize(format === 'A4' ? 14 : 12);
     doc.setFont('helvetica', 'bold');
     doc.text('✓ LUNAS', pageWidth / 2, y + 100, { align: 'center' });
 
-    const sigY = await drawSignatureBlockCompact(doc, y + 108, signatures, selectedRoles);
-    await drawVerificationFooterCompact(doc, sigY, verificationCode);
+    const sigY = format === 'A4'
+        ? await drawSignatureBlock(doc, y + 108, signatures, selectedRoles)
+        : await drawSignatureBlockCompact(doc, y + 108, signatures, selectedRoles);
+
+    if (format === 'A4') {
+        await drawVerificationFooter(doc, sigY, verificationCode);
+    } else {
+        await drawVerificationFooterCompact(doc, sigY, verificationCode);
+    }
 
     doc.save(`Kuitansi_${bill.title.replace(/\s+/g, '_')}_${name.replace(/\s+/g, '_')}.pdf`);
 };
@@ -886,8 +896,18 @@ export const generateStudentBillPDF = async (data: StudentBillPDFData) => {
     doc.setDrawColor(203, 213, 225);
     doc.line(labelX, divY, pageWidth - 14, divY);
 
-    // ALL items (paid + unpaid)
-    const allObs = data.obligations;
+    // ALL items (paid + unpaid), sorted by due date
+    const allObs = [...data.obligations].sort((a, b) => {
+        const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+        const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+        if (dateA !== dateB) return dateA - dateB;
+        
+        // If due dates are the same, sort by billing month (normalized for academic year)
+        // July (7) should be first, June (6) last
+        const monthA = a.billing_month ? (a.billing_month < 7 ? a.billing_month + 12 : a.billing_month) : 0;
+        const monthB = b.billing_month ? (b.billing_month < 7 ? b.billing_month + 12 : b.billing_month) : 0;
+        return monthA - monthB;
+    });
     // (Reusing totals calculated above)
 
     doc.setFont('helvetica', 'bold');
@@ -962,7 +982,8 @@ export const generateStudentBillPDF = async (data: StudentBillPDFData) => {
     doc.text(formatCurrency(totalUnpaid), pageWidth - 20, finalY + 24, { align: 'right' });
 
     // Signature block & verification
-    const sigY = await drawSignatureBlock(doc, finalY + 54, signatures);
+    const filteredSigs = signatures.filter(s => s.role !== 'committee');
+    const sigY = await drawSignatureBlock(doc, finalY + 54, filteredSigs);
     await drawVerificationFooter(doc, sigY, verificationCode);
 
     addPageFooters(doc);
@@ -1051,8 +1072,8 @@ interface ObligationReceiptData {
     totalInstallments?: number;
 }
 
-export const generateObligationReceipt = async (data: ObligationReceiptData, selectedRoles?: string[]) => {
-    const doc = new jsPDF('p', 'mm', 'a5');
+export const generateObligationReceipt = async (data: ObligationReceiptData, selectedRoles?: string[], format: 'A4' | 'A5' = 'A5') => {
+    const doc = new jsPDF('p', 'mm', format.toLowerCase());
     const pageWidth = doc.internal.pageSize.getWidth();
     const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     const invoiceType = 'Obligation';
@@ -1066,7 +1087,7 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
         dateStr
     );
 
-    const bodyStart = drawStandardHeaderA5(doc, {
+    const bodyStart = (format === 'A4' ? drawStandardHeader : drawStandardHeaderA5)(doc, {
         title: 'KUITANSI PEMBAYARAN',
         invoiceNumber: invoiceNumber,
     });
@@ -1116,8 +1137,15 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
     doc.setFontSize(12);
     doc.text(isLunas ? '✓ LUNAS' : '◐ CICILAN', pageWidth / 2, currentY + 5, { align: 'center' });
 
-    const sigY = await drawSignatureBlockCompact(doc, currentY + 10, signatures, selectedRoles);
-    await drawVerificationFooterCompact(doc, sigY, verificationCode);
+    const sigY = format === 'A4'
+        ? await drawSignatureBlock(doc, currentY + 10, signatures, selectedRoles)
+        : await drawSignatureBlockCompact(doc, currentY + 10, signatures, selectedRoles);
+
+    if (format === 'A4') {
+        await drawVerificationFooter(doc, sigY, verificationCode);
+    } else {
+        await drawVerificationFooterCompact(doc, sigY, verificationCode);
+    }
 
     doc.save(`Kuitansi_${data.studentName.replace(/\s+/g, '_')}_${data.paymentTypeName.replace(/\s+/g, '_')}.pdf`);
 };
@@ -1137,7 +1165,11 @@ export const generateActivityBillPDF = async (items: ActivityBillItem[], activit
     const doc = new jsPDF();
     const invoiceType = 'Activity';
     const dateStr = new Date().toISOString().split('T')[0];
-    const totalUnpaid = items.reduce((s, i) => s + (i.amount - i.paidAmount), 0);
+    const sortedItems = [...items].sort((a, b) => {
+        if (a.className !== b.className) return a.className.localeCompare(b.className);
+        return a.studentName.localeCompare(b.studentName);
+    });
+    const totalUnpaid = sortedItems.reduce((s, i) => s + (i.amount - i.paidAmount), 0);
 
     // Fetch backend signatures
     const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
@@ -1160,14 +1192,14 @@ export const generateActivityBillPDF = async (items: ActivityBillItem[], activit
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     // totalUnpaid already calculated above
-    doc.text(`Total Siswa: ${items.length}  |  Total Tunggakan: ${formatCurrency(totalUnpaid)}`, 14, headerH + 12);
+    doc.text(`Total Siswa: ${sortedItems.length}  |  Total Tunggakan: ${formatCurrency(totalUnpaid)}`, 14, headerH + 12);
     doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, headerH + 19);
-
+ 
     // Table
     autoTable(doc, {
         startY: headerH + 26,
         head: [['No', 'Nama Siswa', 'Kelas', 'Tagihan', 'Terbayar', 'Sisa', 'Status']],
-        body: items.map((item, i) => [
+        body: sortedItems.map((item, i) => [
             i + 1,
             item.studentName,
             item.className,
@@ -1193,7 +1225,8 @@ export const generateActivityBillPDF = async (items: ActivityBillItem[], activit
         }
     });
 
-    const sigY = await drawSignatureBlock(doc, (doc as any).lastAutoTable?.finalY + 15, signatures);
+    const filteredSigs = signatures.filter(s => s.role !== 'committee');
+    const sigY = await drawSignatureBlock(doc, (doc as any).lastAutoTable?.finalY + 15, filteredSigs);
     await drawVerificationFooter(doc, sigY, verificationCode);
 
     addPageFooters(doc);

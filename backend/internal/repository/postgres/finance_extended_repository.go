@@ -30,7 +30,7 @@ func (r *financeExtendedRepository) CreateAcademicYear(year *domain.AcademicYear
 
 func (r *financeExtendedRepository) GetAllAcademicYears() ([]domain.AcademicYear, error) {
 	var years []domain.AcademicYear
-	if err := r.db.Order("start_date desc").Find(&years).Error; err != nil {
+	if err := r.db.Order("id ASC").Find(&years).Error; err != nil {
 		return nil, err
 	}
 	return years, nil

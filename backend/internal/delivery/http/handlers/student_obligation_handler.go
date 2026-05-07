@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
 	"strconv"
@@ -12,10 +13,11 @@ import (
 
 type StudentObligationHandler struct {
 	usecase *usecase.StudentObligationUsecase
+	cfg     *config.Config
 }
 
-func NewStudentObligationHandler(uc *usecase.StudentObligationUsecase) *StudentObligationHandler {
-	return &StudentObligationHandler{usecase: uc}
+func NewStudentObligationHandler(uc *usecase.StudentObligationUsecase, cfg *config.Config) *StudentObligationHandler {
+	return &StudentObligationHandler{usecase: uc, cfg: cfg}
 }
 
 func (h *StudentObligationHandler) Create(c *gin.Context) {
@@ -189,4 +191,26 @@ func (h *StudentObligationHandler) RecordPayment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Pembayaran berhasil dicatat"})
+}
+
+func (h *StudentObligationHandler) BulkDelete(c *gin.Context) {
+	if !h.cfg.FeatureBulkDeleteObligations {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Fitur hapus massal dinonaktifkan di konfigurasi sistem"})
+		return
+	}
+	paymentTypeID, _ := strconv.ParseUint(c.Query("payment_type_id"), 10, 32)
+	academicYearID, _ := strconv.ParseUint(c.Query("academic_year_id"), 10, 32)
+	classID, _ := strconv.ParseUint(c.Query("class_id"), 10, 32)
+
+	if paymentTypeID == 0 || academicYearID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payment_type_id and academic_year_id are required"})
+		return
+	}
+
+	if err := h.usecase.BulkDelete(uint(paymentTypeID), uint(academicYearID), uint(classID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tanggungan massal berhasil dihapus (khusus yang belum ada pembayaran)"})
 }

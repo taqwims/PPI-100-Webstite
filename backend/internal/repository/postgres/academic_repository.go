@@ -25,7 +25,7 @@ func (r *AcademicRepository) GetAllClasses(unitID uint) ([]domain.Class, error) 
 	if unitID != 0 {
 		query = query.Where("unit_id = ?", unitID)
 	}
-	err := query.Find(&classes).Error
+	err := query.Order("id ASC").Find(&classes).Error
 	return classes, err
 }
 
@@ -56,7 +56,7 @@ func (r *AcademicRepository) CreateSubject(subject *domain.Subject) error {
 
 func (r *AcademicRepository) GetAllSubjects(unitID uint) ([]domain.Subject, error) {
 	var subjects []domain.Subject
-	err := r.db.Where("unit_id = ?", unitID).Find(&subjects).Error
+	err := r.db.Where("unit_id = ?", unitID).Order("id ASC").Find(&subjects).Error
 	return subjects, err
 }
 
@@ -87,7 +87,7 @@ func (r *AcademicRepository) GetAllSchedules(unitID, classID uint, teacherID str
 		query = query.Where("schedules.teacher_id = ?", teacherID)
 	}
 
-	err := query.Find(&schedules).Error
+	err := query.Order("schedules.id ASC").Find(&schedules).Error
 	return schedules, err
 }
 

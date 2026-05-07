@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Search } from 'lucide-react';
+import { useFeatureStore } from '../../store/featureStore';
+import { Plus, Search, Trash2 } from 'lucide-react';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 import { ObligationsTable } from '../../components/finance/StudentObligations/ObligationsTable';
 import { BulkAssignModal } from '../../components/finance/StudentObligations/BulkAssignModal';
+import { BulkDeleteModal } from '../../components/finance/StudentObligations/BulkDeleteModal';
 import { ActionModals } from '../../components/finance/StudentObligations/ActionModals';
 import { AcademicYear, ClassOption, PaymentType, Obligation, GroupedStudentAmount } from '../../components/finance/StudentObligations/types';
 import toast from 'react-hot-toast';
@@ -13,6 +15,7 @@ const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'c
 
 const StudentObligations = () => {
     const { user } = useAuth();
+    const isBulkDeleteEnabled = useFeatureStore(s => s.isEnabled('bulk_delete_obligations'));
     const canManage = [1, 9, 11].includes(user?.role_id || 0);
 
     const [obligations, setObligations] = useState<Obligation[]>([]);
@@ -27,6 +30,7 @@ const StudentObligations = () => {
     const [filterClassId, setFilterClassId] = useState('');
 
     const [showBulkModal, setShowBulkModal] = useState(false);
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
     const [payingOb, setPayingOb] = useState<Obligation | null>(null);
     const [payAmount, setPayAmount] = useState('');
@@ -146,11 +150,11 @@ const StudentObligations = () => {
         setIsPrintModalOpen(true);
     };
 
-    const handleConfirmPrint = async (selectedRoles: string[]) => {
+    const handleConfirmPrint = async (selectedRoles: string[], format: 'A4' | 'A5') => {
         if (printParams) {
             try {
                 const mod = await import('../../utils/pdfUtils');
-                await mod.generateObligationReceipt(printParams, selectedRoles);
+                await mod.generateObligationReceipt(printParams, selectedRoles, format);
                 toast.success('Kuitansi berhasil diunduh');
             } catch (error) {
                 console.error(error);
@@ -205,9 +209,16 @@ const StudentObligations = () => {
                     <p className="text-slate-500 mt-1">Item pembayaran yang harus dibayar oleh siswa.</p>
                 </div>
                 {canManage && (
-                    <button onClick={() => setShowBulkModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition">
-                        <Plus size={18} /> Assign Tanggungan
-                    </button>
+                    <div className="flex gap-2">
+                        {isBulkDeleteEnabled && (
+                            <button onClick={() => setShowBulkDeleteModal(true)} className="flex items-center gap-2 bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-100 shadow-sm transition">
+                                <Trash2 size={18} /> Hapus Massal
+                            </button>
+                        )}
+                        <button onClick={() => setShowBulkModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition">
+                            <Plus size={18} /> Assign Tanggungan
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -271,6 +282,17 @@ const StudentObligations = () => {
                 semesterMonths={semesterMonths}
             />
 
+            <BulkDeleteModal 
+                isOpen={showBulkDeleteModal}
+                onClose={() => setShowBulkDeleteModal(false)}
+                onSuccess={fetchData}
+                paymentTypes={paymentTypes}
+                classes={classes}
+                academicYears={academicYears}
+                filterYearId={filterYearId}
+                filterClassId={filterClassId}
+            />
+
             <ActionModals 
                 payingOb={payingOb}
                 setPayingOb={setPayingOb}
@@ -288,6 +310,13 @@ const StudentObligations = () => {
                 onClose={() => setIsPrintModalOpen(false)}
                 onConfirm={handleConfirmPrint}
                 title="Cetak Kuitansi Pembayaran"
+                defaultFormat="A5"
+                defaultRoles={['treasurer', 'admin_tu', 'principal']}
+                availableRoles={[
+                    { id: 'treasurer', label: 'Bendahara' },
+                    { id: 'admin_tu', label: 'Tata Usaha' },
+                    { id: 'principal', label: 'Kepala Sekolah' },
+                ]}
             />
         </div>
     );

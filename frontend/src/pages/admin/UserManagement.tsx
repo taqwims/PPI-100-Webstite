@@ -365,6 +365,7 @@ const UserManagement: React.FC = () => {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-sm">
+                                <th className="px-5 py-3 font-medium w-12">No</th>
                                 <th className="px-5 py-3 font-medium">Nama</th>
                                 <th className="px-5 py-3 font-medium">Email</th>
                                 <th className="px-5 py-3 font-medium">Role</th>
@@ -375,11 +376,12 @@ const UserManagement: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
-                                <tr><td colSpan={6} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
+                                <tr><td colSpan={7} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
                             ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan={6} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
-                            ) : filteredUsers.map((u: User) => (
+                                <tr><td colSpan={7} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
+                            ) : filteredUsers.map((u: User, idx: number) => (
                                 <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-5 py-3 text-slate-400 text-sm font-medium">{idx + 1}</td>
                                     <td className="px-5 py-3">
                                         <div className="flex items-center gap-2.5">
                                             <div className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold', roleColor(u.role_id))}>

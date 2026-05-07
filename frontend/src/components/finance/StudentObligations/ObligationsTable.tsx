@@ -46,6 +46,7 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                 <thead>
                     <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-sm">
                         <th className="px-4 py-3 font-medium w-10"></th>
+                        <th className="px-4 py-3 font-medium w-10">No</th>
                         <th className="px-4 py-3 font-medium">Siswa</th>
                         <th className="px-4 py-3 font-medium">Kelas</th>
                         <th className="px-4 py-3 font-medium hidden md:table-cell">Orang Tua / Wali</th>
@@ -56,11 +57,11 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                 </thead>
                 <tbody className="divide-y divide-transparent">
                     {loading ? (
-                        <tr><td colSpan={7} className="py-12 text-center">
+                        <tr><td colSpan={8} className="py-12 text-center">
                             <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
                         </td></tr>
                     ) : groupedStudents.length === 0 ? (
-                        <tr><td colSpan={7} className="py-12 text-center text-slate-400">
+                        <tr><td colSpan={8} className="py-12 text-center text-slate-400">
                             <AlertCircle size={40} className="mx-auto mb-2 text-slate-300" />
                             <p className="font-medium text-slate-600">Belum ada tanggungan</p>
                         </td></tr>
@@ -78,6 +79,9 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                                 >
                                     <td className="px-4 py-4 text-slate-400 group-hover:text-blue-600 transition-colors text-center">
                                         {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                    </td>
+                                    <td className="px-4 py-4 text-slate-500 text-sm font-medium">
+                                        {idx + 1}
                                     </td>
                                     <td className="px-4 py-4">
                                         <div className="flex items-center gap-2">
@@ -103,7 +107,7 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                                 </tr>
                                 {isExpanded && (
                                     <tr>
-                                        <td colSpan={7} className="p-0 border-b border-slate-100">
+                                        <td colSpan={8} className="p-0 border-b border-slate-100">
                                             <StudentObligationsExpanded 
                                                 group={group}
                                                 academicYears={props.academicYears}
