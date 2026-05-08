@@ -187,6 +187,33 @@ func (h *FinanceExtendedHandler) ProcessSavingTransaction(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Saving transaction processed successfully"})
 }
 
+type UpdateSavingTransactionRequest struct {
+	Amount float64 `json:"amount" binding:"required"`
+	Notes  string  `json:"notes"`
+}
+
+func (h *FinanceExtendedHandler) UpdateSavingTransaction(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid transaction ID"})
+		return
+	}
+
+	var req UpdateSavingTransactionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.financeExtendedUsecase.UpdateSavingTransaction(id, req.Amount, req.Notes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Saving transaction updated successfully"})
+}
+
 func (h *FinanceExtendedHandler) GetStudentSavings(c *gin.Context) {
 	studentID := c.Param("student_id")
 	studentUUID, err := uuid.Parse(studentID)

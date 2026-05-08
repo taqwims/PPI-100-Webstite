@@ -155,6 +155,46 @@ func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledB
 	})
 }
 
+func (r *financeExtendedRepository) UpdateSavingTransaction(id uuid.UUID, amount float64, notes string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var txn domain.SavingTransaction
+		if err := tx.Where("id = ?", id).First(&txn).Error; err != nil {
+			return err
+		}
+
+		var account domain.SavingAccount
+		if err := tx.Where("id = ?", txn.AccountID).First(&account).Error; err != nil {
+			return err
+		}
+
+		// Reverse old amount
+		if txn.Type == "Deposit" {
+			account.Balance -= txn.Amount
+		} else {
+			account.Balance += txn.Amount
+		}
+
+		// Apply new amount
+		if txn.Type == "Deposit" {
+			account.Balance += amount
+		} else {
+			if account.Balance < amount {
+				return gorm.ErrInvalidData // Not enough balance
+			}
+			account.Balance -= amount
+		}
+
+		if err := tx.Save(&account).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&txn).Updates(map[string]interface{}{
+			"amount": amount,
+			"notes":  notes,
+		}).Error
+	})
+}
+
 func (r *financeExtendedRepository) GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error) {
 	var account domain.SavingAccount
 	if err := r.db.Preload("Student").Where("student_id = ?", studentID).First(&account).Error; err != nil {

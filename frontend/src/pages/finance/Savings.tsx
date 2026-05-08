@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
-import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download } from 'lucide-react';
+import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download, Edit2 } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
 import { generatePiutangInvoice } from '../../utils/piutangInvoice';
@@ -64,6 +64,12 @@ const Savings = () => {
     const [historyAccount, setHistoryAccount] = useState<SavingAccount | null>(null);
     const [transactions, setTransactions] = useState<SavingTransaction[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+
+    // Edit Transaction
+    const [editingTrx, setEditingTrx] = useState<SavingTransaction | null>(null);
+    const [editAmount, setEditAmount] = useState('');
+    const [editNotes, setEditNotes] = useState('');
+    const [savingEdit, setSavingEdit] = useState(false);
 
     const fetchAccounts = useCallback(async (classId?: string) => {
         setLoading(true);
@@ -144,6 +150,27 @@ const Savings = () => {
             transactions,
             historyAccount.balance
         );
+    };
+
+    const handleUpdateTrx = async () => {
+        if (!editingTrx) return;
+        setSavingEdit(true);
+        try {
+            await api.put(`/finance/savings/transactions/${editingTrx.id}`, {
+                amount: Number(editAmount),
+                notes: editNotes
+            });
+            // Refresh history
+            if (historyAccount) {
+                const res = await api.get(`/finance/savings/transactions/${historyAccount.id}`);
+                setTransactions(res.data || []);
+                // Refresh pool summary and accounts
+                fetchPoolSummary();
+                fetchAccounts(classFilter || undefined);
+            }
+            setEditingTrx(null);
+        } catch (error) { console.error(error); alert('Gagal mengupdate transaksi'); }
+        finally { setSavingEdit(false); }
     };
 
     if (!canManage) {
@@ -367,21 +394,33 @@ const Savings = () => {
                             <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left min-w-[600px]">
-                                        <thead><tr className="bg-slate-50"><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Tanggal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Jenis</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase w-1/3">Keterangan</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Nominal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Input Oleh</th></tr></thead>
+                                        <thead><tr className="bg-slate-50"><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Tanggal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Jenis</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase w-1/3">Keterangan</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Nominal</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Input Oleh</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-center">Aksi</th></tr></thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {loadingHistory ? (<tr><td colSpan={5} className="py-8 text-center text-slate-400">Memuat...</td></tr>) : transactions.length === 0 ? (<tr><td colSpan={5} className="py-8 text-center text-slate-400">Belum ada transaksi</td></tr>) : transactions.map(trx => (
+                                            {loadingHistory ? (<tr><td colSpan={6} className="py-8 text-center text-slate-400">Memuat...</td></tr>) : transactions.length === 0 ? (<tr><td colSpan={6} className="py-8 text-center text-slate-400">Belum ada transaksi</td></tr>) : transactions.map(trx => (
                                                 <tr key={trx.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-4 py-4 text-sm whitespace-nowrap text-slate-600">{formatDate(trx.date)}</td>
                                                     <td className="px-4 py-4"><span className={clsx("px-2.5 py-1 text-xs font-bold rounded-lg border", trx.type === 'Deposit' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>{trx.type === 'Deposit' ? 'Setoran' : 'Ditarik'}</span></td>
                                                     <td className="px-4 py-4 text-sm text-slate-600 break-words">{trx.notes || '-'}</td>
                                                     <td className={clsx("px-4 py-4 text-sm font-bold text-right whitespace-nowrap border-r border-slate-100", trx.type === 'Deposit' ? "text-green-600" : "text-red-600")}>{trx.type === 'Deposit' ? '+' : '-'}{formatCurrency(trx.amount)}</td>
                                                     <td className="px-4 py-4 text-sm text-slate-500 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>{trx.handled_by?.name}</div></td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setEditingTrx(trx);
+                                                                setEditAmount(trx.amount.toString());
+                                                                setEditNotes(trx.notes || '');
+                                                            }}
+                                                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         {transactions.length > 0 && (
                                             <tfoot className="bg-slate-50 border-t border-slate-200">
-                                                <tr><td colSpan={3} className="px-4 py-4 text-right font-bold text-slate-700">Saldo Akhir:</td><td colSpan={2} className="px-4 py-4 text-left font-bold text-emerald-600 text-lg">{formatCurrency(historyAccount?.balance || 0)}</td></tr>
+                                                <tr><td colSpan={3} className="px-4 py-4 text-right font-bold text-slate-700">Saldo Akhir:</td><td colSpan={3} className="px-4 py-4 text-left font-bold text-emerald-600 text-lg">{formatCurrency(historyAccount?.balance || 0)}</td></tr>
                                             </tfoot>
                                         )}
                                     </table>
@@ -410,9 +449,21 @@ const Savings = () => {
                                                     </p>
                                                 </div>
                                                 {trx.notes && <p className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">{trx.notes}</p>}
-                                                <div className="flex items-center gap-2 text-xs text-slate-400 pt-1 border-t border-slate-100">
-                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>
-                                                    {trx.handled_by?.name}
+                                                <div className="flex justify-between items-center gap-2 text-xs text-slate-400 pt-1 border-t border-slate-100">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>
+                                                        {trx.handled_by?.name}
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setEditingTrx(trx);
+                                                            setEditAmount(trx.amount.toString());
+                                                            setEditNotes(trx.notes || '');
+                                                        }}
+                                                        className="flex items-center gap-1 text-emerald-600 font-bold"
+                                                    >
+                                                        <Edit2 size={14} /> Edit
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))}
@@ -423,6 +474,54 @@ const Savings = () => {
                                     </>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Transaction Modal */}
+            {editingTrx && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl border border-white/20 animate-in zoom-in-95 duration-200">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight">Koreksi Transaksi</h3>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">{editingTrx.type === 'Deposit' ? 'Setoran' : 'Penarikan'}</p>
+                            </div>
+                            <button onClick={() => setEditingTrx(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors"><X size={20} className="text-slate-400" /></button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nominal (Rp)</label>
+                                <div className="relative group">
+                                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-300 group-focus-within:text-emerald-500 transition-colors">Rp</div>
+                                    <input 
+                                        type="text" 
+                                        className="w-full pl-16 pr-5 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-black text-3xl tracking-tight text-slate-900" 
+                                        value={editAmount ? new Intl.NumberFormat('id-ID').format(Number(editAmount)) : ''}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            setEditAmount(val);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Keterangan</label>
+                                <textarea 
+                                    className="w-full p-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-bold text-slate-700 min-h-[100px]"
+                                    value={editNotes}
+                                    onChange={e => setEditNotes(e.target.value)}
+                                    placeholder="Alasan koreksi..."
+                                />
+                            </div>
+                            <button 
+                                onClick={handleUpdateTrx}
+                                disabled={savingEdit || !editAmount}
+                                className="w-full py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                            >
+                                {savingEdit ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Simpan Perubahan'}
+                            </button>
                         </div>
                     </div>
                 </div>

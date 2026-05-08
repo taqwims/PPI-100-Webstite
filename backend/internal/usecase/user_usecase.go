@@ -263,13 +263,48 @@ func (u *UserUsecase) BulkCreateUsers(rows []domain.BulkUserImportRow) (*domain.
 				Status:  "Active",
 			}
 			if err := u.studentRepo.Create(student); err != nil {
-				// Student creation failed — rollback User creation
 				u.userRepo.Delete(user.ID.String())
 				result.Failed++
 				result.Errors = append(result.Errors, domain.BulkImportRowError{
 					Row:    rowNum,
 					Email:  row.Email,
 					Reason: fmt.Sprintf("Gagal membuat record Student: %v", err),
+				})
+				continue
+			}
+		}
+
+		// Auto-create Parent record when role is Orang Tua (7)
+		if row.RoleID == parentRoleID {
+			parent := &domain.Parent{
+				UserID: user.ID,
+			}
+			if err := u.parentRepo.Create(parent); err != nil {
+				u.userRepo.Delete(user.ID.String())
+				result.Failed++
+				result.Errors = append(result.Errors, domain.BulkImportRowError{
+					Row:    rowNum,
+					Email:  row.Email,
+					Reason: fmt.Sprintf("Gagal membuat data orang tua: %v", err),
+				})
+				continue
+			}
+		}
+
+		// Auto-create Teacher record when role is Guru (4) or Wali Kelas (5)
+		if row.RoleID == 4 || row.RoleID == 5 {
+			teacher := &domain.Teacher{
+				UserID: user.ID,
+				UnitID: row.UnitID,
+				NIP:    fmt.Sprintf("NIP-%d", time.Now().UnixNano()),
+			}
+			if err := u.teacherRepo.Create(teacher); err != nil {
+				u.userRepo.Delete(user.ID.String())
+				result.Failed++
+				result.Errors = append(result.Errors, domain.BulkImportRowError{
+					Row:    rowNum,
+					Email:  row.Email,
+					Reason: fmt.Sprintf("Gagal membuat data guru: %v", err),
 				})
 				continue
 			}

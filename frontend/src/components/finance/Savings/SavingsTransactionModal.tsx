@@ -121,7 +121,16 @@ export const SavingsTransactionModal: React.FC<Props> = ({
                             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nominal (Rp)</label>
                             <div className="relative group">
                                 <div className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-300 group-focus-within:text-emerald-500 transition-colors">Rp</div>
-                                <input type="number" required min="1000" className="w-full pl-16 pr-5 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-black text-3xl tracking-tight text-slate-900" value={trxAmount} onChange={e => setTrxAmount(e.target.value)} />
+                                <input 
+                                    type="text" 
+                                    required 
+                                    className="w-full pl-16 pr-5 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-black text-3xl tracking-tight text-slate-900" 
+                                    value={trxAmount ? new Intl.NumberFormat('id-ID').format(Number(trxAmount)) : ''}
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/\D/g, '');
+                                        setTrxAmount(val ? val : '');
+                                    }} 
+                                />
                             </div>
                         </div>
                         <div>

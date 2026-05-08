@@ -65,6 +65,10 @@ func (u *FinanceExtendedUsecase) ProcessSavingTransaction(studentID, handledByID
 	return u.financeRepo.ProcessSavingTransaction(studentID, handledByID, txnType, amount, notes)
 }
 
+func (u *FinanceExtendedUsecase) UpdateSavingTransaction(id uuid.UUID, amount float64, notes string) error {
+	return u.financeRepo.UpdateSavingTransaction(id, amount, notes)
+}
+
 func (u *FinanceExtendedUsecase) GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error) {
 	return u.financeRepo.GetStudentSavingAccount(studentID)
 }

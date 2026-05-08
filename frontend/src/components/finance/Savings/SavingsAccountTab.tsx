@@ -47,6 +47,14 @@ export const SavingsAccountTab: React.FC<Props> = ({
         return acc;
     }, {} as Record<string, { accounts: SavingAccount[], totalBalance: number }>);
 
+    // Sort classes naturally
+    const sortedClassNames = Object.keys(groupedAccounts).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+    // Sort students alphabetically within each class
+    sortedClassNames.forEach(className => {
+        groupedAccounts[className].accounts.sort((a, b) => (a.student?.user?.name || '').localeCompare(b.student?.user?.name || ''));
+    });
+
     const toggleClass = (className: string) => {
         setExpandedClasses(prev => {
             const next = new Set(prev);
@@ -116,7 +124,8 @@ export const SavingsAccountTab: React.FC<Props> = ({
                             <button onClick={expandAll} className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-colors">Buka Semua</button>
                             <button onClick={collapseAll} className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 transition-colors">Tutup Semua</button>
                         </div>
-                        {Object.entries(groupedAccounts).map(([className, data]) => {
+                        {sortedClassNames.map((className) => {
+                            const data = groupedAccounts[className];
                             const isExpanded = expandedClasses.has(className);
                             return (
                                 <div key={className} className="bg-white/40 backdrop-blur-xl rounded-[2.5rem] border border-white/60 shadow-xl shadow-slate-200/50 overflow-hidden transition-all duration-300">
@@ -155,6 +164,7 @@ export const SavingsAccountTab: React.FC<Props> = ({
                                                 <table className="w-full text-left">
                                                     <thead>
                                                         <tr className="bg-slate-50/50">
+                                                            <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] w-16">No.</th>
                                                             <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Siswa</th>
                                                             <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">NISN</th>
                                                             <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Saldo</th>
@@ -162,8 +172,9 @@ export const SavingsAccountTab: React.FC<Props> = ({
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-50/50">
-                                                        {data.accounts.map(account => (
+                                                        {data.accounts.map((account, index) => (
                                                             <tr key={account.id} className="group hover:bg-emerald-50/30 transition-all duration-300">
+                                                                <td className="px-8 py-5 text-sm font-bold text-slate-400">{index + 1}.</td>
                                                                 <td className="px-8 py-5">
                                                                     <div className="flex items-center gap-4">
                                                                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 font-black shrink-0 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
@@ -193,12 +204,15 @@ export const SavingsAccountTab: React.FC<Props> = ({
 
                                             {/* Mobile Cards */}
                                             <div className="md:hidden divide-y divide-slate-100/50">
-                                                {data.accounts.map(account => (
+                                                {data.accounts.map((account, index) => (
                                                     <div key={account.id} className="p-6 space-y-4 hover:bg-slate-50/30 transition-colors">
                                                         <div className="flex justify-between items-start">
-                                                            <div className="space-y-0.5">
-                                                                <p className="font-black text-slate-900 text-sm leading-tight">{account.student?.user?.name}</p>
-                                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{account.student?.nisn}</p>
+                                                            <div className="flex gap-3">
+                                                                <span className="text-xs font-bold text-slate-300 mt-1">{index + 1}.</span>
+                                                                <div className="space-y-0.5">
+                                                                    <p className="font-black text-slate-900 text-sm leading-tight">{account.student?.user?.name}</p>
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{account.student?.nisn}</p>
+                                                                </div>
                                                             </div>
                                                             <p className={clsx("text-base font-black tracking-tight", account.balance > 0 ? "text-emerald-600" : "text-slate-300")}>
                                                                 {formatCurrency(account.balance)}
