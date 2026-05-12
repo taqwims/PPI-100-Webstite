@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Edit, Trash2, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react';
+import ConfirmDialog from '../../ui/ConfirmDialog';
 import clsx from 'clsx';
 import { Budget } from './types';
 
@@ -25,6 +26,12 @@ export const RKASTable: React.FC<RKASTableProps> = ({
     isLoading, budgetTypeTab, groupedBudgets, canEdit, onEdit, onDelete, onRealize
 }) => {
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void }>({
+        title: '',
+        message: '',
+        onConfirm: () => {}
+    });
 
     const toggleGroup = (standarName: string) => {
         setExpandedGroups(prev => ({ ...prev, [standarName]: !prev[standarName] }));
@@ -122,13 +129,39 @@ export const RKASTable: React.FC<RKASTableProps> = ({
                                                         {canEdit && !isMulti && (
                                                             <>
                                                                 <button onClick={() => onEdit(b)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><Edit size={14} /></button>
-                                                                <button onClick={() => { if (window.confirm('Hapus anggaran ini?')) onDelete(b.id); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><Trash2 size={14} /></button>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setConfirmAction({
+                                                                            title: 'Hapus Anggaran?',
+                                                                            message: 'Apakah Anda yakin ingin menghapus item anggaran ini?',
+                                                                            onConfirm: () => { onDelete(b.id); setIsConfirmOpen(false); }
+                                                                        });
+                                                                        setIsConfirmOpen(true);
+                                                                    }} 
+                                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" 
+                                                                    title="Hapus"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
                                                                 <button onClick={() => onRealize(b.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Input Realisasi"><TrendingUp size={14} /></button>
                                                             </>
                                                         )}
                                                         {canEdit && isMulti && (
                                                             <>
-                                                                <button onClick={() => { if (window.confirm('Hapus semua anggaran bulan ini?')) { b.ids.forEach((id: string) => onDelete(id)); } }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus Semua"><Trash2 size={14} /></button>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setConfirmAction({
+                                                                            title: 'Hapus Semua Anggaran?',
+                                                                            message: `Apakah Anda yakin ingin menghapus semua (${b.ids.length}) item anggaran untuk ${b.item_name}?`,
+                                                                            onConfirm: () => { b.ids.forEach((id: string) => onDelete(id)); setIsConfirmOpen(false); }
+                                                                        });
+                                                                        setIsConfirmOpen(true);
+                                                                    }} 
+                                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" 
+                                                                    title="Hapus Semua"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
                                                             </>
                                                         )}
                                                     </div>
@@ -142,6 +175,15 @@ export const RKASTable: React.FC<RKASTableProps> = ({
                     </tbody>
                 </table>
             </div>
+
+            <ConfirmDialog 
+                isOpen={isConfirmOpen}
+                onClose={() => setIsConfirmOpen(false)}
+                onConfirm={confirmAction.onConfirm}
+                title={confirmAction.title}
+                message={confirmAction.message}
+                variant="danger"
+            />
         </div>
     );
 };

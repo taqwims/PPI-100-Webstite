@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface ExternalDebt {
     id: string;
@@ -63,6 +64,8 @@ const ExternalDebts: React.FC = () => {
         notes: ''
     });
 
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [debtToDelete, setDebtToDelete] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     // Print Options
@@ -168,13 +171,18 @@ const ExternalDebts: React.FC = () => {
         }
     };
 
-    const handleDeleteDebt = async (id: string) => {
-        if (!window.confirm("Yakin ingin menghapus catatan hutang ini? (Hanya dapat dihapus bila belum ada pembayaran)")) return;
+    const handleDeleteDebt = async () => {
+        if (!debtToDelete) return;
+        setSubmitting(true);
         try {
-            await api.delete(`/finance/debts/${id}`);
+            await api.delete(`/finance/debts/${debtToDelete}`);
             toast.success("Hutang berhasil dihapus");
             fetchDebts();
+            setIsConfirmOpen(false);
+            setDebtToDelete(null);
         } catch (error: any) {
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -389,7 +397,7 @@ const ExternalDebts: React.FC = () => {
                                                             <button onClick={() => handleOpenForm(debt)} className="p-1.5 text-slate-400 hover:text-blue-600 transition">
                                                                 <PenSquare size={16} />
                                                             </button>
-                                                            <button onClick={() => handleDeleteDebt(debt.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition" disabled={debt.paid_amount > 0}>
+                                                            <button onClick={() => { setDebtToDelete(debt.id); setIsConfirmOpen(true); }} className="p-1.5 text-slate-400 hover:text-red-600 transition" disabled={debt.paid_amount > 0}>
                                                                 <Trash2 size={16} />
                                                             </button>
                                                             </>
@@ -586,6 +594,17 @@ const ExternalDebts: React.FC = () => {
                 onClose={() => setIsPrintModalOpen(false)}
                 onConfirm={handleConfirmPrint}
                 title="Cetak Bukti Pembayaran Hutang"
+            />
+            <ConfirmDialog 
+                isOpen={isConfirmOpen}
+                onClose={() => { setIsConfirmOpen(false); setDebtToDelete(null); }}
+                onConfirm={handleDeleteDebt}
+                title="Hapus Catatan Hutang?"
+                message="Apakah Anda yakin ingin menghapus catatan hutang ini? Aksi ini hanya dapat dilakukan jika belum ada pembayaran yang tercatat."
+                confirmText="Ya, Hapus"
+                cancelText="Batal"
+                variant="danger"
+                isLoading={submitting}
             />
         </div>
     );

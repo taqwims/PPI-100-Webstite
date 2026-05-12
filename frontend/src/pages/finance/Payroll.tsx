@@ -11,6 +11,7 @@ import { PayrollCardMobile } from '../../components/finance/Payroll/PayrollCardM
 import { PayrollFormModal } from '../../components/finance/Payroll/PayrollFormModal';
 import { PayrollTemplateModal } from '../../components/finance/Payroll/PayrollTemplateModal';
 import { UserData, PayrollRecord, PayrollTemplate } from '../../components/finance/Payroll/types';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
@@ -43,6 +44,23 @@ const Payroll = () => {
     // Print Options
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
     const [payrollToPrint, setPayrollToPrint] = useState<PayrollRecord | null>(null);
+
+    // Confirm Dialog State
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        isLoading: boolean;
+        variant: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+        isLoading: false,
+        variant: 'danger'
+    });
 
     useEffect(() => {
         fetchPayrolls();
@@ -111,26 +129,50 @@ const Payroll = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('Yakin ingin menghapus slip gaji ini?')) return;
-        try {
-            await api.delete(`/finance/payroll/${id}`);
-            toast.success("Slip gaji dihapus!");
-            fetchPayrolls();
-        } catch (error: any) {
-            console.error(error);
-        }
+    const handleDelete = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Hapus Slip Gaji?',
+            message: 'Apakah Anda yakin ingin menghapus slip gaji ini? Data yang sudah dihapus tidak dapat dikembalikan.',
+            variant: 'danger',
+            isLoading: false,
+            onConfirm: async () => {
+                setConfirmConfig(prev => ({ ...prev, isLoading: true }));
+                try {
+                    await api.delete(`/finance/payroll/${id}`);
+                    toast.success("Slip gaji dihapus!");
+                    fetchPayrolls();
+                    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                } catch (error: any) {
+                    console.error(error);
+                } finally {
+                    setConfirmConfig(prev => ({ ...prev, isLoading: false }));
+                }
+            }
+        });
     };
 
-    const handlePay = async (id: string) => {
-        if (!window.confirm('Verifikasi status menjadi LUNAS? Tindakan ini akan otomatis mencatat pengeluaran di Buku Kas.')) return;
-        try {
-            await api.post(`/finance/payroll/${id}/pay`);
-            toast.success("Gaji berhasil dilunasi dan tercatat sebagai pengeluaran otomatis.");
-            fetchPayrolls();
-        } catch (error: any) {
-            console.error(error);
-        }
+    const handlePay = (id: string) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Verifikasi Pelunasan?',
+            message: 'Verifikasi status menjadi LUNAS? Tindakan ini akan otomatis mencatat pengeluaran di Buku Kas sesuai dengan nominal gaji bersih.',
+            variant: 'info',
+            isLoading: false,
+            onConfirm: async () => {
+                setConfirmConfig(prev => ({ ...prev, isLoading: true }));
+                try {
+                    await api.post(`/finance/payroll/${id}/pay`);
+                    toast.success("Gaji berhasil dilunasi dan tercatat sebagai pengeluaran otomatis.");
+                    fetchPayrolls();
+                    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                } catch (error: any) {
+                    console.error(error);
+                } finally {
+                    setConfirmConfig(prev => ({ ...prev, isLoading: false }));
+                }
+            }
+        });
     };
 
     const handlePrintClick = (p: PayrollRecord) => {
@@ -332,6 +374,15 @@ const Payroll = () => {
                 onClose={() => setIsPrintModalOpen(false)}
                 onConfirm={handleConfirmPrint}
                 title="Cetak Slip Gaji Pegawai"
+            />
+            <ConfirmDialog 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                isLoading={confirmConfig.isLoading}
             />
         </div>
     );

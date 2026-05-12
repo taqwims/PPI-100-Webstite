@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { RefreshCw, PenSquare, FileText, CheckCircle, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Stakeholder {
     id: string;
@@ -34,6 +35,10 @@ const InvoiceConfigPage: React.FC = () => {
     const [invoiceConfigs, setInvoiceConfigs] = useState<InvoiceConfig[]>([]);
     const [waTemplates, setWATemplates] = useState<WATemplate[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [configToReset, setConfigToReset] = useState<string | null>(null);
+    const [isResetting, setIsResetting] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -74,13 +79,18 @@ const InvoiceConfigPage: React.FC = () => {
         }
     };
 
-    const handleResetCounter = async (id: string) => {
-        if (!window.confirm("Yakin ingin me-reset (mengulang dari 0) urutan nomor dokumen ini?")) return;
+    const handleResetCounter = async () => {
+        if (!configToReset) return;
+        setIsResetting(true);
         try {
-            await api.post(`/finance/invoice-configs/${id}/reset`);
+            await api.post(`/finance/invoice-configs/${configToReset}/reset`);
             toast.success("Urutan dokumen berhasil di-reset");
             fetchData();
+            setIsConfirmOpen(false);
+            setConfigToReset(null);
         } catch (error) {
+        } finally {
+            setIsResetting(false);
         }
     };
 
@@ -256,7 +266,7 @@ const InvoiceConfigPage: React.FC = () => {
                                         Contoh: {cfg.prefix || ''}{cfg.separator || ''}{cfg.include_date ? '202604' : ''}{cfg.separator || ''}{'0'.repeat(Math.max(0, (cfg.counter_length || 1) - 1))}1
                                     </div>
                                     <button 
-                                        onClick={() => handleResetCounter(cfg.id)}
+                                        onClick={() => { setConfigToReset(cfg.id); setIsConfirmOpen(true); }}
                                         className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition"
                                     >
                                         <RefreshCw size={12} /> Reset Nomor Urut
@@ -267,6 +277,18 @@ const InvoiceConfigPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <ConfirmDialog 
+                isOpen={isConfirmOpen}
+                onClose={() => { setIsConfirmOpen(false); setConfigToReset(null); }}
+                onConfirm={handleResetCounter}
+                title="Reset Nomor Urut?"
+                message="Apakah Anda yakin ingin me-reset urutan nomor dokumen ini? Urutan akan kembali ke 0. Aksi ini tidak dapat dibatalkan."
+                confirmText="Ya, Reset"
+                cancelText="Batal"
+                variant="danger"
+                isLoading={isResetting}
+            />
         </div>
     );
 };

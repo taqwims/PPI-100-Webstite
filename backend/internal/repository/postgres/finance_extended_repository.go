@@ -195,6 +195,36 @@ func (r *financeExtendedRepository) UpdateSavingTransaction(id uuid.UUID, amount
 	})
 }
 
+func (r *financeExtendedRepository) DeleteSavingTransaction(id uuid.UUID) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var txn domain.SavingTransaction
+		if err := tx.Where("id = ?", id).First(&txn).Error; err != nil {
+			return err
+		}
+
+		var account domain.SavingAccount
+		if err := tx.Where("id = ?", txn.AccountID).First(&account).Error; err != nil {
+			return err
+		}
+
+		// Reverse the transaction amount from balance
+		if txn.Type == "Deposit" {
+			if account.Balance < txn.Amount {
+				return fmt.Errorf("tidak dapat menghapus setoran: saldo tidak mencukupi untuk penarikan balik")
+			}
+			account.Balance -= txn.Amount
+		} else {
+			account.Balance += txn.Amount
+		}
+
+		if err := tx.Save(&account).Error; err != nil {
+			return err
+		}
+
+		return tx.Delete(&txn).Error
+	})
+}
+
 func (r *financeExtendedRepository) GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error) {
 	var account domain.SavingAccount
 	if err := r.db.Preload("Student").Where("student_id = ?", studentID).First(&account).Error; err != nil {
@@ -593,11 +623,13 @@ func (r *financeExtendedRepository) GetSavingsRecap(params domain.SavingsRecapPa
 	var startDate, endDate time.Time
 	var periodLabel string
 
+	monthNames := []string{"", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"}
+
 	switch params.PeriodType {
 	case "daily":
 		startDate = time.Date(params.StartDate.Year(), params.StartDate.Month(), params.StartDate.Day(), 0, 0, 0, 0, time.UTC)
 		endDate = time.Date(params.StartDate.Year(), params.StartDate.Month(), params.StartDate.Day(), 23, 59, 59, 0, time.UTC)
-		periodLabel = fmt.Sprintf("Harian: %s", startDate.Format("02 Januari 2006"))
+		periodLabel = fmt.Sprintf("Harian: %02d %s %d", startDate.Day(), monthNames[int(startDate.Month())], startDate.Year())
 	case "monthly":
 		startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
 		endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)
@@ -605,7 +637,9 @@ func (r *financeExtendedRepository) GetSavingsRecap(params domain.SavingsRecapPa
 	case "range":
 		startDate = params.StartDate
 		endDate = params.EndDate
-		periodLabel = fmt.Sprintf("%s s/d %s", startDate.Format("02 Jan 2006"), endDate.Format("02 Jan 2006"))
+		periodLabel = fmt.Sprintf("%02d %s %d s/d %02d %s %d", 
+			startDate.Day(), monthNames[int(startDate.Month())][:3], startDate.Year(),
+			endDate.Day(), monthNames[int(endDate.Month())][:3], endDate.Year())
 	case "semester":
 		if params.Semester == 1 {
 			// Semester 1 = Juli–Desember

@@ -88,6 +88,7 @@ func RegisterFinanceRoutes(
 			finance.GET("/savings", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetAllSavingAccounts)
 			finance.POST("/savings/transactions", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.ProcessSavingTransaction)
 			finance.PUT("/savings/transactions/:id", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.UpdateSavingTransaction)
+			finance.DELETE("/savings/transactions/:id", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.DeleteSavingTransaction)
 			finance.POST("/savings/transfer", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.TransferSavings)
 			finance.GET("/savings/transactions/:account_id", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingTransactions)
 			finance.GET("/savings/my", middleware.RoleMiddleware(6, 7), financeExtendedHandler.GetMySavings)

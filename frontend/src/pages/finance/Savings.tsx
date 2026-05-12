@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
-import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download, Edit2 } from 'lucide-react';
+import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download, Edit2, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
 import { generatePiutangInvoice } from '../../utils/piutangInvoice';
 
 import SavingsRecap from './SavingsRecap';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 import { SavingsAccountTab } from '../../components/finance/Savings/SavingsAccountTab';
 import { SavingsOperationalTab } from '../../components/finance/Savings/SavingsOperationalTab';
@@ -70,6 +72,10 @@ const Savings = () => {
     const [editAmount, setEditAmount] = useState('');
     const [editNotes, setEditNotes] = useState('');
     const [savingEdit, setSavingEdit] = useState(false);
+
+    // Confirm Delete Dialog
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [trxToDelete, setTrxToDelete] = useState<SavingTransaction | null>(null);
 
     const fetchAccounts = useCallback(async (classId?: string) => {
         setLoading(true);
@@ -169,7 +175,30 @@ const Savings = () => {
                 fetchAccounts(classFilter || undefined);
             }
             setEditingTrx(null);
-        } catch (error) { console.error(error); alert('Gagal mengupdate transaksi'); }
+        } catch (error) { console.error(error); toast.error('Gagal mengupdate transaksi'); }
+        finally { setSavingEdit(false); }
+    };
+
+    const handleDeleteTrx = async () => {
+        const trx = trxToDelete || editingTrx;
+        if (!trx) return;
+        
+        setSavingEdit(true);
+        try {
+            await api.delete(`/finance/savings/transactions/${trx.id}`);
+            // Refresh history
+            if (historyAccount) {
+                const res = await api.get(`/finance/savings/transactions/${historyAccount.id}`);
+                setTransactions(res.data || []);
+                // Refresh pool summary and accounts
+                fetchPoolSummary();
+                fetchAccounts(classFilter || undefined);
+            }
+            setEditingTrx(null);
+            setIsConfirmOpen(false);
+            setTrxToDelete(null);
+            toast.success('Transaksi berhasil dihapus');
+        } catch (error) { console.error(error); toast.error('Gagal menghapus transaksi'); }
         finally { setSavingEdit(false); }
     };
 
@@ -515,17 +544,41 @@ const Savings = () => {
                                     placeholder="Alasan koreksi..."
                                 />
                             </div>
-                            <button 
-                                onClick={handleUpdateTrx}
-                                disabled={savingEdit || !editAmount}
-                                className="w-full py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                            >
-                                {savingEdit ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Simpan Perubahan'}
-                            </button>
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => {
+                                        setTrxToDelete(editingTrx);
+                                        setIsConfirmOpen(true);
+                                    }}
+                                    disabled={savingEdit}
+                                    className="flex-1 py-5 bg-white text-rose-600 border-2 border-rose-100 rounded-[1.5rem] font-black text-lg hover:bg-rose-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    <Trash2 size={20} />
+                                    <span>Hapus</span>
+                                </button>
+                                <button 
+                                    onClick={handleUpdateTrx}
+                                    disabled={savingEdit || !editAmount}
+                                    className="flex-[2] py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                >
+                                    {savingEdit ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Simpan Perubahan'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+            <ConfirmDialog 
+                isOpen={isConfirmOpen}
+                onClose={() => { setIsConfirmOpen(false); setTrxToDelete(null); }}
+                onConfirm={handleDeleteTrx}
+                title="Hapus Transaksi?"
+                message="Apakah Anda yakin ingin menghapus transaksi ini? Saldo siswa akan dikembalikan secara otomatis. Tindakan ini tidak dapat dibatalkan."
+                confirmText="Ya, Hapus"
+                cancelText="Batal"
+                variant="danger"
+                isLoading={savingEdit}
+            />
         </div>
     );
 };

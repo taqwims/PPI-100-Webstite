@@ -24,6 +24,7 @@ type FinanceExtendedRepository interface {
 	GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error)
 	GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error)
 	UpdateSavingTransaction(id uuid.UUID, amount float64, notes string) error
+	DeleteSavingTransaction(id uuid.UUID) error
 
 
 	AddCashLedgerEntry(req *domain.CashLedger) error

@@ -4,6 +4,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import type { SchoolBankAccount } from '../../store/featureStore';
 import { useFeatureStore } from '../../store/featureStore';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const SchoolBankAccounts: React.FC = () => {
     const [accounts, setAccounts] = useState<SchoolBankAccount[]>([]);
@@ -12,6 +13,10 @@ const SchoolBankAccounts: React.FC = () => {
     const [editingAccount, setEditingAccount] = useState<SchoolBankAccount | null>(null);
     const [form, setForm] = useState({ bank_name: '', account_number: '', account_holder: '', is_active: true });
     const fetchFeatures = useFeatureStore((s) => s.fetchFeatures);
+
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [accountToDelete, setAccountToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchAccounts = async () => {
         try {
@@ -63,15 +68,20 @@ const SchoolBankAccounts: React.FC = () => {
         }
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('Yakin ingin menghapus rekening ini?')) return;
+    const handleDelete = async () => {
+        if (!accountToDelete) return;
+        setIsDeleting(true);
         try {
-            await api.delete(`/finance/bank-accounts/${id}`);
+            await api.delete(`/finance/bank-accounts/${accountToDelete}`);
             toast.success('Rekening berhasil dihapus');
             fetchAccounts();
             fetchFeatures();
+            setIsConfirmOpen(false);
+            setAccountToDelete(null);
         } catch (err: any) {
             toast.error(err?.response?.data?.error || 'Gagal menghapus rekening');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -188,7 +198,7 @@ const SchoolBankAccounts: React.FC = () => {
                                         <Edit2 size={16} />
                                     </button>
                                     <button
-                                        onClick={() => handleDelete(account.id)}
+                                        onClick={() => { setAccountToDelete(account.id); setIsConfirmOpen(true); }}
                                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Hapus"
                                     >
@@ -275,6 +285,18 @@ const SchoolBankAccounts: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog 
+                isOpen={isConfirmOpen}
+                onClose={() => { setIsConfirmOpen(false); setAccountToDelete(null); }}
+                onConfirm={handleDelete}
+                title="Hapus Rekening?"
+                message="Apakah Anda yakin ingin menghapus rekening bank ini? Aksi ini tidak dapat dibatalkan."
+                confirmText="Ya, Hapus"
+                cancelText="Batal"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };
