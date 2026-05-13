@@ -3,6 +3,7 @@ import api from '../../services/api';
 import { Filter, Download, FileText, BarChart3 } from 'lucide-react';
 import clsx from 'clsx';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { drawStandardHeader, addPageFooters } from '../../utils/invoiceTemplate';
 
 interface ClassData { id: number; name: string; }
@@ -113,13 +114,20 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
         if (!recapData || !recapData.rows?.length) return;
 
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pageWidth = doc.internal.pageSize.getWidth();
         const label = recapData.period || periodLabel();
+
+        const now = new Date();
+        const timestamp = now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0');
+        const recapNumber = `RKP-${timestamp}`;
 
         let y = drawStandardHeader(doc, {
             title: 'REKAP TABUNGAN',
             subtitle: label,
-            invoiceNumber: '',
+            invoiceNumber: recapNumber,
         });
 
         // Period label row
@@ -127,60 +135,55 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.text(`Periode: ${label}`, 14, y);
-        y += 8;
+        y += 5;
 
-        // Table header
-        const colX = { no: 14, name: 22, kelas: 90, deposit: 125, withdraw: 158, balance: 196 };
-        const tableW = pageWidth - 28;
+        const tableBody: any[][] = recapData.rows.map((row, idx) => [
+            idx + 1,
+            row.student_name,
+            row.class_name || '-',
+            formatCurrency(row.total_deposit),
+            formatCurrency(row.total_withdraw),
+            formatCurrency(row.end_balance),
+        ]);
 
-        doc.setFillColor(15, 23, 42);
-        doc.rect(14, y, tableW, 7, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'bold');
-        doc.text('No.', colX.no + 1, y + 4.5);
-        doc.text('Nama Siswa', colX.name, y + 4.5);
-        doc.text('Kelas', colX.kelas, y + 4.5);
-        doc.text('Total Setoran', colX.deposit, y + 4.5, { align: 'right' });
-        doc.text('Total Penarikan', colX.withdraw, y + 4.5, { align: 'right' });
-        doc.text('Saldo Akhir', colX.balance, y + 4.5, { align: 'right' });
-        y += 7;
+        // Add Grand Total Row
+        tableBody.push([
+            { content: 'TOTAL', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: [255, 255, 255] } },
+            { content: formatCurrency(recapData.grand_deposit), styles: { halign: 'right', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: [255, 255, 255] } },
+            { content: formatCurrency(recapData.grand_withdraw), styles: { halign: 'right', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: [255, 255, 255] } },
+            { content: formatCurrency(recapData.grand_balance), styles: { halign: 'right', fontStyle: 'bold', fillColor: [15, 23, 42], textColor: [255, 255, 255] } },
+        ]);
 
-        // Table rows
-        recapData.rows.forEach((row, idx) => {
-            if (y + 7 > doc.internal.pageSize.getHeight() - 20) {
-                doc.addPage();
-                y = 20;
+        autoTable(doc, {
+            startY: y,
+            head: [['No.', 'Nama Siswa', 'Kelas', 'Total Setoran', 'Total Penarikan', 'Saldo Akhir']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: {
+                fillColor: [15, 23, 42],
+                textColor: [255, 255, 255],
+                fontSize: 8,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                fontSize: 7.5,
+                textColor: [30, 41, 59],
+            },
+            columnStyles: {
+                0: { cellWidth: 10, halign: 'center' },
+                1: { cellWidth: 'auto' },
+                2: { cellWidth: 'auto' },
+                3: { halign: 'right' },
+                4: { halign: 'right' },
+                5: { halign: 'right' },
+            },
+            margin: { left: 14, right: 14 },
+            didDrawPage: () => {
+                addPageFooters(doc);
             }
-            const rowBg = idx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
-            doc.setFillColor(rowBg[0], rowBg[1], rowBg[2]);
-            doc.rect(14, y, tableW, 7, 'F');
-
-            doc.setTextColor(30, 41, 59);
-            doc.setFontSize(7);
-            doc.setFont('helvetica', 'normal');
-            doc.text(String(idx + 1), colX.no + 1, y + 4.5);
-            doc.text(row.student_name, colX.name, y + 4.5);
-            doc.text(row.class_name || '-', colX.kelas, y + 4.5);
-            doc.setFont('helvetica', 'bold');
-            doc.text(formatCurrency(row.total_deposit), colX.deposit, y + 4.5, { align: 'right' });
-            doc.text(formatCurrency(row.total_withdraw), colX.withdraw, y + 4.5, { align: 'right' });
-            doc.text(formatCurrency(row.end_balance), colX.balance, y + 4.5, { align: 'right' });
-            y += 7;
         });
 
-        // Grand total row
-        doc.setFillColor(15, 23, 42);
-        doc.rect(14, y, tableW, 8, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL', colX.name, y + 5.5);
-        doc.text(formatCurrency(recapData.grand_deposit), colX.deposit, y + 5.5, { align: 'right' });
-        doc.text(formatCurrency(recapData.grand_withdraw), colX.withdraw, y + 5.5, { align: 'right' });
-        doc.text(formatCurrency(recapData.grand_balance), colX.balance, y + 5.5, { align: 'right' });
-
-        addPageFooters(doc);
         doc.save(`rekap-tabungan-${label.replace(/\s/g, '-')}.pdf`);
     };
 

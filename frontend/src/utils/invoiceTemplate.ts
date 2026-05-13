@@ -109,11 +109,14 @@ export function drawStandardHeader(
     }
 
     // Invoice number
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, options.subtitle ? 65 : 60, { align: 'center' });
+    if (options.invoiceNumber) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, options.subtitle ? 65 : 60, { align: 'center' });
+    }
 
-    return options.subtitle ? 70 : 65;
+    const nextY = options.invoiceNumber ? (options.subtitle ? 70 : 65) : (options.subtitle ? 64 : 58);
+    return nextY;
 }
 
 // ─── A5 Header (for receipts) ───
