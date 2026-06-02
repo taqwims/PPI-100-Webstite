@@ -11,6 +11,8 @@ type WATemplateUsecase interface {
 	GetAll() ([]domain.WATemplate, error)
 	Update(id uint, req *domain.WATemplate) error
 	Delete(id uint) error
+	GetNotificationSettings() ([]domain.SchoolSetting, error)
+	UpdateNotificationSettings(settings []domain.SchoolSetting) error
 }
 
 type waTemplateUsecase struct {
@@ -47,4 +49,12 @@ func (u *waTemplateUsecase) Update(id uint, req *domain.WATemplate) error {
 
 func (u *waTemplateUsecase) Delete(id uint) error {
 	return u.repo.Delete(id)
+}
+
+func (u *waTemplateUsecase) GetNotificationSettings() ([]domain.SchoolSetting, error) {
+	return u.repo.GetNotificationSettings()
+}
+
+func (u *waTemplateUsecase) UpdateNotificationSettings(settings []domain.SchoolSetting) error {
+	return u.repo.UpdateNotificationSettings(settings)
 }

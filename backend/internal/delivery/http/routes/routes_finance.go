@@ -203,6 +203,8 @@ func RegisterFinanceRoutes(
 			finance.GET("/wa-templates", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.GetAll)
 			finance.PUT("/wa-templates/:id", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.Update)
 			finance.DELETE("/wa-templates/:id", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.Delete)
+			finance.GET("/notification-settings", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.GetNotificationSettings)
+			finance.PUT("/notification-settings", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.UpdateNotificationSettings)
 		}
 
 		// ── Invoice Signatures & Config (always available) ──

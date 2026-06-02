@@ -78,6 +78,16 @@ func (r *SchoolSettingRepository) Seed(defaults map[string]string) error {
 		{Key: "landing_about_desc", Value: "Fasilitas modern dan kurikulum terintegrasi untuk mendukung perkembangan santri secara holistik.", Description: "Deskripsi Bagian Tentang Kami", IsAdminEdit: true},
 		{Key: "landing_cta_title", Value: "Siap Bergabung Menjadi Bagian dari Keluarga Besar Kami?", Description: "Judul Call to Action (CTA)", IsAdminEdit: true},
 		{Key: "landing_cta_desc", Value: "Pendaftaran Santri Baru Tahun Ajaran 2025/2026 telah dibuka. Segera daftarkan putra-putri Anda.", Description: "Deskripsi Call to Action (CTA)", IsAdminEdit: true},
+		{Key: "enable_wa_notifications", Value: "true", Description: "Aktifkan Notifikasi WhatsApp", IsAdminEdit: true},
+		{Key: "fonnte_token", Value: defaults["fonnte_token"], Description: "Token API Fonnte", IsAdminEdit: true},
+		{Key: "app_notif_bill_student_title", Value: "Tagihan Baru", Description: "Judul Notifikasi Tagihan Baru (Siswa)", IsAdminEdit: true},
+		{Key: "app_notif_bill_student_body", Value: "Anda memiliki tagihan baru: {nama_tagihan}", Description: "Konten Notifikasi Tagihan Baru (Siswa)", IsAdminEdit: true},
+		{Key: "app_notif_bill_parent_title", Value: "Tagihan Baru untuk Anak Anda", Description: "Judul Notifikasi Tagihan Baru (Wali)", IsAdminEdit: true},
+		{Key: "app_notif_bill_parent_body", Value: "Tagihan baru untuk {nama_siswa}: {nama_tagihan}", Description: "Konten Notifikasi Tagihan Baru (Wali)", IsAdminEdit: true},
+		{Key: "app_notif_payment_student_title", Value: "Pembayaran Berhasil", Description: "Judul Notifikasi Pembayaran Berhasil (Siswa)", IsAdminEdit: true},
+		{Key: "app_notif_payment_student_body", Value: "Pembayaran {nama_tagihan} sebesar {nominal} telah diverifikasi.", Description: "Konten Notifikasi Pembayaran Berhasil (Siswa)", IsAdminEdit: true},
+		{Key: "app_notif_payment_parent_title", Value: "Pembayaran Tagihan Anak Berhasil", Description: "Judul Notifikasi Pembayaran Berhasil (Wali)", IsAdminEdit: true},
+		{Key: "app_notif_payment_parent_body", Value: "Pembayaran {nama_tagihan} untuk {nama_siswa} sebesar {nominal} telah diverifikasi.", Description: "Konten Notifikasi Pembayaran Berhasil (Wali)", IsAdminEdit: true},
 	}
 
 	for _, s := range seedSettings {

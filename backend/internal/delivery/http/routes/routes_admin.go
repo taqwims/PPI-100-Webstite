@@ -55,6 +55,7 @@ func RegisterAdminRoutes(
 	{
 		notifications.GET("/", notificationHandler.GetNotifications)
 		notifications.GET("/all", notificationHandler.GetAllNotifications)
+		notifications.PUT("/read-all", notificationHandler.MarkAllAsRead)
 		notifications.PUT("/:id/read", notificationHandler.MarkAsRead)
 		notifications.POST("/", notificationHandler.SendNotification)
 		notifications.DELETE("/:id", notificationHandler.DeleteNotification)

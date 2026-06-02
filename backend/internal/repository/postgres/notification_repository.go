@@ -59,3 +59,21 @@ func (r *NotificationRepository) GetDefaultWATemplate() (*domain.WATemplate, err
 	}
 	return &template, nil
 }
+
+func (r *NotificationRepository) MarkAllAsRead(userID string) error {
+	return r.db.Model(&domain.Notification{}).Where("user_id = ? AND is_read = ?", userID, false).Update("is_read", true).Error
+}
+
+func (r *NotificationRepository) GetSettingValue(key string, defaultValue string) string {
+	var setting domain.SchoolSetting
+	err := r.db.Where("key = ?", key).First(&setting).Error
+	if err != nil {
+		return defaultValue
+	}
+	return setting.Value
+}
+
+func (r *NotificationRepository) IsWAEnabled() bool {
+	return r.GetSettingValue("enable_wa_notifications", "true") == "true"
+}
+

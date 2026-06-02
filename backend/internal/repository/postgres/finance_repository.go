@@ -411,3 +411,13 @@ func (r *FinanceRepository) ApprovePaymentAtomically(
 		return nil
 	})
 }
+
+func (r *FinanceRepository) GetSettingValue(key string, defaultValue string) string {
+	var setting domain.SchoolSetting
+	err := r.db.Where("key = ?", key).First(&setting).Error
+	if err != nil {
+		return defaultValue
+	}
+	return setting.Value
+}
+

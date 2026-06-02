@@ -298,25 +298,14 @@ func (u *MidtransUsecase) processPaymentStatus(orderID string, transactionStatus
 			_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
 
 			// Send notifications
-			_ = u.notificationUsecase.SendNotification(
-				bill.Student.UserID,
-				"Pembayaran Berhasil",
-				fmt.Sprintf("Pembayaran %s sebesar Rp%.0f via Midtrans telah berhasil.", bill.Title, payment.Amount),
-				"payment",
-				bill.ID.String(),
-			)
-
+			var parent *domain.Parent
 			if bill.Student.ParentID != nil {
-				parent, err := u.studentRepo.GetParentByID(bill.Student.ParentID.String())
-				if err == nil {
-					_ = u.notificationUsecase.SendNotification(
-						parent.UserID,
-						"Pembayaran Tagihan Anak Berhasil",
-						fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f via Midtrans telah berhasil.", bill.Title, bill.Student.User.Name, payment.Amount),
-						"payment",
-						bill.ID.String(),
-					)
-				}
+				parent, _ = u.studentRepo.GetParentByID(bill.Student.ParentID.String())
+			}
+			u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
+
+			if parent != nil {
+				u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount)
 			}
 
 			// Sync payment status back to StudentObligation or ActivityObligation

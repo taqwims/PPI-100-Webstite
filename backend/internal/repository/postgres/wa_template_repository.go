@@ -13,6 +13,8 @@ type WATemplateRepository interface {
 	GetByID(id uint) (*domain.WATemplate, error)
 	Update(id uint, name, bodyTemplate string, isDefault bool) error
 	Delete(id uint) error
+	GetNotificationSettings() ([]domain.SchoolSetting, error)
+	UpdateNotificationSettings(settings []domain.SchoolSetting) error
 }
 
 type waTemplateRepository struct {
@@ -70,4 +72,23 @@ func (r *waTemplateRepository) Delete(id uint) error {
 		return fmt.Errorf("%w: wa template id %d", domain.ErrNotFound, id)
 	}
 	return nil
+}
+
+func (r *waTemplateRepository) GetNotificationSettings() ([]domain.SchoolSetting, error) {
+	var settings []domain.SchoolSetting
+	err := r.db.Where("key = ? OR key = ? OR key LIKE ?", "enable_wa_notifications", "fonnte_token", "app_notif_%").Order("id ASC").Find(&settings).Error
+	return settings, err
+}
+
+func (r *waTemplateRepository) UpdateNotificationSettings(settings []domain.SchoolSetting) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, s := range settings {
+			if err := tx.Model(&domain.SchoolSetting{}).
+				Where("key = ?", s.Key).
+				Update("value", s.Value).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

@@ -39,7 +39,8 @@ func NewNotificationUsecase(notificationRepo *postgres.NotificationRepository, w
 func (u *NotificationUsecase) waWorker() {
 	for job := range u.waQueue {
 		if u.waService != nil {
-			err := u.waService.SendWhatsApp(job.Phone, job.Message)
+			token := u.notificationRepo.GetSettingValue("fonnte_token", u.waService.GetDefaultToken())
+			err := u.waService.SendWhatsApp(token, job.Phone, job.Message)
 			if err != nil {
 				fmt.Printf("[WA Worker] Failed to send WA to %s: %v\n", job.Phone, err)
 			}
@@ -69,6 +70,10 @@ func (u *NotificationUsecase) MarkAsRead(id string) error {
 	return u.notificationRepo.MarkAsRead(id)
 }
 
+func (u *NotificationUsecase) MarkAllAsRead(userID string) error {
+	return u.notificationRepo.MarkAllAsRead(userID)
+}
+
 func (u *NotificationUsecase) GetAllNotifications() ([]domain.Notification, error) {
 	return u.notificationRepo.GetAll()
 }
@@ -80,6 +85,10 @@ func (u *NotificationUsecase) DeleteNotification(id string) error {
 func (u *NotificationUsecase) SendWhatsApp(phone, message string) error {
 	if u.waService == nil {
 		return nil // Service not initialized
+	}
+
+	if !u.notificationRepo.IsWAEnabled() {
+		return fmt.Errorf("fitur notifikasi WhatsApp dinonaktifkan di pengaturan")
 	}
 	
 	// Send to queue instead of blocking

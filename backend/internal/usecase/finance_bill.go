@@ -31,33 +31,10 @@ func (u *FinanceUsecase) CreateBill(studentID uuid.UUID, title string, amount fl
 		return err
 	}
 
-	// Send notification to student (via student's UserID)
+	// Send notifications
 	student, err := u.studentRepo.GetByID(studentID.String())
 	if err == nil {
-		_ = u.notificationUsecase.SendNotification(
-			student.UserID,
-			"Tagihan Baru",
-			"Anda memiliki tagihan baru: "+title,
-			"bill",
-			bill.ID.String(),
-		)
-
-		// Also notify parent if linked
-		if student.ParentID != nil {
-			parent, err := u.getParentByID(*student.ParentID)
-			if err == nil {
-				_ = u.notificationUsecase.SendNotification(
-					parent.UserID,
-					"Tagihan Baru untuk Anak Anda",
-					"Tagihan baru untuk "+student.User.Name+": "+title,
-					"bill",
-					bill.ID.String(),
-				)
-
-				// WhatsApp Auto Notification
-				u.triggerAutoWA(student, parent, bill)
-			}
-		}
+		u.sendBillInAppNotifications(student, bill)
 	}
 
 	return nil

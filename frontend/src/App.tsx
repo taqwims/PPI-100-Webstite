@@ -90,7 +90,7 @@ import InvoiceConfig from './pages/finance/InvoiceConfig';
 import InvoiceHistory from './pages/finance/InvoiceHistory';
 import StudentBillSummary from './pages/finance/StudentBillSummary';
 import InfaqTypes from './pages/finance/InfaqTypes';
-import WATemplates from './pages/finance/WATemplates';
+import NotificationSettings from './pages/finance/NotificationSettings';
 import PaymentVerification from './pages/finance/PaymentVerification';
 import SchoolBankAccounts from './pages/finance/SchoolBankAccounts';
 import ToastProvider from './components/ui/Toast';
@@ -218,7 +218,11 @@ function App() {
                                     <Route path="finance/student-obligations" element={<StudentObligations />} />
                                     <Route path="finance/student-bill-summary" element={<StudentBillSummary />} />
                                     <Route path="finance/infaq-types" element={<InfaqTypes />} />
-                                    <Route path="finance/wa-templates" element={<WATemplates />} />
+                                    <Route path="finance/notification-settings" element={
+                                        <RoleRoute allowedRoles={[1, 9, 11]}>
+                                            <NotificationSettings />
+                                        </RoleRoute>
+                                    } />
                                     <Route path="finance/invoice-config" element={<InvoiceConfig />} />
                                     <Route path="finance/invoices" element={<InvoiceHistory />} />
                                     <Route path="finance/payments/verify" element={

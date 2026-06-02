@@ -124,6 +124,7 @@ func SeedSchoolSettings(db *gorm.DB, cfg *config.Config) {
 		"school_name":     cfg.SchoolName,
 		"school_address":  cfg.SchoolAddress,
 		"school_logo_url": cfg.SchoolLogoURL,
+		"fonnte_token":    cfg.FonnteToken,
 	}
 	repo.Seed(defaults)
 }

@@ -151,3 +151,27 @@ func (h *WATemplateHandler) Delete(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Template WA berhasil dihapus"})
 }
+
+func (h *WATemplateHandler) GetNotificationSettings(c *gin.Context) {
+	settings, err := h.usecase.GetNotificationSettings()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, settings)
+}
+
+func (h *WATemplateHandler) UpdateNotificationSettings(c *gin.Context) {
+	var req struct {
+		Settings []domain.SchoolSetting `json:"settings" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.usecase.UpdateNotificationSettings(req.Settings); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Pengaturan notifikasi berhasil diperbarui"})
+}

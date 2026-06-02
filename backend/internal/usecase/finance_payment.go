@@ -80,26 +80,14 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 
 	// Notifications
 	if status == "Success" {
-		_ = u.notificationUsecase.SendNotification(
-			bill.Student.UserID,
-			"Pembayaran Berhasil",
-			fmt.Sprintf("Pembayaran %s sebesar Rp%.0f telah diverifikasi.", bill.Title, amount),
-			"payment",
-			bill.ID.String(),
-		)
-
+		var parent *domain.Parent
 		if bill.Student.ParentID != nil {
-			parent, err := u.getParentByID(*bill.Student.ParentID)
-			if err == nil {
-				_ = u.notificationUsecase.SendNotification(
-					parent.UserID,
-					"Pembayaran Tagihan Anak Berhasil",
-					fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f telah diverifikasi.", bill.Title, bill.Student.User.Name, amount),
-					"payment",
-					bill.ID.String(),
-				)
-				u.triggerPaymentWA(&bill.Student, parent, bill, amount)
-			}
+			parent, _ = u.getParentByID(*bill.Student.ParentID)
+		}
+		u.sendPaymentInAppNotifications(&bill.Student, bill, parent, amount)
+
+		if parent != nil {
+			u.triggerPaymentWA(&bill.Student, parent, bill, amount)
 		}
 		
 		// Sync obligation statuses
@@ -359,26 +347,14 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 	}
 
 	// Notify Student and Parent about successful payment
-	_ = u.notificationUsecase.SendNotification(
-		bill.Student.UserID,
-		"Pembayaran Berhasil Diverifikasi",
-		fmt.Sprintf("Pembayaran %s sebesar Rp%.0f telah diverifikasi oleh Bendahara.", bill.Title, payment.Amount),
-		"payment",
-		bill.ID.String(),
-	)
-
+	var parent *domain.Parent
 	if bill.Student.ParentID != nil {
-		parent, err := u.getParentByID(*bill.Student.ParentID)
-		if err == nil {
-			_ = u.notificationUsecase.SendNotification(
-				parent.UserID,
-				"Pembayaran Tagihan Anak Diverifikasi",
-				fmt.Sprintf("Pembayaran %s untuk %s sebesar Rp%.0f telah diverifikasi oleh Bendahara.", bill.Title, bill.Student.User.Name, payment.Amount),
-				"payment",
-				bill.ID.String(),
-			)
-			u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount)
-		}
+		parent, _ = u.getParentByID(*bill.Student.ParentID)
+	}
+	u.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
+
+	if parent != nil {
+		u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount)
 	}
 
 	// Sync payment status back to StudentObligation or ActivityObligation

@@ -44,7 +44,7 @@ func (u *FinanceUsecase) processWATemplate(body string, student *domain.Student,
 	res = strings.ReplaceAll(res, "{nis}", student.NISN)
 	res = strings.ReplaceAll(res, "{kelas}", student.Class.Name)
 	res = strings.ReplaceAll(res, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
-	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Amount)) // Correction: Added bill.Amount which might be missing in some old code, but original was "• %s: Rp%.0f", bill.Title, bill.Amount
+	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
 	return processWATemplateLegacyFix(res, bill)
 }
 
@@ -145,6 +145,88 @@ func (u *FinanceUsecase) NotifyBendahara(title string, message string, reference
 			message,
 			"payment",
 			referenceID,
+		)
+	}
+}
+
+func (u *FinanceUsecase) getSettingValue(key string, defaultValue string) string {
+	return u.financeRepo.GetSettingValue(key, defaultValue)
+}
+
+func (u *FinanceUsecase) sendBillInAppNotifications(student *domain.Student, bill *domain.Bill) {
+	// 1. Notify Student
+	titleTemplate := u.getSettingValue("app_notif_bill_student_title", "Tagihan Baru")
+	bodyTemplate := u.getSettingValue("app_notif_bill_student_body", "Anda memiliki tagihan baru: {nama_tagihan}")
+
+	body := strings.ReplaceAll(bodyTemplate, "{nama_tagihan}", bill.Title)
+	body = strings.ReplaceAll(body, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
+	body = strings.ReplaceAll(body, "{nama_siswa}", student.User.Name)
+
+	_ = u.notificationUsecase.SendNotification(
+		student.UserID,
+		titleTemplate,
+		body,
+		"bill",
+		bill.ID.String(),
+	)
+
+	// 2. Notify Parent if linked
+	if student.ParentID != nil {
+		parent, err := u.getParentByID(*student.ParentID)
+		if err == nil {
+			pTitleTemplate := u.getSettingValue("app_notif_bill_parent_title", "Tagihan Baru untuk Anak Anda")
+			pBodyTemplate := u.getSettingValue("app_notif_bill_parent_body", "Tagihan baru untuk {nama_siswa}: {nama_tagihan}")
+
+			pBody := strings.ReplaceAll(pBodyTemplate, "{nama_tagihan}", bill.Title)
+			pBody = strings.ReplaceAll(pBody, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
+			pBody = strings.ReplaceAll(pBody, "{nama_siswa}", student.User.Name)
+
+			_ = u.notificationUsecase.SendNotification(
+				parent.UserID,
+				pTitleTemplate,
+				pBody,
+				"bill",
+				bill.ID.String(),
+			)
+
+			// WhatsApp Auto Notification
+			u.triggerAutoWA(student, parent, bill)
+		}
+	}
+}
+
+func (u *FinanceUsecase) sendPaymentInAppNotifications(student *domain.Student, bill *domain.Bill, parent *domain.Parent, amount float64) {
+	// 1. Notify Student
+	titleTemplate := u.getSettingValue("app_notif_payment_student_title", "Pembayaran Berhasil")
+	bodyTemplate := u.getSettingValue("app_notif_payment_student_body", "Pembayaran {nama_tagihan} sebesar {nominal} telah diverifikasi.")
+
+	body := strings.ReplaceAll(bodyTemplate, "{nama_tagihan}", bill.Title)
+	body = strings.ReplaceAll(body, "{nominal}", fmt.Sprintf("Rp%.0f", amount))
+	body = strings.ReplaceAll(body, "{nama_siswa}", student.User.Name)
+
+	_ = u.notificationUsecase.SendNotification(
+		student.UserID,
+		titleTemplate,
+		body,
+		"payment",
+		bill.ID.String(),
+	)
+
+	// 2. Notify Parent if linked
+	if parent != nil {
+		pTitleTemplate := u.getSettingValue("app_notif_payment_parent_title", "Pembayaran Tagihan Anak Berhasil")
+		pBodyTemplate := u.getSettingValue("app_notif_payment_parent_body", "Pembayaran {nama_tagihan} untuk {nama_siswa} sebesar {nominal} telah diverifikasi.")
+
+		pBody := strings.ReplaceAll(pBodyTemplate, "{nama_tagihan}", bill.Title)
+		pBody = strings.ReplaceAll(pBody, "{nominal}", fmt.Sprintf("Rp%.0f", amount))
+		pBody = strings.ReplaceAll(pBody, "{nama_siswa}", student.User.Name)
+
+		_ = u.notificationUsecase.SendNotification(
+			parent.UserID,
+			pTitleTemplate,
+			pBody,
+			"payment",
+			bill.ID.String(),
 		)
 	}
 }
