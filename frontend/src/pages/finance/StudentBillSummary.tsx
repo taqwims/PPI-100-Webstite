@@ -14,8 +14,15 @@ interface Student {
     id: string;
     full_name: string;
     nis: string;
-    class?: { name: string };
+    class?: { id: number; name: string };
+    class_id?: number;
     parent?: { phone: string };
+    user?: { phone: string };
+}
+
+interface Class {
+    id: number;
+    name: string;
 }
 
 interface Obligation {
@@ -43,7 +50,11 @@ const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'c
 
 const MONTH_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-const StudentBillSummary: React.FC = () => {
+interface StudentBillSummaryProps {
+    isSubcomponent?: boolean;
+}
+
+const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent = false }) => {
     const { user } = useAuth();
     const canManage = [1, 2, 3, 4, 9].includes(user?.role_id || 0);
     const queryClient = useQueryClient();
@@ -74,6 +85,13 @@ const StudentBillSummary: React.FC = () => {
         totalAmount: number;
         date: string;
     } | null>(null);
+
+    const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+
+    const { data: classes = [] } = useQuery<Class[]>({
+        queryKey: ['classes'],
+        queryFn: async () => (await api.get('/academic/classes')).data || [],
+    });
 
     const { data: students = [] } = useQuery<Student[]>({
         queryKey: ['students'],
@@ -248,28 +266,36 @@ const StudentBillSummary: React.FC = () => {
             return;
         }
 
-        const phone = waModal.student.parent?.phone;
-        if (!phone) {
-            toast.error('Siswa tidak memiliki data nomor telepon orang tua');
+        const parentPhone = waModal.student.parent?.phone || '';
+        const studentPhone = waModal.student.user?.phone || '';
+        const targetPhones = [];
+        if (parentPhone) targetPhones.push(parentPhone);
+        if (studentPhone && studentPhone !== parentPhone) targetPhones.push(studentPhone);
+
+        if (targetPhones.length === 0) {
+            toast.error('Siswa tidak memiliki data nomor telepon orang tua maupun nomor telepon siswa');
             return;
         }
 
+        const phoneString = targetPhones.join(',');
         const message = buildWAMessage(template, waModal.student, waModal.obligations);
         
         setIsSending(true);
         try {
             await api.post('/notifications/wa', {
-                phone: phone,
+                phone: phoneString,
                 message: message
             });
             toast.success('Pesan WhatsApp dikirim via sistem!');
             setWaModal(null);
         } catch (error: any) {
             console.error('Failed to send WA via system', error);
-            // Fallback to wa.me
-            const encodedMessage = encodeURIComponent(message);
-            window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
-            toast.error('Gagal kirim via sistem, mencoba buka WhatsApp manual...');
+            // Fallback to wa.me for all targets
+            targetPhones.forEach(p => {
+                const encodedMessage = encodeURIComponent(message);
+                window.open(`https://wa.me/${p}?text=${encodedMessage}`, '_blank');
+            });
+            toast.error('Gagal kirim via sistem, mencoba membuka WhatsApp manual...');
             setWaModal(null);
         } finally {
             setIsSending(false);
@@ -283,9 +309,15 @@ const StudentBillSummary: React.FC = () => {
             return;
         }
 
-        const studentsWithDebt = filteredStudents.filter(e => e.totalDebt > 0 && e.student.parent?.phone);
+        const studentsWithDebt = filteredStudents.filter(e => {
+            const parentPhone = e.student.parent?.phone;
+            const studentPhone = e.student.user?.phone;
+            const matchesClass = selectedClassIds.length === 0 || (e.student.class?.id && selectedClassIds.includes(e.student.class.id)) || (e.student.class_id && selectedClassIds.includes(e.student.class_id));
+            return e.totalDebt > 0 && (parentPhone || studentPhone) && matchesClass;
+        });
+
         if (studentsWithDebt.length === 0) {
-            toast.error('Tidak ada siswa dengan tunggakan dan nomor HP orang tua');
+            toast.error('Tidak ada siswa dengan tunggakan dan nomor HP valid');
             setBulkSendModal(false);
             return;
         }
@@ -296,14 +328,21 @@ const StudentBillSummary: React.FC = () => {
 
         for (const { student, obligations } of studentsWithDebt) {
             const message = buildWAMessage(template, student, obligations);
+            const parentPhone = student.parent?.phone || '';
+            const studentPhone = student.user?.phone || '';
+            const targetPhones = [];
+            if (parentPhone) targetPhones.push(parentPhone);
+            if (studentPhone && studentPhone !== parentPhone) targetPhones.push(studentPhone);
+            
+            const phoneString = targetPhones.join(',');
             try {
                 await api.post('/notifications/wa', {
-                    phone: student.parent!.phone,
+                    phone: phoneString,
                     message: message
                 });
-                successCount++;
+                successCount += targetPhones.length;
             } catch (error) {
-                failCount++;
+                failCount += targetPhones.length;
             }
         }
 
@@ -314,20 +353,33 @@ const StudentBillSummary: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Surat Tagihan Siswa</h1>
-                    <p className="text-slate-500 mt-1">Ringkasan tunggakan per siswa — untuk keperluan surat tagihan & WhatsApp</p>
+            {isSubcomponent ? (
+                <div className="flex justify-end">
+                    {canManage && (
+                        <button
+                            onClick={() => { setSelectedClassIds([]); setBulkSendModal(true); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-200 transition-all font-medium text-sm"
+                        >
+                            <Send size={18} /> Kirim Notifikasi Massal
+                        </button>
+                    )}
                 </div>
-                {canManage && (
-                    <button
-                        onClick={() => setBulkSendModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-200 transition-all font-medium text-sm"
-                    >
-                        <Send size={18} /> Kirim Notifikasi Massal
-                    </button>
-                )}
-            </div>
+            ) : (
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Surat Tagihan Siswa</h1>
+                        <p className="text-slate-500 mt-1">Ringkasan tunggakan per siswa — untuk keperluan surat tagihan & WhatsApp</p>
+                    </div>
+                    {canManage && (
+                        <button
+                            onClick={() => { setSelectedClassIds([]); setBulkSendModal(true); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-200 transition-all font-medium text-sm"
+                        >
+                            <Send size={18} /> Kirim Notifikasi Massal
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -402,26 +454,26 @@ const StudentBillSummary: React.FC = () => {
                             <div key={student.id}>
                                 {/* Student Header Row */}
                                 <div
-                                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/80 transition"
+                                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 cursor-pointer hover:bg-slate-50/80 transition gap-4"
                                     onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-2 rounded-lg bg-blue-50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 rounded-lg bg-blue-50 shrink-0">
                                             {isExpanded ? <ChevronDown size={18} className="text-blue-600" /> : <ChevronRight size={18} className="text-blue-600" />}
                                         </div>
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{student.full_name}</p>
-                                            <p className="text-sm text-slate-500">{student.nis} • {student.class?.name || '-'}</p>
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-slate-900 truncate">{student.full_name}</p>
+                                            <p className="text-sm text-slate-500 truncate">{student.nis} • {student.class?.name || '-'}</p>
                                         </div>
                                         {unpaidCount > 0 && (
-                                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">
+                                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 shrink-0">
                                                 {unpaidCount} tunggakan
                                             </span>
                                         )}
                                     </div>
 
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
+                                    <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+                                        <div className="text-left sm:text-right">
                                             <p className="text-sm text-red-600 font-semibold">{totalDebt > 0 ? `- ${formatCurrency(totalDebt)}` : '-'}</p>
                                             <p className="text-xs text-emerald-500">{formatCurrency(totalPaid)} terbayar</p>
                                         </div>
@@ -450,14 +502,14 @@ const StudentBillSummary: React.FC = () => {
                                                             toast.error('Gagal membuat surat tagihan');
                                                         }
                                                     }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition shrink-0"
                                                     title="Cetak Surat Tagihan"
                                                 >
                                                     <Printer size={14} /> PDF
                                                 </button>
                                                 <button
                                                     onClick={e => { e.stopPropagation(); setWaModal({ student, obligations }); setSelectedTemplateId(String(waTemplates.find(t => t.is_default)?.id || '')); }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition shrink-0"
                                                     title="Kirim Tagihan via WA"
                                                 >
                                                     <Send size={14} /> WA
@@ -690,9 +742,34 @@ const StudentBillSummary: React.FC = () => {
                                     ))}
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Pilih Kelas Penerima (Kosongkan untuk Kirim ke Semua Kelas)</label>
+                                <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50">
+                                    {classes.map(c => (
+                                        <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer hover:text-emerald-600">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedClassIds.includes(c.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedClassIds([...selectedClassIds, c.id]);
+                                                    } else {
+                                                        setSelectedClassIds(selectedClassIds.filter(id => id !== c.id));
+                                                    }
+                                                }}
+                                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            {c.name}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
                                 <p className="text-sm text-emerald-700 font-medium">
-                                    Total target pengiriman: {filteredStudents.filter(e => e.totalDebt > 0 && e.student.parent?.phone).length} orang tua siswa
+                                    Total target pengiriman: {filteredStudents.filter(e => {
+                                        const matchesClass = selectedClassIds.length === 0 || (e.student.class?.id && selectedClassIds.includes(e.student.class.id)) || (e.student.class_id && selectedClassIds.includes(e.student.class_id));
+                                        return e.totalDebt > 0 && (e.student.parent?.phone || e.student.user?.phone) && matchesClass;
+                                    }).length} orang tua/siswa
                                 </p>
                             </div>
                             <div className="flex gap-3 pt-2">

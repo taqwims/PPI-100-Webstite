@@ -16,7 +16,7 @@ import (
 func main() {
 	// 1. Load Config
 	cfg := &config.Config{
-		FonnteToken: "Tmj5jTdG5edYXSdTXpzF", // Diambil dari .env Anda
+		FonnteToken: "wFf2xsJbz9XpyfpJkDhY", // Diambil dari .env Anda
 	}
 
 	// 2. Setup DB Connection
@@ -46,7 +46,7 @@ func main() {
 
 	fmt.Println("✅ Pesan berhasil dimasukkan ke antrean worker.")
 	fmt.Println("Sedang menunggu worker memproses (cek log terminal backend)...")
-	
+
 	// Tunggu sebentar agar worker sempat memproses sebelum script selesai
 	time.Sleep(3 * time.Second)
 	fmt.Println("Tes selesai.")

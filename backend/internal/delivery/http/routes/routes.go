@@ -133,6 +133,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	waTemplateUsecase := usecase.NewWATemplateUsecase(waTemplateRepo)
 	waTemplateHandler := handlers.NewWATemplateHandler(waTemplateUsecase)
 
+	// WA Scheduler
+	waScheduleRepo := postgres.NewWAScheduleRepository(db)
+	waScheduleUsecase := usecase.NewWAScheduleUsecase(waScheduleRepo, studentObligationRepo, waTemplateRepo, notificationRepo, waService)
+	waScheduleHandler := handlers.NewWAScheduleHandler(waScheduleUsecase)
+	waScheduleUsecase.StartScheduler()
+
 	// External Debt (Catatan Hutang)
 	externalDebtRepo := postgres.NewExternalDebtRepository(db)
 	externalDebtUsecase := usecase.NewExternalDebtUsecase(externalDebtRepo)
@@ -185,6 +191,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		protectedGroup, cfg, financeHandler, midtransHandler, financeExtendedHandler,
 		paymentTypeHandler, studentObligationHandler, infaqTypeHandler, payrollHandler,
 		transactionCodeHandler, budgetHandler, activityHandler, externalDebtHandler,
-		waTemplateHandler, invoiceSignatureHandler, schoolBankHandler,
+		waTemplateHandler, waScheduleHandler, invoiceSignatureHandler, schoolBankHandler,
 	)
 }

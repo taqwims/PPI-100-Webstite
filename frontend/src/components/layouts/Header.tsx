@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Search, Menu, Check, Info, AlertTriangle, FileText, CreditCard } from 'lucide-react';
+import { Bell, Search, Menu, Check, Info, AlertTriangle, FileText, CreditCard, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,12 +10,14 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const profileRef = useRef<HTMLDivElement>(null);
 
     const { data: notifications } = useQuery({
         queryKey: ['notifications'],
@@ -46,15 +48,18 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
             }
+            if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+                setIsProfileOpen(false);
+            }
         };
 
-        if (isDropdownOpen) {
+        if (isDropdownOpen || isProfileOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isDropdownOpen]);
+    }, [isDropdownOpen, isProfileOpen]);
 
     const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
 
@@ -85,6 +90,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             default:
                 return <Info className="text-slate-400" size={16} />;
         }
+    };
+
+    const getRoleName = (roleId?: number) => {
+        const roles: Record<number, string> = {
+            1: 'Super Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
+            5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
+            9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Teller Transaksional'
+        };
+        return roleId && roles[roleId] ? roles[roleId] : 'User';
     };
 
     return (
@@ -205,14 +219,53 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
-                            <p className="text-xs text-slate-500">{user?.role_id === 1 ? 'Super Admin' : 'User'}</p>
-                        </div>
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold shadow-lg shadow-green-500/20">
-                            {user?.name?.charAt(0) || 'U'}
-                        </div>
+                    {/* Profile Dropdown Container */}
+                    <div className="relative" ref={profileRef}>
+                        <button 
+                            onClick={() => setIsProfileOpen(!isProfileOpen)}
+                            className="flex items-center gap-3 pl-4 border-l border-slate-200 text-left hover:opacity-85 transition-opacity"
+                        >
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
+                                <p className="text-xs text-slate-500 capitalize">{getRoleName(user?.role_id)}</p>
+                            </div>
+                            {user?.photo_url ? (
+                                <img src={user.photo_url} alt={user?.name} className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-green-500/20" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold shadow-lg shadow-green-500/20">
+                                    {user?.name?.charAt(0) || 'U'}
+                                </div>
+                            )}
+                        </button>
+
+                        {isProfileOpen && (
+                            <div className="absolute right-0 mt-3 w-56 bg-white/95 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 p-2 space-y-1">
+                                <div className="px-3 py-2 border-b border-slate-100 mb-1 sm:hidden">
+                                    <p className="text-sm font-semibold text-slate-900 truncate">{user?.name || 'User'}</p>
+                                    <p className="text-xs text-slate-500 capitalize">{getRoleName(user?.role_id)}</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setIsProfileOpen(false);
+                                        navigate('/dashboard/settings');
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-950 rounded-xl transition"
+                                >
+                                    <Settings size={16} className="text-slate-400" />
+                                    Pengaturan Profil
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsProfileOpen(false);
+                                        logout();
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl transition font-medium"
+                                >
+                                    <LogOut size={16} className="text-red-500" />
+                                    Keluar
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -2,8 +2,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
-    LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Send, Mail, GraduationCap, FileText, CreditCard,
-    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2
+    LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
+    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -34,6 +34,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     const isEnabled = useFeatureStore((s) => s.isEnabled);
     const school = useFeatureStore((s) => s.school);
 
+    // Sidebar collapse state on desktop, persisted in localStorage
+    const [isCollapsed, setIsCollapsed] = React.useState(() => {
+        return localStorage.getItem('sidebar-collapsed') === 'true';
+    });
+
+    const handleToggleCollapse = () => {
+        setIsCollapsed((prev) => {
+            const next = !prev;
+            localStorage.setItem('sidebar-collapsed', String(next));
+            return next;
+        });
+    };
+
     const getMenuGroups = (): MenuGroup[] => {
         // ── Common (always first) ──
         const dashboardGroup: MenuGroup = {
@@ -57,7 +70,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Konten & Komunikasi',
             items: [
                 { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
-                { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
                 { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
             ]
         };
@@ -87,7 +99,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify', feature: 'billing' },
                 { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities', feature: 'activities' },
                 { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations', feature: 'student_obligations' },
-                { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary', feature: 'billing' },
                 { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger', feature: 'cash_ledger' },
                 { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq', feature: 'infaq' },
                 { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll', feature: 'payroll' },
@@ -198,7 +209,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: ShieldCheck, label: 'Verifikasi Pembayaran', path: '/dashboard/finance/payments/verify', feature: 'billing' },
                 { icon: Activity, label: 'Kegiatan Siswa', path: '/dashboard/finance/activities', feature: 'activities' },
                 { icon: Users, label: 'Tanggungan Siswa', path: '/dashboard/finance/student-obligations', feature: 'student_obligations' },
-                { icon: Send, label: 'Surat Tagihan', path: '/dashboard/finance/student-bill-summary', feature: 'billing' },
                 { icon: Inbox, label: 'Buku Kas Umum', path: '/dashboard/finance/cash-ledger', feature: 'cash_ledger' },
                 { icon: Activity, label: 'Infaq Harian', path: '/dashboard/finance/daily-infaq', feature: 'infaq' },
                 { icon: FileText, label: 'Penggajian', path: '/dashboard/finance/payroll', feature: 'payroll' },
@@ -212,7 +222,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Konten & Komunikasi',
             items: [
                 { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
-                { icon: Send, label: 'Kelola Notifikasi', path: '/dashboard/admin/notifications' },
                 { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
             ]
         };
@@ -288,11 +297,35 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
             {/* Sidebar Container */}
             <div className={clsx(
-                "fixed inset-y-0 left-0 z-50 w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen flex flex-col shadow-xl shadow-slate-200/50",
+                "fixed inset-y-0 left-0 z-50 bg-white/90 backdrop-blur-xl border-r border-slate-200 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen flex flex-col shadow-xl shadow-slate-200/50",
+                isCollapsed ? "lg:w-20 w-64" : "lg:w-64 w-64",
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
-                <div className="p-6 flex items-center justify-between border-b border-slate-200">
-                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-500">{school.name || 'SDIT Management'}</h1>
+                {/* Collapse Toggle Button (Desktop only) */}
+                <button
+                    onClick={handleToggleCollapse}
+                    className="hidden lg:flex absolute top-6 -right-3.5 z-50 bg-white border border-slate-200 rounded-full p-1 text-slate-400 hover:text-slate-600 shadow-md hover:scale-110 transition-all"
+                >
+                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                </button>
+
+                {/* Sidebar Header with School Logo */}
+                <div className={clsx(
+                    "p-4 flex items-center border-b border-slate-200 transition-all duration-300",
+                    isCollapsed ? "justify-center" : "justify-between"
+                )}>
+                    <div className="flex items-center space-x-3 overflow-hidden">
+                        {school.logo_url ? (
+                            <img src={school.logo_url} alt="Logo" className="w-9 h-9 min-w-[36px] object-contain rounded-lg shadow-sm" />
+                        ) : (
+                            <Building2 className="w-9 h-9 min-w-[36px] text-green-600" />
+                        )}
+                        {!isCollapsed && (
+                            <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 to-emerald-500 truncate whitespace-nowrap animate-in fade-in duration-300">
+                                {school.name || 'SDIT Management'}
+                            </h1>
+                        )}
+                    </div>
                     <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-slate-600">
                         <X size={24} />
                     </button>
@@ -300,7 +333,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                     {/* Global Academic Year Selector */}
-                    {[1, 8, 9, 11].includes(user?.role_id || 0) && academicYears.length > 0 && (
+                    {!isCollapsed && [1, 8, 9, 11].includes(user?.role_id || 0) && academicYears.length > 0 && (
                         <div className="mb-3 px-1">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2 block mb-1">Tahun Ajaran</label>
                             <select
@@ -330,9 +363,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         return (
                             <div key={gi}>
                                 {group.title && (
-                                    <div className={clsx("px-3 pt-4 pb-1.5", gi > 0 && "mt-2 border-t border-slate-100")}>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.title}</span>
-                                    </div>
+                                    <>
+                                        {!isCollapsed ? (
+                                            <div className={clsx("px-3 pt-4 pb-1.5", gi > 0 && "mt-2 border-t border-slate-100")}>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.title}</span>
+                                            </div>
+                                        ) : (
+                                            gi > 0 && <div className="mt-2 border-t border-slate-100 mx-2" />
+                                        )}
+                                    </>
                                 )}
                                 {groupItems.map(item => {
                                     const Icon = item.icon;
@@ -342,15 +381,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                                             key={item.path}
                                             to={item.path}
                                             onClick={() => { if (window.innerWidth < 1024) onClose(); }}
+                                            title={isCollapsed ? item.label : undefined}
                                             className={clsx(
-                                                'flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 group',
+                                                'flex items-center rounded-xl transition-all duration-200 group border border-transparent',
+                                                isCollapsed ? 'justify-center p-2.5 mx-auto w-10 h-10' : 'space-x-3 px-4 py-2.5',
                                                 isActive
-                                                    ? 'bg-green-50 text-green-700 border border-green-200 shadow-sm'
+                                                    ? 'bg-green-50 text-green-700 border-green-200 shadow-sm'
                                                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                                             )}
                                         >
                                             <Icon size={18} className={clsx(isActive ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600')} />
-                                            <span className="text-sm font-medium">{item.label}</span>
+                                            {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
                                         </Link>
                                     );
                                 })}
@@ -364,36 +405,43 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             <Link
                                 to={settingsItem.path}
                                 onClick={() => { if (window.innerWidth < 1024) onClose(); }}
+                                title={isCollapsed ? settingsItem.label : undefined}
                                 className={clsx(
-                                    'flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 group',
+                                    'flex items-center rounded-xl transition-all duration-200 group border border-transparent',
+                                    isCollapsed ? 'justify-center p-2.5 mx-auto w-10 h-10' : 'space-x-3 px-4 py-2.5',
                                     location.pathname.startsWith(settingsItem.path)
-                                        ? 'bg-green-50 text-green-700 border border-green-200 shadow-sm'
+                                        ? 'bg-green-50 text-green-700 border-green-200 shadow-sm'
                                         : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                                )}
+                                    )}
                             >
                                 <Settings size={18} className={clsx(location.pathname.startsWith(settingsItem.path) ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600')} />
-                                <span className="text-sm font-medium">{settingsItem.label}</span>
+                                {!isCollapsed && <span className="text-sm font-medium">{settingsItem.label}</span>}
                             </Link>
                         </div>
                     )}
                 </nav>
 
-                <div className="p-4 border-t border-slate-200">
-                    <div className="mb-4 px-4">
-                        <p className="text-sm font-medium text-slate-900">{user?.name}</p>
-                        <p className="text-xs text-slate-500 capitalize">{getRoleName(user?.role_id)}</p>
-                    </div>
+                <div className={clsx("p-4 border-t border-slate-200", isCollapsed ? "flex flex-col items-center" : "")}>
+                    {!isCollapsed && (
+                        <div className="mb-4 px-4">
+                            <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
+                            <p className="text-xs text-slate-500 capitalize truncate">{getRoleName(user?.role_id)}</p>
+                        </div>
+                    )}
                     <button
                         onClick={logout}
-                        className="flex items-center space-x-3 px-4 py-3 w-full text-left text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors duration-200"
+                        title={isCollapsed ? "Logout" : undefined}
+                        className={clsx(
+                            "flex items-center text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors duration-200",
+                            isCollapsed ? "justify-center w-10 h-10 p-0" : "space-x-3 px-4 py-3 w-full text-left"
+                        )}
                     >
-                        <LogOut size={20} />
-                        <span className="font-medium">Logout</span>
+                        <LogOut size={20} className="min-w-[20px]" />
+                        {!isCollapsed && <span className="font-medium">Logout</span>}
                     </button>
                 </div>
             </div>
         </>
     );
 };
-
 export default Sidebar;

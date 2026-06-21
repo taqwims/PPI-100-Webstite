@@ -23,6 +23,7 @@ func RegisterFinanceRoutes(
 	activityHandler *handlers.ActivityHandler,
 	externalDebtHandler *handlers.ExternalDebtHandler,
 	waTemplateHandler *handlers.WATemplateHandler,
+	waScheduleHandler *handlers.WAScheduleHandler,
 	invoiceSignatureHandler *handlers.InvoiceSignatureHandler,
 	schoolBankHandler *handlers.SchoolBankHandler,
 ) {
@@ -197,7 +198,7 @@ func RegisterFinanceRoutes(
 			finance.POST("/debts/:id/pay", middleware.RoleMiddleware(1, 9), externalDebtHandler.RecordPayment)
 		}
 
-		// ── WA Templates ──
+		// ── WA Templates & Schedules ──
 		if cfg.FeatureWAGateway {
 			finance.POST("/wa-templates", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.Create)
 			finance.GET("/wa-templates", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.GetAll)
@@ -205,6 +206,12 @@ func RegisterFinanceRoutes(
 			finance.DELETE("/wa-templates/:id", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.Delete)
 			finance.GET("/notification-settings", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.GetNotificationSettings)
 			finance.PUT("/notification-settings", middleware.RoleMiddleware(1, 9, 11), waTemplateHandler.UpdateNotificationSettings)
+
+			// Schedules
+			finance.POST("/wa-schedules", middleware.RoleMiddleware(1, 9, 11), waScheduleHandler.CreateSchedule)
+			finance.GET("/wa-schedules", middleware.RoleMiddleware(1, 9, 11), waScheduleHandler.GetSchedules)
+			finance.GET("/wa-schedules/:id", middleware.RoleMiddleware(1, 9, 11), waScheduleHandler.GetScheduleDetail)
+			finance.PUT("/wa-schedules/:id/cancel", middleware.RoleMiddleware(1, 9, 11), waScheduleHandler.CancelSchedule)
 		}
 
 		// ── Invoice Signatures & Config (always available) ──

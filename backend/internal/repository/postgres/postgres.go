@@ -80,6 +80,8 @@ func AutoMigrate(db *gorm.DB) error {
 		// Enhancement models
 		&domain.InfaqType{},
 		&domain.WATemplate{},
+		&domain.WASchedule{},
+		&domain.WAScheduleDetail{},
 
 		// Savings Operational
 		&domain.SavingsOperationalWithdrawal{},

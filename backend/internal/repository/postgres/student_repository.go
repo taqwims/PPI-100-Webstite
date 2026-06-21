@@ -20,9 +20,11 @@ func (r *StudentRepository) Create(student *domain.Student) error {
 
 func (r *StudentRepository) GetAll(unitID uint) ([]domain.Student, error) {
 	var students []domain.Student
-	err := r.db.Joins("User").
-		Where("students.unit_id = ? AND \"User\".deleted_at IS NULL", unitID).
-		Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").
+	query := r.db.Joins("User").Where("\"User\".deleted_at IS NULL")
+	if unitID > 0 {
+		query = query.Where("students.unit_id = ?", unitID)
+	}
+	err := query.Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").
 		Find(&students).Error
 	return students, err
 }

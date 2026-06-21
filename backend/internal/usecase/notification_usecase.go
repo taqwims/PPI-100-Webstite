@@ -5,6 +5,7 @@ import (
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/internal/utils"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -91,13 +92,28 @@ func (u *NotificationUsecase) SendWhatsApp(phone, message string) error {
 		return fmt.Errorf("fitur notifikasi WhatsApp dinonaktifkan di pengaturan")
 	}
 	
-	// Send to queue instead of blocking
-	select {
-	case u.waQueue <- WAJob{Phone: phone, Message: message}:
-		return nil
-	default:
-		return fmt.Errorf("whatsapp queue is full")
+	// Support comma-separated multiple phone numbers
+	phones := strings.Split(phone, ",")
+	var errors []string
+	
+	for _, p := range phones {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		
+		select {
+		case u.waQueue <- WAJob{Phone: p, Message: message}:
+			// Successfully queued
+		default:
+			errors = append(errors, fmt.Sprintf("whatsapp queue is full for number: %s", p))
+		}
 	}
+	
+	if len(errors) > 0 {
+		return fmt.Errorf("%s", strings.Join(errors, "; "))
+	}
+	return nil
 }
 
 func (u *NotificationUsecase) GetWATemplateByID(id uint) (*domain.WATemplate, error) {

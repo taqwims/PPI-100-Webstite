@@ -33,10 +33,15 @@ func (r *FinanceRepository) GetBillsByStudent(studentID string) ([]domain.Bill, 
 
 func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 	var bills []domain.Bill
-	err := r.db.Joins("JOIN students ON students.id = bills.student_id").
+	query := r.db.Joins("JOIN students ON students.id = bills.student_id").
 		Joins("JOIN users ON users.id = students.user_id").
-		Where("students.unit_id = ? AND students.deleted_at IS NULL AND users.deleted_at IS NULL", unitID).
-		Preload("Payments").
+		Where("students.deleted_at IS NULL AND users.deleted_at IS NULL")
+
+	if unitID > 0 {
+		query = query.Where("students.unit_id = ?", unitID)
+	}
+
+	err := query.Preload("Payments").
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("AcademicYear").

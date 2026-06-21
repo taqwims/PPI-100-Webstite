@@ -48,6 +48,31 @@ func (r *StudentObligationRepository) GetAll(academicYearID uint, classID uint) 
 	return obs, nil
 }
 
+func (r *StudentObligationRepository) GetByClassIDs(academicYearID uint, classIDs []uint) ([]domain.StudentObligation, error) {
+	var obs []domain.StudentObligation
+	query := r.db.
+		Preload("Student").
+		Preload("Student.User").
+		Preload("Student.Class").
+		Preload("PaymentType").
+		Preload("AcademicYear").
+		Joins("JOIN students ON students.id = student_obligations.student_id").
+		Joins("JOIN users ON users.id = students.user_id").
+		Where("students.deleted_at IS NULL AND users.deleted_at IS NULL")
+
+	if academicYearID > 0 {
+		query = query.Where("student_obligations.academic_year_id = ?", academicYearID)
+	}
+	if len(classIDs) > 0 {
+		query = query.Where("students.class_id IN ?", classIDs)
+	}
+
+	if err := query.Order("created_at desc").Find(&obs).Error; err != nil {
+		return nil, err
+	}
+	return obs, nil
+}
+
 func (r *StudentObligationRepository) GetByStudentID(studentID uuid.UUID, academicYearID uint) ([]domain.StudentObligation, error) {
 	var obs []domain.StudentObligation
 	query := r.db.

@@ -1,11 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"ppi-100-sis/internal/config"
-	"ppi-100-sis/internal/repository/postgres"
 	"ppi-100-sis/internal/domain"
+	"ppi-100-sis/internal/repository/postgres"
 )
 
 func main() {
@@ -19,23 +20,32 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	fmt.Println("--- Budgets with Month > 0 ---")
-	var budgets []domain.Budget
-	db.Where("month > 0").Limit(10).Find(&budgets)
-	for _, b := range budgets {
-		fmt.Printf("Budget: %s | Month: %d | Realized: %.2f | Planned: %.2f | TC_ID: %v\n", 
-			b.ItemName, b.Month, b.RealizedAmount, b.PlannedAmount, b.TransactionCodeID)
+	fmt.Println("--- Students List ---")
+	var students []domain.Student
+	err = db.Joins("User").
+		Where("\"User\".deleted_at IS NULL").
+		Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").
+		Find(&students).Error
+	if err != nil {
+		log.Fatalf("Query error: %v", err)
 	}
 
-	fmt.Println("\n--- Bills with Obligations ---")
-	var bills []domain.Bill
-	db.Preload("Obligation").Where("obligation_id IS NOT NULL").Limit(10).Find(&bills)
-	for _, b := range bills {
-		month := 0
-		if b.Obligation != nil {
-			month = b.Obligation.BillingMonth
+	for _, s := range students {
+		fmt.Printf("Student ID: %s\n", s.ID)
+		fmt.Printf("  NISN: %s\n", s.NISN)
+		fmt.Printf("  User Name: %s\n", s.User.Name)
+		fmt.Printf("  User Phone: %s\n", s.User.Phone)
+		if s.Parent != nil {
+			fmt.Printf("  Parent Phone: %s\n", s.Parent.Phone)
+			fmt.Printf("  Parent User Phone: %s\n", s.Parent.User.Phone)
+		} else {
+			fmt.Println("  Parent: <nil>")
 		}
-		fmt.Printf("Bill: %s | Amount: %.2f | Status: %s | BillingMonth: %d | TC_ID: %v\n", 
-			b.Title, b.Amount, b.Status, month, b.TransactionCodeID)
+		
+		// Print JSON of the first student to see the actual JSON tags
+		bz, _ := json.MarshalIndent(s, "", "  ")
+		fmt.Println("  JSON Output:")
+		fmt.Println(string(bz))
+		fmt.Println("--------------------")
 	}
 }

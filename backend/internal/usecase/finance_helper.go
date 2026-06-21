@@ -10,7 +10,17 @@ import (
 )
 
 func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill) {
-	if parent.Phone == "" {
+	var phones []string
+	if parent != nil && parent.Phone != "" {
+		phones = append(phones, parent.Phone)
+	}
+	if student != nil && student.User.Phone != "" {
+		if parent == nil || student.User.Phone != parent.Phone {
+			phones = append(phones, student.User.Phone)
+		}
+	}
+
+	if len(phones) == 0 {
 		return
 	}
 
@@ -35,7 +45,7 @@ func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.P
 
 	// Format message
 	msg := u.safeProcessWATemplate(template.BodyTemplate, student, bill)
-	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
+	_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
 }
 
 func (u *FinanceUsecase) processWATemplate(body string, student *domain.Student, bill *domain.Bill) string {

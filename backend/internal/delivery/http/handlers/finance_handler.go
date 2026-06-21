@@ -144,6 +144,17 @@ func (h *FinanceHandler) GetAllBills(c *gin.Context) {
 		return
 	}
 
+	// Admin and Financial Roles = 1, 8, 9, 11
+	if roleID == 1 || roleID == 8 || roleID == 9 || roleID == 11 {
+		bills, err := h.financeUsecase.GetAllBills(0)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, bills)
+		return
+	}
+
 	c.JSON(http.StatusBadRequest, gin.H{"error": "unit_id or student_id is required"})
 }
 

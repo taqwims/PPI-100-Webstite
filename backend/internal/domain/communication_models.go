@@ -47,3 +47,30 @@ type WATemplate struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// ------------------- WhatsApp Scheduler Models -------------------
+type WASchedule struct {
+	ID           uint               `gorm:"primaryKey" json:"id"`
+	SendAt       time.Time          `gorm:"not null" json:"send_at"`
+	Status       string             `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, processing, completed, failed, cancelled
+	WATemplateID uint               `gorm:"not null" json:"wa_template_id"`
+	WATemplate   WATemplate         `gorm:"foreignKey:WATemplateID" json:"wa_template"`
+	MinDelay     int                `gorm:"default:10" json:"min_delay"` // in seconds
+	MaxDelay     int                `gorm:"default:30" json:"max_delay"` // in seconds
+	Recipients   []WAScheduleDetail `gorm:"foreignKey:WAScheduleID;constraint:OnDelete:CASCADE;" json:"recipients,omitempty"`
+	CreatedAt    time.Time          `json:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+}
+
+type WAScheduleDetail struct {
+	ID           uint       `gorm:"primaryKey" json:"id"`
+	WAScheduleID uint       `gorm:"not null" json:"wa_schedule_id"`
+	StudentID    uuid.UUID  `gorm:"type:uuid;not null" json:"student_id"`
+	Student      Student    `gorm:"foreignKey:StudentID" json:"student"`
+	Phone        string     `gorm:"type:varchar(20);not null" json:"phone"`
+	Message      string     `gorm:"type:text;not null" json:"message"`
+	Status       string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, sent, failed
+	ErrorMsg     string     `gorm:"type:text" json:"error_msg"`
+	SentAt       *time.Time `json:"sent_at"`
+}
+
+

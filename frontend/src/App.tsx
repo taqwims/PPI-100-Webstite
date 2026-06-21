@@ -91,6 +91,7 @@ import InvoiceHistory from './pages/finance/InvoiceHistory';
 import StudentBillSummary from './pages/finance/StudentBillSummary';
 import InfaqTypes from './pages/finance/InfaqTypes';
 import NotificationSettings from './pages/finance/NotificationSettings';
+import WAScheduler from './pages/finance/WAScheduler';
 import PaymentVerification from './pages/finance/PaymentVerification';
 import SchoolBankAccounts from './pages/finance/SchoolBankAccounts';
 import ToastProvider from './components/ui/Toast';
@@ -221,6 +222,11 @@ function App() {
                                     <Route path="finance/notification-settings" element={
                                         <RoleRoute allowedRoles={[1, 9, 11]}>
                                             <NotificationSettings />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="finance/wa-scheduler" element={
+                                        <RoleRoute allowedRoles={[1, 9, 11]}>
+                                            <WAScheduler />
                                         </RoleRoute>
                                     } />
                                     <Route path="finance/invoice-config" element={<InvoiceConfig />} />

@@ -1,11 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import CardGlass from '../components/ui/glass/CardGlass';
 import InputGlass from '../components/ui/glass/InputGlass';
 import ButtonGlass from '../components/ui/glass/ButtonGlass';
-import { User, Lock, Save, Camera, Landmark } from 'lucide-react';
+import { User, Lock, Save, Camera, Landmark, X } from 'lucide-react';
 import api from '../services/api';
 import { useMutation } from '@tanstack/react-query';
+import Cropper from 'react-easy-crop';
+import toast from 'react-hot-toast';
+
+// Helper to create image element
+const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+        const image = new Image();
+        image.addEventListener('load', () => resolve(image));
+        image.addEventListener('error', (error) => reject(error));
+        image.setAttribute('crossOrigin', 'anonymous'); // to prevent CORS issues
+        image.src = url;
+    });
+
+// Helper to crop image in canvas
+async function getCroppedImg(imageSrc: string, pixelCrop: any): Promise<Blob> {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+        throw new Error('No 2d context');
+    }
+
+    // set canvas size to match the cropped area
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    // draw cropped image
+    ctx.drawImage(
+        image,
+        pixelCrop.x,
+        pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
+        pixelCrop.width,
+        pixelCrop.height
+    );
+
+    // As Blob
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((file) => {
+            if (file) {
+                resolve(file);
+            } else {
+                reject(new Error('Canvas is empty'));
+            }
+        }, 'image/jpeg');
+    });
+}
 
 const Settings: React.FC = () => {
     const { user } = useAuth();
@@ -27,18 +78,29 @@ const Settings: React.FC = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
+    // Cropper States
+    const [imageSrc, setImageSrc] = useState<string | null>(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+    const [isUploading, setIsUploading] = useState(false);
+
     // Staff roles (not student=6, not parent=7)
     const isStaff = user?.role_id !== 6 && user?.role_id !== 7;
+
+    const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
 
     const updateProfileMutation = useMutation({
         mutationFn: async (data: { name: string; email: string; phone: string; address: string; bank_name: string; bank_account_number: string; bank_account_holder: string }) => {
             return await api.put('/profile', data);
         },
         onSuccess: () => {
-            alert('Profil berhasil diperbarui. Silakan login ulang untuk melihat perubahan.');
+            toast.success('Profil berhasil diperbarui. Silakan login ulang untuk melihat perubahan.');
         },
         onError: (error: any) => {
-            alert(error.response?.data?.error || 'Gagal memperbarui profil');
+            toast.error(error.response?.data?.error || 'Gagal memperbarui profil');
         }
     });
 
@@ -47,13 +109,13 @@ const Settings: React.FC = () => {
             return await api.put('/profile/password', data);
         },
         onSuccess: () => {
-            alert('Password berhasil diubah.');
+            toast.success('Password berhasil diubah.');
             setOldPassword('');
             setNewPassword('');
             setConfirmPassword('');
         },
         onError: (error: any) => {
-            alert(error.response?.data?.error || 'Gagal mengubah password');
+            toast.error(error.response?.data?.error || 'Gagal mengubah password');
         }
     });
 
@@ -73,10 +135,33 @@ const Settings: React.FC = () => {
     const handleChangePassword = (e: React.FormEvent) => {
         e.preventDefault();
         if (newPassword !== confirmPassword) {
-            alert('Konfirmasi password tidak cocok');
+            toast.error('Konfirmasi password tidak cocok');
             return;
         }
         changePasswordMutation.mutate({ old_password: oldPassword, new_password: newPassword });
+    };
+
+    const handleSaveCrop = async () => {
+        if (!imageSrc || !croppedAreaPixels) return;
+        setIsUploading(true);
+        try {
+            const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+            const croppedFile = new File([croppedBlob], 'profile.jpg', { type: 'image/jpeg' });
+            
+            const formData = new FormData();
+            formData.append('file', croppedFile);
+            
+            await api.post('/profile/photo', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            toast.success('Foto profil berhasil diperbarui. Silakan refresh halaman.');
+            setImageSrc(null);
+        } catch (err: any) {
+            toast.error('Gagal memproses foto: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     return (
@@ -130,19 +215,16 @@ const Settings: React.FC = () => {
                                         const file = e.target.files?.[0];
                                         if (file) {
                                             if (file.size > 3 * 1024 * 1024) {
-                                                alert("Maksimal ukuran file adalah 3MB");
+                                                toast.error("Maksimal ukuran file adalah 3MB");
                                                 e.target.value = '';
                                                 return;
                                             }
-                                            const formData = new FormData();
-                                            formData.append('file', file);
-                                            api.post('/profile/photo', formData, {
-                                                headers: { 'Content-Type': 'multipart/form-data' }
-                                            }).then(() => {
-                                                alert('Foto profil berhasil diperbarui. Silakan refresh halaman.');
-                                            }).catch((err) => {
-                                                alert('Gagal mengupload foto: ' + (err.response?.data?.error || err.message));
+                                            const reader = new FileReader();
+                                            reader.addEventListener('load', () => {
+                                                setImageSrc(reader.result as string);
                                             });
+                                            reader.readAsDataURL(file);
+                                            e.target.value = ''; // Reset input
                                         }
                                     }}
                                 />
@@ -285,6 +367,68 @@ const Settings: React.FC = () => {
                     </CardGlass>
                 </div>
             </div>
+
+            {/* Adjust/Crop Modal */}
+            {imageSrc && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-lg flex flex-col">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-slate-900 text-lg">Sesuaikan Foto Profil</h3>
+                            <button onClick={() => setImageSrc(null)} className="text-slate-400 hover:text-slate-600 transition">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        {/* Cropper Container */}
+                        <div className="relative w-full h-80 bg-slate-900">
+                            <Cropper
+                                image={imageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                aspect={1}
+                                onCropChange={setCrop}
+                                onZoomChange={setZoom}
+                                onCropComplete={onCropComplete}
+                            />
+                        </div>
+                        
+                        {/* Controls */}
+                        <div className="p-6 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Perbesar/Perkecil</label>
+                                <input
+                                    type="range"
+                                    value={zoom}
+                                    min={1}
+                                    max={3}
+                                    step={0.1}
+                                    aria-labelledby="Zoom"
+                                    onChange={(e) => setZoom(Number(e.target.value))}
+                                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                />
+                            </div>
+                            
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setImageSrc(null)}
+                                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleSaveCrop}
+                                    disabled={isUploading}
+                                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                                >
+                                    {isUploading ? (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    ) : 'Terapkan & Simpan'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
