@@ -3,6 +3,20 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { Bill, getRemainingAmount } from '../components/finance/Billing/BillingUtils';
 
+export interface MidtransDetail {
+    order_id: string;
+    status: string;
+    transaction_status?: string;
+    payment_type?: string;
+    gross_amount?: string;
+    va_numbers?: { bank: string; va_number: string }[];
+    permata_va_number?: string;
+    bill_key?: string;
+    biller_code?: string;
+    qr_code_url?: string;
+    expiry_time?: string;
+}
+
 export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined) => {
     // Single payment state
     const [showPayModal, setShowPayModal] = useState(false);
@@ -12,7 +26,9 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [loadingSnap, setLoadingSnap] = useState(false);
+    const [cancelingPayment, setCancelingPayment] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
+    const [activeMidtransDetail, setActiveMidtransDetail] = useState<MidtransDetail | null>(null);
 
     // Multi-payment state
     const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
@@ -26,8 +42,31 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         setProofFile(null);
         setSuccessMsg('');
         setLoadingSnap(false);
+        setActiveMidtransDetail(null);
         setPaymentAmount(getRemainingAmount(bill));
         setShowPayModal(true);
+
+        // Check if there is an active pending midtrans payment for this bill
+        const pendingPayment = bill.payments?.find(
+            p => p.payment_method === 'Midtrans' && p.status === 'Pending' && p.transaction_id
+        );
+        if (pendingPayment && pendingPayment.transaction_id) {
+            checkPendingDetails(pendingPayment.transaction_id);
+        }
+    };
+
+    const checkPendingDetails = async (orderId: string) => {
+        try {
+            const res = await api.post('/finance/midtrans/check-status', { order_id: orderId });
+            if (res.data) {
+                setActiveMidtransDetail({
+                    ...res.data,
+                    order_id: orderId
+                });
+            }
+        } catch (e) {
+            console.error('Failed to fetch pending Midtrans details:', e);
+        }
     };
 
     // Auto-check pending midtrans payments on load if there are bills with pending Status
@@ -44,7 +83,9 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                             promises.push(
                                 api.post('/finance/midtrans/check-status', { order_id: p.transaction_id })
                                     .then(res => {
-                                        if (res.data.status === 'Success') shouldRefetch = true;
+                                        if (res.data.status === 'Success' || res.data.status === 'Failed') {
+                                            shouldRefetch = true;
+                                        }
                                     })
                                     .catch(e => console.error(e))
                             );
@@ -61,6 +102,20 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         checkPending();
     }, [bills, refetch]);
 
+    const cancelPendingPayment = async (orderId: string) => {
+        setCancelingPayment(true);
+        try {
+            await api.post('/finance/midtrans/cancel-transaction', { order_id: orderId });
+            toast.success('Pembayaran sebelumnya telah dibatalkan. Silakan pilih metode pembayaran baru.');
+            setActiveMidtransDetail(null);
+            refetch();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Gagal membatalkan transaksi');
+        } finally {
+            setCancelingPayment(false);
+        }
+    };
+
     const handleMidtransPayment = async () => {
         if (!selectedBill || paymentAmount <= 0) return;
         setLoadingSnap(true);
@@ -75,7 +130,15 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
             const verifyAndRefresh = (delay = 2000) => {
                 setTimeout(() => {
                     api.post('/finance/midtrans/check-status', { order_id: orderID })
-                        .then(() => refetch())
+                        .then((res) => {
+                            if (res.data) {
+                                setActiveMidtransDetail({
+                                    ...res.data,
+                                    order_id: orderID
+                                });
+                            }
+                            refetch();
+                        })
                         .catch((e) => {
                             console.error('Failed to verify Midtrans status:', e);
                             refetch();
@@ -95,14 +158,13 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                 },
                 onPending: () => {
                     verifyAndRefresh(1000);
-                    setSuccessMsg('Pembayaran sedang diproses. Status akan diperbarui otomatis.');
+                    setSuccessMsg('Pembayaran sedang diproses. Silakan selesaikan pembayaran.');
                     setTimeout(() => {
-                        setShowPayModal(false);
-                        setSuccessMsg('');
-                    }, 3500);
+                        refetch();
+                    }, 1500);
                 },
                 onError: () => {
-                    alert('Pembayaran gagal. Silakan coba lagi.');
+                    toast.error('Pembayaran gagal. Silakan coba lagi.');
                     setLoadingSnap(false);
                 },
                 onClose: () => {
@@ -111,7 +173,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                 },
             });
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Gagal membuat transaksi Midtrans');
+            toast.error(error.response?.data?.error || 'Gagal membuat transaksi Midtrans');
             setLoadingSnap(false);
         }
     };
@@ -120,7 +182,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         if (!selectedBill) return;
 
         if (paymentAmount <= 0 || paymentAmount > getRemainingAmount(selectedBill)) {
-            alert('Jumlah pembayaran tidak valid.');
+            toast.error('Jumlah pembayaran tidak valid.');
             return;
         }
 
@@ -152,7 +214,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                 setSuccessMsg('');
             }, 2500);
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Gagal mengirim pembayaran');
+            toast.error(error.response?.data?.error || 'Gagal mengirim pembayaran');
         } finally {
             setSubmitting(false);
         }
@@ -234,7 +296,8 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         // Single Modal
         showPayModal, setShowPayModal, openPayModal, selectedBill, 
         paymentMethod, setPaymentMethod, paymentAmount, setPaymentAmount, 
-        proofFile, setProofFile, submitting, loadingSnap, successMsg, 
+        proofFile, setProofFile, submitting, loadingSnap, cancelingPayment, successMsg,
+        activeMidtransDetail, cancelPendingPayment,
         handleMidtransPayment, handleSubmitPayment,
 
         // Multi Modal

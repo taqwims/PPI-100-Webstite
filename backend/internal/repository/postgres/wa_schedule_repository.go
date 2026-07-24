@@ -35,7 +35,7 @@ func (r *waScheduleRepository) Create(schedule *domain.WASchedule) error {
 
 func (r *waScheduleRepository) GetAll() ([]domain.WASchedule, error) {
 	var schedules []domain.WASchedule
-	err := r.db.Preload("WATemplate").Order("send_at desc").Find(&schedules).Error
+	err := r.db.Preload("WATemplate").Preload("Recipients").Order("send_at desc").Find(&schedules).Error
 	return schedules, err
 }
 

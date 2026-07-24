@@ -285,7 +285,8 @@ const ParentChildBills: React.FC = () => {
                 paymentMethod={bp.paymentMethod} setPaymentMethod={bp.setPaymentMethod}
                 paymentAmount={bp.paymentAmount} setPaymentAmount={bp.setPaymentAmount}
                 proofFile={bp.proofFile} setProofFile={bp.setProofFile}
-                submitting={bp.submitting} loadingSnap={bp.loadingSnap} successMsg={bp.successMsg}
+                submitting={bp.submitting} loadingSnap={bp.loadingSnap} cancelingPayment={bp.cancelingPayment} successMsg={bp.successMsg}
+                activeMidtransDetail={bp.activeMidtransDetail} cancelPendingPayment={bp.cancelPendingPayment}
                 handleMidtransPayment={bp.handleMidtransPayment} handleSubmitPayment={bp.handleSubmitPayment}
             />
 

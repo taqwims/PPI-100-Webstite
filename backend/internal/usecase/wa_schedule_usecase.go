@@ -105,22 +105,21 @@ func (u *waScheduleUsecase) CreateSchedule(sendAt time.Time, templateID uint, mi
 		student := firstOb.Student
 
 		// Get Parent and Student phone numbers
-		parent, _, _ := u.studentObligationRepo.GetParentByStudentID(student.ParentID)
+		parent, parentUser, _ := u.studentObligationRepo.GetParentByStudentID(student.ParentID)
 		
 		var parentPhone string
-		if parent != nil {
+		if parent != nil && parent.Phone != "" {
 			parentPhone = parent.Phone
+		} else if parentUser != nil && parentUser.Phone != "" {
+			parentPhone = parentUser.Phone
 		}
 		studentPhone := student.User.Phone
 
 		var targetPhones []string
 		if parentPhone != "" {
 			targetPhones = append(targetPhones, parentPhone)
-		}
-		if studentPhone != "" {
-			if parentPhone == "" || studentPhone != parentPhone {
-				targetPhones = append(targetPhones, studentPhone)
-			}
+		} else if studentPhone != "" {
+			targetPhones = append(targetPhones, studentPhone)
 		}
 
 		if len(targetPhones) == 0 {

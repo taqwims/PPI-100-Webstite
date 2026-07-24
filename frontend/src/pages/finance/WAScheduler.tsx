@@ -21,8 +21,10 @@ interface Class {
 interface WAScheduleRecipient {
     id: number;
     student: {
-        full_name: string;
-        nis: string;
+        full_name?: string;
+        nis?: string;
+        nisn?: string;
+        user?: { name?: string };
         class?: { name: string };
     };
     phone: string;
@@ -49,7 +51,7 @@ interface WASchedulerProps {
 
 const WAScheduler: React.FC<WASchedulerProps> = ({ isSubcomponent = false }) => {
     const queryClient = useQueryClient();
-    const { selectedYear } = useAcademicYear();
+    const { selectedYear, academicYears } = useAcademicYear();
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [selectedSchedule, setSelectedSchedule] = useState<WASchedule | null>(null);
@@ -77,6 +79,11 @@ const WAScheduler: React.FC<WASchedulerProps> = ({ isSubcomponent = false }) => 
     const { data: classes = [] } = useQuery<Class[]>({
         queryKey: ['classes'],
         queryFn: async () => (await api.get('/academic/classes')).data || [],
+    });
+
+    const { data: yearsList = [] } = useQuery<any[]>({
+        queryKey: ['academic-years-wascheduler'],
+        queryFn: async () => (await api.get('/finance/academic-years')).data || [],
     });
 
     // Mutations
@@ -123,10 +130,13 @@ const WAScheduler: React.FC<WASchedulerProps> = ({ isSubcomponent = false }) => 
             toast.error('Template pesan wajib dipilih');
             return;
         }
-        if (!selectedYear?.id) {
-            toast.error('Tahun ajaran aktif belum dipilih');
-            return;
-        }
+
+        // Determine active academic year ID (selectedYear, fetched yearsList, or fallback)
+        const targetYearId = selectedYear?.id 
+            || academicYears.find(y => y.is_active)?.id 
+            || yearsList.find((y: any) => y.is_active)?.id 
+            || yearsList[0]?.id 
+            || 0;
 
         // Format: YYYY-MM-DD HH:MM:SS in Asia/Jakarta
         const sendAtStr = `${sendAtDate} ${sendAtTime}:00`;
@@ -136,7 +146,7 @@ const WAScheduler: React.FC<WASchedulerProps> = ({ isSubcomponent = false }) => 
             wa_template_id: parseInt(templateId),
             min_delay: minDelay,
             max_delay: maxDelay,
-            academic_year_id: selectedYear.id,
+            academic_year_id: targetYearId,
             class_ids: targetClassIds,
         });
     };
@@ -449,8 +459,8 @@ const WAScheduler: React.FC<WASchedulerProps> = ({ isSubcomponent = false }) => 
                                     {selectedSchedule.recipients.map((recipient) => (
                                         <div key={recipient.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                                             <div>
-                                                <h4 className="font-bold text-slate-900 text-sm">{recipient.student?.full_name}</h4>
-                                                <p className="text-xs text-slate-500">NIS: {recipient.student?.nis || '-'} • Kelas: {recipient.student?.class?.name || '-'}</p>
+                                                <h4 className="font-bold text-slate-900 text-sm">{recipient.student?.full_name || recipient.student?.user?.name || 'Siswa'}</h4>
+                                                <p className="text-xs text-slate-500">NIS/NISN: {recipient.student?.nisn || recipient.student?.nis || '-'} • Kelas: {recipient.student?.class?.name || '-'}</p>
                                                 <p className="text-xs font-mono text-slate-600 mt-1">Telp Wali: {recipient.phone}</p>
                                                 {recipient.error_msg && (
                                                     <span className="text-[10px] text-red-600 font-semibold block mt-1 bg-red-50 p-1.5 rounded border border-red-100">

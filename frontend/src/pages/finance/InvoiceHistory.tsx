@@ -16,6 +16,8 @@ import {
 import { generateInvoiceA5Double } from '../../utils/invoiceTemplate';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 
+import { useAuth } from '../../context/AuthContext';
+
 interface InvoiceHistoryItem {
     invoice_number: string;
     invoice_type: string;
@@ -26,7 +28,7 @@ interface InvoiceHistoryItem {
     verification_code: string;
 }
 
-const INVOICE_TYPES = [
+const ALL_INVOICE_TYPES = [
     { id: '', label: 'Semua Kategori', icon: Tag },
     { id: 'Bill', label: 'Pembayaran Siswa', icon: FileText },
     { id: 'Payroll', label: 'Slip Gaji', icon: FileText },
@@ -37,6 +39,7 @@ const INVOICE_TYPES = [
 ];
 
 const InvoiceHistory: React.FC = () => {
+    const { user } = useAuth();
     const [invoices, setInvoices] = useState<InvoiceHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -46,6 +49,12 @@ const InvoiceHistory: React.FC = () => {
     const [isExporting, setIsExporting] = useState<string | null>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const [activeInvoice, setActiveInvoice] = useState<InvoiceHistoryItem | null>(null);
+
+    // Role-based tabs filtering: Siswa (6) & Orang Tua (7) should only see student-relevant categories
+    const isStudentOrParent = user?.role_id === 6 || user?.role_id === 7;
+    const availableInvoiceTypes = isStudentOrParent
+        ? ALL_INVOICE_TYPES.filter(t => ['', 'Bill', 'Savings', 'Activity'].includes(t.id))
+        : ALL_INVOICE_TYPES;
 
     const fetchInvoices = async () => {
         setLoading(true);
@@ -243,7 +252,7 @@ const InvoiceHistory: React.FC = () => {
                 </form>
 
                 <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {INVOICE_TYPES.map((type) => {
+                    {availableInvoiceTypes.map((type) => {
                         const Icon = type.icon;
                         const isSelected = selectedType === type.id;
                         return (

@@ -57,6 +57,7 @@ func RegisterFinanceRoutes(
 		if cfg.FeatureMidtrans {
 			finance.POST("/midtrans/create-transaction", midtransHandler.CreateSnapTransaction)
 			finance.POST("/midtrans/check-status", midtransHandler.CheckTransactionStatus)
+			finance.POST("/midtrans/cancel-transaction", midtransHandler.CancelTransaction)
 		}
 
 		// ── Academic Years (always available — needed for many modules) ──

@@ -82,11 +82,30 @@ func (h *MidtransHandler) CheckTransactionStatus(c *gin.Context) {
 		return
 	}
 
-	status, err := h.midtransUsecase.CheckTransactionStatus(req.OrderID)
+	detail, err := h.midtransUsecase.CheckTransactionStatus(req.OrderID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": status})
+	c.JSON(http.StatusOK, detail)
+}
+
+// CancelTransaction cancels a pending transaction in Midtrans and DB
+// POST /finance/midtrans/cancel-transaction (authenticated)
+func (h *MidtransHandler) CancelTransaction(c *gin.Context) {
+	var req struct {
+		OrderID string `json:"order_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.midtransUsecase.CancelTransaction(req.OrderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Transaksi berhasil dibatalkan", "status": "Failed"})
 }

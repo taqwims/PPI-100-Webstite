@@ -12,13 +12,16 @@ import { useAcademicYear } from '../../context/AcademicYearContext';
 
 interface Student {
     id: string;
-    full_name: string;
-    nis: string;
+    full_name?: string;
+    nis?: string;
+    nisn?: string;
     class?: { id: number; name: string };
     class_id?: number;
     parent?: { phone: string };
-    user?: { phone: string };
+    user?: { id?: string; name?: string; email?: string; phone?: string };
 }
+
+const getStudentName = (s: Student) => s.full_name || s.user?.name || 'Siswa';
 
 interface Class {
     id: number;
@@ -184,8 +187,9 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
         if (!searchQuery.trim()) return entries;
         const q = searchQuery.toLowerCase();
         return entries.filter(e =>
-            e.student.full_name.toLowerCase().includes(q) ||
+            getStudentName(e.student).toLowerCase().includes(q) ||
             e.student.nis?.toLowerCase().includes(q) ||
+            e.student.nisn?.toLowerCase().includes(q) ||
             e.student.class?.name?.toLowerCase().includes(q)
         );
     }, [studentMap, searchQuery]);
@@ -204,8 +208,8 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
         const totalTagihan = unpaid.reduce((s, o) => s + (o.amount - o.paid_amount), 0);
 
         return template.body_template
-            .replace(/{nama_siswa}/g, student.full_name)
-            .replace(/{nis}/g, student.nis || '-')
+            .replace(/{nama_siswa}/g, getStudentName(student))
+            .replace(/{nis}/g, student.nis || student.nisn || '-')
             .replace(/{kelas}/g, student.class?.name || '-')
             .replace(/{total_tagihan}/g, formatCurrency(totalTagihan))
             .replace(/{rincian}/g, rincian)
@@ -236,7 +240,7 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
 
             setLastMultiPayResult({
                 invoiceNumber,
-                studentName: multiPayModal?.student.full_name || '',
+                studentName: multiPayModal ? getStudentName(multiPayModal.student) : '',
                 paymentMethod: multiPayMethod,
                 bills: selectedObligations.map(o => ({
                     title: o.payment_type?.name || 'Tagihan',
@@ -462,8 +466,8 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                             {isExpanded ? <ChevronDown size={18} className="text-blue-600" /> : <ChevronRight size={18} className="text-blue-600" />}
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="font-semibold text-slate-900 truncate">{student.full_name}</p>
-                                            <p className="text-sm text-slate-500 truncate">{student.nis} • {student.class?.name || '-'}</p>
+                                            <p className="font-semibold text-slate-900 truncate">{getStudentName(student)}</p>
+                                            <p className="text-sm text-slate-500 truncate">{student.nis || student.nisn || '-'} • {student.class?.name || '-'}</p>
                                         </div>
                                         {unpaidCount > 0 && (
                                             <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 shrink-0">
@@ -484,9 +488,9 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                                         e.stopPropagation();
                                                         try {
                                                             await generateStudentBillPDF({
-                                                                studentName: student.full_name,
+                                                                studentName: getStudentName(student),
                                                                 className: student.class?.name || '-',
-                                                                nisn: student.nis,
+                                                                nisn: student.nis || student.nisn || '-',
                                                                 academicYear: obligations[0]?.created_at ? new Date(obligations[0].created_at).getFullYear().toString() : '-',
                                                                 obligations: obligations.map(o => ({
                                                                     name: o.payment_type?.name || '-',
@@ -668,7 +672,7 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                             <h2 className="text-xl font-bold text-emerald-800 flex items-center gap-2">
                                 <Send className="text-emerald-600" size={22} /> Kirim Tagihan via WhatsApp
                             </h2>
-                            <p className="text-sm text-emerald-600 mt-1">Siswa: {waModal.student.full_name}</p>
+                            <p className="text-sm text-emerald-600 mt-1">Siswa: {getStudentName(waModal.student)}</p>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
@@ -801,7 +805,7 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                 <h2 className="text-xl font-bold text-indigo-800 flex items-center gap-2">
                                     <CreditCard className="text-indigo-600" size={22} /> Bayar Terpilih
                                 </h2>
-                                <p className="text-sm text-indigo-600 mt-1">Siswa: {multiPayModal.student.full_name}</p>
+                                <p className="text-sm text-indigo-600 mt-1">Siswa: {getStudentName(multiPayModal.student)}</p>
                             </div>
                             <button
                                 onClick={() => setMultiPayModal(null)}

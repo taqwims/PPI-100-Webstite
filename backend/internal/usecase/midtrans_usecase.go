@@ -174,36 +174,113 @@ func (u *MidtransUsecase) CreateMultiSnapTransaction(orderID string, totalAmount
 	return snapResp.Token, snapResp.RedirectURL, orderID, nil
 }
 
+// CancelTransaction cancels a pending transaction in Midtrans and updates the local payment status
+func (u *MidtransUsecase) CancelTransaction(orderID string) error {
+	// Call Midtrans Core API Cancel endpoint
+	_, midErr := u.coreClient.CancelTransaction(orderID)
+	if midErr != nil {
+		log.Printf("Midtrans cancel warning/error for OrderID %s: %v", orderID, midErr.GetMessage())
+		// Even if Midtrans returns error (e.g. already cancelled/expired), we still mark local payments as Failed/Cancelled
+	}
+
+	payments, err := u.financeRepo.GetPaymentsByTransactionID(orderID)
+	if err != nil {
+		return fmt.Errorf("payments not found for order_id %s: %w", orderID, err)
+	}
+
+	for i := range payments {
+		p := &payments[i]
+		if p.Status == "Pending" {
+			p.Status = "Failed"
+			if err := u.financeRepo.UpdatePayment(p); err != nil {
+				log.Printf("Failed to update payment status to Failed for order_id %s: %v", orderID, err)
+			}
+		}
+	}
+	return nil
+}
+
+type DetailedTransactionStatus struct {
+	Status            string      `json:"status"`
+	TransactionStatus string      `json:"transaction_status"`
+	PaymentType       string      `json:"payment_type"`
+	GrossAmount       string      `json:"gross_amount"`
+	VANumbers         []VANumber  `json:"va_numbers,omitempty"`
+	PermataVANumber   string      `json:"permata_va_number,omitempty"`
+	BillKey           string      `json:"bill_key,omitempty"`
+	BillerCode        string      `json:"biller_code,omitempty"`
+	QRCodeURL         string      `json:"qr_code_url,omitempty"`
+	ExpiryTime        string      `json:"expiry_time,omitempty"`
+}
+
+type VANumber struct {
+	Bank     string `json:"bank"`
+	VANumber string `json:"va_number"`
+}
+
+type ActionURL struct {
+	Name   string `json:"name"`
+	Method string `json:"method"`
+	URL    string `json:"url"`
+}
+
 // CheckTransactionStatus checks payment status directly with Midtrans API
-// This is called from the frontend after Snap popup completes, to handle cases
-// where the webhook can't reach the server (e.g. localhost development)
-func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (string, error) {
+// This is called from the frontend after Snap popup completes or to inspect pending payment details
+func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (*DetailedTransactionStatus, error) {
 	// Verify transaction status with Midtrans
 	transactionStatusResp, midErr := u.coreClient.CheckTransaction(orderID)
 	if midErr != nil {
 		// Handle 404/Not Found from Midtrans gracefully to avoid 500 errors on UX
 		if midErr.GetMessage() == "Transaction doesn't exist." {
 			log.Printf("Midtrans status check - OrderID %s not found in Midtrans (Uninitiated)", orderID)
-			return "Uninitiated", nil
+			return &DetailedTransactionStatus{Status: "Uninitiated"}, nil
 		}
-		return "", fmt.Errorf("failed to check transaction: %s", midErr.GetMessage())
+		return nil, fmt.Errorf("failed to check transaction: %s", midErr.GetMessage())
 	}
 
-	log.Printf("Midtrans status check - OrderID: %s, Status: %s, FraudStatus: %s",
-		orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
+	log.Printf("Midtrans status check - OrderID: %s, Status: %s, FraudStatus: %s, PaymentType: %s",
+		orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus, transactionStatusResp.PaymentType)
 
 	err := u.processPaymentStatus(orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// Return the resolved status
+	// Return the resolved status along with payment details
 	payment, err := u.financeRepo.GetPaymentByTransactionID(orderID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return payment.Status, nil
+	// Extract QR Code URL if payment_type is qris or gopay
+	qrCodeURL := ""
+	if transactionStatusResp.PaymentType == "qris" || transactionStatusResp.PaymentType == "gopay" {
+		// Use Midtrans QR code image endpoint by default for QRIS order
+		qrCodeURL = fmt.Sprintf("https://api.midtrans.com/v2/qris/%s/qr-code", orderID)
+	}
+
+	res := &DetailedTransactionStatus{
+		Status:            payment.Status,
+		TransactionStatus: transactionStatusResp.TransactionStatus,
+		PaymentType:       transactionStatusResp.PaymentType,
+		GrossAmount:       transactionStatusResp.GrossAmount,
+		ExpiryTime:        transactionStatusResp.ExpiryTime,
+		PermataVANumber:   transactionStatusResp.PermataVaNumber,
+		BillKey:           transactionStatusResp.BillKey,
+		BillerCode:        transactionStatusResp.BillerCode,
+		QRCodeURL:         qrCodeURL,
+	}
+
+	if len(transactionStatusResp.VaNumbers) > 0 {
+		for _, va := range transactionStatusResp.VaNumbers {
+			res.VANumbers = append(res.VANumbers, VANumber{
+				Bank:     va.Bank,
+				VANumber: va.VANumber,
+			})
+		}
+	}
+
+	return res, nil
 }
 
 // processPaymentStatus is the shared logic for updating payment and bill status

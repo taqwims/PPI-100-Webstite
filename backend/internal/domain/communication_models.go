@@ -56,7 +56,7 @@ type WASchedule struct {
 	WATemplate   WATemplate         `gorm:"foreignKey:WATemplateID" json:"wa_template"`
 	MinDelay     int                `gorm:"default:10" json:"min_delay"` // in seconds
 	MaxDelay     int                `gorm:"default:30" json:"max_delay"` // in seconds
-	Recipients   []WAScheduleDetail `gorm:"foreignKey:WAScheduleID;constraint:OnDelete:CASCADE;" json:"recipients,omitempty"`
+	Recipients   []WAScheduleDetail `gorm:"foreignKey:WAScheduleID;constraint:OnDelete:CASCADE;" json:"recipients"`
 	CreatedAt    time.Time          `json:"created_at"`
 	UpdatedAt    time.Time          `json:"updated_at"`
 }
