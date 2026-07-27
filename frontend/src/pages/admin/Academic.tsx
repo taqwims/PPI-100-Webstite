@@ -282,11 +282,15 @@ const Academic = () => {
 
         switch (activeTab) {
             case 'classes':
+                const sortedClasses = filterData(classes)?.slice().sort((a: any, b: any) => 
+                    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+                ) || [];
+
                 return (
                     <TableGlass
-                        headers={['ID', 'Nama Kelas', 'Wali Kelas', 'Aksi']}
-                        data={filterData(classes)?.map((cls: any) => ({
-                            id: cls.id,
+                        headers={['No', 'Nama Kelas', 'Wali Kelas', 'Aksi']}
+                        data={sortedClasses.map((cls: any, index: number) => ({
+                            no: index + 1,
                             name: cls.name,
                             homeroom: cls.homeroom_teacher?.user?.name || <span className="text-slate-400 italic text-xs">Belum ditentukan</span>,
                             actions: (
@@ -294,8 +298,9 @@ const Academic = () => {
                                     <button onClick={() => handleOpenModal(cls)} className="text-blue-600 hover:text-blue-500"><Edit size={16} /></button>
                                     <button onClick={() => handleDelete(cls.id)} className="text-red-600 hover:text-red-500"><Trash2 size={16} /></button>
                                 </div>
-                            )
-                        })) || []}
+                            ),
+                            id: cls.id,
+                        }))}
                     />
                 );
             case 'subjects':

@@ -25,7 +25,7 @@ func (r *AcademicRepository) GetAllClasses(unitID uint) ([]domain.Class, error) 
 	if unitID != 0 {
 		query = query.Where("unit_id = ?", unitID)
 	}
-	err := query.Order("id ASC").Find(&classes).Error
+	err := query.Order("name ASC").Find(&classes).Error
 	return classes, err
 }
 

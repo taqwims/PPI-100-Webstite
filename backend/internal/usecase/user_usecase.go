@@ -83,21 +83,40 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 	return nil
 }
 
-func (u *UserUsecase) UpdateUser(user *domain.User) error {
-	if user.PasswordHash != "" {
-		hashedPassword, err := utils.HashPassword(user.PasswordHash)
+func (u *UserUsecase) UpdateUser(user *domain.User, newPassword string) error {
+	if newPassword != "" {
+		hashedPassword, err := utils.HashPassword(newPassword)
 		if err != nil {
 			return err
 		}
 		user.PasswordHash = hashedPassword
-	} else {
-		// Fetch existing user to keep old password if not provided
+	} else if user.PasswordHash == "" {
+		// Fetch existing user to keep old password if not provided in user struct
 		existingUser, err := u.userRepo.FindByID(user.ID.String())
 		if err != nil {
 			return err
 		}
 		user.PasswordHash = existingUser.PasswordHash
 	}
+	return u.userRepo.Update(user)
+}
+
+func (u *UserUsecase) ChangePassword(userID string, oldPassword, newPassword string) error {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil {
+		return fmt.Errorf("user tidak ditemukan")
+	}
+
+	if !utils.CheckPasswordHash(oldPassword, user.PasswordHash) {
+		return fmt.Errorf("password lama tidak sesuai")
+	}
+
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("gagal memproses password baru")
+	}
+
+	user.PasswordHash = hashedPassword
 	return u.userRepo.Update(user)
 }
 

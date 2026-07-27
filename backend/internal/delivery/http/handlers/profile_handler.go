@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"ppi-100-sis/internal/usecase"
-	"ppi-100-sis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -103,7 +102,7 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	user.BankAccountNumber = req.BankAccountNumber
 	user.BankAccountHolder = req.BankAccountHolder
 
-	if err := h.userUsecase.UpdateUser(user); err != nil {
+	if err := h.userUsecase.UpdateUser(user, ""); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -140,30 +139,8 @@ func (h *ProfileHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Get user
-	user, err := h.userUsecase.GetUserByID(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Verify old password
-	if !utils.CheckPasswordHash(req.OldPassword, user.PasswordHash) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password lama tidak sesuai"})
-		return
-	}
-
-	// Hash new password
-	newHash, err := utils.HashPassword(req.NewPassword)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-		return
-	}
-
-	// Update password
-	user.PasswordHash = newHash
-	if err := h.userUsecase.UpdateUser(user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.userUsecase.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -215,7 +192,7 @@ func (h *ProfileHandler) UploadPhoto(c *gin.Context) {
 	}
 
 	user.PhotoURL = "/uploads/profiles/" + filename
-	if err := h.userUsecase.UpdateUser(user); err != nil {
+	if err := h.userUsecase.UpdateUser(user, ""); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api';
-import { Plus, Trash2, Edit2, Phone, MapPin, Users, Briefcase } from 'lucide-react';
+import { Plus, Trash2, Edit2, Phone, MapPin, Users, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { useUnits } from '../../../hooks/useUnits';
+import toast from 'react-hot-toast';
 
 interface Parent {
     id: string;
@@ -26,6 +27,7 @@ export const ParentManagement: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingParent, setEditingParent] = useState<Parent | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
         name: '', email: '', password: '', phone: '', address: '', occupation: '', relation: 'Ayah', unit_id: units[0]?.id || 1
@@ -42,29 +44,33 @@ export const ParentManagement: React.FC = () => {
     const createMutation = useMutation({
         mutationFn: (data: typeof formData) => api.post('/parents/', data),
         onSuccess: () => {
+            toast.success('Data orang tua berhasil ditambahkan');
             queryClient.invalidateQueries({ queryKey: ['parents'] });
             queryClient.invalidateQueries({ queryKey: ['users'] });
             handleCloseModal();
         },
-        onError: (err: any) => alert(err.response?.data?.error || 'Gagal menyimpan data'),
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menyimpan data'),
     });
 
     const updateMutation = useMutation({
         mutationFn: (data: typeof formData) => api.put(`/parents/${editingParent?.id}`, data),
         onSuccess: () => {
+            toast.success('Data orang tua berhasil diperbarui');
             queryClient.invalidateQueries({ queryKey: ['parents'] });
             queryClient.invalidateQueries({ queryKey: ['users'] });
             handleCloseModal();
         },
-        onError: (err: any) => alert(err.response?.data?.error || 'Gagal mengupdate data'),
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal mengupdate data'),
     });
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => api.delete(`/parents/${id}`),
         onSuccess: () => {
+            toast.success('Data orang tua berhasil dihapus');
             queryClient.invalidateQueries({ queryKey: ['parents'] });
             queryClient.invalidateQueries({ queryKey: ['users'] });
         },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus data'),
     });
 
     const handleCloseModal = () => {
@@ -198,8 +204,14 @@ export const ParentManagement: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">{editingParent ? 'Password Baru (Opsional)' : 'Password'}</label>
-                                    <input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="••••••••" required={!editingParent} />
+                                    <div className="relative">
+                                        <input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                            className="w-full pl-3 pr-9 py-2 border border-slate-200 rounded-lg text-sm" placeholder="••••••••" required={!editingParent} />
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition">
+                                            {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">No. HP / WhatsApp</label>

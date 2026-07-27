@@ -59,7 +59,7 @@ func (u *StudentUsecase) CreateStudent(name, email, password, nisn string, class
 	return u.studentRepo.Create(student)
 }
 
-func (u *StudentUsecase) UpdateStudent(id string, name, email, nisn string, classID, unitID uint, parentID *uuid.UUID) error {
+func (u *StudentUsecase) UpdateStudent(id string, name, email, password, nisn string, classID, unitID uint, parentID *uuid.UUID) error {
 	student, err := u.studentRepo.GetByID(id)
 	if err != nil {
 		return err
@@ -72,6 +72,13 @@ func (u *StudentUsecase) UpdateStudent(id string, name, email, nisn string, clas
 	}
 	user.Name = name
 	user.Email = email
+	if password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		user.PasswordHash = string(hashedPassword)
+	}
 	if err := u.userRepo.Update(user); err != nil {
 		return err
 	}

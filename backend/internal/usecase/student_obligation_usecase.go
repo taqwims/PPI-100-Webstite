@@ -27,13 +27,48 @@ func (u *StudentObligationUsecase) Create(ob *domain.StudentObligation) error {
 		return err
 	}
 	ob.Amount = pt.Amount
+	if ob.TotalInstallments > 1 {
+		ob.Amount = pt.Amount / float64(ob.TotalInstallments)
+	}
 	ob.PaidAmount = 0
 	ob.Status = "Unpaid"
+
+	// Calculate due date if not provided
+	if ob.DueDate == nil {
+		ay, err := u.repo.GetAcademicYearByID(ob.AcademicYearID)
+		if err == nil && ob.BillingMonth > 0 {
+			ayStartYear := ay.StartDate.Year()
+			ayStartMonth := int(ay.StartDate.Month())
+			targetYear := ayStartYear
+			if ob.BillingMonth < ayStartMonth && ayStartMonth > 1 {
+				targetYear++
+			}
+			dueDate := time.Date(targetYear, time.Month(ob.BillingMonth), 10, 0, 0, 0, 0, time.Local)
+			ob.DueDate = &dueDate
+		} else if err == nil && ob.InstallmentNumber > 0 {
+			dueDate := ay.StartDate.AddDate(0, (ob.InstallmentNumber-1)*3, 0)
+			ob.DueDate = &dueDate
+		} else {
+			dueDate := time.Now().AddDate(0, 1, 0)
+			ob.DueDate = &dueDate
+		}
+	}
+
 	err = u.repo.Create(ob)
 	if err == nil {
-		dueDate := time.Now().AddDate(0, 1, 0) // Default 1 month due date
 		obID := ob.ID
-		_ = u.financeUsecase.CreateBill(ob.StudentID, pt.Name, pt.Amount, dueDate, pt.Name, &ob.AcademicYearID, pt.TransactionCodeID, false, &obID, nil)
+		title := pt.Name
+		if ob.BillingMonth > 0 {
+			monthNames := []string{"", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"}
+			if ob.BillingMonth <= 12 {
+				title = pt.Name + " - " + monthNames[ob.BillingMonth]
+			}
+		} else if ob.TotalInstallments > 0 {
+			title = pt.Name + " - Cicilan " + strconv.Itoa(ob.InstallmentNumber) + "/" + strconv.Itoa(ob.TotalInstallments)
+		}
+
+		billDueDate := *ob.DueDate
+		_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &ob.AcademicYearID, pt.TransactionCodeID, false, &obID, nil)
 	}
 	return err
 }

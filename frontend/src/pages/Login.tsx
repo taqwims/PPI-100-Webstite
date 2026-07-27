@@ -5,6 +5,7 @@ import ButtonGlass from '../components/ui/glass/ButtonGlass';
 import { ArrowRight, Lock, Mail, ShieldCheck, GraduationCap, Building } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import toast from 'react-hot-toast';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -24,9 +25,12 @@ const Login: React.FC = () => {
             const profileRes = await api.get('/profile');
             useAuthStore.getState().setUser(profileRes.data);
             
+            toast.success('Berhasil masuk!');
             navigate('/dashboard');
-        } catch (err) {
-            setError('Email atau password tidak valid');
+        } catch (err: any) {
+            const errMsg = err.response?.data?.error || 'Email atau password tidak valid';
+            setError(errMsg);
+            toast.error(errMsg);
         } finally {
             setIsLoading(false);
         }
@@ -77,17 +81,15 @@ const Login: React.FC = () => {
                                 <div className="flex justify-between items-center mb-2">
                                     <label className="block text-sm font-medium text-slate-700">Password</label>
                                 </div>
-                                <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                                    <InputGlass
-                                        type="password"
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="pl-12 w-full bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-emerald-500/20 text-slate-900"
-                                        required
-                                    />
-                                </div>
+                                <InputGlass
+                                    type="password"
+                                    icon={Lock}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-emerald-500/20 text-slate-900"
+                                    required
+                                />
                             </div>
                         </div>
 

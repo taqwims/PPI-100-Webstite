@@ -170,6 +170,7 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 type UpdateStudentRequest struct {
 	Name     string `json:"name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password"`
 	NISN     string `json:"nisn" binding:"required"`
 	ClassID  uint   `json:"class_id" binding:"required"`
 	UnitID   uint   `json:"unit_id" binding:"required"`
@@ -190,7 +191,7 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		return
 	}
 
-	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
+	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.Password, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

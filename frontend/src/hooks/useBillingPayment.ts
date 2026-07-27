@@ -104,25 +104,38 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
 
     const cancelPendingPayment = async (orderId: string) => {
         setCancelingPayment(true);
+        // Immediately clear pending state locally for instant UI update
+        setActiveMidtransDetail(null);
+        if (selectedBill && selectedBill.payments) {
+            setSelectedBill({
+                ...selectedBill,
+                payments: selectedBill.payments.filter(p => p.transaction_id !== orderId)
+            });
+        }
+
         try {
             await api.post('/finance/midtrans/cancel-transaction', { order_id: orderId });
-            toast.success('Pembayaran sebelumnya telah dibatalkan. Silakan pilih metode pembayaran baru.');
-            setActiveMidtransDetail(null);
+            toast.success('Pembayaran telah dibatalkan. Silakan pilih metode pembayaran.');
             refetch();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Gagal membatalkan transaksi');
+            console.error('Cancel transaction error:', err);
+            // Refetch to sync state even if Midtrans error occurs (e.g. already expired/cancelled)
+            refetch();
         } finally {
             setCancelingPayment(false);
         }
     };
 
-    const handleMidtransPayment = async () => {
-        if (!selectedBill || paymentAmount <= 0) return;
+    const reopenSnapPopup = async (bill?: Bill) => {
+        const targetBill = bill || selectedBill;
+        if (!targetBill) return;
+        const amt = paymentAmount > 0 ? paymentAmount : getRemainingAmount(targetBill);
+        if (amt <= 0) return;
         setLoadingSnap(true);
         try {
             const res = await api.post('/finance/midtrans/create-transaction', {
-                bill_id: selectedBill.id,
-                amount: paymentAmount,
+                bill_id: targetBill.id,
+                amount: amt,
             });
             const snapToken = res.data.snap_token;
             const orderID = res.data.order_id;
@@ -147,36 +160,44 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
             };
 
             // @ts-ignore
-            window.snap.pay(snapToken, {
-                onSuccess: () => {
-                    verifyAndRefresh(1000);
-                    setSuccessMsg('Pembayaran berhasil! Terima kasih.');
-                    setTimeout(() => {
-                        setShowPayModal(false);
-                        setSuccessMsg('');
-                    }, 3500);
-                },
-                onPending: () => {
-                    verifyAndRefresh(1000);
-                    setSuccessMsg('Pembayaran sedang diproses. Silakan selesaikan pembayaran.');
-                    setTimeout(() => {
-                        refetch();
-                    }, 1500);
-                },
-                onError: () => {
-                    toast.error('Pembayaran gagal. Silakan coba lagi.');
-                    setLoadingSnap(false);
-                },
-                onClose: () => {
-                    verifyAndRefresh(1000);
-                    setLoadingSnap(false);
-                },
-            });
+            if (window.snap) {
+                // @ts-ignore
+                window.snap.pay(snapToken, {
+                    onSuccess: () => {
+                        verifyAndRefresh(1000);
+                        setSuccessMsg('Pembayaran berhasil! Terima kasih.');
+                        setTimeout(() => {
+                            setShowPayModal(false);
+                            setSuccessMsg('');
+                        }, 3500);
+                    },
+                    onPending: () => {
+                        verifyAndRefresh(1000);
+                        setSuccessMsg('Pembayaran sedang diproses.');
+                        setTimeout(() => {
+                            refetch();
+                        }, 1500);
+                    },
+                    onError: () => {
+                        toast.error('Pembayaran gagal. Silakan coba lagi.');
+                        setLoadingSnap(false);
+                    },
+                    onClose: () => {
+                        verifyAndRefresh(1000);
+                        setLoadingSnap(false);
+                    },
+                });
+            } else {
+                toast.error('Modul pembayaran Midtrans belum siap, silakan muat ulang halaman.');
+                setLoadingSnap(false);
+            }
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Gagal membuat transaksi Midtrans');
+            toast.error(error.response?.data?.error || 'Gagal membuka halaman pembayaran Midtrans');
             setLoadingSnap(false);
         }
     };
+
+    const handleMidtransPayment = reopenSnapPopup;
 
     const handleSubmitPayment = async () => {
         if (!selectedBill) return;
@@ -297,7 +318,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         showPayModal, setShowPayModal, openPayModal, selectedBill, 
         paymentMethod, setPaymentMethod, paymentAmount, setPaymentAmount, 
         proofFile, setProofFile, submitting, loadingSnap, cancelingPayment, successMsg,
-        activeMidtransDetail, cancelPendingPayment,
+        activeMidtransDetail, cancelPendingPayment, reopenSnapPopup,
         handleMidtransPayment, handleSubmitPayment,
 
         // Multi Modal

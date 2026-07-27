@@ -45,6 +45,7 @@ func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("AcademicYear").
+		Preload("Obligation").
 		Find(&bills).Error
 	return bills, err
 }
@@ -59,6 +60,7 @@ func (r *FinanceRepository) GetBillsByStudentIDs(studentIDs []uuid.UUID) ([]doma
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("AcademicYear").
+		Preload("Obligation").
 		Order("created_at desc").
 		Find(&bills).Error
 	return bills, err

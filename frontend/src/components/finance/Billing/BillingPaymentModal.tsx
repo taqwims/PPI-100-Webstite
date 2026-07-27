@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, X, CheckCircle, Smartphone, CreditCard, Upload, Send, Copy, Clock, RefreshCw, AlertCircle } from 'lucide-react';
+import { DollarSign, X, CheckCircle, Smartphone, CreditCard, Upload, Send, Copy, Clock, RefreshCw, AlertCircle, Download } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { Bill, formatCurrency, getRemainingAmount, formatPaymentDate } from './BillingUtils';
@@ -22,7 +22,7 @@ interface BillingPaymentModalProps {
     successMsg: string;
     activeMidtransDetail?: MidtransDetail | null;
     cancelPendingPayment?: (orderId: string) => void;
-    handleMidtransPayment: () => void;
+    handleMidtransPayment: (bill?: Bill) => void;
     handleSubmitPayment: () => void;
 }
 
@@ -170,25 +170,54 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                                             )}
 
                                             {/* QRIS / E-Wallet QR Code display */}
-                                            {(activeMidtransDetail.payment_type === 'qris' || activeMidtransDetail.payment_type === 'gopay' || activeMidtransDetail.qr_code_url) && (
-                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center space-y-2">
-                                                    <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Scan QRIS Untuk Membayar</p>
-                                                    {activeMidtransDetail.qr_code_url ? (
-                                                        <div className="bg-white p-2 inline-block rounded-xl shadow-sm border border-slate-200">
+                                            {(activeMidtransDetail.payment_type === 'qris' || activeMidtransDetail.payment_type === 'gopay' || activeMidtransDetail.qr_code_url || (!activeMidtransDetail.va_numbers?.length && !activeMidtransDetail.permata_va_number && !activeMidtransDetail.bill_key)) && (
+                                                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center space-y-2.5">
+                                                    <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Scan Kode QRIS Untuk Membayar</p>
+
+                                                    {activeMidtransDetail.qr_code_url && !activeMidtransDetail.qr_code_url.includes('api.midtrans.com/v2/qris/') ? (
+                                                        <div className="bg-white p-2.5 inline-block rounded-xl shadow-sm border border-slate-200">
                                                             <img
                                                                 src={activeMidtransDetail.qr_code_url}
-                                                                alt="QRIS Code"
+                                                                alt="Kode QRIS"
                                                                 className="w-48 h-48 mx-auto object-contain"
-                                                                onError={(e) => {
-                                                                    // Fallback display if QR image URL fails
-                                                                    (e.target as HTMLElement).style.display = 'none';
-                                                                }}
                                                             />
                                                         </div>
-                                                    ) : null}
-                                                    <p className="text-[10px] text-slate-500">
-                                                        Bisa di-scan menggunakan BCA Mobile, GoPay, OVO, Dana, ShopeePay, LinkAja, atau m-Banking pendukung QRIS lainnya.
-                                                    </p>
+                                                    ) : (
+                                                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                                                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto">
+                                                                <Smartphone size={24} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-800">QRIS / E-Wallet (GoPay, OVO, ShopeePay)</p>
+                                                                <p className="text-[11px] text-slate-500 mt-0.5">Gambar QRIS dinamis dapat dibuka langsung di aplikasi Midtrans Pop-up.</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="pt-1 flex flex-col gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => selectedBill && handleMidtransPayment(selectedBill)}
+                                                            disabled={loadingSnap}
+                                                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+                                                        >
+                                                            <Smartphone size={14} className={clsx(loadingSnap && "animate-spin")} />
+                                                            {loadingSnap ? 'Membuka Midtrans...' : 'Buka Pop-up Midtrans (QRIS / VA / E-Wallet)'}
+                                                        </button>
+                                                        {activeMidtransDetail.qr_code_url && !activeMidtransDetail.qr_code_url.includes('api.midtrans.com/v2/qris/') && (
+                                                            <a
+                                                                href={activeMidtransDetail.qr_code_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-semibold transition"
+                                                            >
+                                                                <Download size={13} /> Unduh Gambar QRIS
+                                                            </a>
+                                                        )}
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Bisa di-scan menggunakan BCA Mobile, GoPay, OVO, Dana, ShopeePay, LinkAja, atau m-Banking pendukung QRIS lainnya.
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -337,7 +366,7 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
 
                                     {paymentMethod === 'Midtrans' ? (
                                         <button
-                                            onClick={handleMidtransPayment}
+                                            onClick={() => handleMidtransPayment(selectedBill || undefined)}
                                             disabled={loadingSnap || paymentAmount <= 0}
                                             className={clsx(
                                                 "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",

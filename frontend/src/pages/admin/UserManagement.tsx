@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search } from 'lucide-react';
+import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
 import clsx from 'clsx';
 import { ParentManagement } from '../../components/admin/UserManagement/ParentManagement';
+import toast from 'react-hot-toast';
 
 interface User {
     id: string;
@@ -89,6 +90,8 @@ const UserManagement: React.FC = () => {
         name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId,
         nisn: '', class_id: 0, parent_id: '',
     });
+
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         setFormData(prev => ({ ...prev, unit_id: initialUnitId }));
@@ -198,19 +201,20 @@ const UserManagement: React.FC = () => {
             });
         },
         onSuccess: () => {
+            toast.success('User berhasil ditambahkan');
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['students'] });
             queryClient.invalidateQueries({ queryKey: ['parents'] });
             handleCloseModal();
         },
-        onError: (err: any) => alert(err.response?.data?.error || 'Gagal membuat user'),
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membuat user'),
     });
 
     const updateUserMutation = useMutation({
         mutationFn: (data: any) => {
             if (editingUser?.role_id === 6 && editingStudentRecord) {
                 return api.put(`/students/${editingStudentRecord.id}`, {
-                    name: data.name, email: data.email,
+                    name: data.name, email: data.email, password: data.password || undefined,
                     nisn: data.nisn || editingStudentRecord.nisn,
                     class_id: Number(data.class_id) || editingStudentRecord.class_id,
                     unit_id: Number(data.unit_id) || editingStudentRecord.unit_id,
@@ -223,20 +227,23 @@ const UserManagement: React.FC = () => {
             });
         },
         onSuccess: () => {
+            toast.success('User berhasil diperbarui');
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['students'] });
             queryClient.invalidateQueries({ queryKey: ['parents'] });
             handleCloseModal();
         },
-        onError: (err: any) => alert(err.response?.data?.error || 'Gagal mengupdate user'),
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal mengupdate user'),
     });
 
     const deleteUserMutation = useMutation({
         mutationFn: (id: string) => api.delete(`/users/${id}`),
         onSuccess: () => {
+            toast.success('User berhasil dihapus');
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['parents'] });
         },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus user'),
     });
 
     const handleCloseModal = () => {
@@ -443,9 +450,13 @@ const UserManagement: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">{editingUser ? 'Password (kosongkan jika tidak diubah)' : 'Password'}</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                    <input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm" placeholder="••••••••"
+                                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                        className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm" placeholder="••••••••"
                                         required={!editingUser} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition">
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">

@@ -98,7 +98,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		UnitID:       req.UnitID,
 	}
 
-	if err := h.userUsecase.UpdateUser(user); err != nil {
+	if err := h.userUsecase.UpdateUser(user, req.Password); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

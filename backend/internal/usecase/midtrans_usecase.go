@@ -6,6 +6,7 @@ import (
 	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,6 +73,15 @@ func (u *MidtransUsecase) CreateSnapTransaction(billID uuid.UUID, amount float64
 
 	if bill.Status == "Paid" {
 		return "", "", "", fmt.Errorf("tagihan sudah lunas")
+	}
+
+	// Cancel any old pending Midtrans payments for this bill to avoid transaction confusion
+	if bill.Payments != nil {
+		for _, p := range bill.Payments {
+			if p.PaymentMethod == "Midtrans" && p.Status == "Pending" && p.TransactionID != "" {
+				_ = u.CancelTransaction(p.TransactionID)
+			}
+		}
 	}
 
 	// Generate a unique order ID using bill ID + timestamp to avoid duplicate order_id
@@ -231,7 +241,7 @@ func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (*DetailedTrans
 	transactionStatusResp, midErr := u.coreClient.CheckTransaction(orderID)
 	if midErr != nil {
 		// Handle 404/Not Found from Midtrans gracefully to avoid 500 errors on UX
-		if midErr.GetMessage() == "Transaction doesn't exist." {
+		if midErr.StatusCode == 404 || strings.Contains(midErr.GetMessage(), "doesn't exist") || midErr.GetMessage() == "Transaction doesn't exist." {
 			log.Printf("Midtrans status check - OrderID %s not found in Midtrans (Uninitiated)", orderID)
 			return &DetailedTransactionStatus{Status: "Uninitiated"}, nil
 		}
@@ -252,10 +262,13 @@ func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (*DetailedTrans
 		return nil, err
 	}
 
-	// Extract QR Code URL if payment_type is qris or gopay
+	// Extract QR Code URL
 	qrCodeURL := ""
-	if transactionStatusResp.PaymentType == "qris" || transactionStatusResp.PaymentType == "gopay" {
-		// Use Midtrans QR code image endpoint by default for QRIS order
+	if transactionStatusResp.PaymentType == "qris" || transactionStatusResp.PaymentType == "gopay" || transactionStatusResp.PaymentType == "other_qris" {
+		qrCodeURL = fmt.Sprintf("https://api.midtrans.com/v2/qris/%s/qr-code", orderID)
+	}
+	// Fallback for QRIS: if orderID exists and no VA/billkey/Permata VA present, generate standard Midtrans QRIS URL
+	if qrCodeURL == "" && len(transactionStatusResp.VaNumbers) == 0 && transactionStatusResp.BillKey == "" && transactionStatusResp.PermataVaNumber == "" {
 		qrCodeURL = fmt.Sprintf("https://api.midtrans.com/v2/qris/%s/qr-code", orderID)
 	}
 
