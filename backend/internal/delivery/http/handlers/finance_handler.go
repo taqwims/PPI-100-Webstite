@@ -19,12 +19,14 @@ import (
 type FinanceHandler struct {
 	financeUsecase  *usecase.FinanceUsecase
 	midtransUsecase *usecase.MidtransUsecase
+	xenditUsecase   *usecase.XenditUsecase
 }
 
-func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase) *FinanceHandler {
+func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase, xenditUsecase *usecase.XenditUsecase) *FinanceHandler {
 	return &FinanceHandler{
 		financeUsecase:  financeUsecase,
 		midtransUsecase: midtransUsecase,
+		xenditUsecase:   xenditUsecase,
 	}
 }
 
@@ -445,12 +447,8 @@ func (h *FinanceHandler) MultiPayment(c *gin.Context) {
 
 	// If method is Midtrans, generate snap token
 	if req.PaymentMethod == "Midtrans" && h.midtransUsecase != nil {
-		// Midtrans transaction ID will be the invoice number from the first payment
-		// since all payments in this multi-pay share the same transaction_id
 		orderID := result.InvoiceNumber
-		
-		// We need to pass the student as well for customer details
-		// We'll just fetch a bill to get student details
+
 		bills, _ := h.financeUsecase.GetBillsByIDsOrObligationIDs([]string{req.BillIDs[0]})
 		var student *domain.Student
 		if len(bills) > 0 {
@@ -467,6 +465,31 @@ func (h *FinanceHandler) MultiPayment(c *gin.Context) {
 			"invoice_number": result.InvoiceNumber,
 			"snap_token":     token,
 			"redirect_url":   redirectURL,
+			"payments":       result.Payments,
+		})
+		return
+	}
+
+	// If method is Xendit, generate invoice URL
+	if req.PaymentMethod == "Xendit" && h.xenditUsecase != nil {
+		orderID := result.InvoiceNumber
+
+		bills, _ := h.financeUsecase.GetBillsByIDsOrObligationIDs([]string{req.BillIDs[0]})
+		var student *domain.Student
+		if len(bills) > 0 {
+			student = &bills[0].Student
+		}
+
+		invoiceURL, _, err := h.xenditUsecase.CreateMultiInvoice(orderID, req.Amount, student, req.BillIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat transaksi Xendit: " + err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"invoice_number": result.InvoiceNumber,
+			"invoice_url":     invoiceURL,
+			"redirect_url":   invoiceURL,
 			"payments":       result.Payments,
 		})
 		return

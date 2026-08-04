@@ -43,6 +43,9 @@ func (u *SchoolSettingUsecase) GetSchoolInfo() map[string]string {
 		"landing_about_desc": "landing_about_desc",
 		"landing_cta_title": "landing_cta_title",
 		"landing_cta_desc": "landing_cta_desc",
+		"active_payment_gateway": "active_payment_gateway",
+		"midtrans_client_key": "midtrans_client_key",
+		"xendit_public_key": "xendit_public_key",
 	}
 
 	for _, s := range settings {

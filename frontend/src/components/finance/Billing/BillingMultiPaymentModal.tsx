@@ -3,6 +3,7 @@ import { CreditCard, X, Smartphone, ListChecks } from 'lucide-react';
 import clsx from 'clsx';
 import { formatCurrency } from './BillingUtils';
 import BankAccountInfo from './BankAccountInfo';
+import { useFeatureStore } from '../../../store/featureStore';
 
 interface BillingMultiPaymentModalProps {
     showMultiPayModal: boolean;
@@ -19,6 +20,8 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
     showMultiPayModal, setShowMultiPayModal, selectedBillIds, selectedTotal,
     multiPayMethod, setMultiPayMethod, isSubmittingMulti, handleMultiPayment
 }) => {
+    const activeGateway = useFeatureStore(s => s.school.active_payment_gateway) || 'midtrans';
+
     if (!showMultiPayModal || selectedBillIds.length === 0) return null;
 
     return (
@@ -43,16 +46,18 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
                             <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setMultiPayMethod('Midtrans')}
-                                    className={clsx(
-                                        "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
-                                        multiPayMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
-                                    )}
-                                >
-                                    <Smartphone size={14} /> Online
-                                </button>
+                                {activeGateway !== 'none' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setMultiPayMethod('Midtrans')}
+                                        className={clsx(
+                                            "flex-1 py-2.5 text-sm font-medium rounded-lg transition flex items-center justify-center gap-1.5",
+                                            multiPayMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
+                                        )}
+                                    >
+                                        <Smartphone size={14} /> {activeGateway === 'xendit' ? 'Online (Xendit)' : 'Online (Midtrans)'}
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => setMultiPayMethod('Transfer')}
@@ -61,15 +66,15 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                                         multiPayMethod === 'Transfer' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
                                     )}
                                 >
-                                    <CreditCard size={14} /> Transfer
+                                    <CreditCard size={14} /> Transfer Manual
                                 </button>
                             </div>
                         </div>
 
-                        {multiPayMethod === 'Midtrans' && (
-                            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                                <p className="font-semibold text-slate-800 mb-1">Pembayaran Multitagihan</p>
-                                <p className="text-xs text-slate-500">Anda akan diarahkan ke Midtrans untuk membayar seluruh tagihan sekaligus.</p>
+                        {multiPayMethod === 'Midtrans' && activeGateway !== 'none' && (
+                            <div className={clsx("p-4 rounded-xl border", activeGateway === 'xendit' ? "bg-blue-50 border-blue-100" : "bg-indigo-50 border-indigo-100")}>
+                                <p className="font-semibold text-slate-800 mb-1">Pembayaran Multitagihan ({activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})</p>
+                                <p className="text-xs text-slate-500">Anda akan diarahkan ke {activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'} untuk membayar seluruh tagihan sekaligus.</p>
                             </div>
                         )}
 
@@ -89,7 +94,7 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                                 "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
                                 (isSubmittingMulti || selectedTotal <= 0)
                                     ? "bg-slate-300 cursor-not-allowed"
-                                    : "bg-indigo-600 hover:bg-indigo-700"
+                                    : multiPayMethod === 'Midtrans' && activeGateway === 'xendit' ? "bg-blue-600 hover:bg-blue-700" : "bg-indigo-600 hover:bg-indigo-700"
                             )}
                         >
                             <CreditCard size={16} />

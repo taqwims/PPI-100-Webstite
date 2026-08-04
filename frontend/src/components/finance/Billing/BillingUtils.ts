@@ -41,7 +41,7 @@ export const hasPendingTransfer = (bill: Bill) => {
 };
 
 export const hasPendingMidtrans = (bill: Bill) => {
-    return bill.status !== 'Paid' && (bill.payments || []).some(p => p.payment_method === 'Midtrans' && p.status === 'Pending' && p.transaction_id);
+    return bill.status !== 'Paid' && (bill.payments || []).some(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit') && p.status === 'Pending' && p.transaction_id);
 };
 
 export const formatPaymentDate = (p: any) => {

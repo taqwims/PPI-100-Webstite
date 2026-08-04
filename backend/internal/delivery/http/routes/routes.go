@@ -83,11 +83,19 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo, studentRepo, budgetRepo, studentObligationRepo, activityRepo, invoiceSignatureUsecase)
 
+	schoolSettingRepo := postgres.NewSchoolSettingRepository(db)
+	schoolSettingUsecase := usecase.NewSchoolSettingUsecase(schoolSettingRepo)
+	schoolSettingHandler := handlers.NewSchoolSettingHandler(schoolSettingUsecase)
+
 	// Midtrans Payment Gateway
-	midtransUsecase := usecase.NewMidtransUsecase(cfg, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
+	midtransUsecase := usecase.NewMidtransUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
 	midtransHandler := handlers.NewMidtransHandler(midtransUsecase)
 
-	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase)
+	// Xendit Payment Gateway
+	xenditUsecase := usecase.NewXenditUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
+	xenditHandler := handlers.NewXenditHandler(xenditUsecase)
+
+	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase, xenditUsecase)
 
 	payrollRepo := postgres.NewPayrollRepository(db)
 	payrollUsecase := usecase.NewPayrollUsecase(payrollRepo, userRepo, financeRepo)
@@ -164,11 +172,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	schoolBankUsecase := usecase.NewSchoolBankUsecase(schoolBankRepo)
 	schoolBankHandler := handlers.NewSchoolBankHandler(schoolBankUsecase)
 
-	// School Settings (SaaS)
-	schoolSettingRepo := postgres.NewSchoolSettingRepository(db)
-	schoolSettingUsecase := usecase.NewSchoolSettingUsecase(schoolSettingRepo)
-	schoolSettingHandler := handlers.NewSchoolSettingHandler(schoolSettingUsecase)
-
 	// Database Backup
 	backupRepo := postgres.NewBackupRepository(db)
 	backupUsecase := usecase.NewBackupUsecase(backupRepo)
@@ -176,7 +179,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	// Public Routes
 	apiGroup := r.Group("/api")
-	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase)
+	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase)
 
 	// Protected Routes (requires authentication)
 	protectedGroup := apiGroup.Group("/")
@@ -188,7 +191,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	RegisterAdminRoutes(protectedGroup, cfg, userHandler, profileHandler, notificationHandler, assetHandler, assetCategoryHandler, schoolSettingHandler, backupHandler, publicHandler, ppdbPaymentHandler, parentHandler)
 
 	RegisterFinanceRoutes(
-		protectedGroup, cfg, financeHandler, midtransHandler, financeExtendedHandler,
+		protectedGroup, cfg, financeHandler, midtransHandler, xenditHandler, financeExtendedHandler,
 		paymentTypeHandler, studentObligationHandler, infaqTypeHandler, payrollHandler,
 		transactionCodeHandler, budgetHandler, activityHandler, externalDebtHandler,
 		waTemplateHandler, waScheduleHandler, invoiceSignatureHandler, schoolBankHandler,

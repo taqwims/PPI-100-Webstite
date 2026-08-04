@@ -20,6 +20,7 @@ interface WATemplate {
 }
 
 const PLACEHOLDER_VARS_WA = ['{nama_siswa}', '{nis}', '{kelas}', '{total_tagihan}', '{rincian}', '{tanggal}'];
+const PLACEHOLDER_VARS_WA_PAYMENT = ['{nama_siswa}', '{nama_tagihan}', '{jumlah_bayar}', '{tanggal_bayar}', '{metode_pembayaran}', '{nama_sekolah}'];
 const PLACEHOLDER_VARS_APP = ['{nama_siswa}', '{nama_tagihan}', '{nominal}'];
 
 const NotificationSettings: React.FC = () => {
@@ -229,10 +230,35 @@ const NotificationSettings: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* WA Payment Receipt Format */}
+                            <div className="space-y-2 pt-4 border-t border-slate-100">
+                                <label className="block text-sm font-semibold text-slate-700">Format Pesan WA Bukti Pembayaran Berhasil</label>
+                                <p className="text-xs text-slate-500">Pesan WhatsApp ini dikirimkan otomatis ke siswa/orang tua saat pembayaran terverifikasi berhasil.</p>
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                    {PLACEHOLDER_VARS_WA_PAYMENT.map(v => (
+                                        <button
+                                            key={v}
+                                            type="button"
+                                            onClick={() => setGeneralForm(prev => ({ ...prev, wa_notif_payment_body: (prev['wa_notif_payment_body'] || '') + v }))}
+                                            className="px-2 py-1 text-xs font-mono bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition border border-emerald-200"
+                                        >
+                                            + {v}
+                                        </button>
+                                    ))}
+                                </div>
+                                <textarea
+                                    rows={6}
+                                    value={generalForm['wa_notif_payment_body'] || "*BUKTI PEMBAYARAN - {nama_sekolah}*\n\nTerima kasih, pembayaran sebesar *{jumlah_bayar}* untuk tagihan *{nama_tagihan}* an. *{nama_siswa}* telah kami terima dan diverifikasi.\n\nTanggal Pembayaran: {tanggal_bayar}\nMetode: {metode_pembayaran}\n\nSemoga berkah."}
+                                    onChange={e => setGeneralForm(prev => ({ ...prev, wa_notif_payment_body: e.target.value }))}
+                                    className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 font-mono bg-white"
+                                    placeholder="Format pesan bukti pembayaran WA..."
+                                />
+                            </div>
+
                             {/* Submit */}
                             <div className="pt-4 border-t border-slate-100 flex justify-end">
                                 <button
-                                    onClick={() => handleSaveSettings(['enable_wa_notifications', 'fonnte_token'])}
+                                    onClick={() => handleSaveSettings(['enable_wa_notifications', 'fonnte_token', 'wa_notif_payment_body'])}
                                     disabled={updateSettingsMutation.isPending}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium shadow-md disabled:opacity-50"
                                 >

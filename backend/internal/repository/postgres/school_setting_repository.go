@@ -88,6 +88,15 @@ func (r *SchoolSettingRepository) Seed(defaults map[string]string) error {
 		{Key: "app_notif_payment_student_body", Value: "Pembayaran {nama_tagihan} sebesar {nominal} telah diverifikasi.", Description: "Konten Notifikasi Pembayaran Berhasil (Siswa)", IsAdminEdit: true},
 		{Key: "app_notif_payment_parent_title", Value: "Pembayaran Tagihan Anak Berhasil", Description: "Judul Notifikasi Pembayaran Berhasil (Wali)", IsAdminEdit: true},
 		{Key: "app_notif_payment_parent_body", Value: "Pembayaran {nama_tagihan} untuk {nama_siswa} sebesar {nominal} telah diverifikasi.", Description: "Konten Notifikasi Pembayaran Berhasil (Wali)", IsAdminEdit: true},
+		{Key: "wa_notif_payment_body", Value: "*BUKTI PEMBAYARAN - {nama_sekolah}*\n\nTerima kasih, pembayaran sebesar *{jumlah_bayar}* untuk tagihan *{nama_tagihan}* an. *{nama_siswa}* telah kami terima dan diverifikasi.\n\nTanggal Pembayaran: {tanggal_bayar}\nMetode: {metode_pembayaran}\n\nSemoga berkah.", Description: "Format Pesan WA Bukti Pembayaran Berhasil", IsAdminEdit: true},
+		{Key: "active_payment_gateway", Value: "midtrans", Description: "Payment Gateway Aktif (midtrans/xendit/none)", IsAdminEdit: true},
+		{Key: "midtrans_server_key", Value: defaults["midtrans_server_key"], Description: "Midtrans Server Key", IsAdminEdit: true},
+		{Key: "midtrans_client_key", Value: defaults["midtrans_client_key"], Description: "Midtrans Client Key", IsAdminEdit: true},
+		{Key: "midtrans_is_production", Value: "false", Description: "Midtrans Mode Production (true/false)", IsAdminEdit: true},
+		{Key: "xendit_secret_key", Value: "", Description: "Xendit Secret Key", IsAdminEdit: true},
+		{Key: "xendit_public_key", Value: "", Description: "Xendit Public Key", IsAdminEdit: true},
+		{Key: "xendit_webhook_token", Value: "", Description: "Xendit Webhook Token", IsAdminEdit: true},
+		{Key: "xendit_is_production", Value: "false", Description: "Xendit Mode Production (true/false)", IsAdminEdit: true},
 	}
 
 	for _, s := range seedSettings {

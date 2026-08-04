@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { DollarSign, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, User, Clock } from 'lucide-react';
+import { DollarSign, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, User, Clock, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { generateBillReceipt } from '../../utils/pdfUtils';
@@ -146,6 +146,42 @@ const ParentChildBills: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Active Pending Transaction Banners */}
+            {bp.activePendingTransactions.map(tx => (
+                <div key={tx.order_id} className="bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-amber-400/60 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30 animate-pulse">
+                            <Clock size={20} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500 text-white">Transaksi Sedang Berlangsung</span>
+                                <span className="text-xs font-mono font-bold text-slate-600">Invoice: {tx.order_id}</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-800 mt-1">{tx.title} • <span className="text-emerald-700">{formatCurrency(tx.amount)}</span></h4>
+                            <p className="text-xs text-slate-500">Invoice pembayaran telah dibuat. Silakan selesaikan pembayaran QRIS / Bank Transfer.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            onClick={() => bp.cancelPendingPayment(tx.order_id)}
+                            disabled={bp.cancelingPayment}
+                            className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition border border-slate-200"
+                        >
+                            Batalkan Transaksi
+                        </button>
+                        <button
+                            onClick={() => bp.resumePendingTransaction(tx.order_id)}
+                            disabled={bp.loadingSnap}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5"
+                        >
+                            <ExternalLink size={14} /> Lanjutkan Pembayaran
+                        </button>
+                    </div>
+                </div>
+            ))}
 
             {/* Top Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -333,7 +369,12 @@ const ParentChildBills: React.FC = () => {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        bp.openPayModal(bill);
+                                                        const pendingTx = bill.payments?.find(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit') && p.status === 'Pending' && p.transaction_id);
+                                                        if (pendingTx && pendingTx.transaction_id) {
+                                                            bp.resumePendingTransaction(pendingTx.transaction_id, bill);
+                                                        } else {
+                                                            bp.openPayModal(bill);
+                                                        }
                                                     }}
                                                     className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm animate-pulse"
                                                 >
@@ -471,7 +512,17 @@ const ParentChildBills: React.FC = () => {
                                                 </td>
                                                 <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                                                     {hasPendingMidtrans(bill) ? (
-                                                        <button onClick={() => bp.openPayModal(bill)} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1 mx-auto animate-pulse">
+                                                        <button
+                                                            onClick={() => {
+                                                                const pendingTx = bill.payments?.find(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit') && p.status === 'Pending' && p.transaction_id);
+                                                                if (pendingTx && pendingTx.transaction_id) {
+                                                                    bp.resumePendingTransaction(pendingTx.transaction_id, bill);
+                                                                } else {
+                                                                    bp.openPayModal(bill);
+                                                                }
+                                                            }}
+                                                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1 mx-auto animate-pulse"
+                                                        >
                                                             <Clock size={13} /> Lihat VA / QRIS
                                                         </button>
                                                     ) : bill.status !== 'Paid' && !hasPendingTransfer(bill) ? (

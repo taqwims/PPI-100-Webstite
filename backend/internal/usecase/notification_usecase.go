@@ -123,3 +123,10 @@ func (u *NotificationUsecase) GetWATemplateByID(id uint) (*domain.WATemplate, er
 func (u *NotificationUsecase) GetDefaultWATemplate() (*domain.WATemplate, error) {
 	return u.notificationRepo.GetDefaultWATemplate()
 }
+
+func (u *NotificationUsecase) GetSettingValue(key, defaultVal string) string {
+	if u.notificationRepo != nil {
+		return u.notificationRepo.GetSettingValue(key, defaultVal)
+	}
+	return defaultVal
+}

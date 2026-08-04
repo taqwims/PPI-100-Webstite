@@ -24,28 +24,40 @@ func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.P
 		return
 	}
 
-	// Get Config for the bill type
+	// Get Template if defined
 	cfg, err := u.financeRepo.GetInvoiceConfigByType(bill.BillType)
-	if err != nil || cfg == nil || !cfg.AutoNotifyWA {
-		return
-	}
-
-	// Get Template
 	var template *domain.WATemplate
-	if cfg.WATemplateID != nil {
+	if err == nil && cfg != nil && cfg.WATemplateID != nil {
 		template, _ = u.notificationUsecase.GetWATemplateByID(*cfg.WATemplateID)
 	}
-	if template == nil {
+	if template == nil && u.notificationUsecase != nil {
 		template, _ = u.notificationUsecase.GetDefaultWATemplate()
 	}
 
-	if template == nil {
-		return // No template found
+	schoolName := "SDIT AN-NUR"
+	if u.notificationUsecase != nil {
+		schoolName = u.notificationUsecase.GetSettingValue("school_name", "SDIT AN-NUR")
 	}
 
-	// Format message
-	msg := u.safeProcessWATemplate(template.BodyTemplate, student, bill)
-	_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
+	defaultBillTemplate := "*INFORMASI TAGIHAN BARU - {nama_sekolah}*\n\nHalo Bpk/Ibu dari *{nama_siswa}*,\nBerikut rincian tagihan sekolah baru Anda:\n\n• Tagihan: *{nama_tagihan}*\n• Nominal: *{total_tagihan}*\n• Jatuh Tempo: *{tanggal_jatuh_tempo}*\n\nSilakan lakukan pembayaran melalui aplikasi / portal sekolah. Terima kasih."
+
+	msg := defaultBillTemplate
+	if template != nil && template.BodyTemplate != "" {
+		msg = template.BodyTemplate
+	}
+
+	msg = strings.ReplaceAll(msg, "{nama_siswa}", student.User.Name)
+	msg = strings.ReplaceAll(msg, "{nama_tagihan}", bill.Title)
+	msg = strings.ReplaceAll(msg, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
+	msg = strings.ReplaceAll(msg, "{tanggal_jatuh_tempo}", bill.DueDate.Format("02 January 2006"))
+	msg = strings.ReplaceAll(msg, "{nis}", student.NISN)
+	msg = strings.ReplaceAll(msg, "{kelas}", student.Class.Name)
+	msg = strings.ReplaceAll(msg, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
+	msg = strings.ReplaceAll(msg, "{nama_sekolah}", schoolName)
+
+	if u.notificationUsecase != nil {
+		_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
+	}
 }
 
 func (u *FinanceUsecase) processWATemplate(body string, student *domain.Student, bill *domain.Bill) string {
@@ -76,22 +88,70 @@ func (u *FinanceUsecase) safeProcessWATemplate(body string, student *domain.Stud
 	return res
 }
 
-func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill, amount float64) {
-	if parent.Phone == "" {
+func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill, amount float64, paymentMethod ...string) {
+	var phones []string
+	if parent != nil && parent.Phone != "" {
+		phones = append(phones, parent.Phone)
+	}
+	if student != nil && student.User.Phone != "" {
+		if parent == nil || student.User.Phone != parent.Phone {
+			phones = append(phones, student.User.Phone)
+		}
+	}
+
+	if len(phones) == 0 {
 		return
 	}
 
-	msg := fmt.Sprintf("*BUKTI PEMBAYARAN - SDIT AN-NUR*\n\nTerima kasih, pembayaran sebesar *Rp%.0f* untuk tagihan *%s* an. *%s* telah kami terima dan diverifikasi.\n\nSemoga berkah.", amount, bill.Title, student.User.Name)
-	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
+	defaultTemplate := "*BUKTI PEMBAYARAN - {nama_sekolah}*\n\nTerima kasih, pembayaran sebesar *{jumlah_bayar}* untuk tagihan *{nama_tagihan}* an. *{nama_siswa}* telah kami terima dan diverifikasi.\n\nTanggal Pembayaran: {tanggal_bayar}\nMetode: {metode_pembayaran}\n\nSemoga berkah."
+	templateStr := defaultTemplate
+	if u.notificationUsecase != nil {
+		templateStr = u.notificationUsecase.GetSettingValue("wa_notif_payment_body", defaultTemplate)
+	}
+
+	schoolName := "SDIT AN-NUR"
+	if u.notificationUsecase != nil {
+		schoolName = u.notificationUsecase.GetSettingValue("school_name", "SDIT AN-NUR")
+	}
+
+	methodName := "Online / Transfer"
+	if len(paymentMethod) > 0 && paymentMethod[0] != "" {
+		methodName = paymentMethod[0]
+	}
+
+	msg := templateStr
+	msg = strings.ReplaceAll(msg, "{nama_siswa}", student.User.Name)
+	msg = strings.ReplaceAll(msg, "{nama_tagihan}", bill.Title)
+	msg = strings.ReplaceAll(msg, "{jumlah_bayar}", fmt.Sprintf("Rp%.0f", amount))
+	msg = strings.ReplaceAll(msg, "{tanggal_bayar}", time.Now().Format("02 January 2006 15:04"))
+	msg = strings.ReplaceAll(msg, "{metode_pembayaran}", methodName)
+	msg = strings.ReplaceAll(msg, "{nama_sekolah}", schoolName)
+
+	_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
 }
 
 func (u *FinanceUsecase) triggerMultiPaymentWA(student *domain.Student, parent *domain.Parent, count int, amount float64) {
-	if parent.Phone == "" {
+	var phones []string
+	if parent != nil && parent.Phone != "" {
+		phones = append(phones, parent.Phone)
+	}
+	if student != nil && student.User.Phone != "" {
+		if parent == nil || student.User.Phone != parent.Phone {
+			phones = append(phones, student.User.Phone)
+		}
+	}
+
+	if len(phones) == 0 {
 		return
 	}
 
-	msg := fmt.Sprintf("*BUKTI PEMBAYARAN MULTI-TAGIHAN - SDIT AN-NUR*\n\nTerima kasih, pembayaran sebesar *Rp%.0f* untuk *%d tagihan* an. *%s* telah kami terima dan diverifikasi.\n\nSemoga berkah.", amount, count, student.User.Name)
-	_ = u.notificationUsecase.SendWhatsApp(parent.Phone, msg)
+	schoolName := "SDIT AN-NUR"
+	if u.notificationUsecase != nil {
+		schoolName = u.notificationUsecase.GetSettingValue("school_name", "SDIT AN-NUR")
+	}
+
+	msg := fmt.Sprintf("*BUKTI PEMBAYARAN MULTI-TAGIHAN - %s*\n\nTerima kasih, pembayaran sebesar *Rp%.0f* untuk *%d tagihan* an. *%s* telah kami terima dan diverifikasi.\n\nTanggal: %s\nSemoga berkah.", schoolName, amount, count, student.User.Name, time.Now().Format("02 January 2006 15:04"))
+	_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
 }
 
 // helper: get parent record by parent.ID

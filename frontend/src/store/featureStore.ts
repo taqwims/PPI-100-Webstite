@@ -41,6 +41,9 @@ interface SchoolInfo {
     landing_about_desc?: string;
     landing_cta_title?: string;
     landing_cta_desc?: string;
+    active_payment_gateway?: string;
+    midtrans_client_key?: string;
+    xendit_public_key?: string;
 }
 
 interface FeatureState {

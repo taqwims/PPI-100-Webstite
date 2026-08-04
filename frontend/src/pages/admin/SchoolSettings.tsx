@@ -5,12 +5,14 @@ import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import {
     Building2, MapPin, Phone, Mail, Hash, Save, Camera,
     Database, Download, Trash2, RotateCcw, Clock, CheckCircle2,
-    XCircle, AlertTriangle, Info, Shield, HardDrive, FileText, CreditCard
+    XCircle, AlertTriangle, Info, Shield, HardDrive, FileText, CreditCard,
+    Copy, Eye, EyeOff, Zap
 } from 'lucide-react';
 import api from '../../services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFeatureStore } from '../../store/featureStore';
 import SchoolBankAccounts from '../finance/SchoolBankAccounts';
+import toast from 'react-hot-toast';
 
 // ─── Types ───
 interface SchoolSetting {
@@ -55,7 +57,7 @@ interface BackupData {
     created_at: string;
 }
 
-type TabKey = 'profile' | 'units' | 'backup' | 'bank_accounts' | 'landing_page';
+type TabKey = 'profile' | 'units' | 'bank_accounts' | 'payment_gateway' | 'landing_page' | 'backup';
 
 // ─── Helpers ───
 function formatBytes(bytes: number): string {
@@ -109,6 +111,7 @@ const SchoolSettings: React.FC = () => {
         { key: 'profile', label: 'Profil Sekolah', icon: <Building2 size={16} /> },
         { key: 'units', label: 'Unit Sekolah', icon: <Shield size={16} /> },
         { key: 'bank_accounts', label: 'Rekening Bank', icon: <CreditCard size={16} /> },
+        { key: 'payment_gateway', label: 'Payment Gateway', icon: <Zap size={16} /> },
         { key: 'landing_page', label: 'Landing Page', icon: <FileText size={16} /> },
         { key: 'backup', label: 'Backup & Restore', icon: <Database size={16} /> },
     ];
@@ -117,7 +120,7 @@ const SchoolSettings: React.FC = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Pengaturan Sekolah</h1>
-                <p className="text-sm text-slate-500 mt-1">Kelola profil sekolah, unit, serta backup & restore database</p>
+                <p className="text-sm text-slate-500 mt-1">Kelola profil sekolah, unit, payment gateway, serta backup & restore database</p>
             </div>
 
             {/* Tab Navigation */}
@@ -147,6 +150,7 @@ const SchoolSettings: React.FC = () => {
                     <SchoolBankAccounts />
                 </div>
             )}
+            {activeTab === 'payment_gateway' && <PaymentGatewayTab onSaved={fetchFeatures} />}
             {activeTab === 'landing_page' && <LandingPageTab onSaved={fetchFeatures} />}
         </div>
     );
@@ -845,6 +849,330 @@ const BackupTab: React.FC = () => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab: Payment Gateway ───
+// ═══════════════════════════════════════════
+const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
+    const queryClient = useQueryClient();
+    const [showMidtransSecret, setShowMidtransSecret] = useState(false);
+    const [showXenditSecret, setShowXenditSecret] = useState(false);
+    const [showXenditToken, setShowXenditToken] = useState(false);
+
+    const { data: settings, isLoading } = useQuery<SchoolSetting[]>({
+        queryKey: ['school-settings'],
+        queryFn: async () => {
+            const res = await api.get('/admin/settings');
+            return res.data;
+        },
+    });
+
+    const [form, setForm] = useState<Record<string, string>>({});
+
+    React.useEffect(() => {
+        if (settings && Object.keys(form).length === 0) {
+            const f: Record<string, string> = {
+                active_payment_gateway: 'midtrans',
+                midtrans_server_key: '',
+                midtrans_client_key: '',
+                midtrans_is_production: 'false',
+                xendit_secret_key: '',
+                xendit_public_key: '',
+                xendit_webhook_token: '',
+                xendit_is_production: 'false',
+            };
+            settings.forEach(s => {
+                if (s.is_admin_edit) f[s.key] = s.value;
+            });
+            setForm(f);
+        }
+    }, [settings]);
+
+    const updateField = (key: string, value: string) => {
+        setForm(prev => ({ ...prev, [key]: value }));
+    };
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            const updates = Object.entries(form).map(([key, value]) => ({ key, value }));
+            return api.put('/admin/settings', { settings: updates });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['school-settings'] });
+            useFeatureStore.getState().fetchFeatures();
+            onSaved();
+            toast.success('Pengaturan Payment Gateway berhasil disimpan!');
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.error || 'Gagal menyimpan pengaturan');
+        },
+    });
+
+    if (isLoading) {
+        return <CardGlass className="p-8 text-center text-slate-500">Memuat pengaturan Payment Gateway...</CardGlass>;
+    }
+
+    const xenditWebhookUrl = `${window.location.origin}/api/xendit/notification`;
+    const midtransWebhookUrl = `${window.location.origin}/api/midtrans/notification`;
+
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} berhasil disalin!`);
+    };
+
+    return (
+        <div className="space-y-6">
+            <CardGlass className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                        <CreditCard size={20} />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-800">Pilih Payment Gateway Aktif</h2>
+                        <p className="text-xs text-slate-500">Tentukan gateway mana yang digunakan untuk pembayaran tagihan online siswa & wali murid</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Midtrans Option */}
+                    <div
+                        onClick={() => updateField('active_payment_gateway', 'midtrans')}
+                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col justify-between ${
+                            form.active_payment_gateway === 'midtrans'
+                                ? 'border-indigo-600 bg-indigo-50/50 shadow-md ring-2 ring-indigo-200'
+                                : 'border-slate-200 hover:border-slate-300 bg-white/60'
+                        }`}
+                    >
+                        <div>
+                            <div className="flex justify-between items-start mb-3">
+                                <span className="px-2.5 py-1 bg-indigo-600 text-white font-bold text-xs rounded-lg">Midtrans</span>
+                                <input
+                                    type="radio"
+                                    name="active_gateway"
+                                    checked={form.active_payment_gateway === 'midtrans'}
+                                    onChange={() => updateField('active_payment_gateway', 'midtrans')}
+                                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                                />
+                            </div>
+                            <p className="font-semibold text-slate-800 text-sm">Snap Payment Page</p>
+                            <p className="text-xs text-slate-500 mt-1">Pop-up checkout serbaguna mendukung QRIS, Bank Transfer (VA), GoPay, ShopeePay, dll.</p>
+                        </div>
+                    </div>
+
+                    {/* Xendit Option */}
+                    <div
+                        onClick={() => updateField('active_payment_gateway', 'xendit')}
+                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col justify-between ${
+                            form.active_payment_gateway === 'xendit'
+                                ? 'border-blue-600 bg-blue-50/50 shadow-md ring-2 ring-blue-200'
+                                : 'border-slate-200 hover:border-slate-300 bg-white/60'
+                        }`}
+                    >
+                        <div>
+                            <div className="flex justify-between items-start mb-3">
+                                <span className="px-2.5 py-1 bg-blue-600 text-white font-bold text-xs rounded-lg">Xendit</span>
+                                <input
+                                    type="radio"
+                                    name="active_gateway"
+                                    checked={form.active_payment_gateway === 'xendit'}
+                                    onChange={() => updateField('active_payment_gateway', 'xendit')}
+                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                            </div>
+                            <p className="font-semibold text-slate-800 text-sm">Xendit Invoice</p>
+                            <p className="text-xs text-slate-500 mt-1">Halaman checkout profesional mendukung QRIS, Virtual Account, Retail (Alfamart/Indomaret), E-Wallet.</p>
+                        </div>
+                    </div>
+
+                    {/* Disabled Option */}
+                    <div
+                        onClick={() => updateField('active_payment_gateway', 'none')}
+                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col justify-between ${
+                            form.active_payment_gateway === 'none'
+                                ? 'border-slate-600 bg-slate-100 shadow-md ring-2 ring-slate-200'
+                                : 'border-slate-200 hover:border-slate-300 bg-white/60'
+                        }`}
+                    >
+                        <div>
+                            <div className="flex justify-between items-start mb-3">
+                                <span className="px-2.5 py-1 bg-slate-600 text-white font-bold text-xs rounded-lg">Nonaktif</span>
+                                <input
+                                    type="radio"
+                                    name="active_gateway"
+                                    checked={form.active_payment_gateway === 'none'}
+                                    onChange={() => updateField('active_payment_gateway', 'none')}
+                                    className="w-4 h-4 text-slate-600 focus:ring-slate-500"
+                                />
+                            </div>
+                            <p className="font-semibold text-slate-800 text-sm">Manual Only</p>
+                            <p className="text-xs text-slate-500 mt-1">Sembunyikan opsi pembayaran online. Siswa hanya dapat membayar via transfer manual & upload bukti.</p>
+                        </div>
+                    </div>
+                </div>
+            </CardGlass>
+
+            {/* Midtrans Config Card */}
+            <CardGlass className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-indigo-600"></span>
+                        <h3 className="font-bold text-slate-800 text-md">Konfigurasi Midtrans</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Mode:</span>
+                        <select
+                            value={form.midtrans_is_production || 'false'}
+                            onChange={(e) => updateField('midtrans_is_production', e.target.value)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="false">Sandbox (Pengujian)</option>
+                            <option value="true">Production (Live)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Midtrans Server Key</label>
+                        <div className="relative">
+                            <input
+                                type={showMidtransSecret ? 'text' : 'password'}
+                                value={form.midtrans_server_key || ''}
+                                onChange={(e) => updateField('midtrans_server_key', e.target.value)}
+                                placeholder="SB-Mid-server-..."
+                                className="w-full px-3 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowMidtransSecret(!showMidtransSecret)}
+                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                            >
+                                {showMidtransSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Midtrans Client Key</label>
+                        <input
+                            type="text"
+                            value={form.midtrans_client_key || ''}
+                            onChange={(e) => updateField('midtrans_client_key', e.target.value)}
+                            placeholder="SB-Mid-client-..."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                    <span className="text-slate-600">Webhook URL: <code className="font-mono text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">{midtransWebhookUrl}</code></span>
+                    <button
+                        type="button"
+                        onClick={() => copyToClipboard(midtransWebhookUrl, 'Midtrans Webhook URL')}
+                        className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                        <Copy size={12} /> Salin
+                    </button>
+                </div>
+            </CardGlass>
+
+            {/* Xendit Config Card */}
+            <CardGlass className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-blue-600"></span>
+                        <h3 className="font-bold text-slate-800 text-md">Konfigurasi Xendit</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Mode:</span>
+                        <select
+                            value={form.xendit_is_production || 'false'}
+                            onChange={(e) => updateField('xendit_is_production', e.target.value)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="false">Development / Sandbox</option>
+                            <option value="true">Production (Live)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Xendit Secret Key</label>
+                        <div className="relative">
+                            <input
+                                type={showXenditSecret ? 'text' : 'password'}
+                                value={form.xendit_secret_key || ''}
+                                onChange={(e) => updateField('xendit_secret_key', e.target.value)}
+                                placeholder="xnd_development_..."
+                                className="w-full px-3 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowXenditSecret(!showXenditSecret)}
+                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                            >
+                                {showXenditSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Xendit Public Key (Opsional)</label>
+                        <input
+                            type="text"
+                            value={form.xendit_public_key || ''}
+                            onChange={(e) => updateField('xendit_public_key', e.target.value)}
+                            placeholder="xnd_public_development_..."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Webhook Verification Token (x-callback-token)</label>
+                        <div className="relative">
+                            <input
+                                type={showXenditToken ? 'text' : 'password'}
+                                value={form.xendit_webhook_token || ''}
+                                onChange={(e) => updateField('xendit_webhook_token', e.target.value)}
+                                placeholder="Token verifikasi callback Xendit..."
+                                className="w-full px-3 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowXenditToken(!showXenditToken)}
+                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                            >
+                                {showXenditToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">Dapatkan Verification Token ini dari dashboard Xendit (Settings &gt; Webhooks &gt; Verification Token).</p>
+                    </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                    <span className="text-slate-600">Webhook URL: <code className="font-mono text-blue-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">{xenditWebhookUrl}</code></span>
+                    <button
+                        type="button"
+                        onClick={() => copyToClipboard(xenditWebhookUrl, 'Xendit Webhook URL')}
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        <Copy size={12} /> Salin
+                    </button>
+                </div>
+            </CardGlass>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+                <ButtonGlass
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition"
+                >
+                    <Save size={16} />
+                    {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Pengaturan Gateway'}
+                </ButtonGlass>
+            </div>
         </div>
     );
 };

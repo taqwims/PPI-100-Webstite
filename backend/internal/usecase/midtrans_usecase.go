@@ -16,8 +16,8 @@ import (
 )
 
 type MidtransUsecase struct {
-	snapClient            snap.Client
-	coreClient            coreapi.Client
+	cfg                   *config.Config
+	schoolSettingRepo     *postgres.SchoolSettingRepository
 	financeRepo           *postgres.FinanceRepository
 	studentRepo           *postgres.StudentRepository
 	userRepo              *postgres.UserRepository
@@ -29,6 +29,7 @@ type MidtransUsecase struct {
 
 func NewMidtransUsecase(
 	cfg *config.Config,
+	schoolSettingRepo *postgres.SchoolSettingRepository,
 	financeRepo *postgres.FinanceRepository,
 	studentRepo *postgres.StudentRepository,
 	userRepo *postgres.UserRepository,
@@ -37,22 +38,9 @@ func NewMidtransUsecase(
 	studentObligationRepo *postgres.StudentObligationRepository,
 	activityRepo *postgres.ActivityRepository,
 ) *MidtransUsecase {
-	var env midtrans.EnvironmentType
-	if cfg.MidtransIsProduction {
-		env = midtrans.Production
-	} else {
-		env = midtrans.Sandbox
-	}
-
-	var s snap.Client
-	s.New(cfg.MidtransServerKey, env)
-
-	var c coreapi.Client
-	c.New(cfg.MidtransServerKey, env)
-
 	return &MidtransUsecase{
-		snapClient:            s,
-		coreClient:            c,
+		cfg:                   cfg,
+		schoolSettingRepo:     schoolSettingRepo,
 		financeRepo:           financeRepo,
 		studentRepo:           studentRepo,
 		userRepo:              userRepo,
@@ -61,6 +49,34 @@ func NewMidtransUsecase(
 		studentObligationRepo: studentObligationRepo,
 		activityRepo:          activityRepo,
 	}
+}
+
+// getClients dynamically fetches the active Midtrans Server Key and Environment from DB (school_settings) or .env fallback
+func (u *MidtransUsecase) getClients() (snap.Client, coreapi.Client, bool) {
+	serverKey := strings.TrimSpace(u.cfg.MidtransServerKey)
+	isProduction := u.cfg.MidtransIsProduction
+
+	if u.schoolSettingRepo != nil {
+		if s, err := u.schoolSettingRepo.GetByKey("midtrans_server_key"); err == nil && strings.TrimSpace(s.Value) != "" {
+			serverKey = strings.TrimSpace(s.Value)
+		}
+		if s, err := u.schoolSettingRepo.GetByKey("midtrans_is_production"); err == nil {
+			isProduction = strings.TrimSpace(s.Value) == "true" || strings.TrimSpace(s.Value) == "1"
+		}
+	}
+
+	env := midtrans.Sandbox
+	if isProduction {
+		env = midtrans.Production
+	}
+
+	var s snap.Client
+	s.New(serverKey, env)
+
+	var c coreapi.Client
+	c.New(serverKey, env)
+
+	return s, c, isProduction
 }
 
 // CreateSnapTransaction creates a Midtrans Snap token for a bill payment
@@ -87,18 +103,6 @@ func (u *MidtransUsecase) CreateSnapTransaction(billID uuid.UUID, amount float64
 	// Generate a unique order ID using bill ID + timestamp to avoid duplicate order_id
 	orderID := fmt.Sprintf("BILL-%s-%d", billID.String()[:8], time.Now().UnixMilli())
 
-	// Create a pending payment record
-	payment := &domain.Payment{
-		BillID:        billID,
-		Amount:        amount,
-		PaymentMethod: "Midtrans",
-		Status:        "Pending",
-		TransactionID: orderID,
-	}
-	if err := u.financeRepo.CreatePayment(payment); err != nil {
-		return "", "", "", fmt.Errorf("failed to create payment record: %w", err)
-	}
-
 	// Build Snap request
 	req := &snap.Request{
 		TransactionDetails: midtrans.TransactionDetails{
@@ -119,11 +123,28 @@ func (u *MidtransUsecase) CreateSnapTransaction(billID uuid.UUID, amount float64
 		},
 	}
 
-	// Call Midtrans Snap API
-	snapResp, midErr := u.snapClient.CreateTransaction(req)
+	snapClient, _, _ := u.getClients()
+	snapResp, midErr := snapClient.CreateTransaction(req)
 	if midErr != nil {
 		log.Printf("Midtrans Snap error: %v", midErr.GetMessage())
-		return "", "", "", fmt.Errorf("failed to create Midtrans transaction: %s", midErr.GetMessage())
+		msg := midErr.GetMessage()
+		if strings.Contains(msg, "timeout") || strings.Contains(msg, "dial tcp") || strings.Contains(msg, "HttpClient") {
+			return "", "", "", fmt.Errorf("Jaringan server VPS ke Midtrans Sandbox timeout (dial tcp 8.215.152.185:443). Silakan periksa DNS/Firewall VPS Anda atau switch ke Mode Production / Xendit di Pengaturan Sekolah.")
+		}
+		return "", "", "", fmt.Errorf("Gagal membuat transaksi Midtrans: %s", msg)
+	}
+
+	// Create a pending payment record storing RedirectURL in ProofURL
+	payment := &domain.Payment{
+		BillID:        billID,
+		Amount:        amount,
+		PaymentMethod: "Midtrans",
+		Status:        "Pending",
+		TransactionID: orderID,
+		ProofURL:      snapResp.RedirectURL,
+	}
+	if err := u.financeRepo.CreatePayment(payment); err != nil {
+		return "", "", "", fmt.Errorf("failed to create payment record: %w", err)
 	}
 
 	return snapResp.Token, snapResp.RedirectURL, orderID, nil
@@ -135,8 +156,8 @@ func (u *MidtransUsecase) HandleNotification(notificationPayload map[string]inte
 		return fmt.Errorf("order_id not found in notification payload")
 	}
 
-	// Verify transaction status with Midtrans
-	transactionStatusResp, midErr := u.coreClient.CheckTransaction(orderID)
+	_, coreClient, _ := u.getClients()
+	transactionStatusResp, midErr := coreClient.CheckTransaction(orderID)
 	if midErr != nil {
 		return fmt.Errorf("failed to check transaction: %s", midErr.GetMessage())
 	}
@@ -175,7 +196,8 @@ func (u *MidtransUsecase) CreateMultiSnapTransaction(orderID string, totalAmount
 	}
 	req.Items = &itemDetails
 
-	snapResp, midErr := u.snapClient.CreateTransaction(req)
+	snapClient, _, _ := u.getClients()
+	snapResp, midErr := snapClient.CreateTransaction(req)
 	if midErr != nil {
 		log.Printf("Midtrans Snap error: %v", midErr.GetMessage())
 		return "", "", "", fmt.Errorf("failed to create Midtrans multi-transaction: %s", midErr.GetMessage())
@@ -186,11 +208,10 @@ func (u *MidtransUsecase) CreateMultiSnapTransaction(orderID string, totalAmount
 
 // CancelTransaction cancels a pending transaction in Midtrans and updates the local payment status
 func (u *MidtransUsecase) CancelTransaction(orderID string) error {
-	// Call Midtrans Core API Cancel endpoint
-	_, midErr := u.coreClient.CancelTransaction(orderID)
+	_, coreClient, _ := u.getClients()
+	_, midErr := coreClient.CancelTransaction(orderID)
 	if midErr != nil {
 		log.Printf("Midtrans cancel warning/error for OrderID %s: %v", orderID, midErr.GetMessage())
-		// Even if Midtrans returns error (e.g. already cancelled/expired), we still mark local payments as Failed/Cancelled
 	}
 
 	payments, err := u.financeRepo.GetPaymentsByTransactionID(orderID)
@@ -221,6 +242,9 @@ type DetailedTransactionStatus struct {
 	BillerCode        string      `json:"biller_code,omitempty"`
 	QRCodeURL         string      `json:"qr_code_url,omitempty"`
 	ExpiryTime        string      `json:"expiry_time,omitempty"`
+	InvoiceURL        string      `json:"invoice_url,omitempty"`
+	RedirectURL       string      `json:"redirect_url,omitempty"`
+	SnapToken         string      `json:"snap_token,omitempty"`
 }
 
 type VANumber struct {
@@ -235,28 +259,21 @@ type ActionURL struct {
 }
 
 // CheckTransactionStatus checks payment status directly with Midtrans API
-// This is called from the frontend after Snap popup completes or to inspect pending payment details
 func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (*DetailedTransactionStatus, error) {
-	// Verify transaction status with Midtrans
-	transactionStatusResp, midErr := u.coreClient.CheckTransaction(orderID)
+	_, coreClient, isProd := u.getClients()
+	transactionStatusResp, midErr := coreClient.CheckTransaction(orderID)
 	if midErr != nil {
-		// Handle 404/Not Found from Midtrans gracefully to avoid 500 errors on UX
-		if midErr.StatusCode == 404 || strings.Contains(midErr.GetMessage(), "doesn't exist") || midErr.GetMessage() == "Transaction doesn't exist." {
-			log.Printf("Midtrans status check - OrderID %s not found in Midtrans (Uninitiated)", orderID)
-			return &DetailedTransactionStatus{Status: "Uninitiated"}, nil
+		payment, _ := u.financeRepo.GetPaymentByTransactionID(orderID)
+		localStatus := "Pending"
+		if payment != nil {
+			localStatus = payment.Status
 		}
-		return nil, fmt.Errorf("failed to check transaction: %s", midErr.GetMessage())
+		return &DetailedTransactionStatus{Status: localStatus}, nil
 	}
 
-	log.Printf("Midtrans status check - OrderID: %s, Status: %s, FraudStatus: %s, PaymentType: %s",
-		orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus, transactionStatusResp.PaymentType)
+	// Always process and update payment status in local database based on Midtrans response
+	_ = u.processPaymentStatus(orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
 
-	err := u.processPaymentStatus(orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the resolved status along with payment details
 	payment, err := u.financeRepo.GetPaymentByTransactionID(orderID)
 	if err != nil {
 		return nil, err
@@ -264,12 +281,26 @@ func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (*DetailedTrans
 
 	// Extract QR Code URL
 	qrCodeURL := ""
-	if transactionStatusResp.PaymentType == "qris" || transactionStatusResp.PaymentType == "gopay" || transactionStatusResp.PaymentType == "other_qris" {
-		qrCodeURL = fmt.Sprintf("https://api.midtrans.com/v2/qris/%s/qr-code", orderID)
+	baseURL := "https://api.sandbox.midtrans.com"
+	if isProd {
+		baseURL = "https://api.midtrans.com"
 	}
-	// Fallback for QRIS: if orderID exists and no VA/billkey/Permata VA present, generate standard Midtrans QRIS URL
+
+	if transactionStatusResp.PaymentType == "qris" || transactionStatusResp.PaymentType == "gopay" || transactionStatusResp.PaymentType == "other_qris" {
+		qrCodeURL = fmt.Sprintf("%s/v2/qris/%s/qr-code", baseURL, orderID)
+	}
 	if qrCodeURL == "" && len(transactionStatusResp.VaNumbers) == 0 && transactionStatusResp.BillKey == "" && transactionStatusResp.PermataVaNumber == "" {
-		qrCodeURL = fmt.Sprintf("https://api.midtrans.com/v2/qris/%s/qr-code", orderID)
+		qrCodeURL = fmt.Sprintf("%s/v2/qris/%s/qr-code", baseURL, orderID)
+	}
+
+	redirectURL := payment.ProofURL
+	snapToken := ""
+	if redirectURL != "" {
+		parts := strings.Split(redirectURL, "/")
+		last := parts[len(parts)-1]
+		if !strings.HasPrefix(last, "BILL-") && len(last) > 10 {
+			snapToken = last
+		}
 	}
 
 	res := &DetailedTransactionStatus{
@@ -282,127 +313,88 @@ func (u *MidtransUsecase) CheckTransactionStatus(orderID string) (*DetailedTrans
 		BillKey:           transactionStatusResp.BillKey,
 		BillerCode:        transactionStatusResp.BillerCode,
 		QRCodeURL:         qrCodeURL,
+		InvoiceURL:        redirectURL,
+		RedirectURL:       redirectURL,
+		SnapToken:         snapToken,
 	}
 
-	if len(transactionStatusResp.VaNumbers) > 0 {
-		for _, va := range transactionStatusResp.VaNumbers {
-			res.VANumbers = append(res.VANumbers, VANumber{
-				Bank:     va.Bank,
-				VANumber: va.VANumber,
-			})
-		}
+	for _, va := range transactionStatusResp.VaNumbers {
+		res.VANumbers = append(res.VANumbers, VANumber{
+			Bank:     va.Bank,
+			VANumber: va.VANumber,
+		})
 	}
 
 	return res, nil
 }
 
-// processPaymentStatus is the shared logic for updating payment and bill status
-func (u *MidtransUsecase) processPaymentStatus(orderID string, transactionStatus string, fraudStatus string) error {
-	// Find all payment records by transaction_id (order_id)
+func (u *MidtransUsecase) processPaymentStatus(orderID, transactionStatus, fraudStatus string) error {
 	payments, err := u.financeRepo.GetPaymentsByTransactionID(orderID)
 	if err != nil {
 		return fmt.Errorf("payments not found for order_id %s: %w", orderID, err)
 	}
-
 	if len(payments) == 0 {
-		return fmt.Errorf("no payments found for order_id %s", orderID)
+		return fmt.Errorf("no payment records found for order_id %s", orderID)
+	}
+
+	newStatus := "Pending"
+	switch transactionStatus {
+	case "capture":
+		if fraudStatus == "challenge" {
+			newStatus = "Pending"
+		} else if fraudStatus == "accept" {
+			newStatus = "Success"
+		}
+	case "settlement":
+		newStatus = "Success"
+	case "cancel", "deny", "expire":
+		newStatus = "Failed"
+	case "pending":
+		newStatus = "Pending"
 	}
 
 	for i := range payments {
-		payment := &payments[i]
-
-		// If already processed as Success, skip this individual payment
-		if payment.Status == "Success" {
-			continue
+		p := &payments[i]
+		if p.Status == "Success" {
+			continue // Already processed, skip to avoid double processing
 		}
 
-		// Update payment status based on Midtrans response
-		switch transactionStatus {
-		case "capture":
-			if fraudStatus == "accept" {
-				payment.Status = "Success"
-				payment.PaidAt = time.Now()
-			} else if fraudStatus == "challenge" {
-				payment.Status = "Pending"
-			}
-		case "settlement":
-			payment.Status = "Success"
-			payment.PaidAt = time.Now()
-		case "pending":
-			payment.Status = "Pending"
-		case "cancel", "expire":
-			payment.Status = "Failed"
-		case "deny":
-			payment.Status = "Failed"
-		default:
-			log.Printf("Unknown transaction status: %s", transactionStatus)
-			continue
-		}
+		p.Status = newStatus
+		if newStatus == "Success" {
+			now := time.Now()
+			p.PaidAt = now
 
-		// Save updated payment
-		if err := u.financeRepo.UpdatePayment(payment); err != nil {
-			log.Printf("failed to update payment %s: %v", payment.ID, err)
-			continue
-		}
+			bill, err := u.financeRepo.GetBillByID(p.BillID.String())
+			if err == nil && bill != nil {
+				totalPaid := float64(0)
+				for _, pay := range bill.Payments {
+					if pay.Status == "Success" || pay.ID == p.ID {
+						totalPaid += pay.Amount
+					}
+				}
+				newBillStatus := "Partial"
+				if totalPaid >= bill.Amount {
+					newBillStatus = "Paid"
+				}
+				_ = u.financeRepo.UpdateBillStatus(p.BillID.String(), newBillStatus)
 
-		// If payment is successful, update bill status and sync to CashLedger
-		if payment.Status == "Success" {
-			bill, err := u.financeRepo.GetBillByID(payment.BillID.String())
-			if err != nil {
-				log.Printf("failed to get bill for payment %s: %v", payment.ID, err)
-				continue
-			}
+				var parent *domain.Parent
+				if bill.Student.ParentID != nil {
+					parent, _ = u.studentRepo.GetParentByID(bill.Student.ParentID.String())
+				}
 
-			// Calculate total paid across all successful payments for this bill
-			totalPaid := float64(0)
-			for _, p := range bill.Payments {
-				if p.Status == "Success" || p.ID == payment.ID { // Include current payment
-					totalPaid += p.Amount
+				if u.financeUsecase != nil {
+					u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, p.Amount)
+					u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, p.Amount, "Midtrans")
+					u.financeUsecase.syncObligationStatus(bill, totalPaid, p.Amount)
 				}
 			}
+		}
 
-			// Update bill status
-			newBillStatus := "Partial"
-			if totalPaid >= bill.Amount {
-				newBillStatus = "Paid"
-			}
-			_ = u.financeRepo.UpdateBillStatus(payment.BillID.String(), newBillStatus)
-
-			// Sync to CashLedger
-			category := "Lain-lain"
-			if bill.TransactionCode != nil {
-				category = bill.TransactionCode.Category
-			} else if bill.BillType != "" {
-				category = bill.BillType
-			}
-
-			cashLedgerEntry := domain.CashLedger{
-				Date:              time.Now(),
-				Source:            bill.Student.User.Name,
-				ItemName:          "Pembayaran Midtrans - " + bill.Title,
-				Type:              "Income",
-				Amount:            payment.Amount,
-				Category:          category,
-				TransactionCodeID: bill.TransactionCodeID,
-			}
-			_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
-
-			// Send notifications
-			var parent *domain.Parent
-			if bill.Student.ParentID != nil {
-				parent, _ = u.studentRepo.GetParentByID(bill.Student.ParentID.String())
-			}
-			u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
-
-			if parent != nil {
-				u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount)
-			}
-
-			// Sync payment status back to StudentObligation or ActivityObligation
-			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
+		if err := u.financeRepo.UpdatePayment(p); err != nil {
+			log.Printf("Failed to update payment status for order_id %s: %v", orderID, err)
 		}
 	}
 
 	return nil
 }
-

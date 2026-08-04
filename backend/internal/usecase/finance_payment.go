@@ -9,9 +9,9 @@ import (
 )
 
 func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method string, proofURL string) error {
-	status := "Success"
-	if method == "Transfer" {
-		status = "Pending"
+	status := "Pending"
+	if method == "Cash" {
+		status = "Success"
 	}
 
 	payment := &domain.Payment{
@@ -164,9 +164,9 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 		}
 		remaining -= payAmount
 
-		status := "Success"
-		if req.PaymentMethod == "Midtrans" || req.PaymentMethod == "Transfer" {
-			status = "Pending"
+		status := "Pending"
+		if req.PaymentMethod == "Cash" {
+			status = "Success"
 		}
 
 		payment := domain.Payment{
@@ -354,7 +354,7 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 	u.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
 
 	if parent != nil {
-		u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount)
+		u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, payment.PaymentMethod)
 	}
 
 	// Sync payment status back to StudentObligation or ActivityObligation

@@ -14,6 +14,7 @@ func RegisterPublicRoutes(
 	authHandler *handlers.AuthHandler,
 	publicHandler *handlers.PublicHandler,
 	midtransHandler *handlers.MidtransHandler,
+	xenditHandler *handlers.XenditHandler,
 	invoiceSignatureHandler *handlers.InvoiceSignatureHandler,
 	schoolBankUsecase *usecase.SchoolBankUsecase,
 	schoolSettingUsecase *usecase.SchoolSettingUsecase,
@@ -57,10 +58,11 @@ func RegisterPublicRoutes(
 		c.JSON(200, units)
 	})
 
-	// Midtrans Webhook (public, no auth required)
+	// Payment Gateway Webhooks (public, no auth required)
 	if cfg.FeatureMidtrans {
 		api.POST("/midtrans/notification", midtransHandler.HandleNotification)
 	}
+	api.POST("/xendit/notification", xenditHandler.HandleNotification)
 
 	// Public Invoice Verification (no auth required)
 	api.GET("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)
