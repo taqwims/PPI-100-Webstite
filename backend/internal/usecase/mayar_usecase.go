@@ -222,7 +222,7 @@ func (u *MayarUsecase) CreateInvoice(billID uuid.UUID, amount float64) (string, 
 		PaymentMethod: "Mayar",
 		Status:        "Pending",
 		TransactionID: orderID,
-		ProofURL:      paymentURL,
+		ProofURL:      mayarResp.Data.ID + "|" + paymentURL,
 	}
 	if err := u.financeRepo.CreatePayment(payment); err != nil {
 		return "", "", fmt.Errorf("failed to create payment record: %w", err)
@@ -326,10 +326,17 @@ func (u *MayarUsecase) CreateMultiInvoice(orderID string, totalAmount float64, s
 		return "", "", fmt.Errorf("Mayar API tidak mengembalikan payment URL")
 	}
 
+	// Update ProofURL for multi-payment records
+	payments, _ := u.financeRepo.GetPaymentsByTransactionID(orderID)
+	for i := range payments {
+		payments[i].ProofURL = mayarResp.Data.ID + "|" + paymentURL
+		_ = u.financeRepo.UpdatePayment(&payments[i])
+	}
+
 	return paymentURL, orderID, nil
 }
 
-// CheckTransactionStatus checks status of Mayar transaction
+// CheckTransactionStatus checks status of Mayar transaction directly from DB and Mayar API
 func (u *MayarUsecase) CheckTransactionStatus(orderID string) (map[string]interface{}, error) {
 	payments, err := u.financeRepo.GetPaymentsByTransactionID(orderID)
 	if err != nil || len(payments) == 0 {
@@ -337,13 +344,21 @@ func (u *MayarUsecase) CheckTransactionStatus(orderID string) (map[string]interf
 	}
 
 	payment := payments[0]
+	redirectURL := payment.ProofURL
+	mayarInvoiceID := ""
+	if strings.Contains(redirectURL, "|") {
+		parts := strings.SplitN(redirectURL, "|", 2)
+		mayarInvoiceID = parts[0]
+		redirectURL = parts[1]
+	}
+
 	res := map[string]interface{}{
 		"order_id":       orderID,
 		"status":         payment.Status,
 		"payment_method": payment.PaymentMethod,
 		"amount":         payment.Amount,
-		"redirect_url":   payment.ProofURL,
-		"invoice_url":    payment.ProofURL,
+		"redirect_url":   redirectURL,
+		"invoice_url":    redirectURL,
 	}
 
 	if payment.Status == "Success" || payment.Status == "Paid" {
@@ -351,14 +366,133 @@ func (u *MayarUsecase) CheckTransactionStatus(orderID string) (map[string]interf
 		return res, nil
 	}
 
+	apiKey := u.getApiKey()
+	if apiKey != "" {
+		baseURL := u.getBaseURL()
+
+		// 1. Direct invoice lookup if mayarInvoiceID is available
+		if mayarInvoiceID != "" {
+			req, err := http.NewRequest("GET", fmt.Sprintf("%s/invoice/%s", baseURL, mayarInvoiceID), nil)
+			if err == nil {
+				req.Header.Set("Authorization", "Bearer "+apiKey)
+				client := &http.Client{Timeout: 8 * time.Second}
+				resp, err := client.Do(req)
+				if err == nil {
+					defer resp.Body.Close()
+					var invResp struct {
+						StatusCode int `json:"statusCode"`
+						Data       struct {
+							ID     string `json:"id"`
+							Status string `json:"status"`
+						} `json:"data"`
+					}
+					if json.NewDecoder(resp.Body).Decode(&invResp) == nil {
+						st := strings.ToLower(invResp.Data.Status)
+						if st == "paid" || st == "settled" || st == "success" {
+							_ = u.processPaymentSuccess(orderID)
+							res["status"] = "Success"
+							return res, nil
+						} else if st == "expired" || st == "cancelled" || st == "failed" {
+							_ = u.updatePaymentStatus(orderID, "Failed")
+							res["status"] = "Failed"
+							return res, nil
+						}
+					}
+				}
+			}
+		}
+
+		// 2. Query recent invoices list from Mayar API (matches order_id in extraData, or matching link/slug)
+		slug := ""
+		if redirectURL != "" {
+			parts := strings.Split(redirectURL, "/")
+			slug = parts[len(parts)-1]
+		}
+
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/invoice?page=1&pageSize=20", baseURL), nil)
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+			client := &http.Client{Timeout: 8 * time.Second}
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				var listResp struct {
+					StatusCode int `json:"statusCode"`
+					Data       []struct {
+						ID           string `json:"id"`
+						Status       string `json:"status"`
+						Link         string `json:"link"`
+						Transactions []struct {
+							Status    string                 `json:"status"`
+							ExtraData map[string]interface{} `json:"extraData"`
+						} `json:"transactions"`
+					} `json:"data"`
+				}
+				if json.NewDecoder(resp.Body).Decode(&listResp) == nil && len(listResp.Data) > 0 {
+					for _, item := range listResp.Data {
+						matched := false
+						if slug != "" && (item.Link == slug || strings.Contains(item.Link, slug)) {
+							matched = true
+						}
+						if !matched && mayarInvoiceID != "" && item.ID == mayarInvoiceID {
+							matched = true
+						}
+						if !matched {
+							for _, tx := range item.Transactions {
+								if tx.ExtraData != nil {
+									if oid, ok := tx.ExtraData["order_id"].(string); ok && oid == orderID {
+										matched = true
+										break
+									}
+								}
+							}
+						}
+
+						if matched {
+							st := strings.ToLower(item.Status)
+							if st == "paid" || st == "settled" || st == "success" {
+								_ = u.processPaymentSuccess(orderID)
+								res["status"] = "Success"
+								return res, nil
+							} else if st == "expired" || st == "cancelled" || st == "failed" {
+								_ = u.updatePaymentStatus(orderID, "Failed")
+								res["status"] = "Failed"
+								return res, nil
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return res, nil
 }
 
-// CancelTransaction cancels a pending Mayar transaction in DB
+// CancelTransaction cancels a pending Mayar transaction in DB and Mayar
 func (u *MayarUsecase) CancelTransaction(orderID string) error {
 	payments, err := u.financeRepo.GetPaymentsByTransactionID(orderID)
 	if err != nil || len(payments) == 0 {
 		return nil
+	}
+
+	apiKey := u.getApiKey()
+	if apiKey != "" {
+		redirectURL := payments[0].ProofURL
+		mayarInvoiceID := ""
+		if strings.Contains(redirectURL, "|") {
+			parts := strings.SplitN(redirectURL, "|", 2)
+			mayarInvoiceID = parts[0]
+		}
+		if mayarInvoiceID != "" {
+			req, err := http.NewRequest("POST", fmt.Sprintf("%s/invoice/close/%s", u.getBaseURL(), mayarInvoiceID), nil)
+			if err == nil {
+				req.Header.Set("Authorization", "Bearer "+apiKey)
+				client := &http.Client{Timeout: 5 * time.Second}
+				_, _ = client.Do(req)
+			}
+		}
 	}
 
 	return u.updatePaymentStatus(orderID, "Failed")
@@ -540,10 +674,7 @@ func (u *MayarUsecase) processPaymentSuccess(orderID string) error {
 		if u.financeUsecase != nil {
 			u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
 
-			if parent != nil {
-				u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, "Mayar")
-			}
-
+			u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, "Mayar")
 			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
 		}
 	}

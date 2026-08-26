@@ -110,40 +110,44 @@ type CreateStudentRequest struct {
 	ParentID string `json:"parent_id"` // Can be parent_user_id (user.id) — will be resolved
 }
 
-// resolveParentID takes a user ID (from the parent user) and finds the parent table ID
+// resolveParentID takes a user ID (from the parent user) or parent table ID and finds the parent table ID
 func (h *StudentHandler) resolveParentID(parentUserID string) (*uuid.UUID, error) {
 	if parentUserID == "" {
 		return nil, nil
 	}
 	parentUser, err := h.userRepo.FindByID(parentUserID)
-	if err != nil {
-		return nil, err
-	}
-	if parentUser.Parent != nil {
-		return &parentUser.Parent.ID, nil
-	}
-	// If user doesn't have a Parent record yet, create one
-	parsedUUID, err := uuid.Parse(parentUserID)
-	if err != nil {
-		return nil, err
-	}
-	
-	newParent := domain.Parent{
-		UserID: parsedUUID,
-	}
-	// We need to create it using userRepo.Update, which saves the User and its associations,
-	// or create the parent record. We'll assign it to parentUser and save.
-	parentUser.Parent = &newParent
-	if err := h.userRepo.Update(parentUser); err != nil {
-		return nil, err
-	}
-	
-	// parentUser.Parent should now have the generated ID
-	if parentUser.Parent.ID != uuid.Nil {
-		return &parentUser.Parent.ID, nil
+	if err == nil && parentUser != nil {
+		if parentUser.Parent != nil {
+			return &parentUser.Parent.ID, nil
+		}
+		// If user doesn't have a Parent record yet, create one
+		parsedUUID, err := uuid.Parse(parentUserID)
+		if err != nil {
+			return nil, err
+		}
+		
+		newParent := domain.Parent{
+			UserID: parsedUUID,
+		}
+		// We need to create it using userRepo.Update, which saves the User and its associations,
+		// or create the parent record. We'll assign it to parentUser and save.
+		parentUser.Parent = &newParent
+		if err := h.userRepo.Update(parentUser); err != nil {
+			return nil, err
+		}
+		
+		// parentUser.Parent should now have the generated ID
+		if parentUser.Parent.ID != uuid.Nil {
+			return &parentUser.Parent.ID, nil
+		}
 	}
 
-	return nil, errors.New("failed to create parent record")
+	// Also check if parentUserID is already a Parent Table ID directly
+	if parent, pErr := h.studentUsecase.GetParentByID(parentUserID); pErr == nil && parent != nil {
+		return &parent.ID, nil
+	}
+
+	return nil, errors.New("parent not found")
 }
 
 func (h *StudentHandler) CreateStudent(c *gin.Context) {

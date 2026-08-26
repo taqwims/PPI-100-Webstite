@@ -254,8 +254,10 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 			"payment",
 			invoiceNumber,
 		)
+		var parent *domain.Parent
 		if student.ParentID != nil {
-			if parent, err := u.getParentByID(*student.ParentID); err == nil {
+			if p, err := u.getParentByID(*student.ParentID); err == nil {
+				parent = p
 				_ = u.notificationUsecase.SendNotification(
 					parent.UserID,
 					"Pembayaran Tagihan Anak Berhasil",
@@ -263,9 +265,9 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 					"payment",
 					invoiceNumber,
 				)
-				u.triggerMultiPaymentWA(&student, parent, len(payments), req.Amount)
 			}
 		}
+		u.triggerMultiPaymentWA(&student, parent, len(payments), req.Amount)
 	}
 
 	return &domain.MultiPaymentResult{

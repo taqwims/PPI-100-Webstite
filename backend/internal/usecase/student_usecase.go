@@ -172,3 +172,7 @@ func (u *StudentUsecase) PromoteStudents(studentIDs []uuid.UUID, action string, 
 	}
 	return successCount, nil
 }
+
+func (u *StudentUsecase) GetParentByID(parentID string) (*domain.Parent, error) {
+	return u.studentRepo.GetParentByID(parentID)
+}

@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"time"
+
 	"ppi-100-sis/internal/domain"
 
 	"gorm.io/gorm"
@@ -42,7 +44,15 @@ func (r *StudentRepository) GetByParent(parentID string) ([]domain.Student, erro
 }
 
 func (r *StudentRepository) Update(student *domain.Student) error {
-	return r.db.Save(student).Error
+	updates := map[string]interface{}{
+		"nisn":       student.NISN,
+		"class_id":   student.ClassID,
+		"unit_id":    student.UnitID,
+		"parent_id":  student.ParentID,
+		"status":     student.Status,
+		"updated_at": time.Now(),
+	}
+	return r.db.Model(&domain.Student{}).Where("id = ?", student.ID).Updates(updates).Error
 }
 
 // UpdateClassAndStatus performs a targeted update on only class_id and status columns.

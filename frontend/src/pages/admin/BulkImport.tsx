@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../../services/api';
 import {
     Upload, FileText, Download, CheckCircle, XCircle,
-    AlertCircle, Users, Eye, Play, X, FileSpreadsheet, Info, Loader2
+    AlertCircle, Users, Eye, Play, X, FileSpreadsheet, Info, Loader2,
+    GraduationCap, Copy, Check, Search, Layers
 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
@@ -16,6 +17,8 @@ import {
     parseImportFile, downloadXLSXTemplate, isValidImportFile,
     type ParsedRow
 } from '../../utils/importUtils';
+import { useUnits } from '../../hooks/useUnits';
+import type { Class } from '../../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,25 +35,80 @@ interface BulkImportResult {
     errors: BulkImportRowError[];
 }
 
-const ROLE_MAP: Record<string, string> = {
-    '1': 'Super Admin', '4': 'Guru', '5': 'Wali Kelas',
-    '6': 'Siswa', '7': 'Orang Tua', '9': 'Bendahara',
-    '10': 'Teller Tabungan', '11': 'Teller Transaksional',
+const ROLE_MAP: Record<string, { name: string; desc: string; studentReq?: boolean }> = {
+    '1': { name: 'Super Admin', desc: 'Akses penuh ke semua modul sistem' },
+    '4': { name: 'Guru', desc: 'Akses modul akademik & nilai' },
+    '5': { name: 'Wali Kelas', desc: 'Akses nilai, absensi, & siswa binaan' },
+    '6': { name: 'Siswa', desc: 'Wajib mencantumkan NISN & Class ID', studentReq: true },
+    '7': { name: 'Orang Tua', desc: 'Akses portal tagihan & perkembangan santri' },
+    '9': { name: 'Bendahara', desc: 'Akses penuh transaksi & laporan keuangan' },
+    '10': { name: 'Teller Tabungan', desc: 'Akses setoran/penarikan tabungan' },
+    '11': { name: 'Teller Transaksional', desc: 'Akses pembayaran tagihan harian' },
 };
 
-const getRoleName = (roleId: string) => ROLE_MAP[roleId] || roleId || '-';
+const getRoleName = (roleId: string) => ROLE_MAP[roleId]?.name || roleId || '-';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const BulkImport: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { units, getUnitName } = useUnits();
+
+    // Fetch classes for reference and preview validation
+    const { data: classes = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
+        queryKey: ['all-classes-bulk-import'],
+        queryFn: async () => (await api.get('/academic/classes')).data || [],
+    });
+
     const [isDragging, setIsDragging] = useState(false);
     const [fileName, setFileName] = useState<string | null>(null);
     const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
     const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
     const [showRoleRef, setShowRoleRef] = useState(false);
+    const [showClassRef, setShowClassRef] = useState(true);
+    const [classSearch, setClassSearch] = useState('');
+    const [selectedUnitFilter, setSelectedUnitFilter] = useState<number | 'all'>('all');
+    const [copiedClassId, setCopiedClassId] = useState<number | null>(null);
+    const [copiedRoleId, setCopiedRoleId] = useState<string | null>(null);
+    const [copiedUnitId, setCopiedUnitId] = useState<number | null>(null);
     const [importProgress, setImportProgress] = useState(0);
     const [isImporting, setIsImporting] = useState(false);
+
+    // ── Copy helpers ───────────────────────────────────────────────────────────
+
+    const handleCopy = (text: string, label: string, type: 'class' | 'role' | 'unit', id: number | string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} disalin ke clipboard!`);
+        if (type === 'class') {
+            setCopiedClassId(id as number);
+            setTimeout(() => setCopiedClassId(null), 2000);
+        } else if (type === 'role') {
+            setCopiedRoleId(id as string);
+            setTimeout(() => setCopiedRoleId(null), 2000);
+        } else if (type === 'unit') {
+            setCopiedUnitId(id as number);
+            setTimeout(() => setCopiedUnitId(null), 2000);
+        }
+    };
+
+    // ── Filtered Classes ───────────────────────────────────────────────────────
+
+    const filteredClasses = classes.filter(cls => {
+        const matchesUnit = selectedUnitFilter === 'all' || cls.unit_id === selectedUnitFilter;
+        const q = classSearch.toLowerCase().trim();
+        if (!q) return matchesUnit;
+        const unitName = (getUnitName(cls.unit_id) || '').toLowerCase();
+        const teacherName = (cls.homeroom_teacher?.user?.name || '').toLowerCase();
+        const name = cls.name.toLowerCase();
+        const idStr = String(cls.id);
+        return matchesUnit && (
+            name.includes(q) || 
+            idStr === q || 
+            idStr.includes(q) || 
+            unitName.includes(q) || 
+            teacherName.includes(q)
+        );
+    });
 
     // ── File handling ──────────────────────────────────────────────────────────
 
@@ -147,7 +205,6 @@ const BulkImport: React.FC = () => {
                 const res = await batchMutation.mutateAsync(batch);
                 currentSuccess += res.success;
                 currentFailed += res.failed;
-                // Offset row numbers for errors in this batch
                 currentErrors = [...currentErrors, ...res.errors];
                 
                 setImportResult({
@@ -194,61 +251,298 @@ const BulkImport: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    const handleDownloadTemplate = () => {
+        const templateClasses = classes.map(c => ({
+            id: c.id,
+            name: c.name,
+            unit_id: c.unit_id,
+            unit_name: getUnitName(c.unit_id)
+        }));
+        const templateUnits = units.map(u => ({
+            id: u.id,
+            name: u.name
+        }));
+        downloadXLSXTemplate(templateClasses, templateUnits);
+    };
+
     // ─── Render ────────────────────────────────────────────────────────────────
 
     return (
         <div className="space-y-6 pb-20">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Bulk Import Akun</h1>
                     <p className="text-slate-500 text-sm mt-1">
                         Buat banyak akun pengguna sekaligus melalui file CSV atau Excel (.xlsx)
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <ButtonGlass
-                        variant="secondary"
+                        variant={showClassRef ? "primary" : "secondary"}
+                        icon={GraduationCap}
+                        onClick={() => setShowClassRef(!showClassRef)}
+                    >
+                        ID Kelas ({classes.length})
+                    </ButtonGlass>
+                    <ButtonGlass
+                        variant={showRoleRef ? "primary" : "secondary"}
                         icon={Info}
                         onClick={() => setShowRoleRef(!showRoleRef)}
                     >
-                        Role ID
+                        Role & Unit ID
                     </ButtonGlass>
                     <ButtonGlass
                         variant="secondary"
                         icon={Download}
-                        onClick={() => downloadXLSXTemplate()}
+                        onClick={handleDownloadTemplate}
                     >
                         Download Template (.xlsx)
                     </ButtonGlass>
                 </div>
             </div>
 
-            {/* Role ID Reference */}
+            {/* Class ID Reference Section */}
+            {showClassRef && (
+                <CardGlass className="border-indigo-100 bg-white/70 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                <GraduationCap size={20} />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-slate-900 text-base">Referensi ID Kelas (class_id)</h2>
+                                <p className="text-xs text-slate-500">
+                                    Klik ID untuk menyalin. Wajib diisi pada kolom <code className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-purple-700">class_id</code> saat membuat akun Siswa (Role ID 6).
+                                </p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setShowClassRef(false)} 
+                            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 self-end sm:self-center transition-colors"
+                            title="Tutup Referensi ID Kelas"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                        <div className="relative flex-1">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Cari nama kelas, ID, tingkat, wali kelas..."
+                                value={classSearch}
+                                onChange={(e) => setClassSearch(e.target.value)}
+                                className="w-full pl-9 pr-8 py-2 text-sm rounded-xl border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                            />
+                            {classSearch && (
+                                <button
+                                    onClick={() => setClassSearch('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Unit Filter Pills */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                            <button
+                                onClick={() => setSelectedUnitFilter('all')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                                    selectedUnitFilter === 'all'
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                Semua Unit ({classes.length})
+                            </button>
+                            {units.map((unit) => {
+                                const count = classes.filter(c => c.unit_id === unit.id).length;
+                                return (
+                                    <button
+                                        key={unit.id}
+                                        onClick={() => setSelectedUnitFilter(unit.id)}
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                                            selectedUnitFilter === unit.id
+                                                ? 'bg-indigo-600 text-white shadow-sm'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {unit.name} ({count})
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Classes Grid */}
+                    {isLoadingClasses ? (
+                        <div className="py-8 flex items-center justify-center gap-2 text-slate-400 text-sm">
+                            <Loader2 size={18} className="animate-spin text-indigo-600" />
+                            Memuat daftar kelas...
+                        </div>
+                    ) : filteredClasses.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400 text-sm bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            {classSearch ? 'Tidak ada kelas yang sesuai dengan kata kunci pencarian.' : 'Belum ada data kelas yang terdaftar.'}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
+                            {filteredClasses.map((cls) => {
+                                const isCopied = copiedClassId === cls.id;
+                                const unitName = getUnitName(cls.unit_id);
+                                return (
+                                    <div
+                                        key={cls.id}
+                                        onClick={() => handleCopy(String(cls.id), `ID Kelas ${cls.name} (${cls.id})`, 'class', cls.id)}
+                                        className={`group relative p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                            isCopied
+                                                ? 'bg-green-50/90 border-green-300 ring-2 ring-green-500/20'
+                                                : 'bg-white/80 hover:bg-indigo-50/50 border-slate-200/80 hover:border-indigo-300 hover:shadow-sm'
+                                        }`}
+                                        title="Klik untuk menyalin ID Kelas"
+                                    >
+                                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                                            <span className={`px-2 py-0.5 rounded-md font-mono font-bold text-xs ${
+                                                isCopied
+                                                    ? 'bg-green-600 text-white'
+                                                    : 'bg-indigo-100 text-indigo-800 group-hover:bg-indigo-600 group-hover:text-white'
+                                            } transition-colors`}>
+                                                ID: {cls.id}
+                                            </span>
+                                            {unitName && (
+                                                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 truncate max-w-[65px]">
+                                                    {unitName}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="mb-2">
+                                            <p className="font-bold text-slate-800 text-sm group-hover:text-indigo-700 transition-colors leading-tight">
+                                                {cls.name}
+                                            </p>
+                                            {cls.homeroom_teacher?.user?.name && (
+                                                <p className="text-[11px] text-slate-400 truncate mt-0.5" title={cls.homeroom_teacher.user.name}>
+                                                    {cls.homeroom_teacher.user.name}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1.5 border-t border-slate-100/80">
+                                            <span className="group-hover:text-indigo-600 text-[10px] font-medium">
+                                                {isCopied ? 'Tersalin!' : 'Klik salin'}
+                                            </span>
+                                            {isCopied ? (
+                                                <Check size={13} className="text-green-600 animate-in zoom-in-50" />
+                                            ) : (
+                                                <Copy size={13} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </CardGlass>
+            )}
+
+            {/* Role & Unit ID Reference */}
             {showRoleRef && (
                 <CardGlass>
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                         <div className="flex items-center gap-2">
                             <Info size={18} className="text-blue-600" />
-                            <h2 className="font-semibold text-slate-900 text-sm">Referensi Role ID</h2>
+                            <h2 className="font-semibold text-slate-900 text-sm">Referensi Role ID & Unit ID</h2>
                         </div>
-                        <button onClick={() => setShowRoleRef(false)} className="text-slate-400 hover:text-red-500">
+                        <button onClick={() => setShowRoleRef(false)} className="text-slate-400 hover:text-red-500 p-1 rounded-lg">
                             <X size={16} />
                         </button>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {Object.entries(ROLE_MAP).map(([id, name]) => (
-                            <div key={id} className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-2">
-                                <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-bold">
-                                    {id}
-                                </span>
-                                <span className="text-slate-700 text-sm">{name}</span>
+
+                    <div className="space-y-4">
+                        {/* Role IDs */}
+                        <div>
+                            <div className="flex items-center gap-1.5 mb-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                <Users size={14} className="text-purple-600" />
+                                Daftar Role ID
                             </div>
-                        ))}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                {Object.entries(ROLE_MAP).map(([id, info]) => {
+                                    const isCopied = copiedRoleId === id;
+                                    return (
+                                        <div 
+                                            key={id} 
+                                            onClick={() => handleCopy(id, `Role ID ${info.name} (${id})`, 'role', id)}
+                                            className={`flex items-start justify-between gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                                isCopied
+                                                    ? 'bg-green-50 border-green-300'
+                                                    : 'bg-white/40 hover:bg-white/80 border-slate-200/60 hover:border-purple-300'
+                                            }`}
+                                            title="Klik untuk menyalin Role ID"
+                                        >
+                                            <div className="flex items-start gap-2 min-w-0">
+                                                <span className="px-2 py-0.5 rounded-md text-xs bg-purple-100 text-purple-700 font-mono font-bold shrink-0 mt-0.5">
+                                                    {id}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="text-slate-800 text-xs font-semibold truncate">{info.name}</p>
+                                                    <p className="text-[10px] text-slate-400 truncate">{info.desc}</p>
+                                                </div>
+                                            </div>
+                                            {isCopied ? (
+                                                <Check size={14} className="text-green-600 shrink-0 mt-1" />
+                                            ) : (
+                                                <Copy size={14} className="text-slate-300 hover:text-purple-600 shrink-0 mt-1" />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Unit IDs */}
+                        <div>
+                            <div className="flex items-center gap-1.5 mb-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                <Layers size={14} className="text-indigo-600" />
+                                Daftar Unit ID
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                                {units.map((unit) => {
+                                    const isCopied = copiedUnitId === unit.id;
+                                    return (
+                                        <div
+                                            key={unit.id}
+                                            onClick={() => handleCopy(String(unit.id), `Unit ID ${unit.name} (${unit.id})`, 'unit', unit.id)}
+                                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                                isCopied
+                                                    ? 'bg-green-50 border-green-300'
+                                                    : 'bg-white/40 hover:bg-white/80 border-slate-200/60 hover:border-indigo-300'
+                                            }`}
+                                            title="Klik untuk menyalin Unit ID"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2 py-0.5 rounded-md text-xs bg-indigo-100 text-indigo-700 font-mono font-bold">
+                                                    {unit.id}
+                                                </span>
+                                                <span className="text-slate-800 text-xs font-semibold">{unit.name}</span>
+                                            </div>
+                                            {isCopied ? (
+                                                <Check size={14} className="text-green-600" />
+                                            ) : (
+                                                <Copy size={14} className="text-slate-300 hover:text-indigo-600" />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-slate-500 pt-2 border-t border-slate-100">
+                            💡 <strong>Catatan:</strong> Untuk role Siswa (<code className="px-1 py-0.2 rounded bg-slate-100 text-purple-700 font-mono">role_id = 6</code>), kolom <code className="px-1 py-0.2 rounded bg-slate-100 text-purple-700 font-mono">nisn</code>, <code className="px-1 py-0.2 rounded bg-slate-100 text-purple-700 font-mono">unit_id</code>, dan <code className="px-1 py-0.2 rounded bg-slate-100 text-purple-700 font-mono">class_id</code> wajib diisi.
+                        </p>
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">
-                        * Untuk role Siswa (6), field <strong>nisn</strong> dan <strong>class_id</strong> wajib diisi.
-                    </p>
                 </CardGlass>
             )}
 
@@ -279,7 +573,7 @@ const BulkImport: React.FC = () => {
                             Format yang didukung: <strong>.csv</strong> dan <strong>.xlsx</strong> (Excel)
                         </p>
                         <p className="text-slate-400 text-xs mt-2">
-                            Kolom: name, email, password, role_id, unit_id, nisn (opsional), class_id (opsional)
+                            Kolom: <code className="text-purple-600 font-mono">name, email, password, role_id, unit_id, nisn, class_id</code>
                         </p>
                         <input
                             ref={fileInputRef}
@@ -373,33 +667,92 @@ const BulkImport: React.FC = () => {
                                     <TableHeadGlass>Role</TableHeadGlass>
                                     <TableHeadGlass>Unit</TableHeadGlass>
                                     <TableHeadGlass>NISN</TableHeadGlass>
-                                    <TableHeadGlass>Class ID</TableHeadGlass>
+                                    <TableHeadGlass>Class ID (ID Kelas)</TableHeadGlass>
                                 </TableRowGlass>
                             </TableHeaderGlass>
                             <TableBodyGlass>
-                                {parsedRows.map((row) => (
-                                    <TableRowGlass key={row.row}>
-                                        <TableCellGlass className="text-slate-400">{row.row}</TableCellGlass>
-                                        <TableCellGlass>
-                                            <span className={!row.name ? 'text-red-500 italic' : ''}>
-                                                {row.name || '(kosong)'}
-                                            </span>
-                                        </TableCellGlass>
-                                        <TableCellGlass>
-                                            <span className={!row.email ? 'text-red-500 italic' : ''}>
-                                                {row.email || '(kosong)'}
-                                            </span>
-                                        </TableCellGlass>
-                                        <TableCellGlass>
-                                            <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
-                                                {getRoleName(row.role_id)}
-                                            </span>
-                                        </TableCellGlass>
-                                        <TableCellGlass>{row.unit_id || '-'}</TableCellGlass>
-                                        <TableCellGlass>{row.nisn || '-'}</TableCellGlass>
-                                        <TableCellGlass>{row.class_id || '-'}</TableCellGlass>
-                                    </TableRowGlass>
-                                ))}
+                                {parsedRows.map((row) => {
+                                    const matchedClass = row.class_id ? classes.find(c => String(c.id) === String(row.class_id)) : undefined;
+                                    const unitName = row.unit_id ? getUnitName(parseInt(row.unit_id, 10)) : undefined;
+                                    const isStudent = row.role_id === '6';
+                                    
+                                    return (
+                                        <TableRowGlass key={row.row}>
+                                            <TableCellGlass className="text-slate-400 font-mono text-xs">{row.row}</TableCellGlass>
+                                            <TableCellGlass>
+                                                <span className={!row.name ? 'text-red-500 italic' : 'font-medium text-slate-800'}>
+                                                    {row.name || '(kosong)'}
+                                                </span>
+                                            </TableCellGlass>
+                                            <TableCellGlass>
+                                                <span className={!row.email ? 'text-red-500 italic' : 'text-slate-600'}>
+                                                    {row.email || '(kosong)'}
+                                                </span>
+                                            </TableCellGlass>
+                                            <TableCellGlass>
+                                                <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-medium">
+                                                    {getRoleName(row.role_id)}
+                                                </span>
+                                            </TableCellGlass>
+                                            <TableCellGlass>
+                                                {row.unit_id ? (
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className="font-mono text-xs text-slate-500 font-semibold">{row.unit_id}</span>
+                                                        {unitName && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs bg-slate-100 text-slate-700 font-medium">
+                                                                {unitName}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </TableCellGlass>
+                                            <TableCellGlass className="font-mono text-xs text-slate-600">
+                                                {row.nisn || (isStudent ? <span className="text-red-500 text-xs italic font-medium">Wajib diisi</span> : '-')}
+                                            </TableCellGlass>
+                                            <TableCellGlass>
+                                                {(() => {
+                                                    if (!row.class_id) {
+                                                        if (isStudent) {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                                                    <AlertCircle size={12} />
+                                                                    Wajib diisi (Siswa)
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return <span className="text-slate-400">-</span>;
+                                                    }
+                                                    if (matchedClass) {
+                                                        const classUnitName = getUnitName(matchedClass.unit_id);
+                                                        return (
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                                                    ID {row.class_id}
+                                                                </span>
+                                                                <span className="text-xs font-semibold text-slate-800">
+                                                                    {matchedClass.name}
+                                                                </span>
+                                                                {classUnitName && (
+                                                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500">
+                                                                        {classUnitName}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                                            <AlertCircle size={12} />
+                                                            ID {row.class_id} (Tidak Ditemukan)
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </TableCellGlass>
+                                        </TableRowGlass>
+                                    );
+                                })}
                             </TableBodyGlass>
                         </TableGlass>
                     </div>

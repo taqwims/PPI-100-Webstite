@@ -361,7 +361,22 @@ function escXml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildXLSXTemplate(): Blob {
+export interface TemplateClassInfo {
+    id: number;
+    name: string;
+    unit_id?: number;
+    unit_name?: string;
+}
+
+export interface TemplateUnitInfo {
+    id: number;
+    name: string;
+}
+
+function buildXLSXTemplate(
+    classes?: TemplateClassInfo[],
+    units?: TemplateUnitInfo[]
+): Blob {
     const roleInfo = [
         ['', '', '', '', '', '', ''],
         ['REFERENSI ROLE ID:', '', '', '', '', '', ''],
@@ -376,15 +391,36 @@ function buildXLSXTemplate(): Blob {
         ['11', 'Teller Transaksional', 'Petugas transaksi harian', '', '', '', ''],
     ];
 
+    const unitInfo: string[][] = units && units.length > 0 ? [
+        ['', '', '', '', '', '', ''],
+        ['REFERENSI UNIT ID:', '', '', '', '', '', ''],
+        ['Unit ID', 'Nama Unit', '', '', '', '', ''],
+        ...units.map(u => [String(u.id), u.name, '', '', '', '', ''])
+    ] : [];
+
+    const classInfo: string[][] = classes && classes.length > 0 ? [
+        ['', '', '', '', '', '', ''],
+        ['REFERENSI ID KELAS (class_id):', '', '', '', '', '', ''],
+        ['ID Kelas', 'Nama Kelas', 'Unit ID / Nama Unit', '', '', '', ''],
+        ...classes.map(c => {
+            const unitLabel = c.unit_name ? `${c.unit_id ?? ''} (${c.unit_name})` : String(c.unit_id ?? '');
+            return [String(c.id), c.name, unitLabel, '', '', '', ''];
+        })
+    ] : [];
+
     const headers = ['name', 'email', 'password', 'role_id', 'unit_id', 'nisn', 'class_id'];
+    const sampleClassId1 = classes?.[0] ? String(classes[0].id) : '1';
+    const sampleClassId2 = classes?.[1] ? String(classes[1].id) : '2';
+    const sampleUnitId1 = units?.[0] ? String(units[0].id) : '1';
+
     const examples = [
-        ['Budi Santoso', 'budi@example.com', 'password123', '6', '1', '1234567890', '1'],
-        ['Siti Rahayu', 'siti@example.com', 'password456', '6', '1', '0987654321', '2'],
-        ['Ahmad Guru', 'ahmad@example.com', 'password789', '4', '1', '', ''],
-        ['Fatimah Wali', 'fatimah@example.com', 'password321', '7', '1', '', ''],
+        ['Budi Santoso', 'budi@example.com', 'password123', '6', sampleUnitId1, '1234567890', sampleClassId1],
+        ['Siti Rahayu', 'siti@example.com', 'password456', '6', sampleUnitId1, '0987654321', sampleClassId2],
+        ['Ahmad Guru', 'ahmad@example.com', 'password789', '4', sampleUnitId1, '', ''],
+        ['Fatimah Wali', 'fatimah@example.com', 'password321', '7', sampleUnitId1, '', ''],
     ];
 
-    const allRows = [headers, ...examples, ...roleInfo];
+    const allRows = [headers, ...examples, ...roleInfo, ...unitInfo, ...classInfo];
 
     // Build shared strings table
     const uniqueStrings: string[] = [];
@@ -551,8 +587,11 @@ function crc32(data: Uint8Array): number {
 
 // ─── Template Download ───────────────────────────────────────────────────────
 
-export function downloadXLSXTemplate(): void {
-    const blob = buildXLSXTemplate();
+export function downloadXLSXTemplate(
+    classes?: TemplateClassInfo[],
+    units?: TemplateUnitInfo[]
+): void {
+    const blob = buildXLSXTemplate(classes, units);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

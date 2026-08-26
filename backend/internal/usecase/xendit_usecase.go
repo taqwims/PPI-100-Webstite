@@ -418,10 +418,7 @@ func (u *XenditUsecase) processPaymentSuccess(orderID string) error {
 		if u.financeUsecase != nil {
 			u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
 
-			if parent != nil {
-				u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, "Xendit")
-			}
-
+			u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, "Xendit")
 			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
 		}
 	}

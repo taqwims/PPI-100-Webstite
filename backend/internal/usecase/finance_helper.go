@@ -111,11 +111,17 @@ func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domai
 	templateStr := defaultTemplate
 	if u.notificationUsecase != nil {
 		templateStr = u.notificationUsecase.GetSettingValue("wa_notif_payment_body", defaultTemplate)
+		if strings.TrimSpace(templateStr) == "" {
+			templateStr = defaultTemplate
+		}
 	}
 
 	schoolName := "SDIT AN-NUR"
 	if u.notificationUsecase != nil {
 		schoolName = u.notificationUsecase.GetSettingValue("school_name", "SDIT AN-NUR")
+		if strings.TrimSpace(schoolName) == "" {
+			schoolName = "SDIT AN-NUR"
+		}
 	}
 
 	methodName := "Online / Transfer"
@@ -123,10 +129,20 @@ func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domai
 		methodName = paymentMethod[0]
 	}
 
+	studentName := ""
+	if student != nil && student.User.Name != "" {
+		studentName = student.User.Name
+	}
+	billTitle := ""
+	if bill != nil {
+		billTitle = bill.Title
+	}
+
 	msg := templateStr
-	msg = strings.ReplaceAll(msg, "{nama_siswa}", student.User.Name)
-	msg = strings.ReplaceAll(msg, "{nama_tagihan}", bill.Title)
+	msg = strings.ReplaceAll(msg, "{nama_siswa}", studentName)
+	msg = strings.ReplaceAll(msg, "{nama_tagihan}", billTitle)
 	msg = strings.ReplaceAll(msg, "{jumlah_bayar}", utils.FormatRupiah(amount))
+	msg = strings.ReplaceAll(msg, "{nominal}", utils.FormatRupiah(amount))
 	msg = strings.ReplaceAll(msg, "{tanggal_bayar}", time.Now().Format("02 January 2006 15:04"))
 	msg = strings.ReplaceAll(msg, "{metode_pembayaran}", methodName)
 	msg = strings.ReplaceAll(msg, "{nama_sekolah}", schoolName)

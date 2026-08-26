@@ -1,17 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
 import clsx from 'clsx';
 import { ParentManagement } from '../../components/admin/UserManagement/ParentManagement';
 import toast from 'react-hot-toast';
 
+interface ParentRecord {
+    id: string;      // Parent Table ID
+    user_id: string; // User ID
+    phone?: string;
+    address?: string;
+    occupation?: string;
+    relation?: string;
+    user?: {
+        id: string;
+        name: string;
+        email: string;
+        unit_id: number;
+    };
+    children?: any[];
+}
+
 interface User {
     id: string;
     name: string;
     email: string;
+    phone?: string;
     role_id: number;
     unit_id: number;
     student?: {
@@ -19,9 +36,21 @@ interface User {
         nisn: string;
         class_id: number;
         parent_id?: string;
+        parent?: {
+            id: string;
+            user_id: string;
+            phone?: string;
+            relation?: string;
+            user?: {
+                id: string;
+                name: string;
+                email: string;
+            };
+        };
     };
     parent?: {
         id: string;
+        phone?: string;
     };
 }
 
@@ -71,8 +100,6 @@ const roleColor = (roleId: number) => {
     return m[roleId] || 'bg-slate-100 text-slate-600';
 };
 
-// getUnitName is now provided by useUnits hook inside component
-
 const UserManagement: React.FC = () => {
     const { user } = useAuth();
     const { units: activeUnits, getUnitName, defaultUnitId } = useUnits();
@@ -97,18 +124,23 @@ const UserManagement: React.FC = () => {
         setFormData(prev => ({ ...prev, unit_id: initialUnitId }));
     }, [initialUnitId]);
 
-    const { data: users = [], isLoading } = useQuery({
+    const { data: users = [], isLoading } = useQuery<User[]>({
         queryKey: ['users'],
         queryFn: async () => (await api.get('/users/')).data || [],
     });
 
-    const { data: classes = [] } = useQuery({
+    const { data: parentsList = [] } = useQuery<ParentRecord[]>({
+        queryKey: ['parents'],
+        queryFn: async () => (await api.get('/parents/')).data || [],
+    });
+
+    const { data: classes = [] } = useQuery<Class[]>({
         queryKey: ['classes', formData.unit_id],
         queryFn: async () => (await api.get(`/academic/classes?unit_id=${formData.unit_id}`)).data || [],
         enabled: formData.role_id === 6 && isModalOpen,
     });
 
-    const { data: allStudents } = useQuery({
+    const { data: allStudents } = useQuery<StudentRecord[]>({
         queryKey: ['all-students', formData.unit_id],
         queryFn: async () => (await api.get(`/students/?unit_id=${formData.unit_id}`)).data as StudentRecord[],
         enabled: isModalOpen && !!editingUser && editingUser.role_id === 6,
@@ -116,33 +148,92 @@ const UserManagement: React.FC = () => {
 
     // For sorting students by class - always fetch classes
     const { data: allClasses = [] } = useQuery<Class[]>({
-        queryKey: ['all-classes'], queryFn: async () => (await api.get('/academic/classes')).data || [],
+        queryKey: ['all-classes'], 
+        queryFn: async () => (await api.get('/academic/classes')).data || [],
     });
 
-    const parentUsers = users.filter((u: User) => u.role_id === 7);
+    // Combined, deduplicated parent options for the dropdown
+    const allParentOptions = useMemo(() => {
+        const map = new Map<string, { userId: string; name: string; email?: string; phone?: string; parentTableId?: string }>();
 
-    // Helper: resolve Parent table ID -> User ID for the dropdown
-    // Student.parent_id is a Parent table UUID, but dropdown uses User.id
-    const resolveParentIdToUserId = (parentTableId: string): string => {
-        if (!parentTableId) return '';
-        const parentUser = parentUsers.find((u: User) => u.parent?.id === parentTableId);
-        return parentUser?.id || '';
+        // 1. From parentsList (/parents/)
+        parentsList.forEach(p => {
+            const uid = p.user?.id || p.user_id;
+            if (uid) {
+                map.set(uid, {
+                    userId: uid,
+                    parentTableId: p.id,
+                    name: p.user?.name || 'Orang Tua',
+                    email: p.user?.email,
+                    phone: p.phone,
+                });
+            }
+        });
+
+        // 2. From users with role_id === 7 (Orang Tua)
+        users.filter(u => u.role_id === 7).forEach(u => {
+            if (!map.has(u.id)) {
+                map.set(u.id, {
+                    userId: u.id,
+                    parentTableId: u.parent?.id,
+                    name: u.name,
+                    email: u.email,
+                    phone: u.phone,
+                });
+            } else if (u.parent?.id) {
+                const existing = map.get(u.id)!;
+                if (!existing.parentTableId) {
+                    existing.parentTableId = u.parent.id;
+                }
+            }
+        });
+
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [parentsList, users]);
+
+    // Helper: resolve Parent table ID (or User ID) -> User ID for dropdown value
+    const resolveParentIdToUserId = (parentIdentifier?: string): string => {
+        if (!parentIdentifier) return '';
+
+        // Match by parentTableId (Parent.id)
+        const matchByTableId = allParentOptions.find(p => p.parentTableId && p.parentTableId === parentIdentifier);
+        if (matchByTableId) return matchByTableId.userId;
+
+        // Match by userId (User.id)
+        const matchByUserId = allParentOptions.find(p => p.userId === parentIdentifier);
+        if (matchByUserId) return matchByUserId.userId;
+
+        // Match directly in parentsList
+        const p1 = parentsList.find(p => p.id === parentIdentifier || p.user_id === parentIdentifier || p.user?.id === parentIdentifier);
+        if (p1) return p1.user?.id || p1.user_id || '';
+
+        // Match in users (role 7)
+        const u1 = users.find(u => u.role_id === 7 && (u.parent?.id === parentIdentifier || u.id === parentIdentifier));
+        if (u1) return u1.id;
+
+        return parentIdentifier;
     };
 
-    useEffect(() => {
-        if (editingUser && editingUser.role_id === 6 && allStudents) {
-            const studentRec = allStudents.find((s: StudentRecord) => s.user_id === editingUser.id);
-            if (studentRec) {
-                setEditingStudentRecord(studentRec);
-                setFormData(prev => ({
-                    ...prev,
-                    nisn: studentRec.nisn || '',
-                    class_id: studentRec.class_id || 0,
-                    parent_id: resolveParentIdToUserId(studentRec.parent_id || ''),
-                }));
-            }
+    // Helper: get display name for a student's parent
+    const getStudentParentName = (u: User): string => {
+        if (u.role_id !== 6 || !u.student) return '-';
+        if (u.student.parent?.user?.name) {
+            return u.student.parent.user.name;
         }
-    }, [editingUser, allStudents, parentUsers]);
+        const parentId = u.student.parent_id;
+        if (!parentId) return '-';
+
+        const opt = allParentOptions.find(p => p.parentTableId === parentId || p.userId === parentId);
+        if (opt?.name) return opt.name;
+
+        const p = parentsList.find(item => item.id === parentId || item.user_id === parentId || item.user?.id === parentId);
+        if (p?.user?.name) return p.user.name;
+
+        const parentUser = users.find(usr => usr.role_id === 7 && (usr.parent?.id === parentId || usr.id === parentId));
+        if (parentUser) return parentUser.name;
+
+        return '-';
+    };
 
     // Filter & sort
     const filteredUsers = users
@@ -190,21 +281,32 @@ const UserManagement: React.FC = () => {
         mutationFn: (data: typeof formData) => {
             if (data.role_id === 6) {
                 return api.post('/students/', {
-                    name: data.name, email: data.email, password: data.password,
-                    nisn: data.nisn, class_id: Number(data.class_id),
-                    unit_id: Number(data.unit_id), parent_id: data.parent_id || undefined,
+                    name: data.name, 
+                    email: data.email, 
+                    password: data.password,
+                    nisn: data.nisn, 
+                    class_id: Number(data.class_id),
+                    unit_id: Number(data.unit_id), 
+                    parent_id: data.parent_id || undefined,
                 });
             }
             return api.post('/users/', {
-                name: data.name, email: data.email, password: data.password,
-                role_id: Number(data.role_id), unit_id: Number(data.unit_id),
+                name: data.name, 
+                email: data.email, 
+                password: data.password,
+                role_id: Number(data.role_id), 
+                unit_id: Number(data.unit_id),
             });
         },
         onSuccess: () => {
             toast.success('User berhasil ditambahkan');
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['all-students'] });
             queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['parent-users'] });
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            queryClient.invalidateQueries({ queryKey: ['all-classes'] });
             handleCloseModal();
         },
         onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membuat user'),
@@ -212,25 +314,35 @@ const UserManagement: React.FC = () => {
 
     const updateUserMutation = useMutation({
         mutationFn: (data: any) => {
-            if (editingUser?.role_id === 6 && editingStudentRecord) {
-                return api.put(`/students/${editingStudentRecord.id}`, {
-                    name: data.name, email: data.email, password: data.password || undefined,
-                    nisn: data.nisn || editingStudentRecord.nisn,
-                    class_id: Number(data.class_id) || editingStudentRecord.class_id,
-                    unit_id: Number(data.unit_id) || editingStudentRecord.unit_id,
-                    parent_id: data.parent_id || undefined,
+            const studentId = editingUser?.student?.id || editingStudentRecord?.id;
+            if (editingUser?.role_id === 6 && studentId) {
+                return api.put(`/students/${studentId}`, {
+                    name: data.name,
+                    email: data.email,
+                    password: data.password || undefined,
+                    nisn: data.nisn || editingUser?.student?.nisn || '',
+                    class_id: Number(data.class_id),
+                    unit_id: Number(data.unit_id) || editingUser?.unit_id || 1,
+                    parent_id: data.parent_id || '',
                 });
             }
             return api.put(`/users/${editingUser?.id}`, {
-                name: data.name, email: data.email, password: data.password,
-                role_id: Number(data.role_id), unit_id: Number(data.unit_id),
+                name: data.name,
+                email: data.email,
+                password: data.password || undefined,
+                role_id: Number(data.role_id),
+                unit_id: Number(data.unit_id),
             });
         },
         onSuccess: () => {
             toast.success('User berhasil diperbarui');
             queryClient.invalidateQueries({ queryKey: ['users'] });
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['all-students'] });
             queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['parent-users'] });
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            queryClient.invalidateQueries({ queryKey: ['all-classes'] });
             handleCloseModal();
         },
         onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal mengupdate user'),
@@ -241,7 +353,9 @@ const UserManagement: React.FC = () => {
         onSuccess: () => {
             toast.success('User berhasil dihapus');
             queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['students'] });
             queryClient.invalidateQueries({ queryKey: ['parents'] });
+            queryClient.invalidateQueries({ queryKey: ['parent-users'] });
         },
         onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus user'),
     });
@@ -255,12 +369,30 @@ const UserManagement: React.FC = () => {
 
     const handleEdit = (u: User) => {
         setEditingUser(u);
-        setEditingStudentRecord(null);
+        const studentRec = allStudents?.find((s: StudentRecord) => s.user_id === u.id);
+        if (studentRec) {
+            setEditingStudentRecord(studentRec);
+        } else {
+            setEditingStudentRecord(null);
+        }
+
+        const rawParentId = u.student?.parent?.user?.id 
+            || u.student?.parent?.user_id 
+            || u.student?.parent_id 
+            || studentRec?.parent_id 
+            || '';
+
+        const resolvedParentUserId = resolveParentIdToUserId(rawParentId);
+
         setFormData({
-            name: u.name, email: u.email, password: '',
-            role_id: u.role_id, unit_id: u.unit_id,
-            nisn: u.student?.nisn || '', class_id: u.student?.class_id || 0,
-            parent_id: resolveParentIdToUserId(u.student?.parent_id || ''),
+            name: u.name,
+            email: u.email,
+            password: '',
+            role_id: u.role_id,
+            unit_id: u.unit_id,
+            nisn: u.student?.nisn || studentRec?.nisn || '',
+            class_id: u.student?.class_id || studentRec?.class_id || 0,
+            parent_id: resolvedParentUserId,
         });
         setIsModalOpen(true);
     };
@@ -296,6 +428,12 @@ const UserManagement: React.FC = () => {
         const cls = allClasses.find((c: Class) => c.id === u.student!.class_id);
         return cls?.name || '-';
     };
+
+    const selectedParentName = useMemo(() => {
+        if (!formData.parent_id) return '';
+        const found = allParentOptions.find(p => p.userId === formData.parent_id);
+        return found?.name || 'Orang Tua Terpilih';
+    }, [formData.parent_id, allParentOptions]);
 
     return (
         <div className="space-y-6">
@@ -357,7 +495,9 @@ const UserManagement: React.FC = () => {
                                     {allClasses
                                         .filter((cls: Class) => user?.role_id === 1 || cls.unit_id === user?.unit_id)
                                         .map((cls: Class) => (
-                                            <option key={cls.id} value={cls.id}>{cls.name}</option>
+                                             <option key={cls.id} value={cls.id}>
+                                                 {cls.name} {user?.role_id === 1 ? `(${getUnitName(cls.unit_id)})` : ''}
+                                             </option>
                                         ))}
                                 </select>
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -377,42 +517,65 @@ const UserManagement: React.FC = () => {
                                 <th className="px-5 py-3 font-medium">Email</th>
                                 <th className="px-5 py-3 font-medium">Role</th>
                                 {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Kelas</th>}
+                                {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Orang Tua</th>}
                                 <th className="px-5 py-3 font-medium">Unit</th>
                                 <th className="px-5 py-3 font-medium text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
-                                <tr><td colSpan={7} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
+                                <tr><td colSpan={8} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
                             ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan={7} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
-                            ) : filteredUsers.map((u: User, idx: number) => (
-                                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-5 py-3 text-slate-400 text-sm font-medium">{idx + 1}</td>
-                                    <td className="px-5 py-3">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold', roleColor(u.role_id))}>
-                                                {u.name.charAt(0).toUpperCase()}
+                                <tr><td colSpan={8} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
+                            ) : filteredUsers.map((u: User, idx: number) => {
+                                const parentName = getStudentParentName(u);
+                                return (
+                                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-5 py-3 text-slate-400 text-sm font-medium">{idx + 1}</td>
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold', roleColor(u.role_id))}>
+                                                    {u.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className="font-medium text-slate-900">{u.name}</span>
                                             </div>
-                                            <span className="font-medium text-slate-900">{u.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-3 text-slate-500 text-sm">{u.email}</td>
-                                    <td className="px-5 py-3">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roleColor(u.role_id)}`}>
-                                            {getRoleName(u.role_id)}
-                                        </span>
-                                    </td>
-                                    {(activeTab === 0 || activeTab === 6) && (
-                                        <td className="px-5 py-3 text-sm text-slate-600">{getStudentClass(u)}</td>
-                                    )}
-                                    <td className="px-5 py-3 text-sm text-slate-500">{getUnitName(u.unit_id)}</td>
-                                    <td className="px-5 py-3 text-center space-x-1">
-                                        <button onClick={() => handleEdit(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                                        <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="px-5 py-3 text-slate-500 text-sm">{u.email}</td>
+                                        <td className="px-5 py-3">
+                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roleColor(u.role_id)}`}>
+                                                {getRoleName(u.role_id)}
+                                            </span>
+                                        </td>
+                                        {(activeTab === 0 || activeTab === 6) && (
+                                            <td className="px-5 py-3 text-sm text-slate-600 font-medium">{getStudentClass(u)}</td>
+                                        )}
+                                        {(activeTab === 0 || activeTab === 6) && (
+                                            <td className="px-5 py-3 text-sm">
+                                                {u.role_id === 6 ? (
+                                                    parentName !== '-' ? (
+                                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                                                            <CheckCircle size={12} className="text-emerald-600" />
+                                                            {parentName}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                                                            <AlertCircle size={12} className="text-amber-500" />
+                                                            Belum Ditentukan
+                                                        </span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </td>
+                                        )}
+                                        <td className="px-5 py-3 text-sm text-slate-500">{getUnitName(u.unit_id)}</td>
+                                        <td className="px-5 py-3 text-center space-x-1">
+                                            <button onClick={() => handleEdit(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit User"><Edit2 size={16} /></button>
+                                            <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus User"><Trash2 size={16} /></button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -507,22 +670,42 @@ const UserManagement: React.FC = () => {
                                             <select value={formData.class_id} onChange={e => setFormData({ ...formData, class_id: Number(e.target.value) })}
                                                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm">
                                                 <option value={0}>Pilih Kelas</option>
-                                                {classes?.map((cls: Class) => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+                                                {((classes && classes.length > 0) ? classes : allClasses.filter((c: Class) => !formData.unit_id || c.unit_id === formData.unit_id))?.map((cls: Class) => (
+                                                    <option key={cls.id} value={cls.id}>
+                                                        {cls.name} {user?.role_id === 1 ? `(${getUnitName(cls.unit_id)})` : ''}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Orang Tua / Wali</label>
-                                        <select value={formData.parent_id} onChange={e => setFormData({ ...formData, parent_id: e.target.value })}
-                                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Orang Tua / Wali Murid</label>
+                                        <select 
+                                            value={formData.parent_id} 
+                                            onChange={e => setFormData({ ...formData, parent_id: e.target.value })}
+                                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+                                        >
                                             <option value="">-- Belum Ada Orang Tua --</option>
-                                            {parentUsers.map((p: User) => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
+                                            {allParentOptions.map(p => (
+                                                <option key={p.userId} value={p.userId}>
+                                                    {p.name} {p.email ? `(${p.email})` : ''} {p.phone ? `· ${p.phone}` : ''}
+                                                </option>
+                                            ))}
                                         </select>
-                                        {editingUser && !formData.parent_id && (
-                                            <p className="text-xs text-amber-600 mt-1">⚠ Siswa belum terhubung dengan orang tua</p>
-                                        )}
-                                        {editingUser && formData.parent_id && (
-                                            <p className="text-xs text-emerald-600 mt-1">✓ Terhubung dengan orang tua</p>
+                                        
+                                        {/* Status Indicator */}
+                                        {formData.parent_id ? (
+                                            <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium mt-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200/60">
+                                                <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                                                <span>
+                                                    Terhubung dengan orang tua: <strong>{selectedParentName}</strong>
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium mt-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200/60">
+                                                <AlertCircle size={14} className="text-amber-500 shrink-0" />
+                                                <span>Siswa ini belum terhubung dengan akun orang tua</span>
+                                            </div>
                                         )}
                                     </div>
                                 </div>

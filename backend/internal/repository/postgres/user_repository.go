@@ -20,7 +20,14 @@ func (r *UserRepository) Create(user *domain.User) error {
 
 func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Where("email = ?", email).Preload("Teacher").Preload("Parent").Preload("Student").First(&user).Error; err != nil {
+	if err := r.db.Where("email = ?", email).
+		Preload("Teacher").
+		Preload("Parent").
+		Preload("Student").
+		Preload("Student.Class").
+		Preload("Student.Parent").
+		Preload("Student.Parent.User").
+		First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -36,7 +43,14 @@ func (r *UserRepository) FindByEmailUnscoped(email string) (*domain.User, error)
 
 func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Where("id = ?", id).Preload("Teacher").Preload("Parent").Preload("Student").First(&user).Error; err != nil {
+	if err := r.db.Where("id = ?", id).
+		Preload("Teacher").
+		Preload("Parent").
+		Preload("Student").
+		Preload("Student.Class").
+		Preload("Student.Parent").
+		Preload("Student.Parent.User").
+		First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -44,7 +58,13 @@ func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 
 func (r *UserRepository) GetAll(roleID uint) ([]domain.User, error) {
 	var users []domain.User
-	query := r.db.Preload("Teacher").Preload("Parent").Preload("Student").Preload("Student.Class")
+	query := r.db.
+		Preload("Teacher").
+		Preload("Parent").
+		Preload("Student").
+		Preload("Student.Class").
+		Preload("Student.Parent").
+		Preload("Student.Parent.User")
 	if roleID != 0 {
 		query = query.Where("role_id = ?", roleID)
 	}
