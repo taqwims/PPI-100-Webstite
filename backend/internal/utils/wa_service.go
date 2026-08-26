@@ -1,11 +1,11 @@
 package utils
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"ppi-100-sis/internal/config"
 	"strings"
 )
@@ -41,22 +41,23 @@ func (s *WAService) SendWhatsApp(token, target, message string) error {
 		target = "62" + target[1:]
 	}
 
-	url := "https://api.fonnte.com/send"
-	
-	payload := map[string]string{
-		"target":  target,
-		"message": message,
+	if strings.TrimSpace(message) == "" {
+		return fmt.Errorf("message body is empty")
 	}
+
+	apiUrl := "https://api.fonnte.com/send"
 	
-	jsonPayload, _ := json.Marshal(payload)
+	data := url.Values{}
+	data.Set("target", target)
+	data.Set("message", message)
 	
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest("POST", apiUrl, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
 	
 	req.Header.Set("Authorization", token)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	
 	client := &http.Client{}
 	resp, err := client.Do(req)

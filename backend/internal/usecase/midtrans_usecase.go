@@ -25,6 +25,7 @@ type MidtransUsecase struct {
 	financeUsecase        *FinanceUsecase
 	studentObligationRepo *postgres.StudentObligationRepository
 	activityRepo          *postgres.ActivityRepository
+	budgetRepo            *postgres.BudgetRepository
 }
 
 func NewMidtransUsecase(
@@ -37,6 +38,7 @@ func NewMidtransUsecase(
 	financeUsecase *FinanceUsecase,
 	studentObligationRepo *postgres.StudentObligationRepository,
 	activityRepo *postgres.ActivityRepository,
+	budgetRepo *postgres.BudgetRepository,
 ) *MidtransUsecase {
 	return &MidtransUsecase{
 		cfg:                   cfg,
@@ -48,6 +50,7 @@ func NewMidtransUsecase(
 		financeUsecase:        financeUsecase,
 		studentObligationRepo: studentObligationRepo,
 		activityRepo:          activityRepo,
+		budgetRepo:            budgetRepo,
 	}
 }
 
@@ -91,10 +94,10 @@ func (u *MidtransUsecase) CreateSnapTransaction(billID uuid.UUID, amount float64
 		return "", "", "", fmt.Errorf("tagihan sudah lunas")
 	}
 
-	// Cancel any old pending Midtrans payments for this bill to avoid transaction confusion
+	// Cancel any old pending online payments for this bill to avoid transaction confusion
 	if bill.Payments != nil {
 		for _, p := range bill.Payments {
-			if p.PaymentMethod == "Midtrans" && p.Status == "Pending" && p.TransactionID != "" {
+			if (p.PaymentMethod == "Midtrans" || p.PaymentMethod == "Xendit" || p.PaymentMethod == "Mayar") && p.Status == "Pending" && p.TransactionID != "" {
 				_ = u.CancelTransaction(p.TransactionID)
 			}
 		}
@@ -201,6 +204,13 @@ func (u *MidtransUsecase) CreateMultiSnapTransaction(orderID string, totalAmount
 	if midErr != nil {
 		log.Printf("Midtrans Snap error: %v", midErr.GetMessage())
 		return "", "", "", fmt.Errorf("failed to create Midtrans multi-transaction: %s", midErr.GetMessage())
+	}
+
+	// Save RedirectURL for multi-payment records
+	payments, _ := u.financeRepo.GetPaymentsByTransactionID(orderID)
+	for i := range payments {
+		payments[i].ProofURL = snapResp.RedirectURL
+		_ = u.financeRepo.UpdatePayment(&payments[i])
 	}
 
 	return snapResp.Token, snapResp.RedirectURL, orderID, nil
@@ -377,6 +387,36 @@ func (u *MidtransUsecase) processPaymentStatus(orderID, transactionStatus, fraud
 					newBillStatus = "Paid"
 				}
 				_ = u.financeRepo.UpdateBillStatus(p.BillID.String(), newBillStatus)
+
+				// 1. Sync CashLedger entry (Skip for Kegiatan)
+				if bill.BillType != "Kegiatan" {
+					category := "Lain-lain"
+					if bill.TransactionCode != nil {
+						category = bill.TransactionCode.Category
+					} else if bill.BillType != "" {
+						category = bill.BillType
+					}
+
+					cashLedgerEntry := domain.CashLedger{
+						Date:              now,
+						Source:            bill.Student.User.Name,
+						ItemName:          "Pembayaran " + bill.Title + " (Midtrans)",
+						Type:              "Income",
+						Amount:            p.Amount,
+						Category:          category,
+						TransactionCodeID: bill.TransactionCodeID,
+					}
+					_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
+				}
+
+				// 2. Auto-realize RKAS
+				if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 && u.budgetRepo != nil {
+					var billingMonth int
+					if bill.Obligation != nil {
+						billingMonth = bill.Obligation.BillingMonth
+					}
+					_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, p.Amount, billingMonth)
+				}
 
 				var parent *domain.Parent
 				if bill.Student.ParentID != nil {

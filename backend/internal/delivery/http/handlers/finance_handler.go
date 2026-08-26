@@ -20,13 +20,15 @@ type FinanceHandler struct {
 	financeUsecase  *usecase.FinanceUsecase
 	midtransUsecase *usecase.MidtransUsecase
 	xenditUsecase   *usecase.XenditUsecase
+	mayarUsecase    *usecase.MayarUsecase
 }
 
-func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase, xenditUsecase *usecase.XenditUsecase) *FinanceHandler {
+func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase, xenditUsecase *usecase.XenditUsecase, mayarUsecase *usecase.MayarUsecase) *FinanceHandler {
 	return &FinanceHandler{
 		financeUsecase:  financeUsecase,
 		midtransUsecase: midtransUsecase,
 		xenditUsecase:   xenditUsecase,
+		mayarUsecase:    mayarUsecase,
 	}
 }
 
@@ -483,6 +485,31 @@ func (h *FinanceHandler) MultiPayment(c *gin.Context) {
 		invoiceURL, _, err := h.xenditUsecase.CreateMultiInvoice(orderID, req.Amount, student, req.BillIDs)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat transaksi Xendit: " + err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"invoice_number": result.InvoiceNumber,
+			"invoice_url":     invoiceURL,
+			"redirect_url":   invoiceURL,
+			"payments":       result.Payments,
+		})
+		return
+	}
+
+	// If method is Mayar, generate invoice URL
+	if req.PaymentMethod == "Mayar" && h.mayarUsecase != nil {
+		orderID := result.InvoiceNumber
+
+		bills, _ := h.financeUsecase.GetBillsByIDsOrObligationIDs([]string{req.BillIDs[0]})
+		var student *domain.Student
+		if len(bills) > 0 {
+			student = &bills[0].Student
+		}
+
+		invoiceURL, _, err := h.mayarUsecase.CreateMultiInvoice(orderID, req.Amount, student, req.BillIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat transaksi Mayar: " + err.Error()})
 			return
 		}
 

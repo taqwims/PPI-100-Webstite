@@ -14,6 +14,7 @@ func RegisterFinanceRoutes(
 	financeHandler *handlers.FinanceHandler,
 	midtransHandler *handlers.MidtransHandler,
 	xenditHandler *handlers.XenditHandler,
+	mayarHandler *handlers.MayarHandler,
 	financeExtendedHandler *handlers.FinanceExtendedHandler,
 	paymentTypeHandler *handlers.PaymentTypeHandler,
 	studentObligationHandler *handlers.StudentObligationHandler,
@@ -65,6 +66,11 @@ func RegisterFinanceRoutes(
 		finance.POST("/xendit/create-transaction", xenditHandler.CreateTransaction)
 		finance.POST("/xendit/check-status", xenditHandler.CheckTransactionStatus)
 		finance.POST("/xendit/cancel-transaction", xenditHandler.CancelTransaction)
+
+		// ── Mayar ──
+		finance.POST("/mayar/create-transaction", mayarHandler.CreateTransaction)
+		finance.POST("/mayar/check-status", mayarHandler.CheckTransactionStatus)
+		finance.POST("/mayar/cancel-transaction", mayarHandler.CancelTransaction)
 
 		// ── Academic Years (always available — needed for many modules) ──
 		finance.POST("/academic-years", middleware.RoleMiddleware(1, 2, 3, 9), financeExtendedHandler.CreateAcademicYear)

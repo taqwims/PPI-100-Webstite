@@ -55,7 +55,7 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                                             multiPayMethod === 'Midtrans' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
                                         )}
                                     >
-                                        <Smartphone size={14} /> {activeGateway === 'xendit' ? 'Online (Xendit)' : 'Online (Midtrans)'}
+                                        <Smartphone size={14} /> {activeGateway === 'mayar' ? 'Online (Mayar.id)' : activeGateway === 'xendit' ? 'Online (Xendit)' : 'Online (Midtrans)'}
                                     </button>
                                 )}
                                 <button
@@ -72,9 +72,9 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                         </div>
 
                         {multiPayMethod === 'Midtrans' && activeGateway !== 'none' && (
-                            <div className={clsx("p-4 rounded-xl border", activeGateway === 'xendit' ? "bg-blue-50 border-blue-100" : "bg-indigo-50 border-indigo-100")}>
-                                <p className="font-semibold text-slate-800 mb-1">Pembayaran Multitagihan ({activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})</p>
-                                <p className="text-xs text-slate-500">Anda akan diarahkan ke {activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'} untuk membayar seluruh tagihan sekaligus.</p>
+                            <div className={clsx("p-4 rounded-xl border", activeGateway === 'mayar' ? "bg-purple-50 border-purple-100" : activeGateway === 'xendit' ? "bg-blue-50 border-blue-100" : "bg-indigo-50 border-indigo-100")}>
+                                <p className="font-semibold text-slate-800 mb-1">Pembayaran Multitagihan ({activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})</p>
+                                <p className="text-xs text-slate-500">Anda akan diarahkan ke {activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'} untuk membayar seluruh tagihan sekaligus.</p>
                             </div>
                         )}
 
@@ -94,7 +94,7 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                                 "w-full py-3 rounded-xl text-white font-medium transition flex items-center justify-center gap-2",
                                 (isSubmittingMulti || selectedTotal <= 0)
                                     ? "bg-slate-300 cursor-not-allowed"
-                                    : multiPayMethod === 'Midtrans' && activeGateway === 'xendit' ? "bg-blue-600 hover:bg-blue-700" : "bg-indigo-600 hover:bg-indigo-700"
+                                    : multiPayMethod === 'Midtrans' && activeGateway === 'mayar' ? "bg-purple-600 hover:bg-purple-700" : multiPayMethod === 'Midtrans' && activeGateway === 'xendit' ? "bg-blue-600 hover:bg-blue-700" : "bg-indigo-600 hover:bg-indigo-700"
                             )}
                         >
                             <CreditCard size={16} />

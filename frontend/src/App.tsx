@@ -82,6 +82,7 @@ import ExecutiveDashboard from './pages/finance/ExecutiveDashboard';
 import Reports from './pages/finance/Reports';
 
 import PaymentTypes from './pages/finance/PaymentTypes';
+import FinancialMasterHub from './pages/finance/FinancialMasterHub';
 import AcademicYears from './pages/finance/AcademicYears';
 import StudentObligations from './pages/finance/StudentObligations';
 import Activities from './pages/finance/Activities';
@@ -214,6 +215,7 @@ function App() {
                                         </RoleRoute>
                                     } />
 
+                                    <Route path="finance/master-hub" element={<FinancialMasterHub />} />
                                     <Route path="finance/payment-types" element={<PaymentTypes />} />
                                     <Route path="finance/academic-years" element={<AcademicYears />} />
                                     <Route path="finance/student-obligations" element={<StudentObligations />} />

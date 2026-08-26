@@ -85,10 +85,7 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 			parent, _ = u.getParentByID(*bill.Student.ParentID)
 		}
 		u.sendPaymentInAppNotifications(&bill.Student, bill, parent, amount)
-
-		if parent != nil {
-			u.triggerPaymentWA(&bill.Student, parent, bill, amount)
-		}
+		u.triggerPaymentWA(&bill.Student, parent, bill, amount, method)
 		
 		// Sync obligation statuses
 		u.syncObligationStatus(bill, totalPaid, amount)
@@ -352,10 +349,7 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 		parent, _ = u.getParentByID(*bill.Student.ParentID)
 	}
 	u.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
-
-	if parent != nil {
-		u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, payment.PaymentMethod)
-	}
+	u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, payment.PaymentMethod)
 
 	// Sync payment status back to StudentObligation or ActivityObligation
 	u.syncObligationStatus(bill, totalPaid, payment.Amount)

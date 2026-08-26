@@ -15,6 +15,7 @@ func RegisterPublicRoutes(
 	publicHandler *handlers.PublicHandler,
 	midtransHandler *handlers.MidtransHandler,
 	xenditHandler *handlers.XenditHandler,
+	mayarHandler *handlers.MayarHandler,
 	invoiceSignatureHandler *handlers.InvoiceSignatureHandler,
 	schoolBankUsecase *usecase.SchoolBankUsecase,
 	schoolSettingUsecase *usecase.SchoolSettingUsecase,
@@ -63,6 +64,7 @@ func RegisterPublicRoutes(
 		api.POST("/midtrans/notification", midtransHandler.HandleNotification)
 	}
 	api.POST("/xendit/notification", xenditHandler.HandleNotification)
+	api.POST("/mayar/notification", mayarHandler.HandleNotification)
 
 	// Public Invoice Verification (no auth required)
 	api.GET("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)

@@ -369,7 +369,7 @@ const ParentChildBills: React.FC = () => {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        const pendingTx = bill.payments?.find(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit') && p.status === 'Pending' && p.transaction_id);
+                                                        const pendingTx = bill.payments?.find(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit' || p.payment_method === 'Mayar') && p.status === 'Pending' && p.transaction_id);
                                                         if (pendingTx && pendingTx.transaction_id) {
                                                             bp.resumePendingTransaction(pendingTx.transaction_id, bill);
                                                         } else {
@@ -514,7 +514,7 @@ const ParentChildBills: React.FC = () => {
                                                     {hasPendingMidtrans(bill) ? (
                                                         <button
                                                             onClick={() => {
-                                                                const pendingTx = bill.payments?.find(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit') && p.status === 'Pending' && p.transaction_id);
+                                                                const pendingTx = bill.payments?.find(p => (p.payment_method === 'Midtrans' || p.payment_method === 'Xendit' || p.payment_method === 'Mayar') && p.status === 'Pending' && p.transaction_id);
                                                                 if (pendingTx && pendingTx.transaction_id) {
                                                                     bp.resumePendingTransaction(pendingTx.transaction_id, bill);
                                                                 } else {

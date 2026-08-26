@@ -155,7 +155,7 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                                     </div>
                                     <div className="flex-1">
                                         <p className="font-bold text-sm text-slate-800">
-                                            Online ({activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})
+                                            Online ({activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})
                                         </p>
                                         <p className="text-xs text-slate-500">QRIS, Virtual Account (BCA, BNI, BRI, Mandiri), E-Wallet</p>
                                     </div>
@@ -233,7 +233,7 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <ExternalLink size={14} /> Lanjut Pembayaran Online ({activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})
+                                    <ExternalLink size={14} /> Lanjut Pembayaran Online ({activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})
                                 </>
                             )}
                         </button>

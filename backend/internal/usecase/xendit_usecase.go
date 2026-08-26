@@ -26,6 +26,7 @@ type XenditUsecase struct {
 	financeUsecase        *FinanceUsecase
 	studentObligationRepo *postgres.StudentObligationRepository
 	activityRepo          *postgres.ActivityRepository
+	budgetRepo            *postgres.BudgetRepository
 }
 
 func NewXenditUsecase(
@@ -38,6 +39,7 @@ func NewXenditUsecase(
 	financeUsecase *FinanceUsecase,
 	studentObligationRepo *postgres.StudentObligationRepository,
 	activityRepo *postgres.ActivityRepository,
+	budgetRepo *postgres.BudgetRepository,
 ) *XenditUsecase {
 	return &XenditUsecase{
 		cfg:                   cfg,
@@ -49,6 +51,7 @@ func NewXenditUsecase(
 		financeUsecase:        financeUsecase,
 		studentObligationRepo: studentObligationRepo,
 		activityRepo:          activityRepo,
+		budgetRepo:            budgetRepo,
 	}
 }
 
@@ -81,10 +84,10 @@ func (u *XenditUsecase) CreateInvoice(billID uuid.UUID, amount float64) (string,
 		return "", "", fmt.Errorf("tagihan sudah lunas")
 	}
 
-	// Cancel any old pending Xendit or Midtrans payments for this bill
+	// Cancel any old pending online payments (Xendit, Midtrans, Mayar) for this bill
 	if bill.Payments != nil {
 		for _, p := range bill.Payments {
-			if (p.PaymentMethod == "Xendit" || p.PaymentMethod == "Midtrans") && p.Status == "Pending" && p.TransactionID != "" {
+			if (p.PaymentMethod == "Xendit" || p.PaymentMethod == "Midtrans" || p.PaymentMethod == "Mayar") && p.Status == "Pending" && p.TransactionID != "" {
 				_ = u.CancelTransaction(p.TransactionID)
 			}
 		}
@@ -397,6 +400,15 @@ func (u *XenditUsecase) processPaymentSuccess(orderID string) error {
 			TransactionCodeID: bill.TransactionCodeID,
 		}
 		_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
+
+		// Auto-realize RKAS
+		if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 && u.budgetRepo != nil {
+			var billingMonth int
+			if bill.Obligation != nil {
+				billingMonth = bill.Obligation.BillingMonth
+			}
+			_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, payment.Amount, billingMonth)
+		}
 
 		var parent *domain.Parent
 		if bill.Student.ParentID != nil {

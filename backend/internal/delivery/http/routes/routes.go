@@ -88,14 +88,18 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	schoolSettingHandler := handlers.NewSchoolSettingHandler(schoolSettingUsecase)
 
 	// Midtrans Payment Gateway
-	midtransUsecase := usecase.NewMidtransUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
+	midtransUsecase := usecase.NewMidtransUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)
 	midtransHandler := handlers.NewMidtransHandler(midtransUsecase)
 
 	// Xendit Payment Gateway
-	xenditUsecase := usecase.NewXenditUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo)
+	xenditUsecase := usecase.NewXenditUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)
 	xenditHandler := handlers.NewXenditHandler(xenditUsecase)
 
-	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase, xenditUsecase)
+	// Mayar Payment Gateway
+	mayarUsecase := usecase.NewMayarUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)
+	mayarHandler := handlers.NewMayarHandler(mayarUsecase)
+
+	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase, xenditUsecase, mayarUsecase)
 
 	payrollRepo := postgres.NewPayrollRepository(db)
 	payrollUsecase := usecase.NewPayrollUsecase(payrollRepo, userRepo, financeRepo)
@@ -179,7 +183,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	// Public Routes
 	apiGroup := r.Group("/api")
-	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase)
+	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, mayarHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase)
 
 	// Protected Routes (requires authentication)
 	protectedGroup := apiGroup.Group("/")
@@ -191,7 +195,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	RegisterAdminRoutes(protectedGroup, cfg, userHandler, profileHandler, notificationHandler, assetHandler, assetCategoryHandler, schoolSettingHandler, backupHandler, publicHandler, ppdbPaymentHandler, parentHandler)
 
 	RegisterFinanceRoutes(
-		protectedGroup, cfg, financeHandler, midtransHandler, xenditHandler, financeExtendedHandler,
+		protectedGroup, cfg, financeHandler, midtransHandler, xenditHandler, mayarHandler, financeExtendedHandler,
 		paymentTypeHandler, studentObligationHandler, infaqTypeHandler, payrollHandler,
 		transactionCodeHandler, budgetHandler, activityHandler, externalDebtHandler,
 		waTemplateHandler, waScheduleHandler, invoiceSignatureHandler, schoolBankHandler,

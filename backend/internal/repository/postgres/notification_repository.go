@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"ppi-100-sis/internal/domain"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -67,7 +68,7 @@ func (r *NotificationRepository) MarkAllAsRead(userID string) error {
 func (r *NotificationRepository) GetSettingValue(key string, defaultValue string) string {
 	var setting domain.SchoolSetting
 	err := r.db.Where("key = ?", key).First(&setting).Error
-	if err != nil {
+	if err != nil || strings.TrimSpace(setting.Value) == "" {
 		return defaultValue
 	}
 	return setting.Value

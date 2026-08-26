@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
-    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight
+    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -115,6 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const finPengaturan: MenuGroup = {
             title: 'Pengaturan Keuangan',
             items: [
+                { icon: Layers, label: 'Pusat Master Keuangan', path: '/dashboard/finance/master-hub', feature: 'student_obligations' },
                 { icon: Tag, label: 'Kode Transaksi', path: '/dashboard/finance/transaction-codes' },
                 { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types', feature: 'student_obligations' },
                 { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types', feature: 'infaq' },

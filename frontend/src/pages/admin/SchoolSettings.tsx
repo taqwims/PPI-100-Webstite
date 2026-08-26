@@ -861,6 +861,8 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     const [showMidtransSecret, setShowMidtransSecret] = useState(false);
     const [showXenditSecret, setShowXenditSecret] = useState(false);
     const [showXenditToken, setShowXenditToken] = useState(false);
+    const [showMayarSecret, setShowMayarSecret] = useState(false);
+    const [showMayarToken, setShowMayarToken] = useState(false);
 
     const { data: settings, isLoading } = useQuery<SchoolSetting[]>({
         queryKey: ['school-settings'],
@@ -883,6 +885,9 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                 xendit_public_key: '',
                 xendit_webhook_token: '',
                 xendit_is_production: 'false',
+                mayar_api_key: '',
+                mayar_webhook_token: '',
+                mayar_is_production: 'false',
             };
             settings.forEach(s => {
                 if (s.is_admin_edit) f[s.key] = s.value;
@@ -917,6 +922,7 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
 
     const xenditWebhookUrl = `${window.location.origin}/api/xendit/notification`;
     const midtransWebhookUrl = `${window.location.origin}/api/midtrans/notification`;
+    const mayarWebhookUrl = `${window.location.origin}/api/mayar/notification`;
 
     const copyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
@@ -936,7 +942,7 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Midtrans Option */}
                     <div
                         onClick={() => updateField('active_payment_gateway', 'midtrans')}
@@ -957,8 +963,8 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                                     className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
                                 />
                             </div>
-                            <p className="font-semibold text-slate-800 text-sm">Snap Payment Page</p>
-                            <p className="text-xs text-slate-500 mt-1">Pop-up checkout serbaguna mendukung QRIS, Bank Transfer (VA), GoPay, ShopeePay, dll.</p>
+                            <p className="font-semibold text-slate-800 text-sm">Snap Payment</p>
+                            <p className="text-xs text-slate-500 mt-1">Pop-up checkout mendukung QRIS, Bank Transfer (VA), GoPay, ShopeePay, dll.</p>
                         </div>
                     </div>
 
@@ -983,7 +989,32 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                                 />
                             </div>
                             <p className="font-semibold text-slate-800 text-sm">Xendit Invoice</p>
-                            <p className="text-xs text-slate-500 mt-1">Halaman checkout profesional mendukung QRIS, Virtual Account, Retail (Alfamart/Indomaret), E-Wallet.</p>
+                            <p className="text-xs text-slate-500 mt-1">Halaman checkout mendukung QRIS, Virtual Account, Retail, E-Wallet.</p>
+                        </div>
+                    </div>
+
+                    {/* Mayar.id Option */}
+                    <div
+                        onClick={() => updateField('active_payment_gateway', 'mayar')}
+                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col justify-between ${
+                            form.active_payment_gateway === 'mayar'
+                                ? 'border-purple-600 bg-purple-50/50 shadow-md ring-2 ring-purple-200'
+                                : 'border-slate-200 hover:border-slate-300 bg-white/60'
+                        }`}
+                    >
+                        <div>
+                            <div className="flex justify-between items-start mb-3">
+                                <span className="px-2.5 py-1 bg-purple-600 text-white font-bold text-xs rounded-lg">Mayar.id</span>
+                                <input
+                                    type="radio"
+                                    name="active_gateway"
+                                    checked={form.active_payment_gateway === 'mayar'}
+                                    onChange={() => updateField('active_payment_gateway', 'mayar')}
+                                    className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                                />
+                            </div>
+                            <p className="font-semibold text-slate-800 text-sm">Mayar Invoice</p>
+                            <p className="text-xs text-slate-500 mt-1">Payment link instan mendukung QRIS, Virtual Account bank, E-Wallet & Retail.</p>
                         </div>
                     </div>
 
@@ -1008,7 +1039,7 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                                 />
                             </div>
                             <p className="font-semibold text-slate-800 text-sm">Manual Only</p>
-                            <p className="text-xs text-slate-500 mt-1">Sembunyikan opsi pembayaran online. Siswa hanya dapat membayar via transfer manual & upload bukti.</p>
+                            <p className="text-xs text-slate-500 mt-1">Sembunyikan pembayaran online. Hanya transfer bank manual & upload bukti.</p>
                         </div>
                     </div>
                 </div>
@@ -1156,6 +1187,81 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                         type="button"
                         onClick={() => copyToClipboard(xenditWebhookUrl, 'Xendit Webhook URL')}
                         className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        <Copy size={12} /> Salin
+                    </button>
+                </div>
+            </CardGlass>
+
+            {/* Mayar Config Card */}
+            <CardGlass className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-purple-600"></span>
+                        <h3 className="font-bold text-slate-800 text-md">Konfigurasi Mayar.id</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Mode:</span>
+                        <select
+                            value={form.mayar_is_production || 'false'}
+                            onChange={(e) => updateField('mayar_is_production', e.target.value)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white focus:ring-2 focus:ring-purple-500"
+                        >
+                            <option value="false">Sandbox (api.mayar.io)</option>
+                            <option value="true">Production (api.mayar.id)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Mayar API Key (Secret Key)</label>
+                        <div className="relative">
+                            <input
+                                type={showMayarSecret ? 'text' : 'password'}
+                                value={form.mayar_api_key || ''}
+                                onChange={(e) => updateField('mayar_api_key', e.target.value)}
+                                placeholder="eyJhbGciOi..."
+                                className="w-full px-3 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-purple-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowMayarSecret(!showMayarSecret)}
+                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                            >
+                                {showMayarSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">Dapatkan API Key dari Dashboard Mayar (Integration &gt; API Keys).</p>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Webhook Token / Secret (Opsional)</label>
+                        <div className="relative">
+                            <input
+                                type={showMayarToken ? 'text' : 'password'}
+                                value={form.mayar_webhook_token || ''}
+                                onChange={(e) => updateField('mayar_webhook_token', e.target.value)}
+                                placeholder="Token verifikasi webhook Mayar..."
+                                className="w-full px-3 py-2 pr-10 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-purple-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowMayarToken(!showMayarToken)}
+                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                            >
+                                {showMayarToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">Opsional untuk memverifikasi request callback Mayar.</p>
+                    </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                    <span className="text-slate-600">Webhook URL: <code className="font-mono text-purple-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">{mayarWebhookUrl}</code></span>
+                    <button
+                        type="button"
+                        onClick={() => copyToClipboard(mayarWebhookUrl, 'Mayar Webhook URL')}
+                        className="flex items-center gap-1 text-purple-600 hover:text-purple-800 font-medium"
                     >
                         <Copy size={12} /> Salin
                     </button>

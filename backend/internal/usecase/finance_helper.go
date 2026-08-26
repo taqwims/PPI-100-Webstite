@@ -3,23 +3,39 @@ package usecase
 import (
 	"fmt"
 	"ppi-100-sis/internal/domain"
+	"ppi-100-sis/internal/utils"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill) {
+func extractTargetPhones(student *domain.Student, parent *domain.Parent) []string {
 	var phones []string
-	if parent != nil && parent.Phone != "" {
-		phones = append(phones, parent.Phone)
-	}
-	if student != nil && student.User.Phone != "" {
-		if parent == nil || student.User.Phone != parent.Phone {
-			phones = append(phones, student.User.Phone)
+	seen := make(map[string]bool)
+
+	addPhone := func(p string) {
+		p = strings.TrimSpace(p)
+		if p != "" && !seen[p] {
+			seen[p] = true
+			phones = append(phones, p)
 		}
 	}
 
+	if parent != nil {
+		addPhone(parent.Phone)
+		addPhone(parent.User.Phone)
+	}
+
+	if student != nil {
+		addPhone(student.User.Phone)
+	}
+
+	return phones
+}
+
+func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill) {
+	phones := extractTargetPhones(student, parent)
 	if len(phones) == 0 {
 		return
 	}
@@ -48,11 +64,11 @@ func (u *FinanceUsecase) triggerAutoWA(student *domain.Student, parent *domain.P
 
 	msg = strings.ReplaceAll(msg, "{nama_siswa}", student.User.Name)
 	msg = strings.ReplaceAll(msg, "{nama_tagihan}", bill.Title)
-	msg = strings.ReplaceAll(msg, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
+	msg = strings.ReplaceAll(msg, "{total_tagihan}", utils.FormatRupiah(bill.Amount))
 	msg = strings.ReplaceAll(msg, "{tanggal_jatuh_tempo}", bill.DueDate.Format("02 January 2006"))
 	msg = strings.ReplaceAll(msg, "{nis}", student.NISN)
 	msg = strings.ReplaceAll(msg, "{kelas}", student.Class.Name)
-	msg = strings.ReplaceAll(msg, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
+	msg = strings.ReplaceAll(msg, "{rincian}", fmt.Sprintf("• %s: %s", bill.Title, utils.FormatRupiah(bill.Amount)))
 	msg = strings.ReplaceAll(msg, "{nama_sekolah}", schoolName)
 
 	if u.notificationUsecase != nil {
@@ -65,40 +81,28 @@ func (u *FinanceUsecase) processWATemplate(body string, student *domain.Student,
 	res = strings.ReplaceAll(res, "{nama_siswa}", student.User.Name)
 	res = strings.ReplaceAll(res, "{nis}", student.NISN)
 	res = strings.ReplaceAll(res, "{kelas}", student.Class.Name)
-	res = strings.ReplaceAll(res, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
-	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
+	res = strings.ReplaceAll(res, "{total_tagihan}", utils.FormatRupiah(bill.Amount))
+	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: %s", bill.Title, utils.FormatRupiah(bill.Amount)))
 	return processWATemplateLegacyFix(res, bill)
 }
 
 func processWATemplateLegacyFix(res string, bill *domain.Bill) string {
-	// Apply title format if it hasn't been replaced appropriately.
-	// Since original line was strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount)), I will just rewrite it below properly.
 	return res
 }
 
-// Redoing processWATemplate properly here to fix the strings replace error from above without breaking. Let's just fix it.
 func (u *FinanceUsecase) safeProcessWATemplate(body string, student *domain.Student, bill *domain.Bill) string {
 	res := body
 	res = strings.ReplaceAll(res, "{nama_siswa}", student.User.Name)
 	res = strings.ReplaceAll(res, "{nis}", student.NISN)
 	res = strings.ReplaceAll(res, "{kelas}", student.Class.Name)
-	res = strings.ReplaceAll(res, "{total_tagihan}", fmt.Sprintf("Rp%.0f", bill.Amount))
-	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: Rp%.0f", bill.Title, bill.Amount))
+	res = strings.ReplaceAll(res, "{total_tagihan}", utils.FormatRupiah(bill.Amount))
+	res = strings.ReplaceAll(res, "{rincian}", fmt.Sprintf("• %s: %s", bill.Title, utils.FormatRupiah(bill.Amount)))
 	res = strings.ReplaceAll(res, "{tanggal}", time.Now().Format("02 January 2006"))
 	return res
 }
 
 func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domain.Parent, bill *domain.Bill, amount float64, paymentMethod ...string) {
-	var phones []string
-	if parent != nil && parent.Phone != "" {
-		phones = append(phones, parent.Phone)
-	}
-	if student != nil && student.User.Phone != "" {
-		if parent == nil || student.User.Phone != parent.Phone {
-			phones = append(phones, student.User.Phone)
-		}
-	}
-
+	phones := extractTargetPhones(student, parent)
 	if len(phones) == 0 {
 		return
 	}
@@ -122,25 +126,18 @@ func (u *FinanceUsecase) triggerPaymentWA(student *domain.Student, parent *domai
 	msg := templateStr
 	msg = strings.ReplaceAll(msg, "{nama_siswa}", student.User.Name)
 	msg = strings.ReplaceAll(msg, "{nama_tagihan}", bill.Title)
-	msg = strings.ReplaceAll(msg, "{jumlah_bayar}", fmt.Sprintf("Rp%.0f", amount))
+	msg = strings.ReplaceAll(msg, "{jumlah_bayar}", utils.FormatRupiah(amount))
 	msg = strings.ReplaceAll(msg, "{tanggal_bayar}", time.Now().Format("02 January 2006 15:04"))
 	msg = strings.ReplaceAll(msg, "{metode_pembayaran}", methodName)
 	msg = strings.ReplaceAll(msg, "{nama_sekolah}", schoolName)
 
-	_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
+	if u.notificationUsecase != nil {
+		_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
+	}
 }
 
 func (u *FinanceUsecase) triggerMultiPaymentWA(student *domain.Student, parent *domain.Parent, count int, amount float64) {
-	var phones []string
-	if parent != nil && parent.Phone != "" {
-		phones = append(phones, parent.Phone)
-	}
-	if student != nil && student.User.Phone != "" {
-		if parent == nil || student.User.Phone != parent.Phone {
-			phones = append(phones, student.User.Phone)
-		}
-	}
-
+	phones := extractTargetPhones(student, parent)
 	if len(phones) == 0 {
 		return
 	}
@@ -150,8 +147,10 @@ func (u *FinanceUsecase) triggerMultiPaymentWA(student *domain.Student, parent *
 		schoolName = u.notificationUsecase.GetSettingValue("school_name", "SDIT AN-NUR")
 	}
 
-	msg := fmt.Sprintf("*BUKTI PEMBAYARAN MULTI-TAGIHAN - %s*\n\nTerima kasih, pembayaran sebesar *Rp%.0f* untuk *%d tagihan* an. *%s* telah kami terima dan diverifikasi.\n\nTanggal: %s\nSemoga berkah.", schoolName, amount, count, student.User.Name, time.Now().Format("02 January 2006 15:04"))
-	_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
+	msg := fmt.Sprintf("*BUKTI PEMBAYARAN MULTI-TAGIHAN - %s*\n\nTerima kasih, pembayaran sebesar *%s* untuk *%d tagihan* an. *%s* telah kami terima dan diverifikasi.\n\nTanggal: %s\nSemoga berkah.", schoolName, utils.FormatRupiah(amount), count, student.User.Name, time.Now().Format("02 January 2006 15:04"))
+	if u.notificationUsecase != nil {
+		_ = u.notificationUsecase.SendWhatsApp(strings.Join(phones, ","), msg)
+	}
 }
 
 // helper: get parent record by parent.ID

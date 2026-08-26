@@ -69,7 +69,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
             if (b.status === 'Paid') return; // Ignore paid bills!
             if (b.payments) {
                 b.payments.forEach(p => {
-                    if ((p.payment_method === 'Xendit' || p.payment_method === 'Midtrans') && p.status === 'Pending' && p.transaction_id) {
+                    if ((p.payment_method === 'Xendit' || p.payment_method === 'Midtrans' || p.payment_method === 'Mayar') && p.status === 'Pending' && p.transaction_id) {
                         if (processedOrdersRef.current.has(p.transaction_id)) return;
                         const existing = map.get(p.transaction_id);
                         if (existing) {
@@ -121,9 +121,12 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                     continue;
                 }
 
-                const endpoint = pending.order_id.startsWith('XEN-') || pending.order_id.startsWith('MULTI-') || pending.payment_method === 'Xendit'
-                    ? '/finance/xendit/check-status'
-                    : '/finance/midtrans/check-status';
+                let endpoint = '/finance/midtrans/check-status';
+                if (pending.order_id.startsWith('MAY-') || pending.payment_method === 'Mayar') {
+                    endpoint = '/finance/mayar/check-status';
+                } else if (pending.order_id.startsWith('XEN-') || pending.order_id.startsWith('MULTI-') || pending.payment_method === 'Xendit') {
+                    endpoint = '/finance/xendit/check-status';
+                }
 
                 try {
                     const res = await api.post(endpoint, { order_id: pending.order_id }, { _suppressToast: true, timeout: 5000 } as any);
@@ -186,9 +189,12 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
             setPaymentAmount(pendingInfo?.amount || getRemainingAmount(targetBill));
         }
 
-        const endpoint = orderId.startsWith('XEN-') || orderId.startsWith('MULTI-')
-            ? '/finance/xendit/check-status'
-            : '/finance/midtrans/check-status';
+        let endpoint = '/finance/midtrans/check-status';
+        if (orderId.startsWith('MAY-') || targetBill?.payments?.some(p => p.transaction_id === orderId && p.payment_method === 'Mayar')) {
+            endpoint = '/finance/mayar/check-status';
+        } else if (orderId.startsWith('XEN-') || orderId.startsWith('MULTI-') || targetBill?.payments?.some(p => p.transaction_id === orderId && p.payment_method === 'Xendit')) {
+            endpoint = '/finance/xendit/check-status';
+        }
 
         try {
             const res = await api.post(endpoint, { order_id: orderId }, { _suppressToast: true, timeout: 5000 } as any);
@@ -218,8 +224,8 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                     }
                 }
 
-                // If Xendit gateway
-                if (orderId.startsWith('XEN-') || orderId.startsWith('MULTI-')) {
+                // If Mayar or Xendit gateway
+                if (orderId.startsWith('MAY-') || orderId.startsWith('XEN-') || orderId.startsWith('MULTI-')) {
                     if (redirectUrl) {
                         window.open(redirectUrl, '_blank');
                     }
@@ -291,9 +297,12 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         }
 
         try {
-            const endpoint = orderId.startsWith('XEN-') || orderId.startsWith('MULTI-')
-                ? '/finance/xendit/cancel-transaction'
-                : '/finance/midtrans/cancel-transaction';
+            let endpoint = '/finance/midtrans/cancel-transaction';
+            if (orderId.startsWith('MAY-')) {
+                endpoint = '/finance/mayar/cancel-transaction';
+            } else if (orderId.startsWith('XEN-') || orderId.startsWith('MULTI-')) {
+                endpoint = '/finance/xendit/cancel-transaction';
+            }
             await api.post(endpoint, { order_id: orderId });
             toast.success('Pembayaran telah dibatalkan. Silakan pilih metode pembayaran.');
             setShowPayModal(false);
@@ -331,6 +340,21 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         }
 
         try {
+            if (currentGateway === 'mayar') {
+                const res = await api.post('/finance/mayar/create-transaction', {
+                    bill_id: targetBill.id,
+                    amount: amt,
+                });
+                const invoiceUrl = res.data.invoice_url || res.data.redirect_url;
+                if (invoiceUrl) {
+                    window.open(invoiceUrl, '_blank');
+                }
+                setShowPayModal(false);
+                toast.success('Halaman pembayaran Mayar dimuat!');
+                refetch();
+                return;
+            }
+
             if (currentGateway === 'xendit') {
                 const res = await api.post('/finance/xendit/create-transaction', {
                     bill_id: targetBill.id,
@@ -459,7 +483,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         }
 
         const actualMethod = multiPayMethod === 'Midtrans'
-            ? (currentGateway === 'xendit' ? 'Xendit' : 'Midtrans')
+            ? (currentGateway === 'mayar' ? 'Mayar' : currentGateway === 'xendit' ? 'Xendit' : 'Midtrans')
             : 'Transfer';
 
         try {
@@ -469,78 +493,62 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                 payment_method: actualMethod
             });
 
+            if (actualMethod === 'Mayar') {
+                const invoiceUrl = res.data.invoice_url || res.data.redirect_url;
+                if (invoiceUrl) {
+                    window.open(invoiceUrl, '_blank');
+                }
+                setShowMultiPayModal(false);
+                setSelectedBillIds([]);
+                toast.success('Halaman pembayaran multi-tagihan Mayar dimuat!');
+                refetch();
+                return;
+            }
+
             if (actualMethod === 'Xendit') {
                 const invoiceUrl = res.data.invoice_url;
-                const invoiceNumber = res.data.invoice_number;
-
-                const dummyBill: Bill = {
-                    id: bills && bills.length > 0 ? bills[0].id : '',
-                    title: `Multi-Tagihan (${selectedBillIds.length} Tagihan)`,
-                    amount: selectedTotal,
-                    due_date: new Date().toISOString(),
-                    created_at: new Date().toISOString(),
-                    status: 'Pending',
-                    bill_type: 'MultiBill',
-                    payments: [{
-                        payment_method: 'Xendit',
-                        status: 'Pending',
-                        transaction_id: invoiceNumber,
-                        amount: selectedTotal,
-                        created_at: new Date().toISOString(),
-                        paid_at: '',
-                    }]
-                };
-
-                setSelectedBill(dummyBill);
-                setPaymentAmount(selectedTotal);
-                setActiveMidtransDetail({
-                    order_id: invoiceNumber,
-                    status: 'Pending',
-                    invoice_url: invoiceUrl,
-                });
+                if (invoiceUrl) {
+                    window.open(invoiceUrl, '_blank');
+                }
                 setShowMultiPayModal(false);
-                setShowPayModal(true);
+                setSelectedBillIds([]);
                 toast.success('Halaman pembayaran multi-tagihan Xendit dimuat!');
                 refetch();
                 return;
             }
 
             if (actualMethod === 'Midtrans') {
-                const midtransDomain = (res.data.redirect_url && res.data.redirect_url.includes('app.midtrans.com')) 
-                    ? 'https://app.midtrans.com' 
-                    : 'https://app.sandbox.midtrans.com';
-                const redirectUrl = res.data.redirect_url || (res.data.snap_token ? `${midtransDomain}/snap/v2/vtweb/${res.data.snap_token}` : null);
-                const invoiceNumber = res.data.invoice_number;
+                const snapToken = res.data.snap_token;
+                const redirectUrl = res.data.redirect_url;
+
+                setShowMultiPayModal(false);
+                setSelectedBillIds([]);
+
+                // @ts-ignore
+                if (window.snap && snapToken) {
+                    // @ts-ignore
+                    window.snap.pay(snapToken, {
+                        onSuccess: () => {
+                            toast.success('Pembayaran Multi-Tagihan Berhasil!');
+                            refetch();
+                        },
+                        onPending: () => {
+                            toast.success('Pembayaran Multi-Tagihan sedang diproses.');
+                            refetch();
+                        },
+                        onError: () => {
+                            toast.error('Pembayaran gagal. Silakan coba lagi.');
+                            refetch();
+                        },
+                        onClose: () => {
+                            refetch();
+                        },
+                    });
+                    return;
+                }
 
                 if (redirectUrl) {
-                    const dummyBill: Bill = {
-                        id: bills && bills.length > 0 ? bills[0].id : '',
-                        title: `Multi-Tagihan (${selectedBillIds.length} Tagihan)`,
-                        amount: selectedTotal,
-                        due_date: new Date().toISOString(),
-                        created_at: new Date().toISOString(),
-                        status: 'Pending',
-                        bill_type: 'MultiBill',
-                        payments: [{
-                            payment_method: 'Midtrans',
-                            status: 'Pending',
-                            transaction_id: invoiceNumber,
-                            amount: selectedTotal,
-                            created_at: new Date().toISOString(),
-                            paid_at: '',
-                        }]
-                    };
-
-                    setSelectedBill(dummyBill);
-                    setPaymentAmount(selectedTotal);
-                    setActiveMidtransDetail({
-                        order_id: invoiceNumber,
-                        status: 'Pending',
-                        invoice_url: redirectUrl,
-                    });
-                    setShowMultiPayModal(false);
-                    setShowPayModal(true);
-                    toast.success('Halaman pembayaran multi-tagihan Midtrans dimuat!');
+                    window.open(redirectUrl, '_blank');
                     refetch();
                     return;
                 }

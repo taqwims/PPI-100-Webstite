@@ -140,11 +140,11 @@ func (u *waScheduleUsecase) CreateSchedule(sendAt time.Time, templateID uint, mi
 			if o.BillingMonth > 0 && o.BillingMonth <= 12 {
 				monthLabel = " (" + monthNames[o.BillingMonth] + ")"
 			}
-			detailItems = append(detailItems, fmt.Sprintf("• %s%s: Rp%.0f", o.PaymentType.Name, monthLabel, sisa))
+			detailItems = append(detailItems, fmt.Sprintf("• %s%s: %s", o.PaymentType.Name, monthLabel, utils.FormatRupiah(sisa)))
 		}
 
 		rincian := strings.Join(detailItems, "\n")
-		totalTagihanText := fmt.Sprintf("Rp%.0f", totalArrears)
+		totalTagihanText := utils.FormatRupiah(totalArrears)
 
 		// Create anti-spam message body for each number
 		for _, phone := range targetPhones {
