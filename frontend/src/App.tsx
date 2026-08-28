@@ -10,6 +10,7 @@ import GradePromotion from './pages/admin/GradePromotion';
 import Settings from './pages/Settings';
 import Finance from './pages/admin/Finance';
 import Attendance from './pages/admin/Attendance';
+import AttendanceRFID from './pages/admin/AttendanceRFID';
 import BK from './pages/admin/BK';
 import Elearning from './pages/admin/Elearning';
 import Notifications from './pages/admin/Notifications';
@@ -125,6 +126,7 @@ function App() {
                                     <Route path="students" element={<Students />} />
                                     <Route path="admin/promotions" element={<GradePromotion />} />
                                     <Route path="attendance" element={<Attendance />} />
+                                    <Route path="attendance/rfid" element={<AttendanceRFID />} />
                                     <Route path="finance" element={<Finance />} />
                                     <Route path="bk" element={<BK />} />
                                     <Route path="elearning" element={<Elearning />} />

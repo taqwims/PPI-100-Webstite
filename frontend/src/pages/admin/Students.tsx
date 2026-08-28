@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Search, Trash2, User, Save, Edit2 } from 'lucide-react';
+import { Plus, Search, Trash2, User, Save, Edit2, Radio, Smartphone, XCircle } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
@@ -9,6 +9,7 @@ import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadG
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
+import toast from 'react-hot-toast';
 
 interface Student {
     id: string;
@@ -17,6 +18,7 @@ interface Student {
         email: string;
     };
     nisn: string;
+    rfid?: string;
     class: {
         id: number;
         name: string;
@@ -48,10 +50,15 @@ const Students: React.FC = () => {
         email: '',
         password: '',
         nisn: '',
+        rfid: '',
         class_id: '',
         unit_id: unitID,
         parent_id: '',
     });
+
+    // NFC Scan State for Modal
+    const [isScanningNfc, setIsScanningNfc] = useState(false);
+    const nfcAbortRef = useRef<AbortController | null>(null);
 
     // Update formData.unit_id when unitID changes
     React.useEffect(() => {
@@ -116,11 +123,17 @@ const Students: React.FC = () => {
     });
 
     const resetForm = () => {
+        if (nfcAbortRef.current) {
+            nfcAbortRef.current.abort();
+            nfcAbortRef.current = null;
+        }
+        setIsScanningNfc(false);
         setFormData({
             name: '',
             email: '',
             password: '',
             nisn: '',
+            rfid: '',
             class_id: '',
             unit_id: unitID,
             parent_id: '',
@@ -129,6 +142,11 @@ const Students: React.FC = () => {
     };
 
     const handleEdit = (student: Student) => {
+        if (nfcAbortRef.current) {
+            nfcAbortRef.current.abort();
+            nfcAbortRef.current = null;
+        }
+        setIsScanningNfc(false);
         setEditingStudent(student);
         // Resolve parent_id (Parent table ID) back to User ID for the dropdown
         let parentUserId = '';
@@ -143,11 +161,55 @@ const Students: React.FC = () => {
             email: student.user.email,
             password: '',
             nisn: student.nisn,
+            rfid: (student as any).rfid || '',
             class_id: student.class?.id.toString() || '',
             unit_id: student.unit_id,
             parent_id: parentUserId,
         });
         setIsModalOpen(true);
+    };
+
+    // NFC Scanner for Modal
+    const startModalNfcScan = async () => {
+        if (typeof window === 'undefined' || !('NDEFReader' in window)) {
+            toast.error('Web NFC tidak didukung di browser ini. Anda dapat mengetikkan UID kartu atau menggunakan USB scanner.');
+            return;
+        }
+
+        try {
+            const ndef = new (window as any).NDEFReader();
+            const controller = new AbortController();
+            nfcAbortRef.current = controller;
+
+            await ndef.scan({ signal: controller.signal });
+            setIsScanningNfc(true);
+            toast.success('Tempelkan kartu siswa ke belakang HP...');
+
+            ndef.onreading = (event: any) => {
+                const serial = event.serialNumber;
+                if (serial) {
+                    const cleanSerial = serial.replace(/:/g, '').toUpperCase();
+                    setFormData((prev) => ({ ...prev, rfid: cleanSerial }));
+                    toast.success(`Kartu terbaca: ${cleanSerial}`);
+                    if (nfcAbortRef.current) {
+                        nfcAbortRef.current.abort();
+                        nfcAbortRef.current = null;
+                    }
+                    setIsScanningNfc(false);
+                }
+            };
+        } catch (err: any) {
+            setIsScanningNfc(false);
+            toast.error(err.message || 'Gagal membaca sensor NFC.');
+        }
+    };
+
+    const stopModalNfcScan = () => {
+        if (nfcAbortRef.current) {
+            nfcAbortRef.current.abort();
+            nfcAbortRef.current = null;
+        }
+        setIsScanningNfc(false);
     };
 
     const handleDelete = (id: string) => {
@@ -175,7 +237,8 @@ const Students: React.FC = () => {
 
     const filteredStudents = students?.filter((student: Student) =>
         student.user.name.toLowerCase().includes(search.toLowerCase()) ||
-        student.nisn.includes(search)
+        student.nisn.includes(search) ||
+        (student.rfid && student.rfid.toLowerCase().includes(search.toLowerCase()))
     );
 
     return (
@@ -183,7 +246,7 @@ const Students: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Data Siswa</h1>
-                    <p className="text-slate-300-400">Kelola data siswa per unit</p>
+                    <p className="text-slate-500">Kelola data santri, NISN, dan nomor kartu RFID / NFC per unit</p>
                 </div>
                 <ButtonGlass onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2">
                     <Plus size={18} /> Tambah Siswa
@@ -194,7 +257,7 @@ const Students: React.FC = () => {
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
                         <InputGlass
-                            placeholder="Cari nama atau NISN..."
+                            placeholder="Cari nama, NISN, atau nomor RFID..."
                             icon={Search}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -203,16 +266,16 @@ const Students: React.FC = () => {
                     <div className="flex gap-2">
                         {user?.role_id === 1 ? (
                             <select
-                                className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                className="glass-input bg-white/5 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                 value={unitID}
                                 onChange={(e) => setUnitID(Number(e.target.value))}
                             >
                                 {units.map(u => (
-                                    <option key={u.id} value={u.id} className="bg-gray-900">{u.name}</option>
+                                    <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                             </select>
                         ) : (
-                            <div className="glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-900">
+                            <div className="glass-input bg-white/5 border border-slate-200 rounded-xl px-4 py-3 text-slate-900">
                                 {getUnitName(unitID)}
                             </div>
                         )}
@@ -224,6 +287,7 @@ const Students: React.FC = () => {
                         <TableRowGlass>
                             <TableHeadGlass>NISN</TableHeadGlass>
                             <TableHeadGlass>Nama</TableHeadGlass>
+                            <TableHeadGlass>RFID / NFC</TableHeadGlass>
                             <TableHeadGlass>Kelas</TableHeadGlass>
                             <TableHeadGlass>Orang Tua</TableHeadGlass>
                             <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
@@ -232,28 +296,37 @@ const Students: React.FC = () => {
                     <TableBodyGlass>
                         {isLoading ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={4} className="text-center py-8">Loading...</TableCellGlass>
+                                <TableCellGlass colSpan={6} className="text-center py-8">Loading...</TableCellGlass>
                             </TableRowGlass>
                         ) : filteredStudents?.length === 0 ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={4} className="text-center py-8">Tidak ada data siswa</TableCellGlass>
+                                <TableCellGlass colSpan={6} className="text-center py-8">Tidak ada data siswa</TableCellGlass>
                             </TableRowGlass>
                         ) : (
                             filteredStudents?.map((student: Student) => (
                                 <TableRowGlass key={student.id}>
                                     <TableCellGlass>
-                                        <span className="font-mono text-slate-300-300">{student.nisn}</span>
+                                        <span className="font-mono text-slate-600">{student.nisn}</span>
                                     </TableCellGlass>
                                     <TableCellGlass>
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center text-green-400">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center text-green-600">
                                                 <User size={14} />
                                             </div>
                                             <span className="font-medium text-slate-900">{student.user.name}</span>
                                         </div>
                                     </TableCellGlass>
                                     <TableCellGlass>
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-slate-900 border border-white/10">
+                                        {student.rfid ? (
+                                            <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                                                <Radio size={12} /> {student.rfid}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-slate-400 italic">Belum Ada</span>
+                                        )}
+                                    </TableCellGlass>
+                                    <TableCellGlass>
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
                                             {student.class?.name || '-'}
                                         </span>
                                     </TableCellGlass>
@@ -269,13 +342,15 @@ const Students: React.FC = () => {
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => handleEdit(student)}
-                                                className="p-2 hover:bg-white/10 rounded-lg text-indigo-400 transition-colors"
+                                                className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600 transition-colors"
+                                                title="Edit Data & RFID"
                                             >
                                                 <Edit2 size={16} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(student.id)}
-                                                className="p-2 hover:bg-white/10 rounded-lg text-red-400 transition-colors"
+                                                className="p-2 hover:bg-slate-100 rounded-lg text-red-600 transition-colors"
+                                                title="Hapus Siswa"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -290,8 +365,11 @@ const Students: React.FC = () => {
 
             <ModalGlass
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingStudent ? "Edit Siswa" : "Tambah Siswa Baru"}
+                onClose={() => {
+                    stopModalNfcScan();
+                    setIsModalOpen(false);
+                }}
+                title={editingStudent ? "Edit Data & Kartu Siswa" : "Tambah Siswa Baru"}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <InputGlass
@@ -322,17 +400,60 @@ const Students: React.FC = () => {
                         onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
                         required
                     />
+
+                    {/* RFID Field with Scan helper */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-sm font-medium text-slate-900/80 ml-1">
+                                UID / Nomor Kartu RFID (Opsional)
+                            </label>
+                            {isScanningNfc ? (
+                                <button
+                                    type="button"
+                                    onClick={stopModalNfcScan}
+                                    className="text-xs text-red-600 font-bold flex items-center gap-1 hover:underline"
+                                >
+                                    <XCircle size={13} /> Batal Scan NFC
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={startModalNfcScan}
+                                    className="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline"
+                                >
+                                    <Smartphone size={13} /> Scan via HP NFC
+                                </button>
+                            )}
+                        </div>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={formData.rfid}
+                                onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
+                                placeholder="Contoh: 04A1B2C3 atau tap kartu dengan USB Reader..."
+                                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-mono focus:ring-2 focus:ring-emerald-500 bg-white ${
+                                    isScanningNfc ? 'border-emerald-500 ring-2 ring-emerald-200 animate-pulse' : 'border-slate-200'
+                                }`}
+                            />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                            {isScanningNfc
+                                ? '🟢 Mendengarkan kartu... Tempelkan kartu ke bodi belakang smartphone.'
+                                : 'Dapat diisi otomatis dengan menempelkan kartu ke USB reader saat input ini aktif.'}
+                        </p>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-slate-900/80 mb-1 ml-1">Kelas</label>
                         <select
                             value={formData.class_id}
                             onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
-                            className="w-full glass-input"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-emerald-500"
                             required
                         >
-                            <option value="" className="bg-gray-900">-- Pilih Kelas --</option>
+                            <option value="">-- Pilih Kelas --</option>
                             {classes?.map((c: any) => (
-                                <option key={c.id} value={c.id} className="bg-gray-900">{c.name}</option>
+                                <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
                     </div>
@@ -342,17 +463,20 @@ const Students: React.FC = () => {
                         <select
                             value={formData.parent_id}
                             onChange={(e) => setFormData({ ...formData, parent_id: e.target.value })}
-                            className="w-full glass-input"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:ring-2 focus:ring-emerald-500"
                         >
-                            <option value="" className="bg-gray-900">-- Pilih Orang Tua (Opsional) --</option>
+                            <option value="">-- Pilih Orang Tua (Opsional) --</option>
                             {parentsList?.map((p: any) => (
-                                <option key={p.id} value={p.user?.id || p.user_id || ''} className="bg-gray-900">{p.user?.name || 'Unknown'}</option>
+                                <option key={p.id} value={p.user?.id || p.user_id || ''}>{p.user?.name || 'Unknown'}</option>
                             ))}
                         </select>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4">
-                        <ButtonGlass type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+                        <ButtonGlass type="button" variant="ghost" onClick={() => {
+                            stopModalNfcScan();
+                            setIsModalOpen(false);
+                        }}>
                             Batal
                         </ButtonGlass>
                         <ButtonGlass type="submit" icon={Save}>

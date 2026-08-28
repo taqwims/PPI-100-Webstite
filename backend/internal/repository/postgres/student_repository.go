@@ -43,9 +43,30 @@ func (r *StudentRepository) GetByParent(parentID string) ([]domain.Student, erro
 	return students, err
 }
 
+func (r *StudentRepository) GetByRFID(rfid string) (*domain.Student, error) {
+	var student domain.Student
+	err := r.db.Where("LOWER(TRIM(rfid)) = LOWER(TRIM(?)) AND rfid != ''", rfid).
+		Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").
+		First(&student).Error
+	if err != nil {
+		return nil, err
+	}
+	return &student, nil
+}
+
+func (r *StudentRepository) UpdateRFID(studentID string, rfid string) error {
+	return r.db.Model(&domain.Student{}).
+		Where("id = ?", studentID).
+		Updates(map[string]interface{}{
+			"rfid":       rfid,
+			"updated_at": time.Now(),
+		}).Error
+}
+
 func (r *StudentRepository) Update(student *domain.Student) error {
 	updates := map[string]interface{}{
 		"nisn":       student.NISN,
+		"rfid":       student.RFID,
 		"class_id":   student.ClassID,
 		"unit_id":    student.UnitID,
 		"parent_id":  student.ParentID,

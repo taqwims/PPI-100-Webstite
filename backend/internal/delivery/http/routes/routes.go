@@ -124,6 +124,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	
 	// Inject StudentObligationUsecase into StudentHandler for Grade Promotion
 	studentHandler.SetStudentObligationUsecase(studentObligationUsecase)
+	studentUsecase.SetSchoolSettingRepo(schoolSettingRepo)
+	studentUsecase.SetNotificationUsecase(notificationUsecase)
+	studentUsecase.SetCfg(cfg)
 
 	// Profile Handler
 	profileHandler := handlers.NewProfileHandler(userUsecase)
@@ -183,7 +186,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	// Public Routes
 	apiGroup := r.Group("/api")
-	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, mayarHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase)
+	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, mayarHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase, studentHandler)
 
 	// Protected Routes (requires authentication)
 	protectedGroup := apiGroup.Group("/")

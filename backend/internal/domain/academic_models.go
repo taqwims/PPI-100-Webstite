@@ -13,6 +13,7 @@ type Student struct {
 	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
 	User      User      `gorm:"foreignKey:UserID" json:"user"`
 	NISN      string    `gorm:"unique;not null" json:"nisn"`
+	RFID      string    `gorm:"column:rfid;index" json:"rfid"` // RFID / NFC card UID
 	ClassID   uint      `gorm:"not null" json:"class_id"`
 	Class     Class     `gorm:"foreignKey:ClassID" json:"class"`
 	ParentID  *uuid.UUID `gorm:"type:uuid" json:"parent_id"`
@@ -84,11 +85,14 @@ type Attendance struct {
 	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	StudentID  uuid.UUID `gorm:"type:uuid;not null" json:"student_id"`
 	Student    Student   `gorm:"foreignKey:StudentID" json:"student"`
-	ScheduleID uint      `gorm:"not null" json:"schedule_id"`
-	Schedule   Schedule  `gorm:"foreignKey:ScheduleID" json:"schedule"`
+	ScheduleID *uint     `json:"schedule_id"`
+	Schedule   *Schedule `gorm:"foreignKey:ScheduleID" json:"schedule,omitempty"`
 	Timestamp  time.Time `gorm:"not null" json:"timestamp"`
-	Method     string    `gorm:"not null" json:"method"` // Manual, QR
+	Method     string    `gorm:"not null" json:"method"` // Manual, QR, RFID, NFC
 	Status     string    `gorm:"not null" json:"status"` // Present, Absent, Late, Permission, Sick
+	Type       string    `gorm:"not null;default:'CheckIn'" json:"type"` // CheckIn, CheckOut, Schedule
+	DeviceID   string    `json:"device_id"`
+	Notes      string    `json:"notes"`
 }
 
 // ------------------- New Financial & Admin Models -------------------

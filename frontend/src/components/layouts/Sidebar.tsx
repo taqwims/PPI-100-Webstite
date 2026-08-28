@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
-    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers
+    Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers,
+    Radio
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -58,6 +59,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Manajemen',
             items: [
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
+                { icon: Users, label: 'Data Siswa & RFID', path: '/dashboard/students' },
+                { icon: Radio, label: 'Presensi RFID & NFC', path: '/dashboard/attendance', feature: 'rfid_attendance' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
                 { icon: GraduationCap, label: 'Kenaikan Kelas', path: '/dashboard/admin/promotions' },

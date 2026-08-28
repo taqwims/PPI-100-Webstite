@@ -105,6 +105,7 @@ type CreateStudentRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 	NISN     string `json:"nisn" binding:"required"`
+	RFID     string `json:"rfid"`
 	ClassID  uint   `json:"class_id" binding:"required"`
 	UnitID   uint   `json:"unit_id" binding:"required"`
 	ParentID string `json:"parent_id"` // Can be parent_user_id (user.id) — will be resolved
@@ -163,7 +164,7 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 		return
 	}
 
-	if err := h.studentUsecase.CreateStudent(req.Name, req.Email, req.Password, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
+	if err := h.studentUsecase.CreateStudent(req.Name, req.Email, req.Password, req.NISN, req.RFID, req.ClassID, req.UnitID, parentUUID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -176,6 +177,7 @@ type UpdateStudentRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password"`
 	NISN     string `json:"nisn" binding:"required"`
+	RFID     string `json:"rfid"`
 	ClassID  uint   `json:"class_id" binding:"required"`
 	UnitID   uint   `json:"unit_id" binding:"required"`
 	ParentID string `json:"parent_id"` // Can be parent_user_id (user.id) — will be resolved
@@ -195,7 +197,7 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		return
 	}
 
-	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.Password, req.NISN, req.ClassID, req.UnitID, parentUUID); err != nil {
+	if err := h.studentUsecase.UpdateStudent(id, req.Name, req.Email, req.Password, req.NISN, req.RFID, req.ClassID, req.UnitID, parentUUID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -211,6 +213,133 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
+}
+
+type AssignRFIDRequest struct {
+	RFID string `json:"rfid"`
+}
+
+func (h *StudentHandler) AssignRFID(c *gin.Context) {
+	id := c.Param("id")
+	var req AssignRFIDRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.studentUsecase.AssignStudentRFID(id, req.RFID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Nomor kartu RFID/NFC berhasil diperbarui"})
+}
+
+type RFIDTapRequest struct {
+	RFID       string `json:"rfid" binding:"required"`
+	UnitID     uint   `json:"unit_id"`
+	ScheduleID *uint  `json:"schedule_id"`
+	Type       string `json:"type"`   // "Auto", "CheckIn", "CheckOut", "Schedule"
+	Method     string `json:"method"` // "RFID", "NFC"
+	DeviceID   string `json:"device_id"`
+}
+
+func (h *StudentHandler) RecordRFIDAttendance(c *gin.Context) {
+	var req RFIDTapRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format data tidak valid: " + err.Error()})
+		return
+	}
+
+	att, student, actionCode, err := h.studentUsecase.RecordRFIDAttendance(
+		req.RFID,
+		req.UnitID,
+		req.ScheduleID,
+		req.Type,
+		req.Method,
+		req.DeviceID,
+	)
+
+	if err != nil {
+		statusCode := http.StatusBadRequest
+		if student == nil {
+			statusCode = http.StatusNotFound
+		}
+		c.JSON(statusCode, gin.H{
+			"error":   err.Error(),
+			"student": student,
+			"action":  actionCode,
+		})
+		return
+	}
+
+	studentInfo := gin.H{
+		"id":         student.ID,
+		"name":       student.User.Name,
+		"nisn":       student.NISN,
+		"rfid":       student.RFID,
+		"class_id":   student.ClassID,
+		"class_name": student.Class.Name,
+		"unit_id":    student.UnitID,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Presensi berhasil dicatat",
+		"attendance": att,
+		"student":    studentInfo,
+		"status":     att.Status,
+		"type":       att.Type,
+		"action":     actionCode,
+		"timestamp":  att.Timestamp,
+	})
+}
+
+func (h *StudentHandler) GetDailyAttendance(c *gin.Context) {
+	unitID, _ := strconv.Atoi(c.Query("unit_id"))
+	date := c.Query("date")
+	classIDStr := c.Query("class_id")
+
+	var classID *uint
+	if classIDStr != "" {
+		if parsed, err := strconv.Atoi(classIDStr); err == nil && parsed > 0 {
+			uParsed := uint(parsed)
+			classID = &uParsed
+		}
+	}
+
+	attendances, err := h.studentUsecase.GetDailyAttendance(uint(unitID), date, classID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, attendances)
+}
+
+func (h *StudentHandler) GetRecentDailyAttendance(c *gin.Context) {
+	unitID, _ := strconv.Atoi(c.Query("unit_id"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	if limit <= 0 {
+		limit = 15
+	}
+
+	attendances, err := h.studentUsecase.GetRecentDailyAttendance(uint(unitID), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, attendances)
+}
+
+func (h *StudentHandler) GetTodaySummary(c *gin.Context) {
+	unitID, _ := strconv.Atoi(c.Query("unit_id"))
+	date := c.Query("date")
+
+	summary, err := h.studentUsecase.GetDailyAttendanceSummary(uint(unitID), date)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
 }
 
 func (h *StudentHandler) GetStudentAttendance(c *gin.Context) {

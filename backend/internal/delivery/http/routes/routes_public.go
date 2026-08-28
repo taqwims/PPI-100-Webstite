@@ -19,6 +19,7 @@ func RegisterPublicRoutes(
 	invoiceSignatureHandler *handlers.InvoiceSignatureHandler,
 	schoolBankUsecase *usecase.SchoolBankUsecase,
 	schoolSettingUsecase *usecase.SchoolSettingUsecase,
+	studentHandler *handlers.StudentHandler,
 ) {
 	// ── Feature Config (public, no auth) ──
 	api.GET("/config/features", func(c *gin.Context) {
@@ -69,6 +70,9 @@ func RegisterPublicRoutes(
 	// Public Invoice Verification (no auth required)
 	api.GET("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)
 	api.POST("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)
+
+	// Public IoT Device RFID Tap
+	api.POST("/attendance/rfid-tap", studentHandler.RecordRFIDAttendance)
 
 	auth := api.Group("/auth")
 	{

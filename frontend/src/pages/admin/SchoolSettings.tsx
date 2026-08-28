@@ -6,7 +6,7 @@ import {
     Building2, MapPin, Phone, Mail, Hash, Save, Camera,
     Database, Download, Trash2, RotateCcw, Clock, CheckCircle2,
     XCircle, AlertTriangle, Info, Shield, HardDrive, FileText, CreditCard,
-    Copy, Eye, EyeOff, Zap
+    Copy, Eye, EyeOff, Zap, Radio, Key, BellRing, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -57,7 +57,7 @@ interface BackupData {
     created_at: string;
 }
 
-type TabKey = 'profile' | 'units' | 'bank_accounts' | 'payment_gateway' | 'landing_page' | 'backup';
+type TabKey = 'profile' | 'units' | 'bank_accounts' | 'payment_gateway' | 'landing_page' | 'rfid_attendance' | 'backup';
 
 // ─── Helpers ───
 function formatBytes(bytes: number): string {
@@ -106,12 +106,15 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 const SchoolSettings: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('profile');
     const fetchFeatures = useFeatureStore((s) => s.fetchFeatures);
+    const isEnabled = useFeatureStore((s) => s.isEnabled);
+    const isRFIDFeatureEnabled = isEnabled('rfid_attendance');
 
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: 'profile', label: 'Profil Sekolah', icon: <Building2 size={16} /> },
         { key: 'units', label: 'Unit Sekolah', icon: <Shield size={16} /> },
         { key: 'bank_accounts', label: 'Rekening Bank', icon: <CreditCard size={16} /> },
         { key: 'payment_gateway', label: 'Payment Gateway', icon: <Zap size={16} /> },
+        ...(isRFIDFeatureEnabled ? [{ key: 'rfid_attendance' as TabKey, label: 'Presensi & RFID', icon: <Radio size={16} /> }] : []),
         { key: 'landing_page', label: 'Landing Page', icon: <FileText size={16} /> },
         { key: 'backup', label: 'Backup & Restore', icon: <Database size={16} /> },
     ];
@@ -120,11 +123,11 @@ const SchoolSettings: React.FC = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Pengaturan Sekolah</h1>
-                <p className="text-sm text-slate-500 mt-1">Kelola profil sekolah, unit, payment gateway, serta backup & restore database</p>
+                <p className="text-sm text-slate-500 mt-1">Kelola profil sekolah, unit, presensi RFID & NFC, payment gateway, serta backup & restore database</p>
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex space-x-1 bg-white/50 backdrop-blur-sm rounded-xl p-1 border border-slate-200 shadow-sm w-fit">
+            <div className="flex flex-wrap gap-1 bg-white/50 backdrop-blur-sm rounded-xl p-1 border border-slate-200 shadow-sm w-fit">
                 {tabs.map((tab) => (
                     <button
                         key={tab.key}
@@ -151,6 +154,7 @@ const SchoolSettings: React.FC = () => {
                 </div>
             )}
             {activeTab === 'payment_gateway' && <PaymentGatewayTab onSaved={fetchFeatures} />}
+            {activeTab === 'rfid_attendance' && <RFIDAttendanceTab onSaved={fetchFeatures} />}
             {activeTab === 'landing_page' && <LandingPageTab onSaved={fetchFeatures} />}
         </div>
     );
@@ -1277,6 +1281,325 @@ const PaymentGatewayTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                 >
                     <Save size={16} />
                     {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Pengaturan Gateway'}
+                </ButtonGlass>
+            </div>
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab: Presensi & RFID / NFC ───
+// ═══════════════════════════════════════════
+const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
+    const queryClient = useQueryClient();
+
+    const { data: settings } = useQuery<SchoolSetting[]>({
+        queryKey: ['school-settings'],
+        queryFn: async () => {
+            const res = await api.get('/admin/settings');
+            return res.data;
+        },
+    });
+
+    const [form, setForm] = useState<Record<string, string>>({
+        enable_rfid_attendance: 'true',
+        enable_attendance_wa_notif: 'true',
+        attendance_entry_start: '06:00',
+        attendance_late_threshold: '07:15',
+        attendance_exit_start: '14:00',
+        attendance_cooldown_minutes: '3',
+        rfid_device_api_key: '',
+        wa_notif_attendance_in: '',
+        wa_notif_attendance_out: '',
+    });
+
+    React.useEffect(() => {
+        if (settings) {
+            const f: Record<string, string> = { ...form };
+            settings.forEach((s) => {
+                if (s.is_admin_edit) {
+                    f[s.key] = s.value;
+                }
+            });
+            setForm(f);
+        }
+    }, [settings]);
+
+    const updateField = (key: string, value: string) => {
+        setForm((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const generateRandomApiKey = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let res = 'rfid_key_';
+        for (let i = 0; i < 24; i++) {
+            res += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        updateField('rfid_device_api_key', res);
+        toast.success('API Key acak berhasil dibuat');
+    };
+
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} disalin ke clipboard`);
+    };
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            const updates = Object.entries(form).map(([key, value]) => ({ key, value }));
+            return api.put('/admin/settings', { settings: updates });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['school-settings'] });
+            onSaved();
+            toast.success('Pengaturan Presensi & RFID berhasil disimpan!');
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.error || 'Gagal menyimpan pengaturan');
+        },
+    });
+
+    const isEnabled = form.enable_rfid_attendance === 'true';
+    const isWAEnabled = form.enable_attendance_wa_notif === 'true';
+
+    const tapApiUrl = `${window.location.origin}/api/public/attendance/rfid-tap`;
+
+    return (
+        <div className="space-y-6">
+            {/* Header Alert */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                    <Radio size={20} />
+                </div>
+                <div>
+                    <h3 className="text-sm font-bold text-slate-800">Kontrol Presensi Siswa Berbasis RFID & NFC</h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                        Atur status aktif fitur, batas toleransi jam hadir/terlambat, cooldown double-tap, integrasi scanner alat ESP32/IoT, serta notifikasi WhatsApp otomatis ke wali siswa.
+                    </p>
+                </div>
+            </div>
+
+            {/* 1. Master Toggle & WA Notification */}
+            <CardGlass className="p-6">
+                <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Radio size={18} className="text-emerald-600" />
+                    Status Fitur & Notifikasi
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Master Switch */}
+                    <div className={`p-4 rounded-2xl border transition-all ${isEnabled ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-slate-800">Fitur Presensi RFID & NFC</span>
+                            <button
+                                type="button"
+                                onClick={() => updateField('enable_rfid_attendance', isEnabled ? 'false' : 'true')}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            {isEnabled
+                                ? '🟢 Fitur Aktif: Scanner NFC HP, USB Reader, dan IoT Device dapat mencatat kehadiran.'
+                                : '🔴 Fitur Nonaktif: Semua permintaan tap RFID/NFC akan ditolak sementara.'}
+                        </p>
+                    </div>
+
+                    {/* WA Toggle */}
+                    <div className={`p-4 rounded-2xl border transition-all ${isWAEnabled ? 'bg-teal-50/60 border-teal-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-slate-800">Notifikasi WA ke Orang Tua</span>
+                            <button
+                                type="button"
+                                onClick={() => updateField('enable_attendance_wa_notif', isWAEnabled ? 'false' : 'true')}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isWAEnabled ? 'bg-teal-600' : 'bg-slate-300'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isWAEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            {isWAEnabled
+                                ? '🟢 Aktif: Orang tua/wali akan menerima pesan WhatsApp langsung saat siswa tap kartu.'
+                                : '⚪ Nonaktif: Presensi dicatat ke sistem tanpa mengirim pesan WA.'}
+                        </p>
+                    </div>
+                </div>
+            </CardGlass>
+
+            {/* 2. Jam Sekolah & Toleransi */}
+            <CardGlass className="p-6">
+                <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Clock size={18} className="text-purple-600" />
+                    Jadwal Waktu Presensi & Toleransi Keterlambatan
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Jam Mulai Presensi Masuk
+                        </label>
+                        <input
+                            type="time"
+                            value={form.attendance_entry_start || '06:00'}
+                            onChange={(e) => updateField('attendance_entry_start', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">Mulai buka scanner masuk pagi</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Batas Waktu Hadir Tepat Waktu
+                        </label>
+                        <input
+                            type="time"
+                            value={form.attendance_late_threshold || '07:15'}
+                            onChange={(e) => updateField('attendance_late_threshold', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-amber-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">Tap lewat jam ini = <strong className="text-amber-600">Terlambat</strong></p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Jam Mulai Presensi Pulang
+                        </label>
+                        <input
+                            type="time"
+                            value={form.attendance_exit_start || '14:00'}
+                            onChange={(e) => updateField('attendance_exit_start', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">Waktu mulai buka absensi pulang</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Jeda Anti Double-Tap (Menit)
+                        </label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="60"
+                            value={form.attendance_cooldown_minutes || '3'}
+                            onChange={(e) => updateField('attendance_cooldown_minutes', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-emerald-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">Cegah kartu tertempel tak sengaja</p>
+                    </div>
+                </div>
+            </CardGlass>
+
+            {/* 3. Integrasi Alat Scanner IoT (ESP32 / Gate) */}
+            <CardGlass className="p-6">
+                <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Key size={18} className="text-indigo-600" />
+                    Integrasi Alat Scanner IoT / Gerbang Mandiri (ESP32)
+                </h2>
+
+                <div className="space-y-4">
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold text-slate-700">
+                                API Key Perangkat Scanner (Opsional)
+                            </label>
+                            <button
+                                type="button"
+                                onClick={generateRandomApiKey}
+                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                            >
+                                <RefreshCw size={12} /> Buat Key Acak
+                            </button>
+                        </div>
+                        <input
+                            type="text"
+                            value={form.rfid_device_api_key || ''}
+                            onChange={(e) => updateField('rfid_device_api_key', e.target.value)}
+                            placeholder="Contoh: rfid_key_9A8B7C6D5E4F..."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">Kosongkan jika hanya menggunakan scanner via Web Browser / HP NFC.</p>
+                    </div>
+
+                    <div className="p-3 bg-slate-900 text-slate-200 rounded-xl text-xs font-mono space-y-2">
+                        <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1.5">
+                            <span>HTTP POST Request Endpoint untuk ESP32 / IoT:</span>
+                            <button
+                                type="button"
+                                onClick={() => copyToClipboard(`curl -X POST "${tapApiUrl}" -H "Content-Type: application/json" -d '{"rfid": "04A1B2C3", "type": "Auto", "method": "RFID"}'`, 'cURL command')}
+                                className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300"
+                            >
+                                <Copy size={12} /> Salin cURL
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto text-emerald-400">
+                            POST {tapApiUrl}
+                        </div>
+                        <div className="text-slate-400">
+                            {JSON.stringify({ rfid: "04A1B2C3", type: "Auto", method: "RFID", device_id: "Gate-1" }, null, 2)}
+                        </div>
+                    </div>
+                </div>
+            </CardGlass>
+
+            {/* 4. Format Pesan WhatsApp */}
+            <CardGlass className="p-6">
+                <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <BellRing size={18} className="text-teal-600" />
+                    Kustomisasi Template Pesan WhatsApp Presensi
+                </h2>
+
+                <div className="mb-4 p-3 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-1 border border-slate-200">
+                    <span className="font-semibold text-slate-700">Variabel tag yang dapat digunakan:</span>
+                    <div className="flex flex-wrap gap-1.5 pt-1 font-mono text-[11px]">
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-teal-700">{`{nama_siswa}`}</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-teal-700">{`{nisn}`}</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-teal-700">{`{kelas}`}</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-teal-700">{`{waktu}`}</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-teal-700">{`{tanggal}`}</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-teal-700">{`{status}`}</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Pesan WA Presensi Masuk (Check-In)
+                        </label>
+                        <textarea
+                            rows={6}
+                            value={form.wa_notif_attendance_in || ''}
+                            onChange={(e) => updateField('wa_notif_attendance_in', e.target.value)}
+                            placeholder="Assalamu'alaikum Wr. Wb. Diberitahukan bahwa ananda *{nama_siswa}* ({kelas}) telah hadir di sekolah pada pukul *{waktu}* WIB. Status: *{status}*."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-teal-500 bg-white"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Pesan WA Presensi Pulang (Check-Out)
+                        </label>
+                        <textarea
+                            rows={6}
+                            value={form.wa_notif_attendance_out || ''}
+                            onChange={(e) => updateField('wa_notif_attendance_out', e.target.value)}
+                            placeholder="Assalamu'alaikum Wr. Wb. Diberitahukan bahwa ananda *{nama_siswa}* ({kelas}) telah selesai KBM dan melakukan presensi pulang pada pukul *{waktu}* WIB."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-teal-500 bg-white"
+                        />
+                    </div>
+                </div>
+            </CardGlass>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+                <ButtonGlass
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition"
+                >
+                    <Save size={16} />
+                    {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Pengaturan Presensi & RFID'}
                 </ButtonGlass>
             </div>
         </div>

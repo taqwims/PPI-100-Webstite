@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, User as UserIcon, Mail, Lock, Shield, School, Edit2, CreditCard, Search, Eye, EyeOff, CheckCircle, AlertCircle, Radio } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
 import clsx from 'clsx';
@@ -34,6 +34,7 @@ interface User {
     student?: {
         id: string;
         nisn: string;
+        rfid?: string;
         class_id: number;
         parent_id?: string;
         parent?: {
@@ -60,6 +61,7 @@ interface StudentRecord {
     id: string;
     user_id: string;
     nisn: string;
+    rfid?: string;
     class_id: number;
     parent_id?: string;
     unit_id: number;
@@ -115,7 +117,7 @@ const UserManagement: React.FC = () => {
 
     const [formData, setFormData] = useState({
         name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId,
-        nisn: '', class_id: 0, parent_id: '',
+        nisn: '', rfid: '', class_id: 0, parent_id: '',
     });
 
     const [showPassword, setShowPassword] = useState(false);
@@ -285,6 +287,7 @@ const UserManagement: React.FC = () => {
                     email: data.email, 
                     password: data.password,
                     nisn: data.nisn, 
+                    rfid: data.rfid || undefined,
                     class_id: Number(data.class_id),
                     unit_id: Number(data.unit_id), 
                     parent_id: data.parent_id || undefined,
@@ -321,6 +324,7 @@ const UserManagement: React.FC = () => {
                     email: data.email,
                     password: data.password || undefined,
                     nisn: data.nisn || editingUser?.student?.nisn || '',
+                    rfid: data.rfid || undefined,
                     class_id: Number(data.class_id),
                     unit_id: Number(data.unit_id) || editingUser?.unit_id || 1,
                     parent_id: data.parent_id || '',
@@ -364,7 +368,7 @@ const UserManagement: React.FC = () => {
         setIsModalOpen(false);
         setEditingUser(null);
         setEditingStudentRecord(null);
-        setFormData({ name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId, nisn: '', class_id: 0, parent_id: '' });
+        setFormData({ name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId, nisn: '', rfid: '', class_id: 0, parent_id: '' });
     };
 
     const handleEdit = (u: User) => {
@@ -391,6 +395,7 @@ const UserManagement: React.FC = () => {
             role_id: u.role_id,
             unit_id: u.unit_id,
             nisn: u.student?.nisn || studentRec?.nisn || '',
+            rfid: u.student?.rfid || studentRec?.rfid || '',
             class_id: u.student?.class_id || studentRec?.class_id || 0,
             parent_id: resolvedParentUserId,
         });
@@ -516,6 +521,7 @@ const UserManagement: React.FC = () => {
                                 <th className="px-5 py-3 font-medium">Nama</th>
                                 <th className="px-5 py-3 font-medium">Email</th>
                                 <th className="px-5 py-3 font-medium">Role</th>
+                                {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">RFID</th>}
                                 {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Kelas</th>}
                                 {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Orang Tua</th>}
                                 <th className="px-5 py-3 font-medium">Unit</th>
@@ -524,11 +530,12 @@ const UserManagement: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
-                                <tr><td colSpan={8} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
+                                <tr><td colSpan={9} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
                             ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan={8} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
+                                <tr><td colSpan={9} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
                             ) : filteredUsers.map((u: User, idx: number) => {
                                 const parentName = getStudentParentName(u);
+                                const studentRfid = u.student?.rfid || allStudents?.find(s => s.user_id === u.id)?.rfid;
                                 return (
                                     <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-5 py-3 text-slate-400 text-sm font-medium">{idx + 1}</td>
@@ -546,6 +553,21 @@ const UserManagement: React.FC = () => {
                                                 {getRoleName(u.role_id)}
                                             </span>
                                         </td>
+                                        {(activeTab === 0 || activeTab === 6) && (
+                                            <td className="px-5 py-3 text-sm">
+                                                {u.role_id === 6 ? (
+                                                    studentRfid ? (
+                                                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                                                            <Radio size={11} /> {studentRfid}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 italic">Belum Ada</span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </td>
+                                        )}
                                         {(activeTab === 0 || activeTab === 6) && (
                                             <td className="px-5 py-3 text-sm text-slate-600 font-medium">{getStudentClass(u)}</td>
                                         )}
@@ -657,7 +679,7 @@ const UserManagement: React.FC = () => {
                             {formData.role_id === 6 && (
                                 <div className="space-y-4 pt-4 border-t border-slate-200">
                                     <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
-                                        <CreditCard size={16} className="text-blue-600" /> Data Siswa
+                                        <CreditCard size={16} className="text-blue-600" /> Data Siswa & RFID
                                     </h4>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -665,6 +687,13 @@ const UserManagement: React.FC = () => {
                                             <input type="text" value={formData.nisn} onChange={e => setFormData({ ...formData, nisn: e.target.value })}
                                                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" placeholder="NISN" />
                                         </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Nomor / UID RFID</label>
+                                            <input type="text" value={formData.rfid} onChange={e => setFormData({ ...formData, rfid: e.target.value })}
+                                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono" placeholder="Contoh: 04A1B2C3" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Kelas</label>
                                             <select value={formData.class_id} onChange={e => setFormData({ ...formData, class_id: Number(e.target.value) })}

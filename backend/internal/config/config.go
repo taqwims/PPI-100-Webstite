@@ -41,6 +41,7 @@ type Config struct {
 	FeatureWAGateway          bool
 	FeaturePublicWebsite      bool
 	FeatureBulkDeleteObligations bool
+	FeatureRFIDAttendance     bool
 
 	// School Branding
 	SchoolName    string
@@ -76,6 +77,7 @@ func (c *Config) FeatureMap() map[string]bool {
 		"wa_gateway":          c.FeatureWAGateway,
 		"public_website":      c.FeaturePublicWebsite,
 		"bulk_delete_obligations": c.FeatureBulkDeleteObligations,
+		"rfid_attendance":     c.FeatureRFIDAttendance,
 	}
 }
 
@@ -126,6 +128,7 @@ func LoadConfig() (*Config, error) {
 		FeatureWAGateway:          getEnvBool("FEATURE_WA_GATEWAY", true),
 		FeaturePublicWebsite:      getEnvBool("FEATURE_PUBLIC_WEBSITE", true),
 		FeatureBulkDeleteObligations: getEnvBool("FEATURE_BULK_DELETE_OBLIGATIONS", false),
+		FeatureRFIDAttendance:     getEnvBool("FEATURE_RFID_ATTENDANCE", true),
 
 		// School Branding
 		SchoolName:    getEnv("SCHOOL_NAME", "Sekolah"),

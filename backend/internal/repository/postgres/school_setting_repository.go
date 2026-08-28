@@ -100,6 +100,15 @@ func (r *SchoolSettingRepository) Seed(defaults map[string]string) error {
 		{Key: "mayar_api_key", Value: "", Description: "Mayar API Key", IsAdminEdit: true},
 		{Key: "mayar_webhook_token", Value: "", Description: "Mayar Webhook Token", IsAdminEdit: true},
 		{Key: "mayar_is_production", Value: "false", Description: "Mayar Mode Production (true/false)", IsAdminEdit: true},
+		{Key: "enable_rfid_attendance", Value: "true", Description: "Aktifkan Fitur Presensi RFID & NFC", IsAdminEdit: true},
+		{Key: "enable_attendance_wa_notif", Value: "true", Description: "Aktifkan Notifikasi WhatsApp Presensi", IsAdminEdit: true},
+		{Key: "attendance_entry_start", Value: "06:00", Description: "Jam Mulai Presensi Masuk (HH:MM)", IsAdminEdit: true},
+		{Key: "attendance_late_threshold", Value: "07:15", Description: "Batas Waktu Hadir Tepat Waktu (HH:MM)", IsAdminEdit: true},
+		{Key: "attendance_exit_start", Value: "14:00", Description: "Jam Mulai Presensi Pulang (HH:MM)", IsAdminEdit: true},
+		{Key: "attendance_cooldown_minutes", Value: "3", Description: "Jeda Anti Double-Tap (Menit)", IsAdminEdit: true},
+		{Key: "rfid_device_api_key", Value: "", Description: "API Key Perangkat Scanner IoT (ESP32/Gerbang)", IsAdminEdit: true},
+		{Key: "wa_notif_attendance_in", Value: "Assalamu'alaikum Wr. Wb.\n\nDiberitahukan bahwa ananda *{nama_siswa}* ({kelas}) telah hadir di sekolah pada pukul *{waktu}* WIB.\nStatus: *{status}*.\n\nTerima kasih.", Description: "Format Pesan WA Presensi Masuk", IsAdminEdit: true},
+		{Key: "wa_notif_attendance_out", Value: "Assalamu'alaikum Wr. Wb.\n\nDiberitahukan bahwa ananda *{nama_siswa}* ({kelas}) telah selesai KBM dan melakukan presensi pulang pada pukul *{waktu}* WIB.\n\nTerima kasih.", Description: "Format Pesan WA Presensi Pulang", IsAdminEdit: true},
 	}
 
 	for _, s := range seedSettings {
