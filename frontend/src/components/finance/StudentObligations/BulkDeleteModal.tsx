@@ -3,6 +3,7 @@ import { X, Trash2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../services/api';
 import { PaymentType, ClassOption, AcademicYear } from './types';
+import { useFeatureStore } from '../../../store/featureStore';
 
 interface Props {
     isOpen: boolean;
@@ -18,6 +19,7 @@ interface Props {
 export const BulkDeleteModal: React.FC<Props> = ({
     isOpen, onClose, onSuccess, paymentTypes, classes, academicYears, filterYearId, filterClassId
 }) => {
+    const isForceDeleteAllowed = useFeatureStore(s => s.school.allow_delete_paid_obligations === 'true');
     const [selectedPaymentTypeId, setSelectedPaymentTypeId] = useState('');
     const [selectedClassId, setSelectedClassId] = useState(filterClassId);
     const [selectedYearId, setSelectedYearId] = useState(filterYearId);
@@ -35,7 +37,11 @@ export const BulkDeleteModal: React.FC<Props> = ({
         const typeName = paymentTypes.find(t => String(t.id) === selectedPaymentTypeId)?.name || '';
         const className = classes.find(c => String(c.id) === selectedClassId)?.name || 'Semua Kelas';
         
-        if (!confirm(`Hapus SEMUA tanggungan "${typeName}" untuk "${className}"? \n\nHanya tanggungan yang BELUM ADA PEMBAYARAN yang akan dihapus.`)) return;
+        const confirmMsg = isForceDeleteAllowed
+            ? `Hapus SEMUA tanggungan "${typeName}" untuk "${className}"? \n\n⚠️ PERINGATAN KOREKSI: Mode Koreksi AKTIF. Tanggungan yang SUDAH DIBAYAR beserta riwayat transaksi pembayaran, catatan kas BKU, dan realisasi RKAS juga AKAN IKUT DIHAPUS.`
+            : `Hapus SEMUA tanggungan "${typeName}" untuk "${className}"? \n\nHanya tanggungan yang BELUM ADA PEMBAYARAN yang akan dihapus.`;
+
+        if (!confirm(confirmMsg)) return;
 
         setLoading(true);
         try {
@@ -69,13 +75,22 @@ export const BulkDeleteModal: React.FC<Props> = ({
                 </div>
                 
                 <form onSubmit={handleDelete} className="p-6 space-y-4">
-                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex gap-3">
-                        <AlertTriangle className="text-amber-600 shrink-0" size={20} />
-                        <p className="text-xs text-amber-800">
-                            Fitur ini akan menghapus data tanggungan untuk banyak siswa sekaligus. 
-                            <strong> Data siswa di User Management tidak akan terhapus.</strong>
-                        </p>
-                    </div>
+                    {isForceDeleteAllowed ? (
+                        <div className="bg-red-50 border border-red-200 p-3 rounded-xl flex gap-3">
+                            <AlertTriangle className="text-red-600 shrink-0" size={20} />
+                            <p className="text-xs text-red-800 leading-relaxed">
+                                <strong>Mode Koreksi Transaksi Aktif:</strong> Penghapusan ini akan menghapus SEMUA tanggungan, <strong>termasuk yang sudah dibayar</strong>. Tagihan, riwayat transaksi pembayaran, catatan BKU, dan realisasi RKAS terkait akan otomatis dibatalkan/dihapus.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex gap-3">
+                            <AlertTriangle className="text-amber-600 shrink-0" size={20} />
+                            <p className="text-xs text-amber-800">
+                                Fitur ini akan menghapus data tanggungan untuk banyak siswa sekaligus. 
+                                <strong> Hanya tanggungan yang BELUM ADA PEMBAYARAN yang akan dihapus.</strong> Data siswa di User Management tidak akan terhapus.
+                            </p>
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Tahun Ajaran</label>

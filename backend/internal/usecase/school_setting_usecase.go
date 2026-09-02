@@ -46,6 +46,7 @@ func (u *SchoolSettingUsecase) GetSchoolInfo() map[string]string {
 		"active_payment_gateway": "active_payment_gateway",
 		"midtrans_client_key": "midtrans_client_key",
 		"xendit_public_key": "xendit_public_key",
+		"allow_delete_paid_obligations": "allow_delete_paid_obligations",
 	}
 
 	for _, s := range settings {

@@ -44,6 +44,7 @@ interface SchoolInfo {
     active_payment_gateway?: string;
     midtrans_client_key?: string;
     xendit_public_key?: string;
+    allow_delete_paid_obligations?: string;
 }
 
 interface FeatureState {

@@ -239,6 +239,71 @@ func (r *BudgetRepository) AddRealizationByTransactionCodeID(tcID uint, amount f
 	})
 }
 
+func (r *BudgetRepository) SubtractRealizationByTransactionCodeID(tcID uint, amount float64, billingMonth int) error {
+	if amount <= 0 {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var tc domain.TransactionCode
+		if err := tx.First(&tc, "id = ?", tcID).Error; err != nil {
+			return nil // Transaction code not found, skip silently
+		}
+
+		var tcIDs []uint
+		tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+
+		var budgets []domain.Budget
+		tx.Where("transaction_code_id IN ?", tcIDs).Order("month desc, created_at desc").Find(&budgets)
+
+		if len(budgets) == 0 {
+			var prefixTCIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("code LIKE ?", tc.Code+"%").Pluck("id", &prefixTCIDs)
+			if len(prefixTCIDs) > 0 {
+				tx.Where("transaction_code_id IN ?", prefixTCIDs).Order("month desc, created_at desc").Find(&budgets)
+			}
+		}
+
+		if len(budgets) == 0 {
+			return nil // No budgets to subtract from
+		}
+
+		// Try exact billing month match first
+		var targetBudget *domain.Budget
+		if billingMonth > 0 {
+			for i := range budgets {
+				if budgets[i].Month == billingMonth {
+					targetBudget = &budgets[i]
+					break
+				}
+			}
+		}
+
+		if targetBudget != nil {
+			tx.Model(&domain.Budget{}).Where("id = ?", targetBudget.ID).
+				Update("realized_amount", gorm.Expr("GREATEST(0, realized_amount - ?)", amount))
+		} else {
+			// Waterfall subtraction from budgets that have realized_amount > 0
+			remaining := amount
+			for _, b := range budgets {
+				if remaining <= 0 {
+					break
+				}
+				if b.RealizedAmount > 0 {
+					toSub := remaining
+					if toSub > b.RealizedAmount {
+						toSub = b.RealizedAmount
+					}
+					tx.Model(&domain.Budget{}).Where("id = ?", b.ID).
+						Update("realized_amount", gorm.Expr("GREATEST(0, realized_amount - ?)", toSub))
+					remaining -= toSub
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
 // ------------------- Budget Summary -------------------
 
 func (r *BudgetRepository) GetSummaryByYear(academicYearID uint) ([]map[string]interface{}, error) {

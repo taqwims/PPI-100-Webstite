@@ -3,7 +3,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
-import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download, Edit2, Trash2 } from 'lucide-react';
+import { Wallet, Users, ArrowRightLeft, BarChart3, TrendingDown, ShieldCheck, RotateCcw, Plus, X, Download, Edit2, Trash2, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 import { generateSavingsReport } from '../../utils/pdfUtils';
 import { generatePiutangInvoice } from '../../utils/piutangInvoice';
@@ -21,6 +21,15 @@ import { SavingAccount, ClassData, Student, PoolSummary, OperationalWithdrawal, 
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 const formatDate = (d: string) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d));
+const toInputDate = (d: string | Date | undefined) => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const Savings = () => {
     const { user } = useAuth();
@@ -71,6 +80,7 @@ const Savings = () => {
     const [editingTrx, setEditingTrx] = useState<SavingTransaction | null>(null);
     const [editAmount, setEditAmount] = useState('');
     const [editNotes, setEditNotes] = useState('');
+    const [editDate, setEditDate] = useState('');
     const [savingEdit, setSavingEdit] = useState(false);
 
     // Confirm Delete Dialog
@@ -164,7 +174,8 @@ const Savings = () => {
         try {
             await api.put(`/finance/savings/transactions/${editingTrx.id}`, {
                 amount: Number(editAmount),
-                notes: editNotes
+                notes: editNotes,
+                date: editDate || undefined,
             });
             // Refresh history
             if (historyAccount) {
@@ -175,6 +186,7 @@ const Savings = () => {
                 fetchAccounts(classFilter || undefined);
             }
             setEditingTrx(null);
+            toast.success('Transaksi berhasil diperbarui');
         } catch (error) { console.error(error); toast.error('Gagal mengupdate transaksi'); }
         finally { setSavingEdit(false); }
     };
@@ -438,6 +450,7 @@ const Savings = () => {
                                                                 setEditingTrx(trx);
                                                                 setEditAmount(trx.amount.toString());
                                                                 setEditNotes(trx.notes || '');
+                                                                setEditDate(toInputDate(trx.date));
                                                             }}
                                                             className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                                                         >
@@ -488,6 +501,7 @@ const Savings = () => {
                                                             setEditingTrx(trx);
                                                             setEditAmount(trx.amount.toString());
                                                             setEditNotes(trx.notes || '');
+                                                            setEditDate(toInputDate(trx.date));
                                                         }}
                                                         className="flex items-center gap-1 text-emerald-600 font-bold"
                                                     >
@@ -520,6 +534,19 @@ const Savings = () => {
                             <button onClick={() => setEditingTrx(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors"><X size={20} className="text-slate-400" /></button>
                         </div>
                         <div className="p-8 space-y-6">
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <Calendar size={14} className="text-emerald-500" />
+                                    Tanggal Transaksi
+                                </label>
+                                <input 
+                                    type="date" 
+                                    className="w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-bold text-slate-800 text-base" 
+                                    value={editDate}
+                                    onChange={e => setEditDate(e.target.value)}
+                                    required
+                                />
+                            </div>
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nominal (Rp)</label>
                                 <div className="relative group">

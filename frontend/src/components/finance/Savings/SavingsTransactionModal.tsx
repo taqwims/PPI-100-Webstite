@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowUpRight, ArrowDownRight, X } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, X, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import api from '../../../services/api';
 import { SavingAccount, ClassData, Student } from './types';
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+
+const getTodayDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +32,7 @@ export const SavingsTransactionModal: React.FC<Props> = ({
     const [trxType, setTrxType] = useState<'Deposit' | 'Withdrawal'>('Deposit');
     const [trxStudentId, setTrxStudentId] = useState('');
     const [trxAmount, setTrxAmount] = useState('');
+    const [trxDate, setTrxDate] = useState(getTodayDate());
     const [trxNotes, setTrxNotes] = useState('');
     const [trxClassFilter, setTrxClassFilter] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -33,6 +42,7 @@ export const SavingsTransactionModal: React.FC<Props> = ({
             setTrxType(initialType);
             setTrxStudentId(initialStudentId || '');
             setTrxAmount('');
+            setTrxDate(getTodayDate());
             setTrxNotes('');
             setTrxClassFilter('');
         }
@@ -53,7 +63,8 @@ export const SavingsTransactionModal: React.FC<Props> = ({
                 student_id: trxStudentId, 
                 type: trxType, 
                 amount: parseFloat(trxAmount), 
-                notes: trxNotes 
+                notes: trxNotes,
+                date: trxDate || undefined,
             });
             toast.success(trxType === 'Deposit' ? 'Setoran berhasil' : 'Penarikan berhasil');
             onSuccess();
@@ -117,6 +128,20 @@ export const SavingsTransactionModal: React.FC<Props> = ({
                             </div>
                         )}
                         
+                        <div>
+                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                <Calendar size={14} className="text-emerald-500" />
+                                Tanggal Transaksi
+                            </label>
+                            <input 
+                                type="date" 
+                                required 
+                                className="w-full px-5 py-3.5 rounded-2xl border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-bold text-slate-800 text-sm" 
+                                value={trxDate}
+                                onChange={e => setTrxDate(e.target.value)}
+                            />
+                        </div>
+
                         <div>
                             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nominal (Rp)</label>
                             <div className="relative group">

@@ -61,12 +61,12 @@ func (u *FinanceExtendedUsecase) RolloverAcademicYear(fromYearID, toYearID uint)
 
 // ------------------- Savings -------------------
 
-func (u *FinanceExtendedUsecase) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error {
-	return u.financeRepo.ProcessSavingTransaction(studentID, handledByID, txnType, amount, notes)
+func (u *FinanceExtendedUsecase) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string, date ...time.Time) error {
+	return u.financeRepo.ProcessSavingTransaction(studentID, handledByID, txnType, amount, notes, date...)
 }
 
-func (u *FinanceExtendedUsecase) UpdateSavingTransaction(id uuid.UUID, amount float64, notes string) error {
-	return u.financeRepo.UpdateSavingTransaction(id, amount, notes)
+func (u *FinanceExtendedUsecase) UpdateSavingTransaction(id uuid.UUID, amount float64, notes string, date ...time.Time) error {
+	return u.financeRepo.UpdateSavingTransaction(id, amount, notes, date...)
 }
 
 func (u *FinanceExtendedUsecase) DeleteSavingTransaction(id uuid.UUID) error {

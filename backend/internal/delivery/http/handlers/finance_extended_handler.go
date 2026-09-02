@@ -157,6 +157,26 @@ type SavingsTransactionRequest struct {
 	Type      string  `json:"type" binding:"required"` // Deposit, Withdrawal
 	Amount    float64 `json:"amount" binding:"required"`
 	Notes     string  `json:"notes"`
+	Date      string  `json:"date"`
+}
+
+func parseSavingTransactionDate(dateStr string) *time.Time {
+	if dateStr == "" {
+		return nil
+	}
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, dateStr); err == nil {
+			return &t
+		}
+	}
+	return nil
 }
 
 func (h *FinanceExtendedHandler) ProcessSavingTransaction(c *gin.Context) {
@@ -178,7 +198,12 @@ func (h *FinanceExtendedHandler) ProcessSavingTransaction(c *gin.Context) {
 		return
 	}
 
-	err = h.financeExtendedUsecase.ProcessSavingTransaction(studentUUID, handledByID, req.Type, req.Amount, req.Notes)
+	var dateArgs []time.Time
+	if t := parseSavingTransactionDate(req.Date); t != nil {
+		dateArgs = append(dateArgs, *t)
+	}
+
+	err = h.financeExtendedUsecase.ProcessSavingTransaction(studentUUID, handledByID, req.Type, req.Amount, req.Notes, dateArgs...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -190,6 +215,7 @@ func (h *FinanceExtendedHandler) ProcessSavingTransaction(c *gin.Context) {
 type UpdateSavingTransactionRequest struct {
 	Amount float64 `json:"amount" binding:"required"`
 	Notes  string  `json:"notes"`
+	Date   string  `json:"date"`
 }
 
 func (h *FinanceExtendedHandler) UpdateSavingTransaction(c *gin.Context) {
@@ -206,7 +232,12 @@ func (h *FinanceExtendedHandler) UpdateSavingTransaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeExtendedUsecase.UpdateSavingTransaction(id, req.Amount, req.Notes); err != nil {
+	var dateArgs []time.Time
+	if t := parseSavingTransactionDate(req.Date); t != nil {
+		dateArgs = append(dateArgs, *t)
+	}
+
+	if err := h.financeExtendedUsecase.UpdateSavingTransaction(id, req.Amount, req.Notes, dateArgs...); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

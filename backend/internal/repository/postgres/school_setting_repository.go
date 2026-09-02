@@ -109,6 +109,7 @@ func (r *SchoolSettingRepository) Seed(defaults map[string]string) error {
 		{Key: "rfid_device_api_key", Value: "", Description: "API Key Perangkat Scanner IoT (ESP32/Gerbang)", IsAdminEdit: true},
 		{Key: "wa_notif_attendance_in", Value: "Assalamu'alaikum Wr. Wb.\n\nDiberitahukan bahwa ananda *{nama_siswa}* ({kelas}) telah hadir di sekolah pada pukul *{waktu}* WIB.\nStatus: *{status}*.\n\nTerima kasih.", Description: "Format Pesan WA Presensi Masuk", IsAdminEdit: true},
 		{Key: "wa_notif_attendance_out", Value: "Assalamu'alaikum Wr. Wb.\n\nDiberitahukan bahwa ananda *{nama_siswa}* ({kelas}) telah selesai KBM dan melakukan presensi pulang pada pukul *{waktu}* WIB.\n\nTerima kasih.", Description: "Format Pesan WA Presensi Pulang", IsAdminEdit: true},
+		{Key: "allow_delete_paid_obligations", Value: "false", Description: "Izinkan Hapus Tanggungan Terbayar (Mode Koreksi Transaksi)", IsAdminEdit: true},
 	}
 
 	for _, s := range seedSettings {

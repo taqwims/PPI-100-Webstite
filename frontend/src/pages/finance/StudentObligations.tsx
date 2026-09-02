@@ -119,12 +119,22 @@ const StudentObligations = () => {
     const activeYear = academicYears.find(y => y.is_active);
     const semesterMonths = activeYear ? getSemesterMonths(activeYear) : { semester1: [7,8,9,10,11,12], semester2: [1,2,3,4,5,6] };
 
+    const isForceDeleteAllowed = useFeatureStore(s => s.school.allow_delete_paid_obligations === 'true');
+
     const handleDelete = async (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!confirm('Hapus tanggungan ini?')) return;
+        const targetOb = obligations.find(o => o.id === id);
+        const isPaid = targetOb && targetOb.paid_amount > 0;
+
+        let confirmMsg = 'Hapus tanggungan ini?';
+        if (isPaid) {
+            confirmMsg = `⚠️ PERINGATAN KOREKSI TRANSAKSI:\n\nTanggungan ini SUDAH MEMILIKI PEMBAYARAN sebesar ${formatCurrency(targetOb.paid_amount)}.\n\nMenghapus tanggungan ini akan secara otomatis:\n1. Menghapus tagihan siswa (Bill)\n2. Menghapus riwayat transaksi pembayaran (Payment)\n3. Menghapus pencatatan pemasukan di Buku Kas Umum (BKU)\n4. Membatalkan & mengurangi realisasi anggaran RKAS terkait\n\nApakah Anda yakin ingin melanjutkan penghapusan?`;
+        }
+
+        if (!confirm(confirmMsg)) return;
         try {
             await api.delete(`/finance/student-obligations/${id}`);
-            toast.success('Berhasil dihapus');
+            toast.success(isPaid ? 'Tanggungan dan seluruh riwayat pembayaran terkait berhasil dihapus' : 'Berhasil dihapus');
             fetchData();
         } catch (err: any) { 
             console.error(err);
@@ -134,7 +144,16 @@ const StudentObligations = () => {
 
     const handleBulkDeleteGroup = async (ids: string[], typeName: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!confirm(`Hapus semua tanggungan ${typeName}?`)) return;
+        const groupObs = obligations.filter(o => ids.includes(o.id));
+        const totalPaid = groupObs.reduce((s, o) => s + (o.paid_amount || 0), 0);
+        const hasPaid = totalPaid > 0;
+
+        let confirmMsg = `Hapus semua tanggungan ${typeName}?`;
+        if (hasPaid) {
+            confirmMsg = `⚠️ PERINGATAN KOREKSI TRANSAKSI:\n\nBeberapa tanggungan ${typeName} SUDAH DIBAYAR (Total Terbayar: ${formatCurrency(totalPaid)}).\n\nMenghapus tanggungan ini akan membatalkan riwayat pembayaran, menghapus catatan kas BKU, dan mengurangi realisasi RKAS terkait.\n\nApakah Anda yakin ingin menghapus semua tanggungan ${typeName} ini?`;
+        }
+
+        if (!confirm(confirmMsg)) return;
         try {
             await Promise.all(ids.map(id => api.delete(`/finance/student-obligations/${id}`)));
             toast.success(`Berhasil menghapus ${typeName}`);
@@ -221,6 +240,16 @@ const StudentObligations = () => {
                     </div>
                 )}
             </div>
+
+            {isForceDeleteAllowed && (
+                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs shadow-sm">
+                    <span className="text-base">⚠️</span>
+                    <div>
+                        <p className="font-bold">Mode Koreksi Transaksi Sedang Aktif</p>
+                        <p className="text-amber-700 mt-0.5">Penghapusan tanggungan yang sudah dibayar diperbolehkan oleh Admin. Menghapus tanggungan terbayar akan otomatis membatalkan pembayaran, menghapus catatan kas BKU, dan mengurangi realisasi RKAS.</p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">

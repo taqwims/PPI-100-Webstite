@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"strings"
+
 	"ppi-100-sis/internal/domain"
 
 	"github.com/google/uuid"
@@ -81,6 +83,49 @@ func (r *FinanceRepository) UpdateBill(bill *domain.Bill) error {
 
 func (r *FinanceRepository) DeleteBill(id string) error {
 	return r.db.Delete(&domain.Bill{}, "id = ?", id).Error
+}
+
+func (r *FinanceRepository) DeletePaymentsByBillID(billID string) error {
+	return r.db.Delete(&domain.Payment{}, "bill_id = ?", billID).Error
+}
+
+func (r *FinanceRepository) DeleteBillItemsByBillID(billID string) error {
+	return r.db.Delete(&domain.BillItem{}, "bill_id = ?", billID).Error
+}
+
+func (r *FinanceRepository) DeleteCashLedgersForObligation(obligationID uuid.UUID, studentName string, billTitle string, ptName string, tcID *uint) error {
+	// First, try direct obligation_id match
+	res := r.db.Where("obligation_id = ?", obligationID).Delete(&domain.CashLedger{})
+	if res.Error == nil && res.RowsAffected > 0 {
+		return nil
+	}
+
+	// Fallback for legacy records
+	q := r.db.Where("type = ?", "Income")
+	if tcID != nil && *tcID > 0 {
+		q = q.Where("transaction_code_id = ?", *tcID)
+	}
+
+	var conditions []string
+	var args []interface{}
+
+	if billTitle != "" {
+		conditions = append(conditions, "item_name LIKE ?")
+		args = append(args, "%"+billTitle+"%")
+	}
+	if ptName != "" {
+		conditions = append(conditions, "item_name LIKE ?")
+		args = append(args, "%"+ptName+"%")
+	}
+	if studentName != "" {
+		conditions = append(conditions, "source = ?")
+		args = append(args, studentName)
+	}
+	conditions = append(conditions, "source = 'Pembayaran Tanggungan Siswa'")
+	conditions = append(conditions, "auto_generated = true")
+
+	orClause := "(" + strings.Join(conditions, " OR ") + ")"
+	return q.Where(orClause, args...).Delete(&domain.CashLedger{}).Error
 }
 
 func (r *FinanceRepository) GetBillByID(id string) (*domain.Bill, error) {

@@ -111,7 +111,7 @@ func (r *financeExtendedRepository) RolloverAcademicYear(fromYearID, toYearID ui
 
 // ------------------- Savings -------------------
 
-func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error {
+func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string, date ...time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var account domain.SavingAccount
 		err := tx.Where("student_id = ?", studentID).First(&account).Error
@@ -142,11 +142,16 @@ func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledB
 			return err
 		}
 
+		txnDate := time.Now()
+		if len(date) > 0 && !date[0].IsZero() {
+			txnDate = date[0]
+		}
+
 		txn := domain.SavingTransaction{
 			AccountID:   account.ID,
 			Type:        txnType,
 			Amount:      amount,
-			Date:        time.Now(),
+			Date:        txnDate,
 			HandledByID: handledByID,
 			Notes:       notes,
 		}
@@ -155,7 +160,7 @@ func (r *financeExtendedRepository) ProcessSavingTransaction(studentID, handledB
 	})
 }
 
-func (r *financeExtendedRepository) UpdateSavingTransaction(id uuid.UUID, amount float64, notes string) error {
+func (r *financeExtendedRepository) UpdateSavingTransaction(id uuid.UUID, amount float64, notes string, date ...time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var txn domain.SavingTransaction
 		if err := tx.Where("id = ?", id).First(&txn).Error; err != nil {
@@ -188,10 +193,15 @@ func (r *financeExtendedRepository) UpdateSavingTransaction(id uuid.UUID, amount
 			return err
 		}
 
-		return tx.Model(&txn).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"amount": amount,
 			"notes":  notes,
-		}).Error
+		}
+		if len(date) > 0 && !date[0].IsZero() {
+			updates["date"] = date[0]
+		}
+
+		return tx.Model(&txn).Updates(updates).Error
 	})
 }
 

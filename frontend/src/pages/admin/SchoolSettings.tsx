@@ -6,7 +6,7 @@ import {
     Building2, MapPin, Phone, Mail, Hash, Save, Camera,
     Database, Download, Trash2, RotateCcw, Clock, CheckCircle2,
     XCircle, AlertTriangle, Info, Shield, HardDrive, FileText, CreditCard,
-    Copy, Eye, EyeOff, Zap, Radio, Key, BellRing, RefreshCw
+    Copy, Eye, EyeOff, Zap, Radio, Key, BellRing, RefreshCw, ShieldAlert
 } from 'lucide-react';
 import api from '../../services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -57,7 +57,7 @@ interface BackupData {
     created_at: string;
 }
 
-type TabKey = 'profile' | 'units' | 'bank_accounts' | 'payment_gateway' | 'landing_page' | 'rfid_attendance' | 'backup';
+type TabKey = 'profile' | 'units' | 'bank_accounts' | 'payment_gateway' | 'finance_policy' | 'landing_page' | 'rfid_attendance' | 'backup';
 
 // ─── Helpers ───
 function formatBytes(bytes: number): string {
@@ -114,6 +114,7 @@ const SchoolSettings: React.FC = () => {
         { key: 'units', label: 'Unit Sekolah', icon: <Shield size={16} /> },
         { key: 'bank_accounts', label: 'Rekening Bank', icon: <CreditCard size={16} /> },
         { key: 'payment_gateway', label: 'Payment Gateway', icon: <Zap size={16} /> },
+        { key: 'finance_policy', label: 'Kebijakan Keuangan', icon: <ShieldAlert size={16} /> },
         ...(isRFIDFeatureEnabled ? [{ key: 'rfid_attendance' as TabKey, label: 'Presensi & RFID', icon: <Radio size={16} /> }] : []),
         { key: 'landing_page', label: 'Landing Page', icon: <FileText size={16} /> },
         { key: 'backup', label: 'Backup & Restore', icon: <Database size={16} /> },
@@ -154,6 +155,7 @@ const SchoolSettings: React.FC = () => {
                 </div>
             )}
             {activeTab === 'payment_gateway' && <PaymentGatewayTab onSaved={fetchFeatures} />}
+            {activeTab === 'finance_policy' && <FinancePolicyTab onSaved={fetchFeatures} />}
             {activeTab === 'rfid_attendance' && <RFIDAttendanceTab onSaved={fetchFeatures} />}
             {activeTab === 'landing_page' && <LandingPageTab onSaved={fetchFeatures} />}
         </div>
@@ -1602,6 +1604,162 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                     {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Pengaturan Presensi & RFID'}
                 </ButtonGlass>
             </div>
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════
+// ─── Tab: Kebijakan Keuangan (Financial Feature Policy) ───
+// ═══════════════════════════════════════════
+const FinancePolicyTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
+    const queryClient = useQueryClient();
+
+    const { data: settings, isLoading } = useQuery<SchoolSetting[]>({
+        queryKey: ['school-settings'],
+        queryFn: async () => {
+            const res = await api.get('/admin/settings');
+            return res.data;
+        },
+    });
+
+    const isForceDeleteEnabled = settings?.find(s => s.key === 'allow_delete_paid_obligations')?.value === 'true';
+
+    const saveSettingMutation = useMutation({
+        mutationFn: async (newValue: string) => {
+            return api.put('/admin/settings', {
+                settings: [{ key: 'allow_delete_paid_obligations', value: newValue }]
+            });
+        },
+        onSuccess: (_, newValue) => {
+            queryClient.invalidateQueries({ queryKey: ['school-settings'] });
+            onSaved();
+            if (newValue === 'true') {
+                toast.success('Mode Koreksi Aktif: Anda sekarang dapat menghapus tanggungan yang sudah terbayar');
+            } else {
+                toast.success('Mode Aman Aktif: Tanggungan terbayar kini terkunci dan aman dari penghapusan');
+            }
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.error || 'Gagal mengubah pengaturan');
+        },
+    });
+
+    const handleToggle = () => {
+        const nextState = isForceDeleteEnabled ? 'false' : 'true';
+        if (nextState === 'true') {
+            const confirmed = window.confirm(
+                '⚠️ PERINGATAN KEAMANAN TRANSAKSI:\n\n' +
+                'Mengaktifkan fitur ini memungkinkan Admin menghapus tanggungan siswa yang sudah lunas/terbayar.\n' +
+                'Penghapusan akan secara otomatis membatalkan dan menghapus:\n' +
+                '1. Tagihan siswa (Bill)\n' +
+                '2. Riwayat transaksi pembayaran (Payment)\n' +
+                '3. Pencatatan kas pemasukan di Buku Kas Umum (BKU)\n' +
+                '4. Realisasi anggaran di RKAS\n\n' +
+                'Disarankan untuk menonaktifkan kembali fitur ini setelah selesai melakukan perbaikan salah input di produksi.\n\n' +
+                'Apakah Anda yakin ingin mengaktifkan Mode Koreksi ini?'
+            );
+            if (!confirmed) return;
+        }
+        saveSettingMutation.mutate(nextState);
+    };
+
+    if (isLoading) {
+        return <CardGlass className="p-8 text-center text-slate-500">Memuat pengaturan kebijakan keuangan...</CardGlass>;
+    }
+
+    return (
+        <div className="space-y-6 max-w-4xl">
+            {/* Header Card */}
+            <CardGlass className="p-6">
+                <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-2xl ${isForceDeleteEnabled ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {isForceDeleteEnabled ? <AlertTriangle size={28} /> : <Shield size={28} />}
+                    </div>
+                    <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-slate-900">Kebijakan Pembatalan & Koreksi Transaksi</h2>
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                isForceDeleteEnabled 
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            }`}>
+                                {isForceDeleteEnabled ? '⚠️ Mode Koreksi Aktif' : '🛡️ Mode Aman (Terkunci)'}
+                            </span>
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1">
+                            Atur izin penghapusan data tanggungan yang sudah memiliki riwayat pembayaran di sistem. 
+                            Fitur ini berguna saat terjadi kesalahan input data/orang di production.
+                        </p>
+                    </div>
+                </div>
+            </CardGlass>
+
+            {/* Main Toggle Card */}
+            <CardGlass className="p-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <h3 className="font-bold text-slate-800 text-base">Izinkan Hapus Tanggungan Terbayar (Force Delete)</h3>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                            Jika diaktifkan, Admin dapat menghapus tanggungan siswa yang sudah memiliki riwayat pembayaran (lunas maupun sebagian), sekaligus menghapus invoice, membatalkan transaksi pembayaran, menghapus pencatatan kas BKU, dan mengurangi realisasi anggaran RKAS.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            disabled={saveSettingMutation.isPending}
+                            onClick={handleToggle}
+                            className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                isForceDeleteEnabled ? 'bg-amber-500' : 'bg-slate-300'
+                            }`}
+                        >
+                            <span
+                                className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    isForceDeleteEnabled ? 'translate-x-6' : 'translate-x-0'
+                                }`}
+                            />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Explanation of cascading effects */}
+                <div className="mt-6 pt-6 border-t border-slate-200/60 grid sm:grid-cols-2 gap-4 text-xs">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 space-y-2">
+                        <span className="font-bold text-slate-700 flex items-center gap-1.5 text-sm">
+                            <Info size={16} className="text-blue-500" />
+                            Dampak Terhadap Data & Laporan
+                        </span>
+                        <ul className="list-disc list-inside space-y-1 text-slate-600">
+                            <li><strong>Tagihan (Bill)</strong>: Invoice tagihan terkait akan terhapus.</li>
+                            <li><strong>Pembayaran (Payment)</strong>: Riwayat transaksi pembayaran terhapus.</li>
+                            <li><strong>Buku Kas Umum (BKU)</strong>: Catatan pemasukan kas umum yang dibuat otomatis dari pembayaran akan ditarik/dihapus.</li>
+                            <li><strong>Realisasi RKAS</strong>: Realisasi anggaran yang sudah bertambah akan dikurangi kembali secara otomatis.</li>
+                            <li><strong>Dashboard & Analitik</strong>: Grafik SPP dan penerimaan kas akan langsung kembali seimbang.</li>
+                        </ul>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border space-y-2 ${
+                        isForceDeleteEnabled 
+                            ? 'bg-amber-50/80 border-amber-200 text-amber-900' 
+                            : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                    }`}>
+                        <span className="font-bold flex items-center gap-1.5 text-sm">
+                            {isForceDeleteEnabled ? <AlertTriangle size={16} className="text-amber-600" /> : <Shield size={16} className="text-emerald-600" />}
+                            Petunjuk Penggunaan Aman
+                        </span>
+                        <p className="leading-relaxed">
+                            {isForceDeleteEnabled ? (
+                                <>
+                                    <strong>PERHATIAN:</strong> Mode Koreksi sedang <strong>AKTIF</strong>. Anda dapat menghapus tanggungan yang salah input di menu <strong>Tanggungan Siswa</strong> atau <strong>Jenis Pembayaran</strong>. Jangan lupa mematikan toggle ini kembali setelah selesai perbaikan.
+                                </>
+                            ) : (
+                                <>
+                                    Sistem saat ini berada dalam <strong>Mode Aman</strong>. Menghapus tanggungan yang sudah memiliki riwayat pembayaran akan ditolak demi menjaga integritas data keuangan.
+                                </>
+                            )}
+                        </p>
+                    </div>
+                </div>
+            </CardGlass>
         </div>
     );
 };

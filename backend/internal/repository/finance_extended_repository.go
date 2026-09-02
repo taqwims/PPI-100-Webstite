@@ -17,13 +17,13 @@ type FinanceExtendedRepository interface {
 	TransferSavings(studentID, handledByID uuid.UUID, module string, direction string, amount float64, notes string) error
 
 
-	ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string) error
+	ProcessSavingTransaction(studentID, handledByID uuid.UUID, txnType string, amount float64, notes string, date ...time.Time) error
 	GetStudentSavingAccount(studentID uuid.UUID) (*domain.SavingAccount, error)
 	GetAllSavingAccounts(classID *uint) ([]domain.SavingAccount, error)
 	GetSavingTransactions(accountID uuid.UUID) ([]domain.SavingTransaction, error)
 	GetSavingAccountByUserID(userID uuid.UUID) (*domain.SavingAccount, error)
 	GetSavingAccountsByParentID(parentID uuid.UUID) ([]domain.SavingAccount, error)
-	UpdateSavingTransaction(id uuid.UUID, amount float64, notes string) error
+	UpdateSavingTransaction(id uuid.UUID, amount float64, notes string, date ...time.Time) error
 	DeleteSavingTransaction(id uuid.UUID) error
 
 

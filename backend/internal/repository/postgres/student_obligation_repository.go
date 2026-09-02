@@ -171,3 +171,9 @@ func (r *StudentObligationRepository) BulkDelete(paymentTypeID uint, academicYea
 	query = query.Where("paid_amount = 0")
 	return query.Delete(&domain.StudentObligation{}).Error
 }
+
+func (r *StudentObligationRepository) GetByPaymentTypeID(paymentTypeID uint) ([]domain.StudentObligation, error) {
+	var obs []domain.StudentObligation
+	err := r.db.Where("payment_type_id = ?", paymentTypeID).Find(&obs).Error
+	return obs, err
+}
