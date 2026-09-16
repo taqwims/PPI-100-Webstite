@@ -59,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Manajemen',
             items: [
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
-                { icon: Users, label: 'Data Siswa & RFID', path: '/dashboard/students' },
+                { icon: Users, label: isEnabled('rfid_attendance') ? 'Data Siswa & RFID' : 'Data Siswa', path: '/dashboard/students' },
                 { icon: Radio, label: 'Presensi RFID & NFC', path: '/dashboard/attendance', feature: 'rfid_attendance' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },

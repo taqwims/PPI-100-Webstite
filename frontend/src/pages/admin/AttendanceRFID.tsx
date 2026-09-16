@@ -14,6 +14,7 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
+import { useFeatureStore } from '../../store/featureStore';
 
 // ─── Web Audio API Sound Synthesizer ───
 class SoundEffects {
@@ -204,7 +205,8 @@ export const AttendanceRFID: React.FC = () => {
         queryFn: async () => (await api.get('/admin/settings')).data,
     });
 
-    const isFeatureEnabled = settings?.find((s: any) => s.key === 'enable_rfid_attendance')?.value !== 'false';
+    const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
+    const isFeatureEnabled = isRFIDEnabled && settings?.find((s: any) => s.key === 'enable_rfid_attendance')?.value !== 'false';
 
     // Fetch Today's Summary
     const { data: summary } = useQuery({

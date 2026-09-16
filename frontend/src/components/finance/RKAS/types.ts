@@ -39,7 +39,9 @@ export interface TransactionCode {
     code: string;
     name: string;
     category: string;
-    transaction_type: string;
+    type?: string;
+    transaction_type?: string;
+    parent_code_id?: number | null;
     description?: string;
 }
 export interface BudgetSummary { 

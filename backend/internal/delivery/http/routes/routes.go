@@ -81,11 +81,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	invoiceSignatureUsecase := usecase.NewInvoiceSignatureUsecase(invoiceSignatureRepo)
 	invoiceSignatureHandler := handlers.NewInvoiceSignatureHandler(invoiceSignatureUsecase)
 
-	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo, studentRepo, budgetRepo, studentObligationRepo, activityRepo, invoiceSignatureUsecase)
-
 	schoolSettingRepo := postgres.NewSchoolSettingRepository(db)
 	schoolSettingUsecase := usecase.NewSchoolSettingUsecase(schoolSettingRepo)
 	schoolSettingHandler := handlers.NewSchoolSettingHandler(schoolSettingUsecase)
+
+	financeUsecase := usecase.NewFinanceUsecase(financeRepo, notificationUsecase, userRepo, studentRepo, budgetRepo, studentObligationRepo, activityRepo, invoiceSignatureUsecase, schoolSettingRepo)
 
 	// Midtrans Payment Gateway
 	midtransUsecase := usecase.NewMidtransUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)

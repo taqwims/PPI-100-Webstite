@@ -47,6 +47,7 @@ func (u *SchoolSettingUsecase) GetSchoolInfo() map[string]string {
 		"midtrans_client_key": "midtrans_client_key",
 		"xendit_public_key": "xendit_public_key",
 		"allow_delete_paid_obligations": "allow_delete_paid_obligations",
+		"enable_rfid_attendance": "enable_rfid_attendance",
 	}
 
 	for _, s := range settings {

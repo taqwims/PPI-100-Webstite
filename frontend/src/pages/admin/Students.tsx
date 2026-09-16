@@ -9,6 +9,7 @@ import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadG
 import ModalGlass from '../../components/ui/glass/ModalGlass';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
+import { useFeatureStore } from '../../store/featureStore';
 import toast from 'react-hot-toast';
 
 interface Student {
@@ -43,6 +44,7 @@ const Students: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const queryClient = useQueryClient();
+    const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
 
     // Form State
     const [formData, setFormData] = useState({
@@ -238,7 +240,7 @@ const Students: React.FC = () => {
     const filteredStudents = students?.filter((student: Student) =>
         student.user.name.toLowerCase().includes(search.toLowerCase()) ||
         student.nisn.includes(search) ||
-        (student.rfid && student.rfid.toLowerCase().includes(search.toLowerCase()))
+        (isRFIDEnabled && student.rfid && student.rfid.toLowerCase().includes(search.toLowerCase()))
     );
 
     return (
@@ -246,7 +248,11 @@ const Students: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Data Siswa</h1>
-                    <p className="text-slate-500">Kelola data santri, NISN, dan nomor kartu RFID / NFC per unit</p>
+                    <p className="text-slate-500">
+                        {isRFIDEnabled
+                            ? 'Kelola data santri, NISN, dan nomor kartu RFID / NFC per unit'
+                            : 'Kelola data santri dan NISN per unit'}
+                    </p>
                 </div>
                 <ButtonGlass onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2">
                     <Plus size={18} /> Tambah Siswa
@@ -257,7 +263,7 @@ const Students: React.FC = () => {
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
                         <InputGlass
-                            placeholder="Cari nama, NISN, atau nomor RFID..."
+                            placeholder={isRFIDEnabled ? "Cari nama, NISN, atau nomor RFID..." : "Cari nama atau NISN..."}
                             icon={Search}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -287,7 +293,7 @@ const Students: React.FC = () => {
                         <TableRowGlass>
                             <TableHeadGlass>NISN</TableHeadGlass>
                             <TableHeadGlass>Nama</TableHeadGlass>
-                            <TableHeadGlass>RFID / NFC</TableHeadGlass>
+                            {isRFIDEnabled && <TableHeadGlass>RFID / NFC</TableHeadGlass>}
                             <TableHeadGlass>Kelas</TableHeadGlass>
                             <TableHeadGlass>Orang Tua</TableHeadGlass>
                             <TableHeadGlass className="text-right">Aksi</TableHeadGlass>
@@ -296,11 +302,11 @@ const Students: React.FC = () => {
                     <TableBodyGlass>
                         {isLoading ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8">Loading...</TableCellGlass>
+                                <TableCellGlass colSpan={isRFIDEnabled ? 6 : 5} className="text-center py-8">Loading...</TableCellGlass>
                             </TableRowGlass>
                         ) : filteredStudents?.length === 0 ? (
                             <TableRowGlass>
-                                <TableCellGlass colSpan={6} className="text-center py-8">Tidak ada data siswa</TableCellGlass>
+                                <TableCellGlass colSpan={isRFIDEnabled ? 6 : 5} className="text-center py-8">Tidak ada data siswa</TableCellGlass>
                             </TableRowGlass>
                         ) : (
                             filteredStudents?.map((student: Student) => (
@@ -316,15 +322,17 @@ const Students: React.FC = () => {
                                             <span className="font-medium text-slate-900">{student.user.name}</span>
                                         </div>
                                     </TableCellGlass>
-                                    <TableCellGlass>
-                                        {student.rfid ? (
-                                            <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                                                <Radio size={12} /> {student.rfid}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-slate-400 italic">Belum Ada</span>
-                                        )}
-                                    </TableCellGlass>
+                                    {isRFIDEnabled && (
+                                        <TableCellGlass>
+                                            {student.rfid ? (
+                                                <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                                                    <Radio size={12} /> {student.rfid}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">Belum Ada</span>
+                                            )}
+                                        </TableCellGlass>
+                                    )}
                                     <TableCellGlass>
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
                                             {student.class?.name || '-'}
@@ -343,7 +351,7 @@ const Students: React.FC = () => {
                                             <button
                                                 onClick={() => handleEdit(student)}
                                                 className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600 transition-colors"
-                                                title="Edit Data & RFID"
+                                                title={isRFIDEnabled ? "Edit Data & RFID" : "Edit Siswa"}
                                             >
                                                 <Edit2 size={16} />
                                             </button>
@@ -369,7 +377,7 @@ const Students: React.FC = () => {
                     stopModalNfcScan();
                     setIsModalOpen(false);
                 }}
-                title={editingStudent ? "Edit Data & Kartu Siswa" : "Tambah Siswa Baru"}
+                title={editingStudent ? (isRFIDEnabled ? "Edit Data & Kartu Siswa" : "Edit Data Siswa") : "Tambah Siswa Baru"}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <InputGlass
@@ -402,46 +410,48 @@ const Students: React.FC = () => {
                     />
 
                     {/* RFID Field with Scan helper */}
-                    <div>
-                        <div className="flex items-center justify-between mb-1">
-                            <label className="block text-sm font-medium text-slate-900/80 ml-1">
-                                UID / Nomor Kartu RFID (Opsional)
-                            </label>
-                            {isScanningNfc ? (
-                                <button
-                                    type="button"
-                                    onClick={stopModalNfcScan}
-                                    className="text-xs text-red-600 font-bold flex items-center gap-1 hover:underline"
-                                >
-                                    <XCircle size={13} /> Batal Scan NFC
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={startModalNfcScan}
-                                    className="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline"
-                                >
-                                    <Smartphone size={13} /> Scan via HP NFC
-                                </button>
-                            )}
+                    {isRFIDEnabled && (
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="block text-sm font-medium text-slate-900/80 ml-1">
+                                    UID / Nomor Kartu RFID (Opsional)
+                                </label>
+                                {isScanningNfc ? (
+                                    <button
+                                        type="button"
+                                        onClick={stopModalNfcScan}
+                                        className="text-xs text-red-600 font-bold flex items-center gap-1 hover:underline"
+                                    >
+                                        <XCircle size={13} /> Batal Scan NFC
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={startModalNfcScan}
+                                        className="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline"
+                                    >
+                                        <Smartphone size={13} /> Scan via HP NFC
+                                    </button>
+                                )}
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={formData.rfid}
+                                    onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
+                                    placeholder="Contoh: 04A1B2C3 atau tap kartu dengan USB Reader..."
+                                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-mono focus:ring-2 focus:ring-emerald-500 bg-white ${
+                                        isScanningNfc ? 'border-emerald-500 ring-2 ring-emerald-200 animate-pulse' : 'border-slate-200'
+                                    }`}
+                                />
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                                {isScanningNfc
+                                    ? '🟢 Mendengarkan kartu... Tempelkan kartu ke bodi belakang smartphone.'
+                                    : 'Dapat diisi otomatis dengan menempelkan kartu ke USB reader saat input ini aktif.'}
+                            </p>
                         </div>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={formData.rfid}
-                                onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
-                                placeholder="Contoh: 04A1B2C3 atau tap kartu dengan USB Reader..."
-                                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-mono focus:ring-2 focus:ring-emerald-500 bg-white ${
-                                    isScanningNfc ? 'border-emerald-500 ring-2 ring-emerald-200 animate-pulse' : 'border-slate-200'
-                                }`}
-                            />
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                            {isScanningNfc
-                                ? '🟢 Mendengarkan kartu... Tempelkan kartu ke bodi belakang smartphone.'
-                                : 'Dapat diisi otomatis dengan menempelkan kartu ke USB reader saat input ini aktif.'}
-                        </p>
-                    </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-slate-900/80 mb-1 ml-1">Kelas</label>

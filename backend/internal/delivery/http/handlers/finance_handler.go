@@ -217,15 +217,19 @@ func (h *FinanceHandler) UpdateBill(c *gin.Context) {
 	}
 
 	bill := &domain.Bill{
-		ID:        billUUID,
-		StudentID: studentUUID,
-		Title:     req.Title,
-		Amount:    req.Amount,
-		DueDate:   dueDate,
+		ID:                billUUID,
+		StudentID:         studentUUID,
+		Title:             req.Title,
+		Amount:            req.Amount,
+		DueDate:           dueDate,
+		BillType:          req.BillType,
+		AcademicYearID:    req.AcademicYearID,
+		TransactionCodeID: req.TransactionCodeID,
+		IsInstallment:     req.IsInstallment,
 	}
 
 	if err := h.financeUsecase.UpdateBill(bill); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -235,7 +239,7 @@ func (h *FinanceHandler) UpdateBill(c *gin.Context) {
 func (h *FinanceHandler) DeleteBill(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.financeUsecase.DeleteBill(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

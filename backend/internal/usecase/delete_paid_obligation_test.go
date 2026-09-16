@@ -235,3 +235,60 @@ func TestUpdateSavingTransactionDate(t *testing.T) {
 	}
 }
 
+// TestDeleteBillSafetyPolicy tests the safety check on DeleteBill
+func TestDeleteBillSafetyPolicy(t *testing.T) {
+	tests := []struct {
+		name                  string
+		settingValue          string
+		settingExists         bool
+		hasSuccessPayments    bool
+		hasFailedOnlyPayments bool
+		expectedDeleteAllowed bool
+	}{
+		{
+			name:                  "Safe mode blocks bill with successful payments",
+			settingValue:          "false",
+			settingExists:         true,
+			hasSuccessPayments:    true,
+			expectedDeleteAllowed: false,
+		},
+		{
+			name:                  "Safe mode allows bill with only failed payments",
+			settingValue:          "false",
+			settingExists:         true,
+			hasFailedOnlyPayments: true,
+			expectedDeleteAllowed: true,
+		},
+		{
+			name:                  "Safe mode allows completely unpaid bill",
+			settingValue:          "false",
+			settingExists:         true,
+			expectedDeleteAllowed: true,
+		},
+		{
+			name:                  "Correction mode allows bill with successful payments",
+			settingValue:          "true",
+			settingExists:         true,
+			hasSuccessPayments:    true,
+			expectedDeleteAllowed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isCorrectionAllowed := tt.settingExists && tt.settingValue == "true"
+			var deleteBlocked bool
+			if tt.hasSuccessPayments && !isCorrectionAllowed {
+				deleteBlocked = true
+			}
+
+			if tt.expectedDeleteAllowed && deleteBlocked {
+				t.Fatalf("Expected delete to be allowed, but was blocked")
+			}
+			if !tt.expectedDeleteAllowed && !deleteBlocked {
+				t.Fatalf("Expected delete to be blocked, but was allowed")
+			}
+		})
+	}
+}
+

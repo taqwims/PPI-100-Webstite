@@ -30,7 +30,7 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	err := db.AutoMigrate(
 		&domain.User{},
 		&domain.Role{},
 		&domain.Unit{},
@@ -116,6 +116,21 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.SchoolSetting{},
 		&domain.DatabaseBackup{},
 	)
+	if err != nil {
+		return err
+	}
+
+	// Ensure foreign key cascading delete on payments and bill_items referencing bills
+	_ = db.Exec(`
+		ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_bills_payments;
+		ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_bill;
+		ALTER TABLE payments ADD CONSTRAINT fk_bills_payments FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE;
+
+		ALTER TABLE bill_items DROP CONSTRAINT IF EXISTS fk_bills_items;
+		ALTER TABLE bill_items ADD CONSTRAINT fk_bills_items FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE;
+	`).Error
+
+	return nil
 }
 
 // SeedSchoolSettings seeds default school settings from config env vars.

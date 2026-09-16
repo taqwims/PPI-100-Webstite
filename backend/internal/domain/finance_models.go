@@ -28,8 +28,8 @@ type Bill struct {
 	ObligationID         *uuid.UUID       `gorm:"type:uuid" json:"obligation_id"`
 	Obligation           *StudentObligation `gorm:"foreignKey:ObligationID" json:"obligation,omitempty"`
 	ActivityObligationID *uuid.UUID       `gorm:"type:uuid" json:"activity_obligation_id"`
-	Items                []BillItem       `gorm:"foreignKey:BillID" json:"items,omitempty"`
-	Payments             []Payment        `gorm:"foreignKey:BillID" json:"payments,omitempty"`
+	Items                []BillItem       `gorm:"foreignKey:BillID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"items,omitempty"`
+	Payments             []Payment        `gorm:"foreignKey:BillID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"payments,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -51,7 +51,7 @@ type BillTemplate struct {
 type Payment struct {
 	ID            uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	BillID        uuid.UUID `gorm:"type:uuid;not null" json:"bill_id"`
-	Bill          Bill      `gorm:"foreignKey:BillID" json:"bill"`
+	Bill          Bill      `gorm:"foreignKey:BillID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"bill"`
 	Amount        float64   `gorm:"not null" json:"amount"`
 	PaymentMethod string    `gorm:"not null" json:"payment_method"` // Transfer, Cash, Midtrans
 	Status        string    `gorm:"not null" json:"status"` // Pending, Success, Failed

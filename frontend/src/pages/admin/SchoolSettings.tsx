@@ -106,8 +106,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 const SchoolSettings: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('profile');
     const fetchFeatures = useFeatureStore((s) => s.fetchFeatures);
-    const isEnabled = useFeatureStore((s) => s.isEnabled);
-    const isRFIDFeatureEnabled = isEnabled('rfid_attendance');
+    const isRFIDFeatureEnabled = useFeatureStore((s) => s.features['rfid_attendance'] !== false);
 
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: 'profile', label: 'Profil Sekolah', icon: <Building2 size={16} /> },

@@ -91,7 +91,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                                         {title}
                                     </Dialog.Title>
                                     <div className="mt-2">
-                                        <p className="text-slate-500 font-medium leading-relaxed">
+                                        <p className="text-slate-500 font-medium leading-relaxed whitespace-pre-line">
                                             {message}
                                         </p>
                                     </div>

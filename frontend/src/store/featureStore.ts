@@ -45,6 +45,7 @@ interface SchoolInfo {
     midtrans_client_key?: string;
     xendit_public_key?: string;
     allow_delete_paid_obligations?: string;
+    enable_rfid_attendance?: string;
 }
 
 interface FeatureState {
@@ -56,6 +57,7 @@ interface FeatureState {
     loaded: boolean;
     fetchFeatures: () => Promise<void>;
     isEnabled: (key: string) => boolean;
+    isRFIDEnabled: () => boolean;
     getUnitName: (id: number) => string;
 }
 
@@ -85,9 +87,19 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
     },
 
     isEnabled: (key: string) => {
-        const { features } = get();
+        const { features, school } = get();
+        if (key === 'rfid_attendance') {
+            const envEnabled = features['rfid_attendance'] !== undefined ? features['rfid_attendance'] : true;
+            const settingEnabled = school.enable_rfid_attendance !== 'false';
+            return envEnabled && settingEnabled;
+        }
         // Default to true if the feature is not found in the config
         return features[key] !== undefined ? features[key] : true;
+    },
+
+    isRFIDEnabled: () => {
+        const { isEnabled } = get();
+        return isEnabled('rfid_attendance');
     },
 
     getUnitName: (id: number) => {

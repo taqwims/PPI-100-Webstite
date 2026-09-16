@@ -87,8 +87,51 @@ func (u *FinanceUsecase) GetParentBills(userID string) ([]domain.Bill, error) {
 	return u.financeRepo.GetBillsByStudentIDs(studentIDs)
 }
 
-func (u *FinanceUsecase) UpdateBill(bill *domain.Bill) error {
-	return u.financeRepo.UpdateBill(bill)
+func (u *FinanceUsecase) isForceDeletePaidAllowed() bool {
+	if u.schoolSettingRepo == nil {
+		return false
+	}
+	s, err := u.schoolSettingRepo.GetByKey("allow_delete_paid_obligations")
+	if err != nil || s == nil {
+		return false
+	}
+	return s.Value == "true"
+}
+
+func (u *FinanceUsecase) UpdateBill(input *domain.Bill) error {
+	existingBill, err := u.financeRepo.GetBillByID(input.ID.String())
+	if err != nil || existingBill == nil {
+		return errors.New("tagihan tidak ditemukan")
+	}
+
+	existingBill.Title = input.Title
+	existingBill.Amount = input.Amount
+	existingBill.DueDate = input.DueDate
+	if input.BillType != "" {
+		existingBill.BillType = input.BillType
+	}
+	if input.AcademicYearID != nil {
+		existingBill.AcademicYearID = input.AcademicYearID
+	}
+	if input.TransactionCodeID != nil {
+		existingBill.TransactionCodeID = input.TransactionCodeID
+	}
+	existingBill.IsInstallment = input.IsInstallment
+
+	if err := u.financeRepo.UpdateBill(existingBill); err != nil {
+		return err
+	}
+
+	// If linked to an obligation, sync title/amount if unpaid
+	if existingBill.ObligationID != nil && u.studentObligationRepo != nil {
+		ob, err := u.studentObligationRepo.GetByID(*existingBill.ObligationID)
+		if err == nil && ob != nil && ob.PaidAmount == 0 {
+			ob.Amount = existingBill.Amount
+			_ = u.studentObligationRepo.Update(ob)
+		}
+	}
+
+	return nil
 }
 
 func (u *FinanceUsecase) GetBillByID(id string) (*domain.Bill, error) {
@@ -96,7 +139,59 @@ func (u *FinanceUsecase) GetBillByID(id string) (*domain.Bill, error) {
 }
 
 func (u *FinanceUsecase) DeleteBill(id string) error {
-	return u.financeRepo.DeleteBill(id)
+	bill, err := u.financeRepo.GetBillByID(id)
+	if err != nil || bill == nil {
+		return errors.New("tagihan tidak ditemukan")
+	}
+
+	// Calculate total paid amount from successful payments
+	paidAmount := 0.0
+	for _, p := range bill.Payments {
+		if p.Status == "Success" {
+			paidAmount += p.Amount
+		}
+	}
+
+	// Safety check: if payments have been made
+	if paidAmount > 0 || bill.Status == "Paid" || bill.Status == "Partial" {
+		if !u.isForceDeletePaidAllowed() {
+			return errors.New("tidak bisa menghapus tagihan yang sudah memiliki riwayat pembayaran. Aktifkan fitur 'Izinkan Hapus Tanggungan Terbayar' di Pengaturan Sekolah jika ingin menghapus paksa/koreksi")
+		}
+
+		// 1. Revert RKAS budget realization if transaction code exists
+		if u.budgetRepo != nil && bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 && paidAmount > 0 {
+			billingMonth := int(bill.DueDate.Month())
+			if bill.Obligation != nil && bill.Obligation.BillingMonth > 0 {
+				billingMonth = bill.Obligation.BillingMonth
+			}
+			_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*bill.TransactionCodeID, paidAmount, billingMonth)
+		}
+
+		// 2. Remove CashLedger entries (BKU)
+		if u.financeRepo != nil {
+			studentName := ""
+			if bill.Student.User.Name != "" {
+				studentName = bill.Student.User.Name
+			}
+			_ = u.financeRepo.DeleteCashLedgersForBill(bill.ObligationID, studentName, bill.Title, bill.TransactionCodeID)
+		}
+
+		// 3. If linked to an obligation, also clean up the obligation
+		if bill.ObligationID != nil && u.studentObligationRepo != nil {
+			_ = u.studentObligationRepo.Delete(*bill.ObligationID)
+		}
+	} else {
+		// Even for unpaid bill, if it's linked to an obligation, delete the obligation as well
+		if bill.ObligationID != nil && u.studentObligationRepo != nil {
+			_ = u.studentObligationRepo.Delete(*bill.ObligationID)
+		}
+	}
+
+	// Clean up child payments & items explicitly (in addition to DB cascade)
+	_ = u.financeRepo.DeletePaymentsByBillID(bill.ID.String())
+	_ = u.financeRepo.DeleteBillItemsByBillID(bill.ID.String())
+
+	return u.financeRepo.DeleteBill(bill.ID.String())
 }
 
 // Bill Templates

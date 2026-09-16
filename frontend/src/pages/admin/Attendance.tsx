@@ -10,6 +10,7 @@ import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
+import { useFeatureStore } from '../../store/featureStore';
 import AttendanceRFID from './AttendanceRFID';
 
 interface Student {
@@ -71,7 +72,14 @@ const AttendancePage: React.FC = () => {
     const { user } = useAuth();
     const { defaultUnitId } = useUnits();
     const unitID = user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId;
-    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule'>('scanner');
+    const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
+    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule'>(isRFIDEnabled ? 'scanner' : 'daily');
+
+    React.useEffect(() => {
+        if (!isRFIDEnabled && activeTab === 'scanner') {
+            setActiveTab('daily');
+        }
+    }, [isRFIDEnabled, activeTab]);
 
     // Schedule Tab States
     const [selectedClassID, setSelectedClassID] = useState<number | null>(null);
@@ -179,17 +187,19 @@ const AttendancePage: React.FC = () => {
             {/* Top Navigation Tabs */}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex space-x-1 bg-white/60 backdrop-blur-md rounded-2xl p-1.5 border border-slate-200 shadow-sm w-fit">
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab('scanner')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                            activeTab === 'scanner'
-                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                        }`}
-                    >
-                        <Radio size={16} /> Scanner RFID & NFC
-                    </button>
+                    {isRFIDEnabled && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('scanner')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                                activeTab === 'scanner'
+                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                            }`}
+                        >
+                            <Radio size={16} /> Scanner RFID & NFC
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => setActiveTab('daily')}
@@ -216,7 +226,7 @@ const AttendancePage: React.FC = () => {
             </div>
 
             {/* TAB 1: RFID & NFC Scanner */}
-            {activeTab === 'scanner' && <AttendanceRFID />}
+            {isRFIDEnabled && activeTab === 'scanner' && <AttendanceRFID />}
 
             {/* TAB 2: Rekap Presensi Harian */}
             {activeTab === 'daily' && (
@@ -293,7 +303,7 @@ const AttendancePage: React.FC = () => {
                             <TableGlass>
                                 <TableHeaderGlass>
                                     <TableRowGlass>
-                                        <TableHeadGlass>Waktu Tap</TableHeadGlass>
+                                        <TableHeadGlass>{isRFIDEnabled ? 'Waktu Tap' : 'Waktu Presensi'}</TableHeadGlass>
                                         <TableHeadGlass>Nama Siswa</TableHeadGlass>
                                         <TableHeadGlass>NISN</TableHeadGlass>
                                         <TableHeadGlass>Kelas</TableHeadGlass>
@@ -336,7 +346,7 @@ const AttendancePage: React.FC = () => {
                                                 </span>
                                             </TableCellGlass>
                                             <TableCellGlass className="text-xs font-mono text-slate-500">
-                                                {att.method || 'RFID'}
+                                                {att.method || (isRFIDEnabled ? 'RFID' : 'Manual')}
                                             </TableCellGlass>
                                         </TableRowGlass>
                                     ))}

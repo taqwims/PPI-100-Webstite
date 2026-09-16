@@ -13,6 +13,7 @@ type FinanceUsecase struct {
 	studentObligationRepo *postgres.StudentObligationRepository
 	activityRepo          *postgres.ActivityRepository
 	invoiceUsecase        InvoiceSignatureUsecase
+	schoolSettingRepo     *postgres.SchoolSettingRepository
 }
 
 func NewFinanceUsecase(
@@ -24,6 +25,7 @@ func NewFinanceUsecase(
 	studentObligationRepo *postgres.StudentObligationRepository,
 	activityRepo *postgres.ActivityRepository,
 	invoiceUsecase InvoiceSignatureUsecase,
+	schoolSettingRepo *postgres.SchoolSettingRepository,
 ) *FinanceUsecase {
 	return &FinanceUsecase{
 		financeRepo:           financeRepo,
@@ -34,5 +36,6 @@ func NewFinanceUsecase(
 		studentObligationRepo: studentObligationRepo,
 		activityRepo:          activityRepo,
 		invoiceUsecase:        invoiceUsecase,
+		schoolSettingRepo:     schoolSettingRepo,
 	}
 }

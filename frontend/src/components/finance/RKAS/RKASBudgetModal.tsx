@@ -143,15 +143,40 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
         return form.planned_amount;
     };
 
-    const matchingPaymentTypes = form.template_code_id 
-        ? paymentTypes.filter((pt: PaymentType) => pt.transaction_code_id === Number(form.template_code_id))
+    // Filter transaction codes based on budget_type (Pengeluaran vs Penerimaan)
+    const filteredCodes = transactionCodes.filter(tc => {
+        if (tc.description?.startsWith('RKAS Item: ')) return false;
+        if (form.budget_type === 'Pengeluaran') {
+            return tc.type === 'Expense' || tc.type === 'Pengeluaran';
+        }
+        return tc.type === 'Income' || tc.type === 'Penerimaan';
+    });
+
+    const masterFilteredCodes = filteredCodes.filter(tc => !tc.parent_code_id);
+
+    // Matching payment types: ONLY for Penerimaan, checks if pt.transaction_code_id matches template_code_id OR any child of template_code_id
+    const matchingPaymentTypes = (form.budget_type === 'Penerimaan' && form.template_code_id)
+        ? paymentTypes.filter((pt: PaymentType) => {
+            const selId = Number(form.template_code_id);
+            if (pt.transaction_code_id === selId) return true;
+            const childIds = transactionCodes.filter(c => c.parent_code_id === selId).map(c => c.id);
+            return pt.transaction_code_id !== null && childIds.includes(pt.transaction_code_id);
+        })
         : [];
 
     const handleSelectTemplateCode = (codeId: string) => {
-        const matches = codeId ? paymentTypes.filter((pt: PaymentType) => pt.transaction_code_id === Number(codeId)) : [];
+        const selId = Number(codeId);
+        const matches = (form.budget_type === 'Penerimaan' && selId)
+            ? paymentTypes.filter((pt: PaymentType) => {
+                if (pt.transaction_code_id === selId) return true;
+                const childIds = transactionCodes.filter(c => c.parent_code_id === selId).map(c => c.id);
+                return pt.transaction_code_id !== null && childIds.includes(pt.transaction_code_id);
+            })
+            : [];
         setSelectedPaymentTypeId('');
         
         let newForm = { ...form, template_code_id: codeId };
+        const selectedCodeObj = transactionCodes.find(tc => tc.id === selId);
 
         if (matches.length === 1) {
             const singlePt = matches[0];
@@ -162,6 +187,8 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
             if (!newForm.item_name) {
                 newForm.item_name = singlePt.name;
             }
+        } else if (selectedCodeObj && !newForm.item_name) {
+            newForm.item_name = selectedCodeObj.name;
         }
 
         setForm(newForm);
@@ -299,42 +326,91 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Jenis Anggaran</label>
                         <div className="flex bg-slate-100 p-1 rounded-xl">
-                            <button type="button" onClick={() => setForm({ ...form, budget_type: 'Pengeluaran' })}
-                                className={clsx("flex-1 py-1.5 text-sm font-medium rounded-lg transition", form.budget_type === 'Pengeluaran' ? "bg-white text-red-600 shadow-sm" : "text-slate-500")}>
-                                Pengeluaran
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setForm({ ...form, budget_type: 'Pengeluaran', template_code_id: '', item_name: '' });
+                                    setSelectedPaymentTypeId('');
+                                    setShowClassCalc(false);
+                                    setSelectedClassIds([]);
+                                    setExcludedStudentIds([]);
+                                }}
+                                className={clsx("flex-1 py-1.5 text-sm font-medium rounded-lg transition", form.budget_type === 'Pengeluaran' ? "bg-white text-red-600 shadow-sm" : "text-slate-500")}
+                            >
+                                Pengeluaran (Operasional / Gaji / Sarpras)
                             </button>
-                            <button type="button" onClick={() => setForm({ ...form, budget_type: 'Penerimaan' })}
-                                className={clsx("flex-1 py-1.5 text-sm font-medium rounded-lg transition", form.budget_type === 'Penerimaan' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500")}>
-                                Penerimaan
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setForm({ ...form, budget_type: 'Penerimaan', template_code_id: '', item_name: '' });
+                                    setSelectedPaymentTypeId('');
+                                }}
+                                className={clsx("flex-1 py-1.5 text-sm font-medium rounded-lg transition", form.budget_type === 'Penerimaan' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500")}
+                            >
+                                Penerimaan (Siswa / Infaq / Umum)
                             </button>
                         </div>
                     </div>
 
                     {/* Standar / Kode Transaksi Select */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Standar / Pos Keuangan (Wajib)</label>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-sm font-medium text-slate-700">
+                                Standar / Pos Keuangan <span className="text-red-500">*</span>
+                            </label>
+                            <span className="text-[11px] text-slate-400">
+                                {form.budget_type === 'Pengeluaran' ? 'Pos Beban & Belanja' : 'Pos Pemasukan'}
+                            </span>
+                        </div>
                         <select
                             value={form.template_code_id}
                             onChange={e => handleSelectTemplateCode(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 font-medium"
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-sm"
                             required
                             disabled={!!editingItem}
                         >
-                            <option value="">-- Pilih Standar Kode Transaksi --</option>
-                            {transactionCodes.filter(tc => !tc.description?.startsWith('RKAS Item: ')).map(tc => (
-                                <option key={tc.id} value={tc.id}>
-                                    [{tc.code}] {tc.name} ({tc.category})
-                                </option>
+                            <option value="">
+                                {form.budget_type === 'Pengeluaran'
+                                    ? '-- Pilih Pos Belanja / Pengeluaran --'
+                                    : '-- Pilih Pos Penerimaan --'}
+                            </option>
+                            {masterFilteredCodes.map(master => (
+                                <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
+                                    <option value={master.id}>
+                                        {master.code} — {master.name} (Induk)
+                                    </option>
+                                    {filteredCodes
+                                        .filter(child => child.parent_code_id === master.id)
+                                        .map(child => (
+                                            <option key={child.id} value={child.id}>
+                                                &nbsp;&nbsp;↳ {child.code} — {child.name}
+                                            </option>
+                                        ))}
+                                </optgroup>
                             ))}
+                            {filteredCodes.filter(tc => tc.parent_code_id === null && !masterFilteredCodes.find(m => m.id === tc.id)).length > 0 && (
+                                <optgroup label="Lainnya">
+                                    {filteredCodes.filter(tc => tc.parent_code_id === null).map(tc => (
+                                        <option key={tc.id} value={tc.id}>
+                                            {tc.code} — {tc.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
                         </select>
+                        <p className="mt-1 text-xs text-slate-400">
+                            {form.budget_type === 'Pengeluaran'
+                                ? 'Pilih pos akun belanja yang akan digunakan saat pencatatan kas/BKU.'
+                                : 'Pilih pos akun penerimaan (otomatis terhubung dengan tarif tagihan terkait).'}
+                        </p>
                     </div>
 
-                    {/* Auto-fill feedback / Multiple tariff options UI */}
-                    {matchingPaymentTypes.length === 1 && (
+                    {/* Auto-fill feedback / Multiple tariff options UI (Khusus Penerimaan) */}
+                    {form.budget_type === 'Penerimaan' && matchingPaymentTypes.length === 1 && (
                         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900 animate-in fade-in">
                             <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                             <div>
-                                <span className="font-bold">Tarif Otomatis Terdeteksi:</span>
+                                <span className="font-bold">Tarif Siswa Terdeteksi:</span>
                                 <p className="mt-0.5">
                                     Nominal terisi dari Jenis Pembayaran <strong>{matchingPaymentTypes[0].name}</strong> ({formatCurrency(matchingPaymentTypes[0].amount)}).
                                 </p>
@@ -342,19 +418,19 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                         </div>
                     )}
 
-                    {matchingPaymentTypes.length > 1 && (
+                    {form.budget_type === 'Penerimaan' && matchingPaymentTypes.length > 1 && (
                         <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-900 animate-in fade-in">
                             <div className="flex items-center gap-1.5 font-bold">
                                 <Sparkles size={15} className="text-amber-600" />
-                                <span>Pilih Acuan Tarif Jenis Pembayaran:</span>
+                                <span>Pilih Acuan Tarif Jenis Pembayaran Siswa:</span>
                             </div>
                             <p className="text-[11px] text-amber-700">
-                                Ditemukan {matchingPaymentTypes.length} tarif pembayaran yang terhubung dengan kode transaksi ini. Pilih salah satu untuk mengisi nominal otomatis:
+                                Ditemukan {matchingPaymentTypes.length} tarif pembayaran yang terhubung dengan pos ini. Pilih salah satu untuk mengisi nominal otomatis:
                             </p>
                             <select
                                 value={selectedPaymentTypeId}
                                 onChange={e => handleSelectPaymentTypeOption(e.target.value)}
-                                className="w-full px-3 py-2 border border-amber-300 rounded-lg bg-white font-semibold text-amber-950 focus:ring-2 focus:ring-amber-500"
+                                className="w-full px-3 py-2 border border-amber-300 rounded-lg bg-white font-semibold text-amber-950 focus:ring-2 focus:ring-amber-500 text-xs"
                             >
                                 <option value="">-- Gunakan Nominal Manual / Pilih Tarif --</option>
                                 {matchingPaymentTypes.map(pt => (
@@ -368,20 +444,41 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nama Item Anggaran</label>
-                        <input type="text" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-medium" placeholder="Contoh: SPP Siswa Kelas 1" required />
+                        <input
+                            type="text"
+                            value={form.item_name}
+                            onChange={e => setForm({ ...form, item_name: e.target.value })}
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-medium text-sm"
+                            placeholder={form.budget_type === 'Pengeluaran'
+                                ? "Contoh: Pengadaan ATK Kantor / Beban Listrik & Internet / Gaji Guru"
+                                : "Contoh: SPP Bulanan Siswa / Infaq Pembangunan"}
+                            required
+                        />
                     </div>
 
                     {/* Class & Student Calculation Card */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <div className={clsx(
+                        "border rounded-2xl p-4 space-y-3 transition-colors",
+                        form.budget_type === 'Pengeluaran' ? "bg-slate-50 border-slate-200" : "bg-emerald-50/40 border-emerald-200/70"
+                    )}>
                         <div className="flex items-center justify-between">
                             <button
                                 type="button"
                                 onClick={() => setShowClassCalc(!showClassCalc)}
                                 className="flex items-center gap-2 text-xs font-bold text-slate-800 hover:text-emerald-700 transition"
                             >
-                                <Users size={16} className="text-emerald-600" />
-                                <span>Kalkulasi Qty Berdasarkan Jumlah Siswa & Kelas</span>
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Opsional</span>
+                                <Users size={16} className={form.budget_type === 'Pengeluaran' ? "text-slate-500" : "text-emerald-600"} />
+                                <span>
+                                    {form.budget_type === 'Pengeluaran'
+                                        ? "Kalkulasi Berdasarkan Siswa (Opsional — khusus belanja per-anak seperti Seragam/Buku)"
+                                        : "Kalkulasi Qty Berdasarkan Jumlah Siswa & Kelas"}
+                                </span>
+                                <span className={clsx(
+                                    "text-[10px] px-2 py-0.5 rounded-full font-bold",
+                                    form.budget_type === 'Pengeluaran' ? "bg-slate-200 text-slate-700" : "bg-emerald-100 text-emerald-800"
+                                )}>
+                                    {showClassCalc ? 'Aktif' : 'Opsional'}
+                                </span>
                             </button>
                             {selectedClassIds.length > 0 && (
                                 <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
@@ -612,14 +709,18 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Volume / Qty (Siswa/Item)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                {form.budget_type === 'Pengeluaran' ? 'Volume / Kuantitas (Bulan/Unit)' : 'Volume / Qty (Siswa/Unit)'}
+                            </label>
                             <input type="number" min={1} value={form.quantity} onChange={e => {
                                 const qty = Number(e.target.value);
                                 setForm(prev => ({ ...prev, quantity: qty, planned_amount: calcTotalPlanned(qty, prev.unit_price, prev.period, prev.months) }));
                             }} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-medium" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Harga Satuan (Rp)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                {form.budget_type === 'Pengeluaran' ? 'Estimasi Biaya / Satuan (Rp)' : 'Tarif Satuan (Rp)'}
+                            </label>
                             <input type="number" min={0} value={form.unit_price} onChange={e => {
                                 const price = Number(e.target.value);
                                 setForm(prev => ({ ...prev, unit_price: price, planned_amount: calcTotalPlanned(prev.quantity, price, prev.period, prev.months) }));

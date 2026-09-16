@@ -177,9 +177,12 @@ func (r *BudgetRepository) AddRealizationByTransactionCodeID(tcID uint, amount f
 		}
 
 		// Step 2: Find all related transaction code IDs
-		// Strategy A: Direct match + children via parent_code_id
+		// Strategy A: Direct match + children via parent_code_id + parent if this is a child
 		var tcIDs []uint
 		tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+		if tc.ParentCodeID != nil {
+			tcIDs = append(tcIDs, *tc.ParentCodeID)
+		}
 
 		// Step 3: Find budgets using those transaction code IDs
 		var budgets []domain.Budget
@@ -251,6 +254,9 @@ func (r *BudgetRepository) SubtractRealizationByTransactionCodeID(tcID uint, amo
 
 		var tcIDs []uint
 		tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+		if tc.ParentCodeID != nil {
+			tcIDs = append(tcIDs, *tc.ParentCodeID)
+		}
 
 		var budgets []domain.Budget
 		tx.Where("transaction_code_id IN ?", tcIDs).Order("month desc, created_at desc").Find(&budgets)

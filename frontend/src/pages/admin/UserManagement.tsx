@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
 import clsx from 'clsx';
 import { ParentManagement } from '../../components/admin/UserManagement/ParentManagement';
+import { useFeatureStore } from '../../store/featureStore';
 import toast from 'react-hot-toast';
 
 interface ParentRecord {
@@ -106,6 +107,7 @@ const UserManagement: React.FC = () => {
     const { user } = useAuth();
     const { units: activeUnits, getUnitName, defaultUnitId } = useUnits();
     const queryClient = useQueryClient();
+    const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editingStudentRecord, setEditingStudentRecord] = useState<StudentRecord | null>(null);
@@ -521,7 +523,7 @@ const UserManagement: React.FC = () => {
                                 <th className="px-5 py-3 font-medium">Nama</th>
                                 <th className="px-5 py-3 font-medium">Email</th>
                                 <th className="px-5 py-3 font-medium">Role</th>
-                                {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">RFID</th>}
+                                {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && <th className="px-5 py-3 font-medium">RFID</th>}
                                 {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Kelas</th>}
                                 {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Orang Tua</th>}
                                 <th className="px-5 py-3 font-medium">Unit</th>
@@ -530,9 +532,9 @@ const UserManagement: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
-                                <tr><td colSpan={9} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
+                                <tr><td colSpan={(activeTab === 0 || activeTab === 6) ? (isRFIDEnabled ? 9 : 8) : 6} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
                             ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan={9} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
+                                <tr><td colSpan={(activeTab === 0 || activeTab === 6) ? (isRFIDEnabled ? 9 : 8) : 6} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
                             ) : filteredUsers.map((u: User, idx: number) => {
                                 const parentName = getStudentParentName(u);
                                 const studentRfid = u.student?.rfid || allStudents?.find(s => s.user_id === u.id)?.rfid;
@@ -553,7 +555,7 @@ const UserManagement: React.FC = () => {
                                                 {getRoleName(u.role_id)}
                                             </span>
                                         </td>
-                                        {(activeTab === 0 || activeTab === 6) && (
+                                        {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && (
                                             <td className="px-5 py-3 text-sm">
                                                 {u.role_id === 6 ? (
                                                     studentRfid ? (
@@ -679,19 +681,21 @@ const UserManagement: React.FC = () => {
                             {formData.role_id === 6 && (
                                 <div className="space-y-4 pt-4 border-t border-slate-200">
                                     <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
-                                        <CreditCard size={16} className="text-blue-600" /> Data Siswa & RFID
+                                        <CreditCard size={16} className="text-blue-600" /> {isRFIDEnabled ? 'Data Siswa & RFID' : 'Data Siswa'}
                                     </h4>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className={isRFIDEnabled ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">NISN</label>
                                             <input type="text" value={formData.nisn} onChange={e => setFormData({ ...formData, nisn: e.target.value })}
                                                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" placeholder="NISN" />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Nomor / UID RFID</label>
-                                            <input type="text" value={formData.rfid} onChange={e => setFormData({ ...formData, rfid: e.target.value })}
-                                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono" placeholder="Contoh: 04A1B2C3" />
-                                        </div>
+                                        {isRFIDEnabled && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Nomor / UID RFID</label>
+                                                <input type="text" value={formData.rfid} onChange={e => setFormData({ ...formData, rfid: e.target.value })}
+                                                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono" placeholder="Contoh: 04A1B2C3" />
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="grid grid-cols-1 gap-4">
                                         <div>

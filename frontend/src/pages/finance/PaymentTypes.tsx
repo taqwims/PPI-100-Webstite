@@ -222,11 +222,22 @@ const PaymentTypes = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         {pt.transaction_code ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 text-green-700 font-mono text-xs font-medium">
-                                                <Tag size={12} />{pt.transaction_code.code} — {pt.transaction_code.name}
-                                            </span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 text-green-700 font-mono text-xs font-medium">
+                                                    <Tag size={12} />{pt.transaction_code.code} — {pt.transaction_code.name}
+                                                </span>
+                                                {pt.transaction_code.parent_code_id ? (
+                                                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-semibold">
+                                                        ↳ Turunan
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded font-medium">
+                                                        Induk
+                                                    </span>
+                                                )}
+                                            </div>
                                         ) : (
-                                            <span className="text-xs text-slate-400 italic">Belum ada</span>
+                                            <span className="text-xs text-amber-600 italic font-medium">Belum dipetakan</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right font-semibold text-slate-800">{formatCurrency(pt.amount)}</td>

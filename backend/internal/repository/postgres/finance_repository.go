@@ -128,6 +128,38 @@ func (r *FinanceRepository) DeleteCashLedgersForObligation(obligationID uuid.UUI
 	return q.Where(orClause, args...).Delete(&domain.CashLedger{}).Error
 }
 
+func (r *FinanceRepository) DeleteCashLedgersForBill(obligationID *uuid.UUID, studentName string, billTitle string, tcID *uint) error {
+	if obligationID != nil {
+		res := r.db.Where("obligation_id = ?", *obligationID).Delete(&domain.CashLedger{})
+		if res.Error == nil && res.RowsAffected > 0 {
+			return nil
+		}
+	}
+
+	q := r.db.Where("type = ?", "Income")
+	if tcID != nil && *tcID > 0 {
+		q = q.Where("transaction_code_id = ?", *tcID)
+	}
+
+	var conditions []string
+	var args []interface{}
+
+	if billTitle != "" {
+		conditions = append(conditions, "item_name LIKE ?")
+		args = append(args, "%"+billTitle+"%")
+	}
+	if studentName != "" {
+		conditions = append(conditions, "source = ?")
+		args = append(args, studentName)
+	}
+
+	if len(conditions) > 0 {
+		orClause := "(" + strings.Join(conditions, " OR ") + ")"
+		return q.Where(orClause, args...).Delete(&domain.CashLedger{}).Error
+	}
+	return nil
+}
+
 func (r *FinanceRepository) GetBillByID(id string) (*domain.Bill, error) {
 	var bill domain.Bill
 	err := r.db.Where("id = ?", id).
@@ -339,6 +371,10 @@ func (r *FinanceRepository) RecordPaymentAtomically(
 
 			var tcIDs []uint
 			tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", *tcID, *tcID).Pluck("id", &tcIDs)
+			var currentTC domain.TransactionCode
+			if err := tx.First(&currentTC, "id = ?", *tcID).Error; err == nil && currentTC.ParentCodeID != nil {
+				tcIDs = append(tcIDs, *currentTC.ParentCodeID)
+			}
 
 			var budgets []domain.Budget
 			if err := tx.Where("transaction_code_id IN ?", tcIDs).Order("month asc, created_at asc").Find(&budgets).Error; err == nil && len(budgets) > 0 {
@@ -422,6 +458,10 @@ func (r *FinanceRepository) ApprovePaymentAtomically(
 
 			var tcIDs []uint
 			tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", *tcID, *tcID).Pluck("id", &tcIDs)
+			var currentTC domain.TransactionCode
+			if err := tx.First(&currentTC, "id = ?", *tcID).Error; err == nil && currentTC.ParentCodeID != nil {
+				tcIDs = append(tcIDs, *currentTC.ParentCodeID)
+			}
 
 			var budgets []domain.Budget
 			if err := tx.Where("transaction_code_id IN ?", tcIDs).Order("month asc, created_at asc").Find(&budgets).Error; err == nil && len(budgets) > 0 {

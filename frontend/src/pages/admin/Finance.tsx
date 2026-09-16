@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { generateBillReceipt } from '../../utils/pdfUtils';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
+import { useFeatureStore } from '../../store/featureStore';
 
 interface Student {
     id: string;
@@ -118,6 +119,7 @@ const Finance: React.FC = () => {
     const { units, defaultUnitId } = useUnits();
     const [unitID, setUnitID] = useState(getDefaultUnitID(user?.role_id, user?.unit_id, defaultUnitId));
     const queryClient = useQueryClient();
+    const isForceDeleteAllowed = useFeatureStore(s => s.school.allow_delete_paid_obligations === 'true');
     
     // UI States
     const [showForm, setShowForm] = useState(false);
@@ -254,6 +256,16 @@ const Finance: React.FC = () => {
     };
 
     const handleDelete = (id: string) => {
+        const target = bills?.find((b: Bill) => b.id === id);
+        const hasPayment = target && (
+            target.status === 'Paid' ||
+            target.status === 'Partial' ||
+            target.payments?.some((p: Payment) => p.status === 'Success')
+        );
+        if (hasPayment && !isForceDeleteAllowed) {
+            toast.error("Tidak bisa menghapus tagihan terbayar. Aktifkan fitur 'Izinkan Hapus Tanggungan Terbayar' di Pengaturan Sekolah jika ingin menghapus paksa/koreksi.");
+            return;
+        }
         deleteBillMutation.mutate(id);
     };
 
@@ -389,6 +401,16 @@ const Finance: React.FC = () => {
                 </div>
             </div>
 
+            {isForceDeleteAllowed && (
+                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs shadow-sm">
+                    <span className="text-base">⚠️</span>
+                    <div>
+                        <p className="font-bold">Mode Koreksi Transaksi Sedang Aktif</p>
+                        <p className="text-amber-700 mt-0.5">Penghapusan tagihan yang sudah terbayar diperbolehkan oleh Admin. Menghapus tagihan terbayar akan otomatis membatalkan riwayat pembayaran, menghapus catatan kas BKU, dan memotong kembali realisasi RKAS.</p>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     {isLoading ? (
@@ -468,20 +490,29 @@ const Finance: React.FC = () => {
                                                                 <button onClick={() => openAdminPayModal(bill, true)} className="flex items-center text-xs px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-medium transition gap-1 whitespace-nowrap">
                                                                     <ShieldCheck size={12} /> Verifikasi
                                                                 </button>
+                                                                <button onClick={() => setConfirmDelete(bill.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition hover:bg-red-50 rounded-lg" title="Hapus Tagihan">
+                                                                    <Trash2 size={16} />
+                                                                </button>
                                                             </>
                                                         ) : (
                                                             <>
                                                                 <button onClick={() => openAdminPayModal(bill, false)} className="flex items-center text-xs px-2.5 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium transition whitespace-nowrap">
                                                                     <DollarSign size={14} className="mr-0.5" /> Bayar
                                                                 </button>
-                                                                <button onClick={() => handleEdit(bill)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition hover:bg-indigo-50 rounded-lg">
+                                                                <button onClick={() => handleEdit(bill)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition hover:bg-indigo-50 rounded-lg" title="Edit Tagihan">
                                                                     <Edit size={16} />
                                                                 </button>
-                                                                <button onClick={() => setConfirmDelete(bill.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition hover:bg-red-50 rounded-lg">
+                                                                <button onClick={() => setConfirmDelete(bill.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition hover:bg-red-50 rounded-lg" title="Hapus Tagihan">
                                                                     <Trash2 size={16} />
                                                                 </button>
                                                             </>
                                                         )
+                                                    )}
+
+                                                    {bill.status === 'Paid' && isForceDeleteAllowed && (
+                                                        <button onClick={() => setConfirmDelete(bill.id)} className="p-1.5 text-rose-500 hover:text-rose-700 transition hover:bg-rose-50 rounded-lg" title="Mode Koreksi: Hapus Tagihan Terbayar">
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     )}
                                                 </div>
                                             </td>
@@ -762,13 +793,30 @@ const Finance: React.FC = () => {
                 </div>
             )}
 
-            <ConfirmDialog
-                isOpen={!!confirmDelete}
-                onClose={() => setConfirmDelete(null)}
-                onConfirm={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}
-                title="Hapus Tagihan"
-                message="Yakin ingin menghapus tagihan ini? Tindakan ini tidak bisa dibatalkan."
-            />
+            {(() => {
+                const targetDeleteBill = bills?.find((b: Bill) => b.id === confirmDelete);
+                const hasPayment = targetDeleteBill && (
+                    targetDeleteBill.status === 'Paid' ||
+                    targetDeleteBill.status === 'Partial' ||
+                    targetDeleteBill.payments?.some((p: Payment) => p.status === 'Success')
+                );
+
+                const deleteConfirmMsg = hasPayment
+                    ? (isForceDeleteAllowed
+                        ? `⚠️ PERINGATAN KOREKSI TRANSAKSI:\n\nTagihan "${targetDeleteBill?.title}" SUDAH MEMILIKI PEMBAYARAN.\n\nMenghapus tagihan ini akan secara otomatis:\n1. Menghapus riwayat transaksi pembayaran (Payment)\n2. Menghapus pencatatan pemasukan di Buku Kas Umum (BKU)\n3. Membatalkan & memotong kembali realisasi anggaran RKAS terkait\n\nApakah Anda yakin ingin melanjutkan penghapusan tagihan ini?`
+                        : `Tagihan "${targetDeleteBill?.title}" memiliki pembayaran berhasil. Safe Mode aktif sehingga penghapusan tidak diizinkan. Silakan aktifkan 'Izinkan Hapus Tanggungan Terbayar' di Pengaturan Sekolah jika ingin melakukan koreksi.`)
+                    : "Yakin ingin menghapus tagihan ini? Tindakan ini tidak bisa dibatalkan.";
+
+                return (
+                    <ConfirmDialog
+                        isOpen={!!confirmDelete}
+                        onClose={() => setConfirmDelete(null)}
+                        onConfirm={() => { if (confirmDelete) handleDelete(confirmDelete); setConfirmDelete(null); }}
+                        title={hasPayment && isForceDeleteAllowed ? "Koreksi: Hapus Tagihan Terbayar" : "Hapus Tagihan"}
+                        message={deleteConfirmMsg}
+                    />
+                );
+            })()}
 
             <PrintOptionsModal 
                 isOpen={isPrintModalOpen}

@@ -64,7 +64,7 @@ const FinancialMasterHub: React.FC = () => {
                             <Tag size={16} className={activeTab === 'codes' ? "text-indigo-600" : "text-slate-400"} />
                         </div>
                         <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition">1. Kode Transaksi</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Buat pos standar master keuangan (misal: SPP, ATK)</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Kode Induk & Turunan untuk Belanja Operasional, Gaji, dan Penerimaan</p>
                     </button>
 
                     {/* Step 2 */}
@@ -82,8 +82,8 @@ const FinancialMasterHub: React.FC = () => {
                             </span>
                             <CreditCard size={16} className={activeTab === 'types' ? "text-emerald-600" : "text-slate-400"} />
                         </div>
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition">2. Jenis Pembayaran</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Atur tarif tagihan siswa & hubungkan ke Kode Pos</p>
+                        <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition">2. Tarif Tagihan Siswa</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Atur tarif SPP/biaya per jenjang & hubungkan ke Kode Transaksi</p>
                     </button>
 
                     {/* Step 3 */}
@@ -102,7 +102,7 @@ const FinancialMasterHub: React.FC = () => {
                             <Link2 size={16} className={activeTab === 'mapping' ? "text-teal-600" : "text-slate-400"} />
                         </div>
                         <p className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition">3. Matriks Pemetaan</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Verifikasi keterhubungan 3 arah (Jenis ➔ Kode ➔ RKAS)</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Cek alur Siswa, Belanja Operasional, dan Infaq ke RKAS secara cerdas</p>
                     </button>
 
                     {/* Step 4 */}
@@ -121,7 +121,7 @@ const FinancialMasterHub: React.FC = () => {
                             <BarChart2 size={16} className={activeTab === 'rkas' ? "text-amber-600" : "text-slate-400"} />
                         </div>
                         <p className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition">4. Realisasi RKAS</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Atur target RKAS & pantau realisasi otomatis secara live</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Pantau anggaran vs realisasi live dari BKU kas dan pembayaran siswa</p>
                     </button>
                 </div>
             </div>
