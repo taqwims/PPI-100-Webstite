@@ -223,21 +223,17 @@ const PaymentTypes = () => {
                                     <td className="px-6 py-4">
                                         {pt.transaction_code ? (
                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 text-green-700 font-mono text-xs font-medium">
-                                                    <Tag size={12} />{pt.transaction_code.code} — {pt.transaction_code.name}
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-mono text-xs font-semibold border border-emerald-200/70">
+                                                    <Tag size={12} className="text-emerald-600" />{pt.transaction_code.code} — {pt.transaction_code.name}
                                                 </span>
-                                                {pt.transaction_code.parent_code_id ? (
-                                                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-semibold">
-                                                        ↳ Turunan
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded font-medium">
-                                                        Induk
-                                                    </span>
-                                                )}
+                                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                                                    Terhubung RKAS
+                                                </span>
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-amber-600 italic font-medium">Belum dipetakan</span>
+                                            <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md italic font-semibold">
+                                                Belum terhubung ke RKAS
+                                            </span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right font-semibold text-slate-800">{formatCurrency(pt.amount)}</td>
@@ -296,18 +292,23 @@ const PaymentTypes = () => {
                                 </div>
                             </div>
 
-                            {/* Kode Transaksi - WAJIB */}
+                            {/* Kode Transaksi / Pos RKAS - WAJIB */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Kode Transaksi <span className="text-red-500">*</span>
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-semibold text-slate-800">
+                                        Pos Akun RKAS & BKU <span className="text-red-500">*</span>
+                                    </label>
+                                    <span className="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">
+                                        Integrasi Otomatis
+                                    </span>
+                                </div>
                                 <select
                                     value={form.transaction_code_id}
                                     onChange={e => setForm({ ...form, transaction_code_id: e.target.value })}
-                                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+                                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500"
                                     required
                                 >
-                                    <option value="">Pilih Kode Transaksi</option>
+                                    <option value="">-- Pilih Pos Akun Penerimaan / RKAS --</option>
                                     {masterTransactionCodes.map(tc => (
                                         <optgroup key={tc.id} label={`${tc.code} — ${tc.name}`}>
                                             <option value={tc.id}>
@@ -333,7 +334,9 @@ const PaymentTypes = () => {
                                         </optgroup>
                                     )}
                                 </select>
-                                <p className="mt-1 text-xs text-slate-400">Wajib dipilih untuk menghubungkan ke Buku Kas Umum</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Wajib dipilih agar setiap pembayaran siswa otomatis tercatat di <strong>Buku Kas Umum</strong> dan merealisasikan pos anggaran <strong>RKAS Penerimaan</strong>.
+                                </p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

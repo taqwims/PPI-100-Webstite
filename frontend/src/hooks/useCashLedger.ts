@@ -39,6 +39,7 @@ export const useCashLedger = () => {
     const [itemsPerPage, setItemsPerPage] = useState<number>(20);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [selectedSemester, setSelectedSemester] = useState<string>('all');
+    const [filterTransactionCodeId, setFilterTransactionCodeId] = useState<string>('all');
 
     // Export modal state
     const [showExportModal, setShowExportModal] = useState(false);
@@ -210,7 +211,11 @@ export const useCashLedger = () => {
                 e.source?.toLowerCase().includes(q) ||
                 e.notes?.toLowerCase().includes(q) ||
                 e.category?.toLowerCase().includes(q) ||
-                e.responsible?.name?.toLowerCase().includes(q)
+                e.responsible?.name?.toLowerCase().includes(q) ||
+                e.transaction_code?.code?.toLowerCase().includes(q) ||
+                e.transaction_code?.name?.toLowerCase().includes(q) ||
+                e.transaction_code?.parent_code?.code?.toLowerCase().includes(q) ||
+                e.transaction_code?.parent_code?.name?.toLowerCase().includes(q)
             )) match = false;
         }
         if (filterStartDate && e.date.split('T')[0] < filterStartDate) match = false;
@@ -220,6 +225,12 @@ export const useCashLedger = () => {
             const isSem1 = month >= 7 && month <= 12; // Jul-Dec
             if (selectedSemester === '1' && !isSem1) match = false;
             if (selectedSemester === '2' && isSem1) match = false;
+        }
+        if (filterTransactionCodeId !== 'all') {
+            const targetId = Number(filterTransactionCodeId);
+            const tcMatches = e.transaction_code_id === targetId ||
+                              e.transaction_code?.parent_code_id === targetId;
+            if (!tcMatches) match = false;
         }
         return match;
     });
@@ -251,6 +262,7 @@ export const useCashLedger = () => {
         filterStartDate, setFilterStartDate,
         filterEndDate, setFilterEndDate,
         selectedSemester, setSelectedSemester,
+        filterTransactionCodeId, setFilterTransactionCodeId,
         sortOrder, setSortOrder,
         itemsPerPage, setItemsPerPage,
         currentPage, setCurrentPage,

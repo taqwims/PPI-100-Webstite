@@ -1,5 +1,5 @@
-import React from 'react';
-import { Briefcase, Tag, UserCheck, FileText } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Briefcase, Tag, UserCheck, FileText, Search, Layers, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 import clsx from 'clsx';
 import { StaffUser, TransactionCode, CashLedgerEntry } from '../../../types/cashLedgerTypes';
 
@@ -26,6 +26,58 @@ const CashLedgerFormModal: React.FC<Props> = ({
   handleTransactionCodeChange,
   transactionCodes, staffList
 }) => {
+  const [codeSearch, setCodeSearch] = useState('');
+  const [showAllTypes, setShowAllTypes] = useState(false);
+
+  // Selected Transaction Code & its parent (if child)
+  const selectedTC = useMemo(() => {
+    if (!formData.transaction_code_id) return null;
+    return transactionCodes.find(tc => String(tc.id) === String(formData.transaction_code_id)) || null;
+  }, [formData.transaction_code_id, transactionCodes]);
+
+  const parentTC = useMemo(() => {
+    if (!selectedTC || !selectedTC.parent_code_id) return null;
+    return transactionCodes.find(tc => tc.id === selectedTC.parent_code_id) || selectedTC.parent_code || null;
+  }, [selectedTC, transactionCodes]);
+
+  // Filter transaction codes based on active type and search term
+  const matchingCodes = useMemo(() => {
+    return transactionCodes.filter(tc => {
+      if (!tc.is_active) return false;
+      
+      // Type matching unless showAllTypes is toggled
+      if (!showAllTypes) {
+        if (formData.type === 'Expense' && !(tc.type === 'Expense' || tc.type === 'Pengeluaran')) return false;
+        if (formData.type === 'Income' && !(tc.type === 'Income' || tc.type === 'Penerimaan')) return false;
+      }
+
+      // Search matching
+      if (codeSearch.trim()) {
+        const q = codeSearch.toLowerCase();
+        const matchesSelf = tc.code.toLowerCase().includes(q) ||
+                            tc.name.toLowerCase().includes(q) ||
+                            tc.category.toLowerCase().includes(q) ||
+                            (tc.description && tc.description.toLowerCase().includes(q));
+        return matchesSelf;
+      }
+
+      return true;
+    });
+  }, [transactionCodes, formData.type, showAllTypes, codeSearch]);
+
+  // Relevant master codes that either match or have matching children
+  const relevantMasters = useMemo(() => {
+    const matchingIds = new Set(matchingCodes.map(c => c.id));
+    return transactionCodes.filter(tc => {
+      if (!tc.is_active || tc.parent_code_id) return false;
+      // If master itself matches
+      if (matchingIds.has(tc.id)) return true;
+      // If any child matches
+      const hasMatchingChild = transactionCodes.some(c => c.parent_code_id === tc.id && matchingIds.has(c.id));
+      return hasMatchingChild;
+    });
+  }, [transactionCodes, matchingCodes]);
+
   if (!showModal) return null;
 
   return (
@@ -66,29 +118,109 @@ const CashLedgerFormModal: React.FC<Props> = ({
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            <span className="flex items-center gap-1.5"><Tag size={14} className="text-green-500" /> Kode Transaksi</span>
-                        </label>
-                        <select
-                            name="transaction_code_id"
-                            value={formData.transaction_code_id}
-                            onChange={e => handleTransactionCodeChange(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
-                        >
-                            <option value="">-- Pilih Kode Transaksi --</option>
-                            {transactionCodes.filter(tc => tc.is_active && !tc.parent_code_id).map(master => (
-                                <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
-                                    <option value={master.id}>{master.code} — {master.name}</option>
-                                    {transactionCodes.filter(c => c.parent_code_id === master.id && c.is_active).map(child => (
-                                        <option key={child.id} value={child.id}>&nbsp;&nbsp;↳ {child.code} — {child.name}</option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
-                        {formData.transaction_code_id && (
-                            <p className="text-xs text-slate-500 mt-1">
-                                Kategori: <span className="font-medium text-slate-700">{formData.category}</span> | 
-                                Tipe: <span className="font-medium text-slate-700">{formData.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}</span>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="block text-sm font-semibold text-slate-700">
+                                <span className="flex items-center gap-1.5"><Tag size={14} className="text-blue-600" /> Pos Akun / Kode Transaksi (RKAS)</span>
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setShowAllTypes(!showAllTypes)}
+                                className="text-[11px] text-blue-600 hover:text-blue-800 underline font-medium"
+                            >
+                                {showAllTypes ? 'Filter Tipe Aktif' : 'Tampilkan Semua Pos'}
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            {/* Search box for codes */}
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari kode akun / rincian pos (contoh: listrik, gaji, ATK)..."
+                                    value={codeSearch}
+                                    onChange={e => setCodeSearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                                />
+                                {codeSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setCodeSearch('')}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            <select
+                                name="transaction_code_id"
+                                value={formData.transaction_code_id}
+                                onChange={e => handleTransactionCodeChange(e.target.value)}
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm font-medium bg-white"
+                            >
+                                <option value="">-- Pilih Pos Akun / Kode Transaksi --</option>
+                                {relevantMasters.map(master => {
+                                    const children = matchingCodes.filter(c => c.parent_code_id === master.id && c.is_active);
+                                    return (
+                                        <optgroup key={master.id} label={`📁 [${master.code}] ${master.name} (${master.type === 'Income' ? 'Penerimaan' : 'Pengeluaran'})`}>
+                                            <option value={master.id}>
+                                                📁 [${master.code}] ${master.name} (Induk - ${master.category})
+                                            </option>
+                                            {children.map(child => (
+                                                <option key={child.id} value={child.id}>
+                                                    &nbsp;&nbsp;&nbsp;&nbsp;↳ 📄 [${child.code}] ${child.name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    );
+                                })}
+                            </select>
+                        </div>
+
+                        {/* Selected Hierarchy & Path Breakdown */}
+                        {selectedTC ? (
+                            selectedTC.parent_code_id ? (
+                                <div className="mt-2.5 p-3.5 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 border border-blue-200/80 rounded-2xl text-xs space-y-1.5 shadow-sm">
+                                    <div className="flex items-center gap-1.5 font-bold text-blue-900">
+                                        <Layers size={14} className="text-blue-600 shrink-0" />
+                                        <span>Jalur Aliran Pos Anggaran:</span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 text-slate-700 bg-white/80 p-2 rounded-xl border border-blue-100 font-medium">
+                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded-lg text-[11px] font-bold">
+                                            📁 Induk: {parentTC ? `[${parentTC.code}] ${parentTC.name}` : `Pos Induk #${selectedTC.parent_code_id}`}
+                                        </span>
+                                        <ArrowRight size={13} className="text-blue-500 shrink-0" />
+                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-lg text-[11px] font-bold">
+                                            📄 Sub-Pos: [${selectedTC.code}] ${selectedTC.name}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-600">
+                                        <span>Kategori: <strong className="text-slate-800">{selectedTC.category}</strong></span>
+                                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                            <CheckCircle2 size={12} /> Otomatis Merealisasikan RKAS
+                                        </span>
+                                    </div>
+                                    {selectedTC.description && (
+                                        <p className="text-[11px] text-slate-500 italic mt-0.5">
+                                            Catatan: {selectedTC.description}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="mt-2.5 p-3 bg-amber-50/90 border border-amber-200/80 rounded-2xl text-xs space-y-1 shadow-sm">
+                                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                                        <Info size={14} className="text-amber-600 shrink-0" />
+                                        <span>Pos Akun Induk: [${selectedTC.code}] ${selectedTC.name} ({selectedTC.category})</span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-800">
+                                        Ini adalah pos induk. Jika pengeluaran ini memiliki rincian belanja spesifik, Anda juga dapat memilih <strong>sub-pos / anak kode</strong> agar pembukuan lebih rinci.
+                                    </p>
+                                </div>
+                            )
+                        ) : (
+                            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                <Info size={12} /> Pilih pos akun untuk menghubungkan transaksi kas ini dengan realisasi anggaran RKAS.
                             </p>
                         )}
                     </div>

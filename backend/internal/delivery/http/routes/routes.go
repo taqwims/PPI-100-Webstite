@@ -101,18 +101,18 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase, xenditUsecase, mayarUsecase)
 
+	// Transaction Code
+	transactionCodeRepo := postgres.NewTransactionCodeRepository(db)
+	transactionCodeUsecase := usecase.NewTransactionCodeUsecase(transactionCodeRepo)
+	transactionCodeHandler := handlers.NewTransactionCodeHandler(transactionCodeUsecase)
+
 	payrollRepo := postgres.NewPayrollRepository(db)
-	payrollUsecase := usecase.NewPayrollUsecase(payrollRepo, userRepo, financeRepo)
+	payrollUsecase := usecase.NewPayrollUsecase(payrollRepo, userRepo, financeRepo, budgetRepo, transactionCodeRepo)
 	payrollHandler := handlers.NewPayrollHandler(payrollUsecase)
 
 	financeExtendedRepo := postgres.NewFinanceExtendedRepository(db)
 	financeExtendedUsecase := usecase.NewFinanceExtendedUsecase(financeExtendedRepo, budgetRepo)
 	financeExtendedHandler := handlers.NewFinanceExtendedHandler(financeExtendedUsecase)
-
-	// Transaction Code
-	transactionCodeRepo := postgres.NewTransactionCodeRepository(db)
-	transactionCodeUsecase := usecase.NewTransactionCodeUsecase(transactionCodeRepo)
-	transactionCodeHandler := handlers.NewTransactionCodeHandler(transactionCodeUsecase)
 
 	// Budget / RKAS
 	budgetUsecase := usecase.NewBudgetUsecase(budgetRepo, notificationUsecase, userRepo, transactionCodeRepo)

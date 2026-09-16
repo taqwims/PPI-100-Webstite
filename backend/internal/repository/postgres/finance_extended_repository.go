@@ -312,21 +312,33 @@ func (r *financeExtendedRepository) AddCashLedgerEntry(req *domain.CashLedger) e
 
 func (r *financeExtendedRepository) GetCashLedger() ([]domain.CashLedger, error) {
 	var entries []domain.CashLedger
-	if err := r.db.Preload("Responsible").Order("date desc").Find(&entries).Error; err != nil {
+	if err := r.db.Preload("Responsible").Preload("TransactionCode").Preload("TransactionCode.ParentCode").Order("date desc").Find(&entries).Error; err != nil {
 		return nil, err
 	}
 	return entries, nil
 }
 
+func (r *financeExtendedRepository) GetCashLedgerByID(id string) (*domain.CashLedger, error) {
+	var entry domain.CashLedger
+	if err := r.db.Preload("TransactionCode").Preload("TransactionCode.ParentCode").First(&entry, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
 func (r *financeExtendedRepository) UpdateCashLedgerEntry(req *domain.CashLedger) error {
-	return r.db.Model(&domain.CashLedger{}).Where("id = ?", req.ID).Updates(map[string]interface{}{
+	updates := map[string]interface{}{
 		"source":    req.Source,
 		"item_name": req.ItemName,
 		"type":      req.Type,
 		"amount":    req.Amount,
 		"category":  req.Category,
 		"notes":     req.Notes,
-	}).Error
+	}
+	if req.TransactionCodeID != nil {
+		updates["transaction_code_id"] = req.TransactionCodeID
+	}
+	return r.db.Model(&domain.CashLedger{}).Where("id = ?", req.ID).Updates(updates).Error
 }
 
 func (r *financeExtendedRepository) DeleteCashLedgerEntry(id string) error {
@@ -339,18 +351,30 @@ func (r *financeExtendedRepository) AddDailyInfaqEntry(req *domain.DailyInfaq) e
 
 func (r *financeExtendedRepository) GetDailyInfaq() ([]domain.DailyInfaq, error) {
 	var entries []domain.DailyInfaq
-	if err := r.db.Preload("HandledBy").Preload("Responsible").Order("date desc").Find(&entries).Error; err != nil {
+	if err := r.db.Preload("HandledBy").Preload("Responsible").Preload("TransactionCode").Order("date desc").Find(&entries).Error; err != nil {
 		return nil, err
 	}
 	return entries, nil
 }
 
+func (r *financeExtendedRepository) GetDailyInfaqByID(id string) (*domain.DailyInfaq, error) {
+	var entry domain.DailyInfaq
+	if err := r.db.Preload("TransactionCode").First(&entry, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
 func (r *financeExtendedRepository) UpdateDailyInfaqEntry(req *domain.DailyInfaq) error {
-	return r.db.Model(&domain.DailyInfaq{}).Where("id = ?", req.ID).Updates(map[string]interface{}{
+	updates := map[string]interface{}{
 		"source": req.Source,
 		"amount": req.Amount,
 		"notes":  req.Notes,
-	}).Error
+	}
+	if req.TransactionCodeID != nil {
+		updates["transaction_code_id"] = req.TransactionCodeID
+	}
+	return r.db.Model(&domain.DailyInfaq{}).Where("id = ?", req.ID).Updates(updates).Error
 }
 
 func (r *financeExtendedRepository) DeleteDailyInfaqEntry(id string) error {

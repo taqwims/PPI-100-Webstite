@@ -11,13 +11,23 @@ type PayrollUsecase struct {
 	payrollRepo *postgres.PayrollRepository
 	userRepo    *postgres.UserRepository
 	financeRepo *postgres.FinanceRepository
+	budgetRepo  *postgres.BudgetRepository
+	tcRepo      *postgres.TransactionCodeRepository
 }
 
-func NewPayrollUsecase(payrollRepo *postgres.PayrollRepository, userRepo *postgres.UserRepository, financeRepo *postgres.FinanceRepository) *PayrollUsecase {
+func NewPayrollUsecase(
+	payrollRepo *postgres.PayrollRepository,
+	userRepo *postgres.UserRepository,
+	financeRepo *postgres.FinanceRepository,
+	budgetRepo *postgres.BudgetRepository,
+	tcRepo *postgres.TransactionCodeRepository,
+) *PayrollUsecase {
 	return &PayrollUsecase{
 		payrollRepo: payrollRepo,
 		userRepo:    userRepo,
 		financeRepo: financeRepo,
+		budgetRepo:  budgetRepo,
+		tcRepo:      tcRepo,
 	}
 }
 
@@ -120,16 +130,34 @@ func (u *PayrollUsecase) Pay(id string) error {
 		return err
 	}
 
+	// Cari kode transaksi untuk Gaji Pegawai
+	var gajiTCID *uint
+	if u.tcRepo != nil {
+		codes, _ := u.tcRepo.GetAll()
+		for _, tc := range codes {
+			if tc.Category == "Gaji" || tc.Name == "Gaji" || tc.Code == "B1" {
+				gajiTCID = &tc.ID
+				break
+			}
+		}
+	}
+
 	// Otomatis masukkan pengeluaran ke buku kas (CashLedger)
 	cashLedgerEntry := domain.CashLedger{
-		Date:     now,
-		Source:   "TATA USAHA",
-		ItemName: "Pembayaran Gaji - " + existing.EmployeeName,
-		Type:     "Expense",
-		Amount:   existing.NetSalary,
-		Category: "Gaji Pegawai",
+		Date:              now,
+		Source:            "TATA USAHA",
+		ItemName:          "Pembayaran Gaji - " + existing.EmployeeName,
+		Type:              "Expense",
+		Amount:            existing.NetSalary,
+		Category:          "Gaji Pegawai",
+		TransactionCodeID: gajiTCID,
 	}
 	_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
+
+	// Realisasi pos anggaran belanja gaji di RKAS
+	if gajiTCID != nil && u.budgetRepo != nil {
+		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*gajiTCID, existing.NetSalary, existing.PeriodMonth)
+	}
 
 	return nil
 }

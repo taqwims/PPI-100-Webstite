@@ -344,3 +344,114 @@ func (r *BudgetRepository) GetSummaryByYear(academicYearID uint) ([]map[string]i
 	}
 	return results, nil
 }
+
+// ------------------- Budget Reconcile -------------------
+
+func (r *BudgetRepository) Reconcile(academicYearID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var budgets []domain.Budget
+		query := tx.Model(&domain.Budget{})
+		if academicYearID > 0 {
+			query = query.Where("academic_year_id = ?", academicYearID)
+		}
+		if err := query.Find(&budgets).Error; err != nil {
+			return err
+		}
+
+		var ay domain.AcademicYear
+		hasAY := false
+		if academicYearID > 0 {
+			if err := tx.First(&ay, academicYearID).Error; err == nil {
+				hasAY = true
+			}
+		}
+
+		for _, b := range budgets {
+			if b.TransactionCodeID == nil || *b.TransactionCodeID == 0 {
+				continue
+			}
+
+			tcID := *b.TransactionCodeID
+			var tc domain.TransactionCode
+			if err := tx.First(&tc, "id = ?", tcID).Error; err != nil {
+				continue
+			}
+
+			var tcIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+			if tc.ParentCodeID != nil {
+				tcIDs = append(tcIDs, *tc.ParentCodeID)
+			}
+			var prefixTCIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("code LIKE ?", tc.Code+"%").Pluck("id", &prefixTCIDs)
+			for _, pid := range prefixTCIDs {
+				found := false
+				for _, tid := range tcIDs {
+					if tid == pid {
+						found = true
+						break
+					}
+				}
+				if !found {
+					tcIDs = append(tcIDs, pid)
+				}
+			}
+
+			targetType := "Expense"
+			if b.BudgetType == "Penerimaan" {
+				targetType = "Income"
+			}
+
+			// 1. Sum from CashLedger
+			clQuery := tx.Model(&domain.CashLedger{}).
+				Where("transaction_code_id IN ? AND type = ?", tcIDs, targetType)
+			if hasAY {
+				clQuery = clQuery.Where("date >= ? AND date <= ?", ay.StartDate, ay.EndDate)
+			}
+			if b.Month > 0 {
+				clQuery = clQuery.Where("EXTRACT(MONTH FROM date) = ?", b.Month)
+			}
+			var clSum float64
+			clQuery.Select("COALESCE(SUM(amount), 0)").Scan(&clSum)
+
+			// 2. Sum from DailyInfaq
+			diQuery := tx.Model(&domain.DailyInfaq{}).
+				Where("transaction_code_id IN ? AND type = ?", tcIDs, targetType)
+			if hasAY {
+				diQuery = diQuery.Where("date >= ? AND date <= ?", ay.StartDate, ay.EndDate)
+			}
+			if b.Month > 0 {
+				diQuery = diQuery.Where("EXTRACT(MONTH FROM date) = ?", b.Month)
+			}
+			var diSum float64
+			diQuery.Select("COALESCE(SUM(amount), 0)").Scan(&diSum)
+
+			totalRealized := clSum + diSum
+
+			// 3. For Penerimaan: verify with student obligations in case some weren't auto-recorded in BKU
+			if b.BudgetType == "Penerimaan" {
+				soQuery := tx.Table("student_obligations so").
+					Joins("JOIN payment_types pt ON so.payment_type_id = pt.id").
+					Where("pt.transaction_code_id IN ? AND so.status != ?", tcIDs, "Unpaid")
+				if b.AcademicYearID > 0 {
+					soQuery = soQuery.Where("so.academic_year_id = ?", b.AcademicYearID)
+				}
+				if b.Month > 0 {
+					soQuery = soQuery.Where("so.billing_month = ?", b.Month)
+				}
+				var soSum float64
+				soQuery.Select("COALESCE(SUM(so.paid_amount), 0)").Scan(&soSum)
+
+				if soSum > totalRealized {
+					totalRealized = soSum
+				}
+			}
+
+			// Update the budget's realized_amount
+			tx.Model(&domain.Budget{}).Where("id = ?", b.ID).Update("realized_amount", totalRealized)
+		}
+
+		return nil
+	})
+}
+

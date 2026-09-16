@@ -1,6 +1,8 @@
 import React from 'react';
 import { Search } from 'lucide-react';
 
+import type { TransactionCode } from '../../../types/cashLedgerTypes';
+
 interface Props {
   searchQuery: string;
   setSearchQuery: (val: string) => void;
@@ -10,6 +12,9 @@ interface Props {
   setFilterEndDate: (val: string) => void;
   selectedSemester: string;
   setSelectedSemester: (val: string) => void;
+  filterTransactionCodeId: string;
+  setFilterTransactionCodeId: (val: string) => void;
+  transactionCodes: TransactionCode[];
   sortOrder: 'asc' | 'desc';
   setSortOrder: (val: 'asc' | 'desc') => void;
   itemsPerPage: number;
@@ -22,6 +27,8 @@ const CashLedgerFilter: React.FC<Props> = ({
   filterStartDate, setFilterStartDate,
   filterEndDate, setFilterEndDate,
   selectedSemester, setSelectedSemester,
+  filterTransactionCodeId, setFilterTransactionCodeId,
+  transactionCodes,
   sortOrder, setSortOrder,
   itemsPerPage, setItemsPerPage,
   setCurrentPage
@@ -33,7 +40,7 @@ const CashLedgerFilter: React.FC<Props> = ({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
                     type="text"
-                    placeholder="Cari transaksi..."
+                    placeholder="Cari transaksi / pos / kode..."
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                     className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
@@ -46,6 +53,21 @@ const CashLedgerFilter: React.FC<Props> = ({
             </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+            <select
+                value={filterTransactionCodeId}
+                onChange={e => { setFilterTransactionCodeId(e.target.value); setCurrentPage(1); }}
+                className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer w-full sm:w-auto font-medium text-slate-700"
+            >
+                <option value="all">Semua Pos / Kode Akun</option>
+                {transactionCodes.filter(tc => tc.is_active && !tc.parent_code_id).map(master => (
+                    <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
+                        <option value={String(master.id)}>{master.code} — {master.name} (Induk)</option>
+                        {transactionCodes.filter(c => c.parent_code_id === master.id && c.is_active).map(child => (
+                            <option key={child.id} value={String(child.id)}>&nbsp;&nbsp;↳ {child.code} — {child.name}</option>
+                        ))}
+                    </optgroup>
+                ))}
+            </select>
             <select value={selectedSemester} onChange={e => { setSelectedSemester(e.target.value); setCurrentPage(1); }} className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white cursor-pointer w-full sm:w-auto">
                 <option value="all">Semua Semester</option>
                 <option value="1">Ganjil</option>

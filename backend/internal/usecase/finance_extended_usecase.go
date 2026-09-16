@@ -118,10 +118,41 @@ func (u *FinanceExtendedUsecase) GetCashLedger() ([]domain.CashLedger, error) {
 }
 
 func (u *FinanceExtendedUsecase) UpdateCashLedgerEntry(req *domain.CashLedger) error {
+	existing, err := u.financeRepo.GetCashLedgerByID(req.ID.String())
+	if err == nil && existing != nil && u.budgetRepo != nil {
+		oldTC := existing.TransactionCodeID
+		newTC := req.TransactionCodeID
+		oldAmt := existing.Amount
+		newAmt := req.Amount
+
+		if oldTC != nil && *oldTC > 0 {
+			if newTC != nil && *newTC == *oldTC {
+				diff := newAmt - oldAmt
+				if diff > 0 {
+					_ = u.budgetRepo.AddRealizationByTransactionCodeID(*oldTC, diff, 0)
+				} else if diff < 0 {
+					_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*oldTC, -diff, 0)
+				}
+			} else {
+				_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*oldTC, oldAmt, 0)
+				if newTC != nil && *newTC > 0 {
+					_ = u.budgetRepo.AddRealizationByTransactionCodeID(*newTC, newAmt, 0)
+				}
+			}
+		} else if newTC != nil && *newTC > 0 {
+			_ = u.budgetRepo.AddRealizationByTransactionCodeID(*newTC, newAmt, 0)
+		}
+	}
 	return u.financeRepo.UpdateCashLedgerEntry(req)
 }
 
 func (u *FinanceExtendedUsecase) DeleteCashLedgerEntry(id string) error {
+	if u.budgetRepo != nil {
+		existing, err := u.financeRepo.GetCashLedgerByID(id)
+		if err == nil && existing != nil && existing.TransactionCodeID != nil && *existing.TransactionCodeID > 0 {
+			_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*existing.TransactionCodeID, existing.Amount, 0)
+		}
+	}
 	return u.financeRepo.DeleteCashLedgerEntry(id)
 }
 
@@ -130,7 +161,7 @@ func (u *FinanceExtendedUsecase) AddDailyInfaqEntry(req *domain.DailyInfaq) erro
 		return err
 	}
 	// Auto-realize RKAS if transaction code is linked to a budget
-	if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 {
+	if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 && u.budgetRepo != nil {
 		_ = u.budgetRepo.AddRealizationByTransactionCodeID(*req.TransactionCodeID, req.Amount, 0)
 	}
 	return nil
@@ -141,10 +172,41 @@ func (u *FinanceExtendedUsecase) GetDailyInfaq() ([]domain.DailyInfaq, error) {
 }
 
 func (u *FinanceExtendedUsecase) UpdateDailyInfaqEntry(req *domain.DailyInfaq) error {
+	existing, err := u.financeRepo.GetDailyInfaqByID(req.ID.String())
+	if err == nil && existing != nil && u.budgetRepo != nil {
+		oldTC := existing.TransactionCodeID
+		newTC := req.TransactionCodeID
+		oldAmt := existing.Amount
+		newAmt := req.Amount
+
+		if oldTC != nil && *oldTC > 0 {
+			if newTC != nil && *newTC == *oldTC {
+				diff := newAmt - oldAmt
+				if diff > 0 {
+					_ = u.budgetRepo.AddRealizationByTransactionCodeID(*oldTC, diff, 0)
+				} else if diff < 0 {
+					_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*oldTC, -diff, 0)
+				}
+			} else {
+				_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*oldTC, oldAmt, 0)
+				if newTC != nil && *newTC > 0 {
+					_ = u.budgetRepo.AddRealizationByTransactionCodeID(*newTC, newAmt, 0)
+				}
+			}
+		} else if newTC != nil && *newTC > 0 {
+			_ = u.budgetRepo.AddRealizationByTransactionCodeID(*newTC, newAmt, 0)
+		}
+	}
 	return u.financeRepo.UpdateDailyInfaqEntry(req)
 }
 
 func (u *FinanceExtendedUsecase) DeleteDailyInfaqEntry(id string) error {
+	if u.budgetRepo != nil {
+		existing, err := u.financeRepo.GetDailyInfaqByID(id)
+		if err == nil && existing != nil && existing.TransactionCodeID != nil && *existing.TransactionCodeID > 0 {
+			_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*existing.TransactionCodeID, existing.Amount, 0)
+		}
+	}
 	return u.financeRepo.DeleteDailyInfaqEntry(id)
 }
 

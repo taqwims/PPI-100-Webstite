@@ -235,3 +235,26 @@ func (h *BudgetHandler) GetSummary(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, summary)
 }
+
+func (h *BudgetHandler) Reconcile(c *gin.Context) {
+	var body struct {
+		AcademicYearID uint `json:"academic_year_id"`
+	}
+	_ = c.ShouldBindJSON(&body)
+
+	if body.AcademicYearID == 0 {
+		yearStr := c.Query("academic_year_id")
+		if yearStr != "" {
+			if id, err := strconv.ParseUint(yearStr, 10, 32); err == nil {
+				body.AcademicYearID = uint(id)
+			}
+		}
+	}
+
+	if err := h.usecase.ReconcileBudgets(body.AcademicYearID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "realization synchronized successfully"})
+}
+

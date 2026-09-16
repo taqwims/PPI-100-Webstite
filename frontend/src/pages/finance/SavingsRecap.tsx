@@ -337,17 +337,17 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
 
                     {/* Summary cards */}
                     <div className="grid grid-cols-3 gap-px bg-slate-100 border-b border-slate-200">
-                        <div className="bg-white p-4 text-center">
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total Setoran</p>
-                            <p className="text-lg font-bold text-emerald-600 mt-1">{formatCurrency(recapData.grand_deposit)}</p>
+                        <div className="bg-white p-3.5 text-center min-w-0">
+                            <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide truncate">Total Setoran</p>
+                            <p className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 mt-0.5 truncate" title={formatCurrency(recapData.grand_deposit)}>{formatCurrency(recapData.grand_deposit)}</p>
                         </div>
-                        <div className="bg-white p-4 text-center">
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total Penarikan</p>
-                            <p className="text-lg font-bold text-red-600 mt-1">{formatCurrency(recapData.grand_withdraw)}</p>
+                        <div className="bg-white p-3.5 text-center min-w-0">
+                            <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide truncate">Total Penarikan</p>
+                            <p className="text-sm sm:text-base md:text-lg font-bold text-red-600 mt-0.5 truncate" title={formatCurrency(recapData.grand_withdraw)}>{formatCurrency(recapData.grand_withdraw)}</p>
                         </div>
-                        <div className="bg-white p-4 text-center">
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Saldo Akhir</p>
-                            <p className="text-lg font-bold text-blue-600 mt-1">{formatCurrency(recapData.grand_balance)}</p>
+                        <div className="bg-white p-3.5 text-center min-w-0">
+                            <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide truncate">Saldo Akhir</p>
+                            <p className="text-sm sm:text-base md:text-lg font-bold text-blue-600 mt-0.5 truncate" title={formatCurrency(recapData.grand_balance)}>{formatCurrency(recapData.grand_balance)}</p>
                         </div>
                     </div>
 

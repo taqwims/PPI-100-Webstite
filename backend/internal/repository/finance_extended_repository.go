@@ -29,11 +29,13 @@ type FinanceExtendedRepository interface {
 
 	AddCashLedgerEntry(req *domain.CashLedger) error
 	GetCashLedger() ([]domain.CashLedger, error)
+	GetCashLedgerByID(id string) (*domain.CashLedger, error)
 	UpdateCashLedgerEntry(req *domain.CashLedger) error
 	DeleteCashLedgerEntry(id string) error
 
 	AddDailyInfaqEntry(req *domain.DailyInfaq) error
 	GetDailyInfaq() ([]domain.DailyInfaq, error)
+	GetDailyInfaqByID(id string) (*domain.DailyInfaq, error)
 	UpdateDailyInfaqEntry(req *domain.DailyInfaq) error
 	DeleteDailyInfaqEntry(id string) error
 

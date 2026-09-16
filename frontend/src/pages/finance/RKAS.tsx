@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Plus, TrendingUp, Download } from 'lucide-react';
+import { Plus, TrendingUp, Download, RefreshCw, BookOpen } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import { generateRKASReportPDF } from '../../utils/pdfUtils';
 import { RKASTable } from '../../components/finance/RKAS/RKASTable';
 import { RKASCategoriesTab } from '../../components/finance/RKAS/RKASCategoriesTab';
 import { RKASBudgetModal } from '../../components/finance/RKAS/RKASBudgetModal';
 import { RKASRealizeModal } from '../../components/finance/RKAS/RKASRealizeModal';
 import { RKASCategoryModal } from '../../components/finance/RKAS/RKASCategoryModal';
+import FinancialFlowGuideModal from '../../components/finance/FinancialFlowGuideModal';
 import { Budget, AcademicYear, TransactionCode, BudgetCategory, BudgetSummary } from '../../components/finance/RKAS/types';
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
@@ -28,6 +30,7 @@ const RKAS: React.FC = () => {
     const [budgetTypeTab, setBudgetTypeTab] = useState<'Pengeluaran' | 'Penerimaan'>('Pengeluaran');
     const [showRealizeModal, setShowRealizeModal] = useState(false);
     const [realizeBudgetId, setRealizeBudgetId] = useState<string | null>(null);
+    const [showGuideModal, setShowGuideModal] = useState(false);
 
     const { data: transactionCodes = [] } = useQuery<TransactionCode[]>({
         queryKey: ['transaction-codes'], queryFn: async () => (await api.get('/finance/transaction-codes')).data,
@@ -64,6 +67,17 @@ const RKAS: React.FC = () => {
     const realizeBudget = useMutation({ mutationFn: (d: any) => api.put(`/finance/budgets/${d.id}/realize`, { ...d, amount: Number(d.amount), transaction_code_id: Number(d.transaction_code_id) }), onSuccess: () => { invalidateAll(); setShowRealizeModal(false); } });
     const createCat = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-categories', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); setShowCatModal(false); } });
     const deleteCat = useMutation({ mutationFn: (id: number) => api.delete(`/finance/budget-categories/${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budget-categories'] }) });
+
+    const reconcileMutation = useMutation({
+        mutationFn: (yearId?: string) => api.post(`/finance/budgets/reconcile${yearId ? `?academic_year_id=${yearId}` : ''}`, {}),
+        onSuccess: () => {
+            invalidateAll();
+            toast.success('Realisasi RKAS berhasil disinkronkan dengan Buku Kas Umum & Transaksi Siswa!');
+        },
+        onError: () => {
+            toast.error('Gagal menyinkronkan realisasi RKAS');
+        }
+    });
 
     const handleSaveBudget = async (data: any, isMultiple: boolean, months: number[]) => {
         if (editItem) {
@@ -107,22 +121,39 @@ const RKAS: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">RAB / RKAS</h1>
-                    <p className="text-slate-500 mt-1">Rencana Anggaran Kas Sekolah — Budget vs Realisasi</p>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">RAB / RKAS Sekolah</h1>
+                    <p className="text-slate-500 mt-1 text-sm">Rencana Kegiatan dan Anggaran Kas Sekolah — Budget vs Realisasi Riil</p>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                    {budgets.length > 0 && (
+                <div className="flex gap-2 flex-wrap items-center">
+                    <button
+                        onClick={() => setShowGuideModal(true)}
+                        className="flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 shadow-sm text-sm font-semibold transition"
+                        title="Pelajari Panduan Alur Transaksi, Kode Pos, dan Integrasi RKAS"
+                    >
+                        <BookOpen size={15} className="text-blue-600" />
+                        <span>Panduan Alur</span>
+                    </button>
+                    {tab === 'budgets' && budgets.length > 0 && (
                         <button onClick={() => {
                             const yr = years.find(y => String(y.id) === yearFilter);
-                            generateRKASReportPDF(filteredBudgets, yr?.name || 'Semua', budgetTypeTab);
-                        }} className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-sm text-sm font-medium">
-                            <Download size={16} /> Export PDF
+                            generateRKASReportPDF(budgets, yr?.name || 'Semua', budgetTypeTab);
+                        }} className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-900 shadow-sm text-sm font-medium transition">
+                            <Download size={15} /> Export PDF
                         </button>
                     )}
                     {canEdit && (
                         <>
-                            <button onClick={() => setShowCatModal(true)} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">+ Kategori</button>
-                            <button onClick={() => { setEditItem(null); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-600/25 text-sm font-medium">
+                            <button
+                                onClick={() => reconcileMutation.mutate(yearFilter)}
+                                disabled={reconcileMutation.isPending}
+                                className="flex items-center gap-2 px-3.5 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 shadow-sm text-sm font-semibold transition"
+                                title="Sinkronkan angka realisasi otomatis dari Buku Kas Umum dan Pembayaran Siswa"
+                            >
+                                <RefreshCw size={15} className={clsx(reconcileMutation.isPending && "animate-spin text-blue-600")} />
+                                <span>{reconcileMutation.isPending ? 'Menyinkronkan...' : 'Sinkronkan Realisasi'}</span>
+                            </button>
+                            <button onClick={() => setShowCatModal(true)} className="px-3.5 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition">+ Kategori</button>
+                            <button onClick={() => { setEditItem(null); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 text-sm font-bold transition">
                                 <Plus size={16} /> Tambah Anggaran
                             </button>
                         </>
@@ -241,6 +272,10 @@ const RKAS: React.FC = () => {
                 budgetId={realizeBudgetId}
                 transactionCodes={transactionCodes || []}
                 onSubmit={async (data) => { realizeBudget.mutate(data); }}
+            />
+            <FinancialFlowGuideModal
+                isOpen={showGuideModal}
+                onClose={() => setShowGuideModal(false)}
             />
         </div>
     );

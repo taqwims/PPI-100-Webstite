@@ -157,3 +157,8 @@ func (u *BudgetUsecase) RealizeBudget(id uuid.UUID, amount float64, source strin
 func (u *BudgetUsecase) GetBudgetSummary(academicYearID uint) ([]map[string]interface{}, error) {
 	return u.repo.GetSummaryByYear(academicYearID)
 }
+
+func (u *BudgetUsecase) ReconcileBudgets(academicYearID uint) error {
+	return u.repo.Reconcile(academicYearID)
+}
+

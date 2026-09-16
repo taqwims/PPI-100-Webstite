@@ -170,6 +170,21 @@ func (mr *MockFinanceExtendedRepositoryMockRecorder) GetCashLedger() *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCashLedger", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetCashLedger))
 }
 
+// GetCashLedgerByID mocks base method.
+func (m *MockFinanceExtendedRepository) GetCashLedgerByID(id string) (*domain.CashLedger, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCashLedgerByID", id)
+	ret0, _ := ret[0].(*domain.CashLedger)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCashLedgerByID indicates an expected call of GetCashLedgerByID.
+func (mr *MockFinanceExtendedRepositoryMockRecorder) GetCashLedgerByID(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCashLedgerByID", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetCashLedgerByID), id)
+}
+
 // GetDailyInfaq mocks base method.
 func (m *MockFinanceExtendedRepository) GetDailyInfaq() ([]domain.DailyInfaq, error) {
 	m.ctrl.T.Helper()
@@ -183,6 +198,21 @@ func (m *MockFinanceExtendedRepository) GetDailyInfaq() ([]domain.DailyInfaq, er
 func (mr *MockFinanceExtendedRepositoryMockRecorder) GetDailyInfaq() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDailyInfaq", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetDailyInfaq))
+}
+
+// GetDailyInfaqByID mocks base method.
+func (m *MockFinanceExtendedRepository) GetDailyInfaqByID(id string) (*domain.DailyInfaq, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDailyInfaqByID", id)
+	ret0, _ := ret[0].(*domain.DailyInfaq)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDailyInfaqByID indicates an expected call of GetDailyInfaqByID.
+func (mr *MockFinanceExtendedRepositoryMockRecorder) GetDailyInfaqByID(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDailyInfaqByID", reflect.TypeOf((*MockFinanceExtendedRepository)(nil).GetDailyInfaqByID), id)
 }
 
 // GetDashboardAnalytics mocks base method.

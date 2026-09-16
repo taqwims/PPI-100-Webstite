@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, UserCheck, Printer, Pencil, Trash2 } from 'lucide-react';
+import { AlertCircle, UserCheck, Printer, Pencil, Trash2, ArrowRight } from 'lucide-react';
 import { CashLedgerEntry } from '../../../types/cashLedgerTypes';
 
 interface Props {
@@ -70,9 +70,53 @@ const CashLedgerTable: React.FC<Props> = ({
                             </td>
                             <td className="p-4 text-slate-600 text-sm">{entry.source}</td>
                             <td className="p-4">
-                                <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs rounded-md font-medium">
-                                    {entry.category}
-                                </span>
+                                <div className="space-y-1.5 min-w-[170px]">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-md font-medium">
+                                            {entry.category || 'Umum'}
+                                        </span>
+                                    </div>
+                                    {entry.transaction_code ? (
+                                        entry.transaction_code.parent_code ? (
+                                            /* Child Code with Parent */
+                                            <div
+                                                className="p-1.5 bg-blue-50/70 border border-blue-200/80 rounded-lg text-[10px] space-y-0.5 shadow-xs"
+                                                title={`Jalur Pos Anggaran:\nInduk: [${entry.transaction_code.parent_code.code}] ${entry.transaction_code.parent_code.name}\nSub-Pos: [${entry.transaction_code.code}] ${entry.transaction_code.name}\nTerhubung ke Realisasi RKAS`}
+                                            >
+                                                <div className="text-slate-500 font-medium flex items-center gap-1 truncate">
+                                                    <span>📁 {entry.transaction_code.parent_code.code}</span>
+                                                    <ArrowRight size={10} className="text-blue-500 shrink-0" />
+                                                    <span className="font-bold text-blue-700">📄 {entry.transaction_code.code}</span>
+                                                </div>
+                                                <div className="font-semibold text-slate-700 truncate">
+                                                    {entry.transaction_code.name}
+                                                </div>
+                                                <div className="text-[9px] text-emerald-700 font-bold flex items-center gap-0.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                                                    Realisasi RKAS Aktif
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* Master / Standalone Code */
+                                            <div
+                                                className="p-1.5 bg-emerald-50/70 border border-emerald-200/80 rounded-lg text-[10px] space-y-0.5 shadow-xs"
+                                                title={`Pos Induk RKAS: [${entry.transaction_code.code}] ${entry.transaction_code.name}`}
+                                            >
+                                                <div className="font-bold text-emerald-800 flex items-center gap-1 truncate">
+                                                    <span>📁 {entry.transaction_code.code} — {entry.transaction_code.name}</span>
+                                                </div>
+                                                <div className="text-[9px] text-emerald-700 font-bold flex items-center gap-0.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                                                    Pos Induk RKAS
+                                                </div>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <span className="text-[11px] text-slate-400 italic block">
+                                            Tanpa Kode RKAS
+                                        </span>
+                                    )}
+                                </div>
                             </td>
                             <td className="p-4 text-sm">
                                 {entry.type === 'Expense' && entry.responsible ? (

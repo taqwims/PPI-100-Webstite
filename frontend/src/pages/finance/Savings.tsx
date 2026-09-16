@@ -40,7 +40,7 @@ const Savings = () => {
         if (user?.unit_id) return user.unit_id;
         return activeUnits[0]?.id || 1;
     };
-    
+
     const [unitID, setUnitID] = useState<number>(getDefaultUnitID());
     const [activeTab, setActiveTab] = useState<'accounts' | 'operational' | 'receivable' | 'recap'>('accounts');
 
@@ -194,7 +194,7 @@ const Savings = () => {
     const handleDeleteTrx = async () => {
         const trx = trxToDelete || editingTrx;
         if (!trx) return;
-        
+
         setSavingEdit(true);
         try {
             await api.delete(`/finance/savings/transactions/${trx.id}`);
@@ -236,7 +236,7 @@ const Savings = () => {
                     </h1>
                     <p className="text-slate-500 text-sm md:text-base font-medium">Input setoran, tarik dana, dan kelola dana operasional sekolah.</p>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                     {[1, 9, 10, 11].includes(user?.role_id || 0) && (
                         <div className="p-1.5 bg-slate-100/80 backdrop-blur rounded-2xl flex shadow-inner border border-slate-200 w-full sm:w-auto">
@@ -246,16 +246,21 @@ const Savings = () => {
                         </div>
                     )}
                     <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full lg:w-auto">
-                        <button onClick={() => openDepositModal()} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all font-bold group whitespace-nowrap">
-                            <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+                        {/* Button Setor */}
+                        <button onClick={() => openDepositModal()} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-3 py-2 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all font-bold group whitespace-nowrap text-sm">
+                            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
                             <span>Setor</span>
                         </button>
-                        <button onClick={() => setIsWithdrawOpOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-amber-600 border-2 border-amber-100 px-5 py-3 rounded-2xl hover:bg-amber-50 shadow-sm transition-all font-bold whitespace-nowrap">
-                            <TrendingDown size={20} />
+
+                        {/* Button Ambil Operasional */}
+                        <button onClick={() => setIsWithdrawOpOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-amber-600 border-2 border-amber-100 px-3 py-2 rounded-xl hover:bg-amber-50 shadow-sm transition-all font-bold whitespace-nowrap text-sm">
+                            <TrendingDown size={18} />
                             <span>Ambil Operasional</span>
                         </button>
-                        <button onClick={() => setIsWithdrawRecOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-rose-600 border-2 border-rose-100 px-5 py-3 rounded-2xl hover:bg-rose-50 shadow-sm transition-all font-bold whitespace-nowrap">
-                            <TrendingDown size={20} />
+
+                        {/* Button Ambil Piutang */}
+                        <button onClick={() => setIsWithdrawRecOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-rose-600 border-2 border-rose-100 px-3 py-2 rounded-xl hover:bg-rose-50 shadow-sm transition-all font-bold whitespace-nowrap text-sm">
+                            <TrendingDown size={18} />
                             <span>Ambil Piutang</span>
                         </button>
                     </div>
@@ -263,66 +268,129 @@ const Savings = () => {
             </div>
 
             {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                <div className="relative group overflow-hidden bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 rounded-[2rem] p-6 text-white shadow-xl shadow-emerald-100 transition-all duration-500 hover:scale-[1.02]">
-                    <div className="absolute -right-6 -top-6 p-4 opacity-10 group-hover:opacity-20 transition-opacity duration-500 rotate-12"><Wallet size={160} /></div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                {/* 1. Total Saldo Pool */}
+                <div className="relative group overflow-hidden bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-md shadow-emerald-500/10 flex flex-col justify-between">
+                    <div className="absolute -right-3 -top-3 p-3 opacity-15 rotate-12 pointer-events-none">
+                        <Wallet size={90} />
+                    </div>
                     <div className="relative z-10 flex flex-col h-full justify-between">
-                        <div className="space-y-1">
-                            <p className="text-emerald-100 font-bold text-xs uppercase tracking-widest">Total Saldo Pool</p>
-                            <h2 className="text-3xl font-black mt-1 tracking-tight">{formatCurrency(poolSummary?.total_balance || totalBalance)}</h2>
+                        <div className="space-y-0.5">
+                            <p className="text-emerald-100 font-bold text-[10px] uppercase tracking-wider">Total Saldo Pool</p>
+                            <h2
+                                className="text-base sm:text-lg xl:text-xl font-black mt-0.5 tracking-tight truncate"
+                                title={formatCurrency(poolSummary?.total_balance || totalBalance)}
+                            >
+                                {formatCurrency(poolSummary?.total_balance || totalBalance)}
+                            </h2>
                         </div>
-                        <div className="mt-4 flex items-center gap-2 text-emerald-100/80"><Users size={16} /><p className="text-xs font-bold">{totalAccounts} Akun Terdaftar</p></div>
+                        <div className="mt-3 flex items-center gap-1.5 text-emerald-100/90 text-[11px] font-semibold truncate">
+                            <Users size={14} className="shrink-0" />
+                            <span>{totalAccounts} Akun Terdaftar</span>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Dana Operasional</p>
-                            <h2 className="text-2xl font-black text-red-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{formatCurrency(poolSummary?.outstanding_debt || 0)}</h2>
+
+                {/* 2. Dana Operasional */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider truncate">Dana Operasional</p>
+                            <h2
+                                className="text-base sm:text-lg font-black text-red-600 tracking-tight mt-0.5 truncate"
+                                title={formatCurrency(poolSummary?.outstanding_debt || 0)}
+                            >
+                                {formatCurrency(poolSummary?.outstanding_debt || 0)}
+                            </h2>
                         </div>
-                        <div className="p-3 bg-red-50 text-red-500 rounded-2xl group-hover:bg-red-500 group-hover:text-white transition-colors duration-300"><TrendingDown size={20} /></div>
+                        <div className="p-2 bg-red-50 text-red-500 rounded-xl shrink-0">
+                            <TrendingDown size={16} />
+                        </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Status: Belum Kembali</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-3 bg-slate-100 px-2 py-0.5 rounded-md self-start truncate">
+                        Status: Belum Kembali
+                    </p>
                 </div>
-                <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Saldo Tersedia</p>
-                            <h2 className="text-2xl font-black text-emerald-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{formatCurrency(poolSummary?.available_balance || 0)}</h2>
+
+                {/* 3. Saldo Tersedia */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider truncate">Saldo Tersedia</p>
+                            <h2
+                                className="text-base sm:text-lg font-black text-emerald-600 tracking-tight mt-0.5 truncate"
+                                title={formatCurrency(poolSummary?.available_balance || 0)}
+                            >
+                                {formatCurrency(poolSummary?.available_balance || 0)}
+                            </h2>
                         </div>
-                        <div className="p-3 bg-emerald-50 text-emerald-500 rounded-2xl group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-300"><ShieldCheck size={20} /></div>
+                        <div className="p-2 bg-emerald-50 text-emerald-500 rounded-xl shrink-0">
+                            <ShieldCheck size={16} />
+                        </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Status: Aman</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-3 bg-slate-100 px-2 py-0.5 rounded-md self-start truncate">
+                        Status: Aman
+                    </p>
                 </div>
-                <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Kembali Op</p>
-                            <h2 className="text-2xl font-black text-blue-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{formatCurrency(poolSummary?.total_returned || 0)}</h2>
+
+                {/* 4. Total Kembali Op */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider truncate">Total Kembali Op</p>
+                            <h2
+                                className="text-base sm:text-lg font-black text-blue-600 tracking-tight mt-0.5 truncate"
+                                title={formatCurrency(poolSummary?.total_returned || 0)}
+                            >
+                                {formatCurrency(poolSummary?.total_returned || 0)}
+                            </h2>
                         </div>
-                        <div className="p-3 bg-blue-50 text-blue-500 rounded-2xl group-hover:bg-blue-500 group-hover:text-white transition-colors duration-300"><RotateCcw size={20} /></div>
+                        <div className="p-2 bg-blue-50 text-blue-500 rounded-xl shrink-0">
+                            <RotateCcw size={16} />
+                        </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Riwayat Lunas Op</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-3 bg-slate-100 px-2 py-0.5 rounded-md self-start truncate">
+                        Riwayat Lunas Op
+                    </p>
                 </div>
-                <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Piutang</p>
-                            <h2 className="text-2xl font-black text-rose-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{formatCurrency(poolSummary?.outstanding_receivable || 0)}</h2>
+
+                {/* 5. Total Piutang */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider truncate">Total Piutang</p>
+                            <h2
+                                className="text-base sm:text-lg font-black text-rose-600 tracking-tight mt-0.5 truncate"
+                                title={formatCurrency(poolSummary?.outstanding_receivable || 0)}
+                            >
+                                {formatCurrency(poolSummary?.outstanding_receivable || 0)}
+                            </h2>
                         </div>
-                        <div className="p-3 bg-rose-50 text-rose-500 rounded-2xl group-hover:bg-rose-500 group-hover:text-white transition-colors duration-300"><TrendingDown size={20} /></div>
+                        <div className="p-2 bg-rose-50 text-rose-500 rounded-xl shrink-0">
+                            <TrendingDown size={16} />
+                        </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Luar Operasional</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-3 bg-slate-100 px-2 py-0.5 rounded-md self-start truncate">
+                        Luar Operasional
+                    </p>
                 </div>
-                <div className="bg-white/80 backdrop-blur rounded-[2rem] p-6 border border-slate-200/60 shadow-sm transition-all flex flex-col justify-between group md:col-span-2 lg:col-span-1">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Aktivasi Akun</p>
-                            <h2 className="text-2xl font-black text-amber-600 tracking-tight group-hover:scale-105 transition-transform origin-left">{studentsWithoutAccount.length}</h2>
+
+                {/* 6. Aktivasi Akun */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider truncate">Aktivasi Akun</p>
+                            <h2 className="text-base sm:text-lg font-black text-amber-600 tracking-tight mt-0.5 truncate">
+                                {studentsWithoutAccount.length} Siswa
+                            </h2>
                         </div>
-                        <div className="p-3 bg-amber-50 text-amber-500 rounded-2xl group-hover:bg-amber-500 group-hover:text-white transition-colors duration-300"><Users size={20} /></div>
+                        <div className="p-2 bg-amber-50 text-amber-500 rounded-xl shrink-0">
+                            <Users size={16} />
+                        </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium mt-4 bg-slate-100/50 px-3 py-1.5 rounded-full inline-block self-start">Siswa Belum Menabung</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-3 bg-slate-100 px-2 py-0.5 rounded-md self-start truncate">
+                        Siswa Belum Menabung
+                    </p>
                 </div>
             </div>
 
@@ -345,7 +413,7 @@ const Savings = () => {
             {/* Content */}
             <div className="space-y-4">
                 {activeTab === 'accounts' && (
-                    <SavingsAccountTab 
+                    <SavingsAccountTab
                         loading={loading}
                         accounts={accounts}
                         students={students}
@@ -358,7 +426,7 @@ const Savings = () => {
                     />
                 )}
                 {activeTab === 'operational' && (
-                    <SavingsOperationalTab 
+                    <SavingsOperationalTab
                         loading={loadingOpHistory}
                         opHistory={opHistory}
                         fetchOpHistory={fetchOpHistory}
@@ -366,7 +434,7 @@ const Savings = () => {
                     />
                 )}
                 {activeTab === 'receivable' && (
-                    <SavingsReceivableTab 
+                    <SavingsReceivableTab
                         loading={loadingRecHistory}
                         recHistory={recHistory}
                         fetchRecHistory={fetchRecHistory}
@@ -376,12 +444,12 @@ const Savings = () => {
                 )}
                 {activeTab === 'recap' && (
                     <div className="bg-white/40 backdrop-blur-xl rounded-[2.5rem] border border-white/60 shadow-xl shadow-slate-200/50 p-6 overflow-hidden">
-                        <SavingsRecap classList={classList}  />
+                        <SavingsRecap classList={classList} />
                     </div>
                 )}
             </div>
 
-            <SavingsTransactionModal 
+            <SavingsTransactionModal
                 isOpen={isTrxModalOpen}
                 onClose={() => setIsTrxModalOpen(false)}
                 onSuccess={() => { fetchAccounts(classFilter || undefined); fetchPoolSummary(); }}
@@ -392,7 +460,7 @@ const Savings = () => {
                 accounts={accounts}
             />
 
-            <SavingsOperationalModals 
+            <SavingsOperationalModals
                 isWithdrawOpen={isWithdrawOpOpen}
                 onCloseWithdraw={() => setIsWithdrawOpOpen(false)}
                 isReturnOpen={isReturnOpOpen}
@@ -403,7 +471,7 @@ const Savings = () => {
                 opHistory={opHistory}
             />
 
-            <SavingsReceivableModals 
+            <SavingsReceivableModals
                 isWithdrawOpen={isWithdrawRecOpen}
                 onCloseWithdraw={() => setIsWithdrawRecOpen(false)}
                 isReturnOpen={isReturnRecOpen}
@@ -445,7 +513,7 @@ const Savings = () => {
                                                     <td className={clsx("px-4 py-4 text-sm font-bold text-right whitespace-nowrap border-r border-slate-100", trx.type === 'Deposit' ? "text-green-600" : "text-red-600")}>{trx.type === 'Deposit' ? '+' : '-'}{formatCurrency(trx.amount)}</td>
                                                     <td className="px-4 py-4 text-sm text-slate-500 whitespace-nowrap"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>{trx.handled_by?.name}</div></td>
                                                     <td className="px-4 py-4 text-center">
-                                                        <button 
+                                                        <button
                                                             onClick={() => {
                                                                 setEditingTrx(trx);
                                                                 setEditAmount(trx.amount.toString());
@@ -496,7 +564,7 @@ const Savings = () => {
                                                         <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-500">{trx.handled_by?.name?.charAt(0)}</div>
                                                         {trx.handled_by?.name}
                                                     </div>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             setEditingTrx(trx);
                                                             setEditAmount(trx.amount.toString());
@@ -539,9 +607,9 @@ const Savings = () => {
                                     <Calendar size={14} className="text-emerald-500" />
                                     Tanggal Transaksi
                                 </label>
-                                <input 
-                                    type="date" 
-                                    className="w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-bold text-slate-800 text-base" 
+                                <input
+                                    type="date"
+                                    className="w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-bold text-slate-800 text-base"
                                     value={editDate}
                                     onChange={e => setEditDate(e.target.value)}
                                     required
@@ -551,9 +619,9 @@ const Savings = () => {
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nominal (Rp)</label>
                                 <div className="relative group">
                                     <div className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-300 group-focus-within:text-emerald-500 transition-colors">Rp</div>
-                                    <input 
-                                        type="text" 
-                                        className="w-full pl-16 pr-5 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-black text-3xl tracking-tight text-slate-900" 
+                                    <input
+                                        type="text"
+                                        className="w-full pl-16 pr-5 py-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-black text-3xl tracking-tight text-slate-900"
                                         value={editAmount ? new Intl.NumberFormat('id-ID').format(Number(editAmount)) : ''}
                                         onChange={e => {
                                             const val = e.target.value.replace(/\D/g, '');
@@ -564,7 +632,7 @@ const Savings = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Keterangan</label>
-                                <textarea 
+                                <textarea
                                     className="w-full p-5 rounded-[1.5rem] border-2 border-slate-100 focus:border-emerald-500/30 bg-slate-50/50 font-bold text-slate-700 min-h-[100px]"
                                     value={editNotes}
                                     onChange={e => setEditNotes(e.target.value)}
@@ -572,7 +640,7 @@ const Savings = () => {
                                 />
                             </div>
                             <div className="flex gap-3">
-                                <button 
+                                <button
                                     onClick={() => {
                                         setTrxToDelete(editingTrx);
                                         setIsConfirmOpen(true);
@@ -583,7 +651,7 @@ const Savings = () => {
                                     <Trash2 size={20} />
                                     <span>Hapus</span>
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleUpdateTrx}
                                     disabled={savingEdit || !editAmount}
                                     className="flex-[2] py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
@@ -595,7 +663,7 @@ const Savings = () => {
                     </div>
                 </div>
             )}
-            <ConfirmDialog 
+            <ConfirmDialog
                 isOpen={isConfirmOpen}
                 onClose={() => { setIsConfirmOpen(false); setTrxToDelete(null); }}
                 onConfirm={handleDeleteTrx}

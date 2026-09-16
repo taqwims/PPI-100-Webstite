@@ -181,6 +181,7 @@ func RegisterFinanceRoutes(
 			finance.DELETE("/budgets/:id", middleware.RoleMiddleware(1, 9), budgetHandler.Delete)
 			finance.PUT("/budgets/:id/realize", middleware.RoleMiddleware(1, 9), budgetHandler.Realize)
 			finance.GET("/budgets/summary", middleware.RoleMiddleware(1, 8, 9), budgetHandler.GetSummary)
+			finance.POST("/budgets/reconcile", middleware.RoleMiddleware(1, 9), budgetHandler.Reconcile)
 		}
 
 		// ── Activities (Kegiatan Siswa) ──

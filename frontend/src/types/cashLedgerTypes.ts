@@ -18,6 +18,7 @@ export interface CashLedgerEntry {
     responsible_id?: string;
     responsible?: { id: string; name: string };
     transaction_code_id?: number;
+    transaction_code?: TransactionCode;
 }
 
 export interface TransactionCode {
@@ -26,6 +27,9 @@ export interface TransactionCode {
     name: string;
     type: string;
     category: string;
+    description?: string;
     is_active: boolean;
     parent_code_id?: number | null;
+    parent_code?: TransactionCode | null;
+    children?: TransactionCode[];
 }
