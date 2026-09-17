@@ -55,7 +55,7 @@ type UpdateStakeholderInput struct {
 // ─── Interface ───
 
 type InvoiceSignatureUsecase interface {
-	SignInvoice(invoiceType, referenceID string, amount float64, dateStr string) (*SignInvoiceResult, error)
+	SignInvoice(invoiceType, referenceID string, amount float64, dateStr string, customInvoiceNumber ...string) (*SignInvoiceResult, error)
 	VerifyInvoice(code string) (*VerifyInvoiceResult, error)
 	GenerateNumber(invoiceType string) (string, error)
 	GetInvoiceHistory(userIDStr string, roleID int, invoiceType, search, startDate, endDate string) ([]postgres.InvoiceHistoryItem, error)
@@ -76,7 +76,7 @@ func NewInvoiceSignatureUsecase(repo postgres.InvoiceSignatureRepository) Invoic
 	return &invoiceSignatureUsecase{repo: repo}
 }
 
-func (u *invoiceSignatureUsecase) SignInvoice(invoiceType, referenceID string, amount float64, dateStr string) (*SignInvoiceResult, error) {
+func (u *invoiceSignatureUsecase) SignInvoice(invoiceType, referenceID string, amount float64, dateStr string, customInvoiceNumber ...string) (*SignInvoiceResult, error) {
 	invoiceType = strings.Title(strings.ToLower(invoiceType))
 
 	existing, err := u.repo.FindByTypeAndRef(invoiceType, referenceID)
@@ -153,7 +153,12 @@ func (u *invoiceSignatureUsecase) SignInvoice(invoiceType, referenceID string, a
 	}
 
 	verificationCode := utils.GenerateVerificationCode(invoiceType, referenceID, amount, dateStr)
-	invoiceNumber, _ := u.generateInvoiceNumber(invoiceType)
+	var invoiceNumber string
+	if len(customInvoiceNumber) > 0 && strings.TrimSpace(customInvoiceNumber[0]) != "" {
+		invoiceNumber = strings.TrimSpace(customInvoiceNumber[0])
+	} else {
+		invoiceNumber, _ = u.generateInvoiceNumber(invoiceType)
+	}
 
 	now := time.Now()
 	records := make([]domain.InvoiceSignature, 0, len(sigs))

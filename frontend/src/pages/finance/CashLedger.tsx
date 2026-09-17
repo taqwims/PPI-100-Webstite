@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Download, Plus, BookOpen } from 'lucide-react';
+import { Download, Plus, BookOpen, Printer } from 'lucide-react';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
 import { useCashLedger } from '../../hooks/useCashLedger';
@@ -67,7 +67,8 @@ const CashLedger = () => {
         handleDelete,
         handlePrintReceipt,
         handleConfirmPrint,
-        handleExport
+        handleExport,
+        handlePrintFiltered
     } = useCashLedger();
 
     return (
@@ -87,6 +88,14 @@ const CashLedger = () => {
                         >
                             <BookOpen size={16} className="text-blue-600" />
                             <span>Panduan Alur Keuangan</span>
+                        </button>
+                        <button
+                            onClick={handlePrintFiltered}
+                            className="flex items-center space-x-2 bg-slate-800 text-white px-4 py-2 rounded-xl hover:bg-slate-900 shadow-sm transition text-sm font-medium"
+                            title="Cetak Buku Kas Umum berdasarkan data yang sedang difilter"
+                        >
+                            <Printer size={16} />
+                            <span>Cetak Laporan</span>
                         </button>
                         <button
                             onClick={() => setShowExportModal(true)}

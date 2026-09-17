@@ -142,7 +142,7 @@ func (m *mockInvoiceSignatureUsecase) GenerateNumber(invoiceType string) (string
 	return fmt.Sprintf("PPDB-2024-%04d", m.counter), nil
 }
 
-func (m *mockInvoiceSignatureUsecase) SignInvoice(invoiceType, referenceID string, amount float64, dateStr string) (*SignInvoiceResult, error) {
+func (m *mockInvoiceSignatureUsecase) SignInvoice(invoiceType, referenceID string, amount float64, dateStr string, customInvoiceNumber ...string) (*SignInvoiceResult, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

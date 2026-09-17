@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import api from '../../../services/api';
 import { Briefcase, Tag, UserCheck, FileText, Search, Layers, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 import clsx from 'clsx';
 import { StaffUser, TransactionCode, CashLedgerEntry } from '../../../types/cashLedgerTypes';
@@ -28,6 +30,21 @@ const CashLedgerFormModal: React.FC<Props> = ({
 }) => {
   const [codeSearch, setCodeSearch] = useState('');
   const [showAllTypes, setShowAllTypes] = useState(false);
+
+  // Fetch admin budget-categories
+  const { data: budgetCategories = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['budget-categories'],
+    queryFn: async () => (await api.get('/finance/budget-categories')).data || [],
+    enabled: showModal,
+  });
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    budgetCategories.forEach(c => { if (c.name) set.add(c.name.trim()); });
+    transactionCodes.forEach(c => { if (c.category) set.add(c.category.trim()); });
+    if (formData.category) set.add(formData.category.trim());
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [budgetCategories, transactionCodes, formData.category]);
 
   // Selected Transaction Code & its parent (if child)
   const selectedTC = useMemo(() => {
@@ -267,22 +284,44 @@ const CashLedgerFormModal: React.FC<Props> = ({
                     />
                 </div>
 
-                {/* Sumber Dana */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                        <span className="flex items-center gap-1.5">💰 Sumber Dana</span>
-                    </label>
-                    <select
-                        name="fund_source"
-                        value={formData.fund_source}
-                        onChange={handleInput}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                        <option value="Kas Umum">Kas Umum</option>
-                        <option value="Infaq">Infaq</option>
-                        <option value="Tabungan Siswa">Tabungan Siswa</option>
-                    </select>
-                    <p className="text-xs text-slate-400 mt-1">Alokasi dana yang digunakan untuk transaksi ini</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Kategori */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            <span className="flex items-center gap-1.5">🏷️ Kategori</span>
+                        </label>
+                        <select
+                            name="category"
+                            value={formData.category}
+                            onChange={handleInput}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                            required
+                        >
+                            <option value="">-- Pilih Kategori --</option>
+                            {categoryOptions.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-slate-400 mt-1">Kategori anggaran yang ditentukan admin</p>
+                    </div>
+
+                    {/* Sumber Dana */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            <span className="flex items-center gap-1.5">💰 Sumber Dana</span>
+                        </label>
+                        <select
+                            name="fund_source"
+                            value={formData.fund_source}
+                            onChange={handleInput}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                        >
+                            <option value="Kas Umum">Kas Umum</option>
+                            <option value="Infaq">Infaq</option>
+                            <option value="Tabungan Siswa">Tabungan Siswa</option>
+                        </select>
+                        <p className="text-xs text-slate-400 mt-1">Alokasi dana yang digunakan</p>
+                    </div>
                 </div>
 
                 {/* Penanggung Jawab - hanya untuk Pengeluaran */}

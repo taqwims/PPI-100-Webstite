@@ -179,6 +179,7 @@ type SavingTransaction struct {
 
 type CashLedger struct {
 	ID                uuid.UUID        `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	InvoiceNumber     string           `gorm:"type:varchar(100);index" json:"invoice_number"`
 	Date              time.Time        `gorm:"not null" json:"date"`
 	Source            string           `gorm:"not null" json:"source"` // From who, to who
 	ItemName          string           `gorm:"not null" json:"item_name"`

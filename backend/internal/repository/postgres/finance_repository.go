@@ -1,7 +1,9 @@
 package postgres
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"ppi-100-sis/internal/domain"
 
@@ -240,6 +242,29 @@ func (r *FinanceRepository) DeleteBillTemplate(id string) error {
 }
 
 func (r *FinanceRepository) AddCashLedgerEntry(entry *domain.CashLedger) error {
+	if entry.InvoiceNumber == "" {
+		prefix := "BK"
+		if entry.TransactionCodeID != nil && *entry.TransactionCodeID > 0 {
+			var tc domain.TransactionCode
+			if err := r.db.Preload("ParentCode").First(&tc, *entry.TransactionCodeID).Error; err == nil {
+				if tc.ParentCode != nil && tc.ParentCode.Code != "" {
+					prefix = tc.ParentCode.Code
+				} else if tc.Code != "" {
+					prefix = tc.Code
+				}
+			}
+		}
+		dateVal := entry.Date
+		if dateVal.IsZero() {
+			dateVal = time.Now()
+			entry.Date = dateVal
+		}
+		ym := dateVal.Format("200601")
+		var count int64
+		pattern := fmt.Sprintf("%s-%s-%%", prefix, ym)
+		r.db.Model(&domain.CashLedger{}).Where("invoice_number LIKE ?", pattern).Count(&count)
+		entry.InvoiceNumber = fmt.Sprintf("%s-%s-%04d", prefix, ym, count+1)
+	}
 	return r.db.Create(entry).Error
 }
 

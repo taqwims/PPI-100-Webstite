@@ -22,7 +22,8 @@ export const useCashLedger = () => {
         fund_source: 'Kas Umum',
         notes: '',
         responsible_id: '',
-        transaction_code_id: ''
+        transaction_code_id: '',
+        invoice_number: ''
     });
     const [submitting, setSubmitting] = useState(false);
     const [transactionCodes, setTransactionCodes] = useState<TransactionCode[]>([]);
@@ -88,17 +89,18 @@ export const useCashLedger = () => {
 
     const handleTransactionCodeChange = (codeId: string) => {
         const tc = transactionCodes.find(c => c.id === Number(codeId));
-        setFormData({
-            ...formData,
+        setFormData(prev => ({
+            ...prev,
             transaction_code_id: codeId,
-            category: tc ? tc.category : formData.category,
-            type: tc ? (tc.type as 'Income' | 'Expense') : formData.type,
-        });
+            category: tc ? tc.category : prev.category,
+            type: tc ? (tc.type as 'Income' | 'Expense') : prev.type,
+            item_name: (!prev.item_name || prev.item_name.trim() === '') && tc ? tc.name : prev.item_name,
+        }));
     };
 
     const openCreateModal = () => {
         setEditingEntry(null);
-        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '' });
+        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '', invoice_number: '' });
         setShowModal(true);
     };
 
@@ -113,7 +115,8 @@ export const useCashLedger = () => {
             fund_source: entry.fund_source || 'Kas Umum',
             notes: entry.notes || '',
             responsible_id: entry.responsible_id || '',
-            transaction_code_id: entry.transaction_code_id ? String(entry.transaction_code_id) : ''
+            transaction_code_id: entry.transaction_code_id ? String(entry.transaction_code_id) : '',
+            invoice_number: entry.invoice_number || ''
         });
         setShowModal(true);
     };
@@ -138,6 +141,9 @@ export const useCashLedger = () => {
             if (formData.transaction_code_id) {
                 payload.transaction_code_id = Number(formData.transaction_code_id);
             }
+            if (formData.invoice_number) {
+                payload.invoice_number = formData.invoice_number;
+            }
 
             if (editingEntry) {
                 await api.put(`/finance/cash-ledger/${editingEntry.id}`, payload);
@@ -146,7 +152,7 @@ export const useCashLedger = () => {
             }
             setShowModal(false);
             setEditingEntry(null);
-            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '' });
+            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '', invoice_number: '' });
             fetchLedger();
             toast.success(editingEntry ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil disimpan');
         } catch (error: any) {
@@ -201,12 +207,23 @@ export const useCashLedger = () => {
         setShowExportModal(false);
     };
 
+    const handlePrintFiltered = () => {
+        if (processedEntries.length === 0) {
+            toast.error('Tidak ada data transaksi kas yang sesuai dengan filter.');
+            return;
+        }
+        const start = filterStartDate || (processedEntries.length > 0 ? processedEntries[processedEntries.length - 1].date.split('T')[0] : 'Awal');
+        const end = filterEndDate || (processedEntries.length > 0 ? processedEntries[0].date.split('T')[0] : 'Akhir');
+        generateCashLedgerReport(processedEntries, start, end);
+    };
+
     // Filter, Sort and Paginate
     let processedEntries = entries.filter(e => {
         let match = true;
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             if (!(
+                e.invoice_number?.toLowerCase().includes(q) ||
                 e.item_name?.toLowerCase().includes(q) ||
                 e.source?.toLowerCase().includes(q) ||
                 e.notes?.toLowerCase().includes(q) ||
@@ -290,6 +307,8 @@ export const useCashLedger = () => {
         handleDelete,
         handlePrintReceipt,
         handleConfirmPrint,
-        handleExport
+        handleExport,
+        handlePrintFiltered,
+        processedEntries
     };
 };

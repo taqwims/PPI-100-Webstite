@@ -6,6 +6,7 @@ export interface StaffUser {
 
 export interface CashLedgerEntry {
     id: string;
+    invoice_number?: string;
     date: string;
     source: string;
     item_name: string;

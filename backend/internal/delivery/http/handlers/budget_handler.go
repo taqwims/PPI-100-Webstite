@@ -163,10 +163,15 @@ func (h *BudgetHandler) Update(c *gin.Context) {
 		return
 	}
 	req.ID = id
-	// CategoryID won't be sent from frontend update form anymore, we retain the old one
+	// CategoryID & TransactionCodeID won't necessarily be re-sent from frontend update form, retain existing
 	existing, err := h.usecase.GetBudgetByID(id)
-	if err == nil && req.CategoryID == 0 {
-		req.CategoryID = existing.CategoryID
+	if err == nil {
+		if req.CategoryID == 0 {
+			req.CategoryID = existing.CategoryID
+		}
+		if req.TransactionCodeID == nil || *req.TransactionCodeID == 0 {
+			req.TransactionCodeID = existing.TransactionCodeID
+		}
 	}
 
 	if err := h.usecase.UpdateBudget(&req); err != nil {

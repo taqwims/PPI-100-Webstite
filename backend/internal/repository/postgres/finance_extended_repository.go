@@ -307,6 +307,29 @@ func (r *financeExtendedRepository) TransferSavings(studentID, handledByID uuid.
 // ------------------- Cash Ledger & Daily Infaq -------------------
 
 func (r *financeExtendedRepository) AddCashLedgerEntry(req *domain.CashLedger) error {
+	if req.InvoiceNumber == "" {
+		prefix := "BK"
+		if req.TransactionCodeID != nil && *req.TransactionCodeID > 0 {
+			var tc domain.TransactionCode
+			if err := r.db.Preload("ParentCode").First(&tc, *req.TransactionCodeID).Error; err == nil {
+				if tc.ParentCode != nil && tc.ParentCode.Code != "" {
+					prefix = tc.ParentCode.Code
+				} else if tc.Code != "" {
+					prefix = tc.Code
+				}
+			}
+		}
+		dateVal := req.Date
+		if dateVal.IsZero() {
+			dateVal = time.Now()
+			req.Date = dateVal
+		}
+		ym := dateVal.Format("200601")
+		var count int64
+		pattern := fmt.Sprintf("%s-%s-%%", prefix, ym)
+		r.db.Model(&domain.CashLedger{}).Where("invoice_number LIKE ?", pattern).Count(&count)
+		req.InvoiceNumber = fmt.Sprintf("%s-%s-%04d", prefix, ym, count+1)
+	}
 	return r.db.Create(req).Error
 }
 
@@ -334,6 +357,9 @@ func (r *financeExtendedRepository) UpdateCashLedgerEntry(req *domain.CashLedger
 		"amount":    req.Amount,
 		"category":  req.Category,
 		"notes":     req.Notes,
+	}
+	if req.InvoiceNumber != "" {
+		updates["invoice_number"] = req.InvoiceNumber
 	}
 	if req.TransactionCodeID != nil {
 		updates["transaction_code_id"] = req.TransactionCodeID

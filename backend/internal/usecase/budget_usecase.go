@@ -97,12 +97,12 @@ func (u *BudgetUsecase) CreateBudgetFromTemplate(b *domain.Budget, templateCodeI
 	newCodeStr := fmt.Sprintf("%s%d", template.Code, newCodeSuffix)
 	
 	newTc := domain.TransactionCode{
-		Code: newCodeStr,
-		Name: template.Name, // Nama menggunakan standar (template)
-		Type: template.Type,
-		Category: template.Category,
-		Description: "RKAS Item: " + b.ItemName,
-		IsActive: true,
+		Code:         newCodeStr,
+		Name:         b.ItemName, // Nama menggunakan nama item/anggaran yang diinput
+		Type:         template.Type,
+		Category:     template.Category,
+		Description:  "RKAS Item: " + b.ItemName,
+		IsActive:     true,
 		ParentCodeID: &template.ID,
 	}
 	
@@ -139,6 +139,13 @@ func (u *BudgetUsecase) GetBudgetByID(id uuid.UUID) (*domain.Budget, error) {
 }
 
 func (u *BudgetUsecase) UpdateBudget(b *domain.Budget) error {
+	if b.TransactionCodeID != nil && *b.TransactionCodeID > 0 && b.ItemName != "" {
+		if tc, err := u.tcRepo.GetByID(*b.TransactionCodeID); err == nil && tc != nil {
+			tc.Name = b.ItemName
+			tc.Description = "RKAS Item: " + b.ItemName
+			_ = u.tcRepo.Update(tc)
+		}
+	}
 	return u.repo.Update(b)
 }
 

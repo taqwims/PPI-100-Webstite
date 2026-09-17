@@ -105,18 +105,10 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
         }
     }, [isOpen, editingItem, yearFilter]);
 
-    const getPeriodMultiplier = (period: string, monthsCount: number) => {
-        if (period === 'Tahunan') return 12;
-        if (period === 'Semester 1' || period === 'Semester 2') return 6;
-        if (period === 'Bulanan') return monthsCount > 0 ? monthsCount : 1;
-        return 1;
-    };
-
-    const calcTotalPlanned = (qty: number, price: number, period: string, months: number[]) => {
+    const calcTotalPlanned = (qty: number, price: number) => {
         if (price > 0) {
-            const mult = getPeriodMultiplier(period, months.length);
             const q = qty > 0 ? qty : 1;
-            return String(q * price * mult);
+            return String(q * price);
         }
         return form.planned_amount;
     };
@@ -162,7 +154,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
             const qty = activeStudentCount > 0 ? activeStudentCount : (newForm.quantity > 0 ? newForm.quantity : 1);
             newForm.quantity = qty;
             newForm.unit_price = price;
-            newForm.planned_amount = calcTotalPlanned(qty, price, newForm.period, newForm.months);
+            newForm.planned_amount = calcTotalPlanned(qty, price);
             if (!newForm.item_name) {
                 newForm.item_name = singlePt.name;
             }
@@ -185,7 +177,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                 ...prev,
                 quantity: qty,
                 unit_price: price,
-                planned_amount: calcTotalPlanned(qty, price, prev.period, prev.months),
+                planned_amount: calcTotalPlanned(qty, price),
                 item_name: prev.item_name ? prev.item_name : pt.name
             }));
         }
@@ -197,7 +189,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
         setForm(prev => ({
             ...prev,
             quantity: qty,
-            planned_amount: calcTotalPlanned(qty, price, prev.period, prev.months)
+            planned_amount: calcTotalPlanned(qty, price)
         }));
     };
 
@@ -210,7 +202,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
             ...prev,
             period: newPeriod,
             months: newMonths,
-            planned_amount: calcTotalPlanned(prev.quantity, prev.unit_price, newPeriod, newMonths)
+            planned_amount: calcTotalPlanned(prev.quantity, prev.unit_price)
         }));
     };
 
@@ -220,7 +212,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
         setForm(prev => ({
             ...prev,
             months: next,
-            planned_amount: calcTotalPlanned(prev.quantity, prev.unit_price, prev.period, next)
+            planned_amount: calcTotalPlanned(prev.quantity, prev.unit_price)
         }));
     };
 
@@ -230,7 +222,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
         setForm(prev => ({
             ...prev,
             months: next,
-            planned_amount: calcTotalPlanned(prev.quantity, prev.unit_price, prev.period, next)
+            planned_amount: calcTotalPlanned(prev.quantity, prev.unit_price)
         }));
     };
 
@@ -239,7 +231,7 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const calcAmount = form.quantity > 0 && form.unit_price > 0
-            ? form.quantity * form.unit_price * getPeriodMultiplier(form.period, form.months.length)
+            ? form.quantity * form.unit_price
             : Number(form.planned_amount);
 
         const data: any = {
@@ -516,9 +508,14 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
 
                     {/* Kalkulasi Volume & Harga Satuan -> Pagu Anggaran */}
                     <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                            <Calculator size={15} className="text-blue-600" />
-                            <span>Rincian Pagu Anggaran</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                                <Calculator size={15} className="text-blue-600" />
+                                <span>Rincian Pagu Anggaran</span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium">
+                                Otomatis: Qty × Tarif
+                            </span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -535,10 +532,10 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                                         setForm(prev => ({
                                             ...prev,
                                             quantity: q,
-                                            planned_amount: calcTotalPlanned(q, prev.unit_price, prev.period, prev.months)
+                                            planned_amount: calcTotalPlanned(q, prev.unit_price)
                                         }));
                                     }}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
 
@@ -555,18 +552,43 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                                         setForm(prev => ({
                                             ...prev,
                                             unit_price: p,
-                                            planned_amount: calcTotalPlanned(prev.quantity, p, prev.period, prev.months)
+                                            planned_amount: calcTotalPlanned(prev.quantity, p)
                                         }));
                                     }}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
                                     placeholder="Contoh: 150000"
                                 />
                             </div>
                         </div>
 
+                        {/* Breakdown Penjelasan Rumus */}
+                        <div className="p-2.5 bg-blue-50/60 border border-blue-100 rounded-xl text-[11px] text-blue-900 space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="font-semibold text-blue-700">Rumus Pagu:</span>
+                                <span className="font-bold">
+                                    {form.quantity || 1} × {formatCurrency(form.unit_price || 0)} = {formatCurrency((form.quantity || 1) * (form.unit_price || 0))}
+                                </span>
+                            </div>
+                            {form.period === 'Bulanan' && form.months.length > 1 && (
+                                <div className="flex items-center justify-between text-blue-800 pt-1 border-t border-blue-200/60 text-[10.5px]">
+                                    <span>Akumulasi ({form.months.length} Bulan Terpilih):</span>
+                                    <span className="font-black text-blue-900">
+                                        {formatCurrency((form.quantity || 1) * (form.unit_price || 0) * form.months.length)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Total Pagu Display */}
                         <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-700">Total Pagu Anggaran:</span>
+                            <div>
+                                <span className="text-xs font-bold text-slate-700 block">Total Pagu per Item / Bulan:</span>
+                                <span className="text-[10px] text-slate-500">
+                                    {form.period === 'Bulanan' && form.months.length > 1
+                                        ? `Akan dialokasikan ke masing-masing ${form.months.length} bulan (@ ${formatCurrency(Number(form.planned_amount || (form.quantity * form.unit_price)))})`
+                                        : 'Nilai total pagu untuk pos anggaran ini'}
+                                </span>
+                            </div>
                             <span className="text-base font-black text-blue-700">
                                 {formatCurrency(Number(form.planned_amount || (form.quantity * form.unit_price)))}
                             </span>

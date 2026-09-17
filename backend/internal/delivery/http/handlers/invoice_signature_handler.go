@@ -21,10 +21,11 @@ func NewInvoiceSignatureHandler(uc usecase.InvoiceSignatureUsecase) *InvoiceSign
 // ─── Sign Invoice ───
 
 type SignInvoiceRequest struct {
-	InvoiceType string  `json:"invoice_type" binding:"required"`
-	ReferenceID string  `json:"reference_id" binding:"required"`
-	Amount      float64 `json:"amount" binding:"required"`
-	DateStr     string  `json:"date_str" binding:"required"`
+	InvoiceType   string  `json:"invoice_type" binding:"required"`
+	ReferenceID   string  `json:"reference_id" binding:"required"`
+	Amount        float64 `json:"amount" binding:"required"`
+	DateStr       string  `json:"date_str" binding:"required"`
+	InvoiceNumber string  `json:"invoice_number"`
 }
 
 func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
@@ -34,7 +35,7 @@ func (h *InvoiceSignatureHandler) SignInvoice(c *gin.Context) {
 		return
 	}
 
-	result, err := h.uc.SignInvoice(req.InvoiceType, req.ReferenceID, req.Amount, req.DateStr)
+	result, err := h.uc.SignInvoice(req.InvoiceType, req.ReferenceID, req.Amount, req.DateStr, req.InvoiceNumber)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

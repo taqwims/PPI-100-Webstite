@@ -40,15 +40,20 @@ export async function fetchInvoiceSignatures(
     invoiceType: string,
     referenceId: string,
     amount: number,
-    dateStr: string
+    dateStr: string,
+    customInvoiceNumber?: string
 ): Promise<{ signatures: any[]; verificationCode: string; invoiceNumber: string }> {
     try {
-        const response = await api.post('/finance/invoice/sign', {
+        const payload: any = {
             invoice_type: invoiceType,
             reference_id: referenceId,
             amount: amount,
             date_str: dateStr
-        });
+        };
+        if (customInvoiceNumber) {
+            payload.invoice_number = customInvoiceNumber;
+        }
+        const response = await api.post('/finance/invoice/sign', payload);
         const data = response.data;
 
         let finalSigs = data.signatures;
@@ -277,17 +282,20 @@ export const generateCashLedgerReceipt = async (entry: CashLedgerData, selectedR
     const invoiceType = 'CashLedger';
     const dateStr = entry.date.split('T')[0];
 
+    const actualInvoiceNumber = (entry as any).invoice_number;
+
     // Fetch backend signatures
     const { signatures, verificationCode, invoiceNumber } = await fetchInvoiceSignatures(
         invoiceType,
         entry.id,
         entry.amount,
-        dateStr
+        dateStr,
+        actualInvoiceNumber
     );
 
     const bodyStart = drawStandardHeaderA5(doc, {
         title: entry.type === 'Income' ? 'KUITANSI PENERIMAAN' : 'BUKTI PENGELUARAN KAS',
-        invoiceNumber: invoiceNumber,
+        invoiceNumber: actualInvoiceNumber || invoiceNumber,
     });
 
     const labelX = 12;
@@ -447,17 +455,23 @@ export const generateCashLedgerReport = (
     // Table
     autoTable(doc, {
         startY: bodyStart + 16,
-        head: [['No', 'Tanggal', 'Item/Keperluan', 'Sumber/Tujuan', 'Kategori', 'Pemasukan', 'Pengeluaran', 'Keterangan']],
-        body: entries.map((e, i) => [
-            i + 1,
-            formatDate(e.date),
-            e.item_name,
-            e.source,
-            e.category,
-            e.type === 'Income' ? formatCurrency(e.amount) : '-',
-            e.type === 'Expense' ? formatCurrency(e.amount) : '-',
-            e.notes || '-'
-        ]),
+        head: [['No', 'Tanggal', 'No. Invoice', 'Item/Keperluan', 'Sumber/Tujuan', 'Kategori', 'Pemasukan', 'Pengeluaran', 'Keterangan']],
+        body: entries.map((e, i) => {
+            const tc = (e as any).transaction_code;
+            const ym = `${new Date(e.date).getFullYear()}${String(new Date(e.date).getMonth() + 1).padStart(2, '0')}`;
+            const invoiceNo = (e as any).invoice_number || (tc ? `${tc.parent_code?.code || tc.code}-${ym}-0001` : '-');
+            return [
+                i + 1,
+                formatDate(e.date),
+                invoiceNo,
+                e.item_name,
+                e.source,
+                e.category,
+                e.type === 'Income' ? formatCurrency(e.amount) : '-',
+                e.type === 'Expense' ? formatCurrency(e.amount) : '-',
+                e.notes || '-'
+            ];
+        }),
         styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -465,6 +479,13 @@ export const generateCashLedgerReport = (
 
     // Standardized page footers
     addPageFooters(doc);
+
+    try {
+        const blobUrl = doc.output('bloburl');
+        window.open(blobUrl, '_blank');
+    } catch {
+        // Fallback if popup blocked
+    }
 
     doc.save(`Laporan_Kas_${startDate}_${endDate}.pdf`);
 };
