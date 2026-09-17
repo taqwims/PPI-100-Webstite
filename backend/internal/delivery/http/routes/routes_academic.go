@@ -16,6 +16,9 @@ func RegisterAcademicRoutes(
 	featureBK bool,
 	featureElearning bool,
 ) {
+	// Fallback alias
+	rg.GET("/classes", academicHandler.GetAllClasses)
+
 	academic := rg.Group("/academic")
 	{
 		academic.POST("/classes", academicHandler.CreateClass)
@@ -36,11 +39,13 @@ func RegisterAcademicRoutes(
 
 	teachers := rg.Group("/teachers")
 	{
+		teachers.GET("", teacherHandler.GetAllTeachers)
 		teachers.GET("/", teacherHandler.GetAllTeachers)
 	}
 
 	students := rg.Group("/students")
 	{
+		students.GET("", studentHandler.GetAllStudents)
 		students.GET("/", studentHandler.GetAllStudents)
 		students.POST("/", studentHandler.CreateStudent)
 		students.PUT("/:id", studentHandler.UpdateStudent)

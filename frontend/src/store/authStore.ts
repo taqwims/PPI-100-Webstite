@@ -21,17 +21,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     },
 
     logout: () => {
+        try {
+            localStorage.removeItem('token');
+        } catch (e) {
+            // Ignore errors
+        }
         set({ user: null, isAuthenticated: false, isInitialized: true });
     },
 
     setUser: (user: User) => set({ user, isAuthenticated: true, isInitialized: true }),
     setInitialized: (val: boolean) => set({ isInitialized: val }),
 }));
-
-// Bersihkan token sisa versi lama di localStorage
-try {
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth-storage');
-} catch (e) {
-    // Ignore errors
-}

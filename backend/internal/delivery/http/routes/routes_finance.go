@@ -126,60 +126,61 @@ func RegisterFinanceRoutes(
 
 		// ── Cash Ledger (BKU) ──
 		if cfg.FeatureCashLedger {
-			finance.POST("/cash-ledger", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.AddCashLedgerEntry)
-			finance.GET("/cash-ledger", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetCashLedger)
-			finance.PUT("/cash-ledger/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.UpdateCashLedgerEntry)
-			finance.DELETE("/cash-ledger/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.DeleteCashLedgerEntry)
-			finance.POST("/cash-ledger/upload-proof", middleware.RoleMiddleware(1, 9, 11), financeHandler.UploadCashLedgerProof)
+			finance.POST("/cash-ledger", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeExtendedHandler.AddCashLedgerEntry)
+			finance.GET("/cash-ledger", middleware.RoleMiddleware(1, 2, 3, 8, 9, 11), financeExtendedHandler.GetCashLedger)
+			finance.PUT("/cash-ledger/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeExtendedHandler.UpdateCashLedgerEntry)
+			finance.DELETE("/cash-ledger/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeExtendedHandler.DeleteCashLedgerEntry)
+			finance.POST("/cash-ledger/upload-proof", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeHandler.UploadCashLedgerProof)
 		}
 		finance.POST("/upload", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeHandler.UploadGenericFile)
 
 		// ── Infaq Harian ──
 		if cfg.FeatureInfaq {
-			finance.POST("/daily-infaq", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.AddDailyInfaqEntry)
-			finance.GET("/daily-infaq", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetDailyInfaq)
-			finance.PUT("/daily-infaq/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.UpdateDailyInfaqEntry)
-			finance.DELETE("/daily-infaq/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.DeleteDailyInfaqEntry)
+			finance.POST("/daily-infaq", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeExtendedHandler.AddDailyInfaqEntry)
+			finance.GET("/daily-infaq", middleware.RoleMiddleware(1, 2, 3, 8, 9, 11), financeExtendedHandler.GetDailyInfaq)
+			finance.PUT("/daily-infaq/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeExtendedHandler.UpdateDailyInfaqEntry)
+			finance.DELETE("/daily-infaq/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeExtendedHandler.DeleteDailyInfaqEntry)
 
-			finance.POST("/infaq-types", middleware.RoleMiddleware(1, 9, 11), infaqTypeHandler.Create)
-			finance.GET("/infaq-types", middleware.RoleMiddleware(1, 8, 9, 11), infaqTypeHandler.GetAll)
-			finance.PUT("/infaq-types/:id", middleware.RoleMiddleware(1, 9, 11), infaqTypeHandler.Update)
-			finance.DELETE("/infaq-types/:id", middleware.RoleMiddleware(1, 9, 11), infaqTypeHandler.Delete)
+			finance.POST("/infaq-types", middleware.RoleMiddleware(1, 2, 3, 9, 11), infaqTypeHandler.Create)
+			finance.GET("/infaq-types", middleware.RoleMiddleware(1, 2, 3, 8, 9, 11), infaqTypeHandler.GetAll)
+			finance.PUT("/infaq-types/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), infaqTypeHandler.Update)
+			finance.DELETE("/infaq-types/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), infaqTypeHandler.Delete)
 		}
 
 		// ── Payroll (Penggajian) ──
 		if cfg.FeaturePayroll {
-			finance.POST("/payroll", middleware.RoleMiddleware(1, 9), payrollHandler.CreatePayroll)
+			finance.POST("/payroll", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.CreatePayroll)
 			finance.GET("/payroll", middleware.RoleMiddleware(1, 2, 3, 4, 5, 8, 9, 10, 11), payrollHandler.GetPayrolls)
-			finance.PUT("/payroll/:id", middleware.RoleMiddleware(1, 9), payrollHandler.UpdatePayroll)
-			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 9), payrollHandler.DeletePayroll)
-			finance.POST("/payroll/:id/pay", middleware.RoleMiddleware(1, 9), payrollHandler.Pay)
+			finance.PUT("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.UpdatePayroll)
+			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.DeletePayroll)
+			finance.POST("/payroll/:id/pay", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.Pay)
 
-			finance.GET("/payroll/templates", middleware.RoleMiddleware(1, 9), payrollHandler.GetTemplates)
-			finance.GET("/payroll/templates/:userId", middleware.RoleMiddleware(1, 9), payrollHandler.GetTemplateByUserID)
-			finance.POST("/payroll/templates", middleware.RoleMiddleware(1, 9), payrollHandler.UpsertTemplate)
+			finance.GET("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.GetTemplates)
+			finance.GET("/payroll/templates/:userId", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.GetTemplateByUserID)
+			finance.POST("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.UpsertTemplate)
 		}
 
 		// ── Dashboard Analytics ──
-		finance.GET("/dashboard", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetDashboardAnalytics)
+		finance.GET("/dashboard", middleware.RoleMiddleware(1, 2, 3, 8, 9, 11), financeExtendedHandler.GetDashboardAnalytics)
 
 		// ── Transaction Codes ──
-		finance.POST("/transaction-codes", middleware.RoleMiddleware(1, 9, 11), transactionCodeHandler.Create)
-		finance.GET("/transaction-codes", middleware.RoleMiddleware(1, 8, 9, 10, 11), transactionCodeHandler.GetAll)
-		finance.PUT("/transaction-codes/:id", middleware.RoleMiddleware(1, 9, 11), transactionCodeHandler.Update)
-		finance.DELETE("/transaction-codes/:id", middleware.RoleMiddleware(1, 9, 11), transactionCodeHandler.Delete)
-		finance.GET("/global-transactions", middleware.RoleMiddleware(1, 8, 9, 10, 11), transactionCodeHandler.GetGlobalTransactions)
+		finance.POST("/transaction-codes", middleware.RoleMiddleware(1, 2, 3, 9, 11), transactionCodeHandler.Create)
+		finance.GET("/transaction-codes", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10, 11), transactionCodeHandler.GetAll)
+		finance.PUT("/transaction-codes/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), transactionCodeHandler.Update)
+		finance.DELETE("/transaction-codes/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), transactionCodeHandler.Delete)
+		finance.GET("/global-transactions", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10, 11), transactionCodeHandler.GetGlobalTransactions)
 
 		// ── Master Kategori & Komponen (Untuk RKAS & BKU) ──
-		finance.POST("/budget-categories", middleware.RoleMiddleware(1, 9), budgetHandler.CreateCategory)
-		finance.GET("/budget-categories", middleware.RoleMiddleware(1, 8, 9, 10, 11), budgetHandler.GetAllCategories)
-		finance.PUT("/budget-categories/:id", middleware.RoleMiddleware(1, 9), budgetHandler.UpdateCategory)
-		finance.DELETE("/budget-categories/:id", middleware.RoleMiddleware(1, 9), budgetHandler.DeleteCategory)
+		finance.POST("/budget-categories", middleware.RoleMiddleware(1, 2, 3, 9, 11), budgetHandler.CreateCategory)
+		finance.GET("/budget-categories", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10, 11), budgetHandler.GetAllCategories)
+		finance.PUT("/budget-categories/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), budgetHandler.UpdateCategory)
+		finance.DELETE("/budget-categories/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), budgetHandler.DeleteCategory)
 
-		finance.POST("/budget-components", middleware.RoleMiddleware(1, 9), budgetHandler.CreateComponent)
-		finance.GET("/budget-components", middleware.RoleMiddleware(1, 8, 9, 10, 11), budgetHandler.GetComponents)
-		finance.PUT("/budget-components/:id", middleware.RoleMiddleware(1, 9), budgetHandler.UpdateComponent)
-		finance.DELETE("/budget-components/:id", middleware.RoleMiddleware(1, 9), budgetHandler.DeleteComponent)
+		// ── Budget Components (Komponen adalah turunan dari Kategori) ──
+		finance.POST("/budget-components", middleware.RoleMiddleware(1, 2, 3, 9, 11), budgetHandler.CreateComponent)
+		finance.GET("/budget-components", middleware.RoleMiddleware(1, 2, 3, 8, 9, 10, 11), budgetHandler.GetComponents)
+		finance.PUT("/budget-components/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), budgetHandler.UpdateComponent)
+		finance.DELETE("/budget-components/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), budgetHandler.DeleteComponent)
 
 		// ── RKAS / RAB (Budgeting) ──
 		if cfg.FeatureRKAS {

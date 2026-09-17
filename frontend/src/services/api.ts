@@ -11,17 +11,30 @@ declare module 'axios' {
     }
 }
 
+const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+const baseURL = envApiUrl 
+    ? (String(envApiUrl).endsWith('/api') ? String(envApiUrl) : `${String(envApiUrl).replace(/\/$/, '')}/api`) 
+    : '/api';
+
 const api = axios.create({
-    baseURL: '/api',
+    baseURL,
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: true, // Kirim httpOnly cookie secara otomatis
+    withCredentials: true, // Kirim httpOnly cookie secara otomatis jika same-domain / CORS credentials didukung
 });
 
 // ─── Request Interceptor ───
-// Request interceptor bisa ditambahkan di sini jika dibutuhkan di masa depan.
+// Sisipkan Authorization header jika ada token di localStorage
 api.interceptors.request.use((config) => {
+    try {
+        const token = localStorage.getItem('token');
+        if (token && !config.headers.Authorization) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+    } catch (e) {
+        // Ignore localStorage error in restricted iframe environments
+    }
     return config;
 });
 

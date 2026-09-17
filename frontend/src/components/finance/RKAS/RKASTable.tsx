@@ -36,7 +36,7 @@ export const RKASTable: React.FC<RKASTableProps> = ({
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void }>({
         title: '',
         message: '',
-        onConfirm: () => {}
+        onConfirm: () => { }
     });
 
     const toggleGroup = (standarName: string) => {
@@ -49,15 +49,15 @@ export const RKASTable: React.FC<RKASTableProps> = ({
 
     const getStatusBadge = (pct: number, isIncome: boolean) => {
         if (isIncome) {
-            if (pct >= 100) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Target Tercapai</span>;
-            if (pct >= 50) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">On Track</span>;
-            if (pct > 0) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Sedang Berjalan</span>;
-            return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Belum Ada Masuk</span>;
+            if (pct >= 100) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-800">Target Tercapai</span>;
+            if (pct >= 50) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-blue-800">On Track</span>;
+            if (pct > 0) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-800">Sedang Berjalan</span>;
+            return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-slate-500">Belum Ada Masuk</span>;
         } else {
-            if (pct > 100) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800">Overbudget</span>;
-            if (pct >= 80) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Mendekati Pagu</span>;
-            if (pct > 0) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Terkendali</span>;
-            return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Belum Belanja</span>;
+            if (pct > 100) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-red-800">Overbudget</span>;
+            if (pct >= 80) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-800">Mendekati Pagu</span>;
+            if (pct > 0) return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-blue-800">Terkendali</span>;
+            return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-slate-700">Belum Belanja</span>;
         }
     };
 

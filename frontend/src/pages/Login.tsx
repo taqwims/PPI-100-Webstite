@@ -19,7 +19,14 @@ const Login: React.FC = () => {
         setIsLoading(true);
         setError('');
         try {
-            await api.post('/auth/login', { email, password });
+            const loginRes = await api.post('/auth/login', { email, password });
+            if (loginRes.data?.token) {
+                try {
+                    localStorage.setItem('token', loginRes.data.token);
+                } catch (e) {
+                    // Ignore storage errors
+                }
+            }
             
             // Fetch user profile to populate the user object before navigating
             const profileRes = await api.get('/profile');

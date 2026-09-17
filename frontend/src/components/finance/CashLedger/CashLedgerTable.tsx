@@ -72,11 +72,11 @@ const CashLedgerTable: React.FC<Props> = ({
                                 </td>
                                 <td className="p-4 text-sm whitespace-nowrap">
                                     {entry.invoice_number ? (
-                                        <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/90 text-xs shadow-2xs tracking-wide">
+                                        <span className="font-mono font-bold text-slate-700 px-2.5 py-1 rounded-lg text-xs shadow-2xs tracking-wide">
                                             {entry.invoice_number}
                                         </span>
                                     ) : (
-                                        <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/90 text-xs shadow-2xs tracking-wide">
+                                        <span className="font-mono font-bold text-slate-700 px-2.5 py-1 rounded-lg text-xs shadow-2xs tracking-wide">
                                             {`${entry.transaction_code?.parent_code?.code || entry.transaction_code?.code || 'BK'}-${new Date(entry.date).getFullYear()}${String(new Date(entry.date).getMonth() + 1).padStart(2, '0')}-0001`}
                                         </span>
                                     )}
@@ -105,7 +105,7 @@ const CashLedgerTable: React.FC<Props> = ({
                                 </td>
                                 <td className="p-4">
                                     {entry.component ? (
-                                        <span className="inline-block px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/60 text-xs rounded-md font-medium">
+                                        <span className="inline-block px-2.5 py-0.5 text-slate-700 text-xs rounded-md font-medium">
                                             {entry.component}
                                         </span>
                                     ) : (

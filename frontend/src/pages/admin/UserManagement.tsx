@@ -152,7 +152,7 @@ const UserManagement: React.FC = () => {
 
     // For sorting students by class - always fetch classes
     const { data: allClasses = [] } = useQuery<Class[]>({
-        queryKey: ['all-classes'], 
+        queryKey: ['all-classes'],
         queryFn: async () => (await api.get('/academic/classes')).data || [],
     });
 
@@ -244,7 +244,7 @@ const UserManagement: React.FC = () => {
         .filter((u: User) => {
             if (user?.role_id !== 1 && u.unit_id !== user?.unit_id) return false;
             if (activeTab !== 0 && u.role_id !== activeTab) return false;
-            
+
             // Class filter (only for students or in "Semua" tab)
             if (selectedClassId !== 0) {
                 if (u.role_id !== 6 || u.student?.class_id !== selectedClassId) return false;
@@ -270,7 +270,7 @@ const UserManagement: React.FC = () => {
                 if (classCompare !== 0) return classCompare;
                 return a.name.localeCompare(b.name);
             }
-            
+
             // Otherwise sort by role then name
             if (a.role_id !== b.role_id) return a.role_id - b.role_id;
             return a.name.localeCompare(b.name);
@@ -285,21 +285,21 @@ const UserManagement: React.FC = () => {
         mutationFn: (data: typeof formData) => {
             if (data.role_id === 6) {
                 return api.post('/students/', {
-                    name: data.name, 
-                    email: data.email, 
+                    name: data.name,
+                    email: data.email,
                     password: data.password,
-                    nisn: data.nisn, 
+                    nisn: data.nisn,
                     rfid: data.rfid || undefined,
                     class_id: Number(data.class_id),
-                    unit_id: Number(data.unit_id), 
+                    unit_id: Number(data.unit_id),
                     parent_id: data.parent_id || undefined,
                 });
             }
             return api.post('/users/', {
-                name: data.name, 
-                email: data.email, 
+                name: data.name,
+                email: data.email,
                 password: data.password,
-                role_id: Number(data.role_id), 
+                role_id: Number(data.role_id),
                 unit_id: Number(data.unit_id),
             });
         },
@@ -382,10 +382,10 @@ const UserManagement: React.FC = () => {
             setEditingStudentRecord(null);
         }
 
-        const rawParentId = u.student?.parent?.user?.id 
-            || u.student?.parent?.user_id 
-            || u.student?.parent_id 
-            || studentRec?.parent_id 
+        const rawParentId = u.student?.parent?.user?.id
+            || u.student?.parent?.user_id
+            || u.student?.parent_id
+            || studentRec?.parent_id
             || '';
 
         const resolvedParentUserId = resolveParentIdToUserId(rawParentId);
@@ -483,127 +483,125 @@ const UserManagement: React.FC = () => {
             ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 bg-slate-50 border-b border-slate-200">
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <div className="relative flex-1 max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input type="text" placeholder="Cari nama atau email..." value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm" />
-                        </div>
-                        
-                        {(activeTab === 0 || activeTab === 6) && (
-                            <div className="relative w-full md:w-48">
-                                <select 
-                                    value={selectedClassId} 
-                                    onChange={e => setSelectedClassId(Number(e.target.value))}
-                                    className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-sm appearance-none bg-white"
-                                >
-                                    <option value={0}>Semua Kelas</option>
-                                    {allClasses
-                                        .filter((cls: Class) => user?.role_id === 1 || cls.unit_id === user?.unit_id)
-                                        .map((cls: Class) => (
-                                             <option key={cls.id} value={cls.id}>
-                                                 {cls.name} {user?.role_id === 1 ? `(${getUnitName(cls.unit_id)})` : ''}
-                                             </option>
-                                        ))}
-                                </select>
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <Shield size={14} className="text-slate-400" />
-                                </div>
+                        <div className="flex flex-col md:flex-row gap-4 items-center">
+                            <div className="relative flex-1 max-w-sm">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input type="text" placeholder="Cari nama atau email..." value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm" />
                             </div>
-                        )}
+
+                            {(activeTab === 0 || activeTab === 6) && (
+                                <div className="relative w-full md:w-48">
+                                    <select
+                                        value={selectedClassId}
+                                        onChange={e => setSelectedClassId(Number(e.target.value))}
+                                        className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-sm appearance-none bg-white"
+                                    >
+                                        <option value={0}>Semua Kelas</option>
+                                        {allClasses
+                                            .filter((cls: Class) => user?.role_id === 1 || cls.unit_id === user?.unit_id)
+                                            .map((cls: Class) => (
+                                                <option key={cls.id} value={cls.id}>
+                                                    {cls.name} {user?.role_id === 1 ? `(${getUnitName(cls.unit_id)})` : ''}
+                                                </option>
+                                            ))}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <Shield size={14} className="text-slate-400" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-sm">
+                                    <th className="px-5 py-3 font-medium w-12">No</th>
+                                    <th className="px-5 py-3 font-medium">Nama</th>
+                                    <th className="px-5 py-3 font-medium">Email</th>
+                                    <th className="px-5 py-3 font-medium">Role</th>
+                                    {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && <th className="px-5 py-3 font-medium">RFID</th>}
+                                    {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Kelas</th>}
+                                    {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Orang Tua</th>}
+                                    <th className="px-5 py-3 font-medium">Unit</th>
+                                    <th className="px-5 py-3 font-medium text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {isLoading ? (
+                                    <tr><td colSpan={(activeTab === 0 || activeTab === 6) ? (isRFIDEnabled ? 9 : 8) : 6} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
+                                ) : filteredUsers.length === 0 ? (
+                                    <tr><td colSpan={(activeTab === 0 || activeTab === 6) ? (isRFIDEnabled ? 9 : 8) : 6} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
+                                ) : filteredUsers.map((u: User, idx: number) => {
+                                    const parentName = getStudentParentName(u);
+                                    const studentRfid = u.student?.rfid || allStudents?.find(s => s.user_id === u.id)?.rfid;
+                                    return (
+                                        <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-5 py-3 text-slate-400 text-sm font-medium">{idx + 1}</td>
+                                            <td className="px-5 py-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold', roleColor(u.role_id))}>
+                                                        {u.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <span className="font-medium text-slate-900">{u.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-3 text-slate-500 text-sm">{u.email}</td>
+                                            <td className="px-5 py-3">
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roleColor(u.role_id)}`}>
+                                                    {getRoleName(u.role_id)}
+                                                </span>
+                                            </td>
+                                            {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && (
+                                                <td className="px-5 py-3 text-sm">
+                                                    {u.role_id === 6 ? (
+                                                        studentRfid ? (
+                                                            <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                                                                <Radio size={11} /> {studentRfid}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400 italic">Belum Ada</span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-slate-400">-</span>
+                                                    )}
+                                                </td>
+                                            )}
+                                            {(activeTab === 0 || activeTab === 6) && (
+                                                <td className="px-5 py-3 text-sm text-slate-600 font-medium">{getStudentClass(u)}</td>
+                                            )}
+                                            {(activeTab === 0 || activeTab === 6) && (
+                                                <td className="px-5 py-3 text-sm">
+                                                    {u.role_id === 6 ? (
+                                                        parentName !== '-' ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 px-2 py-0.5 rounded-md">
+                                                                {parentName}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-xs text-amber-600 px-2 py-0.5 rounded-md">
+                                                                Belum Ditentukan
+                                                            </span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-slate-400">-</span>
+                                                    )}
+                                                </td>
+                                            )}
+                                            <td className="px-5 py-3 text-sm text-slate-500">{getUnitName(u.unit_id)}</td>
+                                            <td className="px-5 py-3 text-center space-x-1">
+                                                <button onClick={() => handleEdit(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit User"><Edit2 size={16} /></button>
+                                                <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus User"><Trash2 size={16} /></button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-sm">
-                                <th className="px-5 py-3 font-medium w-12">No</th>
-                                <th className="px-5 py-3 font-medium">Nama</th>
-                                <th className="px-5 py-3 font-medium">Email</th>
-                                <th className="px-5 py-3 font-medium">Role</th>
-                                {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && <th className="px-5 py-3 font-medium">RFID</th>}
-                                {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Kelas</th>}
-                                {(activeTab === 0 || activeTab === 6) && <th className="px-5 py-3 font-medium">Orang Tua</th>}
-                                <th className="px-5 py-3 font-medium">Unit</th>
-                                <th className="px-5 py-3 font-medium text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {isLoading ? (
-                                <tr><td colSpan={(activeTab === 0 || activeTab === 6) ? (isRFIDEnabled ? 9 : 8) : 6} className="py-12 text-center text-slate-400">Memuat data...</td></tr>
-                            ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan={(activeTab === 0 || activeTab === 6) ? (isRFIDEnabled ? 9 : 8) : 6} className="py-12 text-center text-slate-400">Tidak ada user ditemukan</td></tr>
-                            ) : filteredUsers.map((u: User, idx: number) => {
-                                const parentName = getStudentParentName(u);
-                                const studentRfid = u.student?.rfid || allStudents?.find(s => s.user_id === u.id)?.rfid;
-                                return (
-                                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-5 py-3 text-slate-400 text-sm font-medium">{idx + 1}</td>
-                                        <td className="px-5 py-3">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold', roleColor(u.role_id))}>
-                                                    {u.name.charAt(0).toUpperCase()}
-                                                </div>
-                                                <span className="font-medium text-slate-900">{u.name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-3 text-slate-500 text-sm">{u.email}</td>
-                                        <td className="px-5 py-3">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roleColor(u.role_id)}`}>
-                                                {getRoleName(u.role_id)}
-                                            </span>
-                                        </td>
-                                        {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && (
-                                            <td className="px-5 py-3 text-sm">
-                                                {u.role_id === 6 ? (
-                                                    studentRfid ? (
-                                                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                                                            <Radio size={11} /> {studentRfid}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-400 italic">Belum Ada</span>
-                                                    )
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
-                                            </td>
-                                        )}
-                                        {(activeTab === 0 || activeTab === 6) && (
-                                            <td className="px-5 py-3 text-sm text-slate-600 font-medium">{getStudentClass(u)}</td>
-                                        )}
-                                        {(activeTab === 0 || activeTab === 6) && (
-                                            <td className="px-5 py-3 text-sm">
-                                                {u.role_id === 6 ? (
-                                                    parentName !== '-' ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                                                            <CheckCircle size={12} className="text-emerald-600" />
-                                                            {parentName}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                                                            <AlertCircle size={12} className="text-amber-500" />
-                                                            Belum Ditentukan
-                                                        </span>
-                                                    )
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
-                                            </td>
-                                        )}
-                                        <td className="px-5 py-3 text-sm text-slate-500">{getUnitName(u.unit_id)}</td>
-                                        <td className="px-5 py-3 text-center space-x-1">
-                                            <button onClick={() => handleEdit(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit User"><Edit2 size={16} /></button>
-                                            <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus User"><Trash2 size={16} /></button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
             )}
 
             {/* Modal */}
@@ -713,8 +711,8 @@ const UserManagement: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Orang Tua / Wali Murid</label>
-                                        <select 
-                                            value={formData.parent_id} 
+                                        <select
+                                            value={formData.parent_id}
                                             onChange={e => setFormData({ ...formData, parent_id: e.target.value })}
                                             className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
                                         >
@@ -725,7 +723,7 @@ const UserManagement: React.FC = () => {
                                                 </option>
                                             ))}
                                         </select>
-                                        
+
                                         {/* Status Indicator */}
                                         {formData.parent_id ? (
                                             <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium mt-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200/60">
