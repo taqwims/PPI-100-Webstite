@@ -13,6 +13,8 @@ export interface CashLedgerEntry {
     type: 'Income' | 'Expense';
     amount: number;
     category: string;
+    component?: string;
+    proof_url?: string;
     fund_source: string;
     auto_generated: boolean;
     notes: string;
@@ -28,9 +30,19 @@ export interface TransactionCode {
     name: string;
     type: string;
     category: string;
+    component?: string;
     description?: string;
     is_active: boolean;
     parent_code_id?: number | null;
     parent_code?: TransactionCode | null;
     children?: TransactionCode[];
+}
+
+export interface BudgetComponent {
+    id: number;
+    category_id: number;
+    category?: { id: number; name: string };
+    name: string;
+    description?: string;
+    is_active: boolean;
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useFeatureStore } from '../../store/featureStore';
@@ -15,8 +16,14 @@ const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'c
 
 const StudentObligations = () => {
     const { user } = useAuth();
+    const queryClient = useQueryClient();
     const isBulkDeleteEnabled = useFeatureStore(s => s.isEnabled('bulk_delete_obligations'));
     const canManage = [1, 9, 11].includes(user?.role_id || 0);
+
+    const invalidateBudgets = () => {
+        queryClient.invalidateQueries({ queryKey: ['budgets'] });
+        queryClient.invalidateQueries({ queryKey: ['budget-summary'] });
+    };
 
     const [obligations, setObligations] = useState<Obligation[]>([]);
     const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
@@ -136,6 +143,7 @@ const StudentObligations = () => {
             await api.delete(`/finance/student-obligations/${id}`);
             toast.success(isPaid ? 'Tanggungan dan seluruh riwayat pembayaran terkait berhasil dihapus' : 'Berhasil dihapus');
             fetchData();
+            invalidateBudgets();
         } catch (err: any) { 
             console.error(err);
             toast.error(err.response?.data?.error || 'Gagal menghapus tanggungan');
@@ -158,6 +166,7 @@ const StudentObligations = () => {
             await Promise.all(ids.map(id => api.delete(`/finance/student-obligations/${id}`)));
             toast.success(`Berhasil menghapus ${typeName}`);
             fetchData();
+            invalidateBudgets();
         } catch (err: any) {
             console.error(err);
             toast.error(err.response?.data?.error || `Gagal menghapus ${typeName}`);
@@ -302,7 +311,7 @@ const StudentObligations = () => {
             <BulkAssignModal 
                 isOpen={showBulkModal}
                 onClose={() => setShowBulkModal(false)}
-                onSuccess={fetchData}
+                onSuccess={() => { fetchData(); invalidateBudgets(); }}
                 filterYearId={filterYearId}
                 classes={classes}
                 students={students}
@@ -314,7 +323,7 @@ const StudentObligations = () => {
             <BulkDeleteModal 
                 isOpen={showBulkDeleteModal}
                 onClose={() => setShowBulkDeleteModal(false)}
-                onSuccess={fetchData}
+                onSuccess={() => { fetchData(); invalidateBudgets(); }}
                 paymentTypes={paymentTypes}
                 classes={classes}
                 academicYears={academicYears}
@@ -331,7 +340,7 @@ const StudentObligations = () => {
                 setEditingOb={setEditingOb}
                 editAmount={editAmount}
                 setEditAmount={setEditAmount}
-                onSuccess={fetchData}
+                onSuccess={() => { fetchData(); invalidateBudgets(); }}
             />
 
             <PrintOptionsModal 

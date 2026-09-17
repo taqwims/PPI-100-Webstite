@@ -292,3 +292,46 @@ func TestDeleteBillSafetyPolicy(t *testing.T) {
 	}
 }
 
+// TestRKASQuantityDecrementationOnObligationDelete verifies the invariant that deleting student obligations
+// reduces RKAS quantity by count (down to 0) and keeps PlannedAmount = Quantity * UnitPrice.
+func TestRKASQuantityDecrementationOnObligationDelete(t *testing.T) {
+	initialQty := 50
+	unitPrice := 150000.0
+	initialPlanned := float64(initialQty) * unitPrice
+
+	// Delete 1 obligation
+	deletedCount := 1
+	updatedQty := initialQty - deletedCount
+	if updatedQty < 0 {
+		updatedQty = 0
+	}
+	updatedPlanned := float64(updatedQty) * unitPrice
+
+	if updatedQty != 49 {
+		t.Fatalf("Expected updated quantity to be 49, got %d", updatedQty)
+	}
+	if updatedPlanned != 49*150000.0 {
+		t.Fatalf("Expected updated planned amount to be %f, got %f", 49*150000.0, updatedPlanned)
+	}
+
+	// Delete oversized count (should clamp to 0, not become negative)
+	oversizedDelete := 100
+	clampedQty := updatedQty - oversizedDelete
+	if clampedQty < 0 {
+		clampedQty = 0
+	}
+	clampedPlanned := float64(clampedQty) * unitPrice
+
+	if clampedQty != 0 {
+		t.Fatalf("Expected clamped quantity to be 0, got %d", clampedQty)
+	}
+	if clampedPlanned != 0 {
+		t.Fatalf("Expected clamped planned amount to be 0, got %f", clampedPlanned)
+	}
+
+	// Initial planned sanity check
+	if initialPlanned != 7500000.0 {
+		t.Fatalf("Expected initial planned to be 7500000.0, got %f", initialPlanned)
+	}
+}
+

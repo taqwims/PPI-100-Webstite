@@ -42,6 +42,37 @@ func (r *BudgetRepository) DeleteCategory(id uint) error {
 	return r.db.Delete(&domain.BudgetCategory{}, "id = ?", id).Error
 }
 
+// ------------------- Budget Component CRUD -------------------
+
+func (r *BudgetRepository) CreateComponent(comp *domain.BudgetComponent) error {
+	return r.db.Create(comp).Error
+}
+
+func (r *BudgetRepository) GetComponents(categoryID uint) ([]domain.BudgetComponent, error) {
+	var comps []domain.BudgetComponent
+	query := r.db.Preload("Category").Order("name asc")
+	if categoryID > 0 {
+		query = query.Where("category_id = ?", categoryID)
+	}
+	if err := query.Find(&comps).Error; err != nil {
+		return nil, err
+	}
+	return comps, nil
+}
+
+func (r *BudgetRepository) UpdateComponent(comp *domain.BudgetComponent) error {
+	return r.db.Model(&domain.BudgetComponent{}).Where("id = ?", comp.ID).Updates(map[string]interface{}{
+		"name":        comp.Name,
+		"category_id": comp.CategoryID,
+		"description": comp.Description,
+		"is_active":   comp.IsActive,
+	}).Error
+}
+
+func (r *BudgetRepository) DeleteComponent(id uint) error {
+	return r.db.Delete(&domain.BudgetComponent{}, "id = ?", id).Error
+}
+
 // ------------------- Budget CRUD -------------------
 
 func (r *BudgetRepository) Create(b *domain.Budget) error {
@@ -310,6 +341,159 @@ func (r *BudgetRepository) SubtractRealizationByTransactionCodeID(tcID uint, amo
 	})
 }
 
+func (r *BudgetRepository) DecrementBudgetQuantityByTransactionCodeID(tcID uint, academicYearID uint, billingMonth int, count int) error {
+	if count <= 0 {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var tc domain.TransactionCode
+		if err := tx.First(&tc, "id = ?", tcID).Error; err != nil {
+			return nil
+		}
+
+		var tcIDs []uint
+		tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+		if tc.ParentCodeID != nil {
+			tcIDs = append(tcIDs, *tc.ParentCodeID)
+		}
+
+		query := tx.Model(&domain.Budget{}).Where("transaction_code_id IN ? AND budget_type = 'Penerimaan'", tcIDs)
+		if academicYearID > 0 {
+			query = query.Where("academic_year_id = ?", academicYearID)
+		}
+
+		var budgets []domain.Budget
+		query.Order("month desc, created_at desc").Find(&budgets)
+
+		if len(budgets) == 0 {
+			var prefixTCIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("code LIKE ?", tc.Code+"%").Pluck("id", &prefixTCIDs)
+			if len(prefixTCIDs) > 0 {
+				prefixQuery := tx.Model(&domain.Budget{}).Where("transaction_code_id IN ? AND budget_type = 'Penerimaan'", prefixTCIDs)
+				if academicYearID > 0 {
+					prefixQuery = prefixQuery.Where("academic_year_id = ?", academicYearID)
+				}
+				prefixQuery.Order("month desc, created_at desc").Find(&budgets)
+			}
+		}
+
+		if len(budgets) == 0 {
+			return nil
+		}
+
+		var targetBudget *domain.Budget
+		if billingMonth > 0 {
+			for i := range budgets {
+				if budgets[i].Month == billingMonth {
+					targetBudget = &budgets[i]
+					break
+				}
+			}
+		}
+		if targetBudget == nil {
+			for i := range budgets {
+				if budgets[i].Month == 0 {
+					targetBudget = &budgets[i]
+					break
+				}
+			}
+		}
+		if targetBudget == nil && len(budgets) > 0 {
+			targetBudget = &budgets[0]
+		}
+
+		if targetBudget != nil {
+			newQty := targetBudget.Quantity - count
+			if newQty < 0 {
+				newQty = 0
+			}
+			newPlanned := float64(newQty) * targetBudget.UnitPrice
+			return tx.Model(&domain.Budget{}).Where("id = ?", targetBudget.ID).
+				Updates(map[string]interface{}{
+					"quantity":       newQty,
+					"planned_amount": newPlanned,
+				}).Error
+		}
+
+		return nil
+	})
+}
+
+func (r *BudgetRepository) IncrementBudgetQuantityByTransactionCodeID(tcID uint, academicYearID uint, billingMonth int, count int) error {
+	if count <= 0 {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var tc domain.TransactionCode
+		if err := tx.First(&tc, "id = ?", tcID).Error; err != nil {
+			return nil
+		}
+
+		var tcIDs []uint
+		tx.Model(&domain.TransactionCode{}).Where("id = ? OR parent_code_id = ?", tcID, tcID).Pluck("id", &tcIDs)
+		if tc.ParentCodeID != nil {
+			tcIDs = append(tcIDs, *tc.ParentCodeID)
+		}
+
+		query := tx.Model(&domain.Budget{}).Where("transaction_code_id IN ? AND budget_type = 'Penerimaan'", tcIDs)
+		if academicYearID > 0 {
+			query = query.Where("academic_year_id = ?", academicYearID)
+		}
+
+		var budgets []domain.Budget
+		query.Order("month desc, created_at desc").Find(&budgets)
+
+		if len(budgets) == 0 {
+			var prefixTCIDs []uint
+			tx.Model(&domain.TransactionCode{}).Where("code LIKE ?", tc.Code+"%").Pluck("id", &prefixTCIDs)
+			if len(prefixTCIDs) > 0 {
+				prefixQuery := tx.Model(&domain.Budget{}).Where("transaction_code_id IN ? AND budget_type = 'Penerimaan'", prefixTCIDs)
+				if academicYearID > 0 {
+					prefixQuery = prefixQuery.Where("academic_year_id = ?", academicYearID)
+				}
+				prefixQuery.Order("month desc, created_at desc").Find(&budgets)
+			}
+		}
+
+		if len(budgets) == 0 {
+			return nil
+		}
+
+		var targetBudget *domain.Budget
+		if billingMonth > 0 {
+			for i := range budgets {
+				if budgets[i].Month == billingMonth {
+					targetBudget = &budgets[i]
+					break
+				}
+			}
+		}
+		if targetBudget == nil {
+			for i := range budgets {
+				if budgets[i].Month == 0 {
+					targetBudget = &budgets[i]
+					break
+				}
+			}
+		}
+		if targetBudget == nil && len(budgets) > 0 {
+			targetBudget = &budgets[0]
+		}
+
+		if targetBudget != nil {
+			newQty := targetBudget.Quantity + count
+			newPlanned := float64(newQty) * targetBudget.UnitPrice
+			return tx.Model(&domain.Budget{}).Where("id = ?", targetBudget.ID).
+				Updates(map[string]interface{}{
+					"quantity":       newQty,
+					"planned_amount": newPlanned,
+				}).Error
+		}
+
+		return nil
+	})
+}
+
 // ------------------- Budget Summary -------------------
 
 func (r *BudgetRepository) GetSummaryByYear(academicYearID uint) ([]map[string]interface{}, error) {
@@ -430,6 +614,31 @@ func (r *BudgetRepository) Reconcile(academicYearID uint) error {
 
 			// 3. For Penerimaan: verify with student obligations in case some weren't auto-recorded in BKU
 			if b.BudgetType == "Penerimaan" {
+				// Sinkronkan Quantity dan PlannedAmount dengan jumlah tanggungan siswa riil yang di-assign
+				qtyQuery := tx.Table("student_obligations so").
+					Joins("JOIN payment_types pt ON so.payment_type_id = pt.id").
+					Where("pt.transaction_code_id IN ?", tcIDs)
+				if b.AcademicYearID > 0 {
+					qtyQuery = qtyQuery.Where("so.academic_year_id = ?", b.AcademicYearID)
+				}
+				if b.Month > 0 {
+					qtyQuery = qtyQuery.Where("so.billing_month = ?", b.Month)
+				}
+
+				var assignedCount int64
+				qtyQuery.Count(&assignedCount)
+
+				var ptCount int64
+				tx.Model(&domain.PaymentType{}).Where("transaction_code_id IN ?", tcIDs).Count(&ptCount)
+				if ptCount > 0 && b.UnitPrice > 0 {
+					newQty := int(assignedCount)
+					newPlanned := float64(newQty) * b.UnitPrice
+					tx.Model(&domain.Budget{}).Where("id = ?", b.ID).Updates(map[string]interface{}{
+						"quantity":       newQty,
+						"planned_amount": newPlanned,
+					})
+				}
+
 				soQuery := tx.Table("student_obligations so").
 					Joins("JOIN payment_types pt ON so.payment_type_id = pt.id").
 					Where("pt.transaction_code_id IN ? AND so.status != ?", tcIDs, "Unpaid")

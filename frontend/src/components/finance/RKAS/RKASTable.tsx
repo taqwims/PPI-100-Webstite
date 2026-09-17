@@ -190,8 +190,15 @@ export const RKASTable: React.FC<RKASTableProps> = ({
                                                         </td>
 
                                                         {/* Vol / Qty */}
-                                                        <td className="px-5 py-4 text-xs text-center text-slate-700 font-semibold">
-                                                            {isMulti ? `${b.quantity} × ${b.months.length} bln` : (b.quantity > 0 ? b.quantity : '-')}
+                                                        <td
+                                                            className="px-5 py-4 text-xs text-center text-slate-700 font-semibold"
+                                                            title={isMulti ? `Rumus Target: ${b.quantity} ${budgetTypeTab === 'Penerimaan' ? 'Siswa' : 'Unit'} × ${b.months.length} Bulan × ${formatCurrency(b.unit_price)} = ${formatCurrency(b.total_planned)}` : undefined}
+                                                        >
+                                                            {isMulti ? (
+                                                                <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-lg text-xs font-bold">
+                                                                    {b.quantity} {budgetTypeTab === 'Penerimaan' ? 'Siswa' : 'Unit'} × {b.months.length} bln
+                                                                </span>
+                                                            ) : (b.quantity > 0 ? b.quantity : '-')}
                                                         </td>
 
                                                         {/* Harga Satuan */}
@@ -200,7 +207,10 @@ export const RKASTable: React.FC<RKASTableProps> = ({
                                                         </td>
 
                                                         {/* Pagu Anggaran */}
-                                                        <td className="px-5 py-4 text-xs text-right font-bold text-slate-900">
+                                                        <td
+                                                            className="px-5 py-4 text-xs text-right font-bold text-slate-900"
+                                                            title={isMulti ? `Akumulasi ${b.months.length} bulan: ${b.quantity} × ${b.months.length} bln × ${formatCurrency(b.unit_price)}` : undefined}
+                                                        >
                                                             {formatCurrency(b.total_planned)}
                                                         </td>
 

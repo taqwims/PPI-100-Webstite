@@ -75,6 +75,11 @@ func (u *StudentObligationUsecase) Create(ob *domain.StudentObligation) error {
 
 		billDueDate := *ob.DueDate
 		_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &ob.AcademicYearID, pt.TransactionCodeID, false, &obID, nil)
+
+		// Sync RKAS: Increment Quantity and PlannedAmount for existing budgets
+		if u.budgetRepo != nil && pt.TransactionCodeID != nil && *pt.TransactionCodeID > 0 {
+			_ = u.budgetRepo.IncrementBudgetQuantityByTransactionCodeID(*pt.TransactionCodeID, ob.AcademicYearID, ob.BillingMonth, 1)
+		}
 	}
 	return err
 }
@@ -222,6 +227,21 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 		}
 	}
 
+	// Sync RKAS: Increment Quantity and PlannedAmount for existing budgets
+	if u.budgetRepo != nil && pt.TransactionCodeID != nil && *pt.TransactionCodeID > 0 {
+		if pt.PaymentSchedule == "Bulanan" {
+			months := selectedMonths
+			if len(months) == 0 {
+				months = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+			}
+			for _, m := range months {
+				_ = u.budgetRepo.IncrementBudgetQuantityByTransactionCodeID(*pt.TransactionCodeID, academicYearID, m, len(students))
+			}
+		} else {
+			_ = u.budgetRepo.IncrementBudgetQuantityByTransactionCodeID(*pt.TransactionCodeID, academicYearID, 0, len(students))
+		}
+	}
+
 	return len(obligations), nil
 }
 
@@ -350,6 +370,21 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 		}
 	}
 
+	// Sync RKAS: Increment Quantity and PlannedAmount for existing budgets
+	if u.budgetRepo != nil && pt.TransactionCodeID != nil && *pt.TransactionCodeID > 0 {
+		if pt.PaymentSchedule == "Bulanan" {
+			months := selectedMonths
+			if len(months) == 0 {
+				months = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+			}
+			for _, m := range months {
+				_ = u.budgetRepo.IncrementBudgetQuantityByTransactionCodeID(*pt.TransactionCodeID, academicYearID, m, len(studentIDs))
+			}
+		} else {
+			_ = u.budgetRepo.IncrementBudgetQuantityByTransactionCodeID(*pt.TransactionCodeID, academicYearID, 0, len(studentIDs))
+		}
+	}
+
 	return len(obligations), nil
 }
 
@@ -401,6 +436,8 @@ func (u *StudentObligationUsecase) Delete(id uuid.UUID) error {
 		}
 	}
 
+	pt, _ := u.paymentRepo.GetByID(ob.PaymentTypeID)
+
 	// If there are payments or paid amount, reverse & clean up related records
 	if ob.PaidAmount > 0 || (bill != nil && len(bill.Payments) > 0) {
 		// 1. Delete all payments associated with this bill
@@ -409,7 +446,6 @@ func (u *StudentObligationUsecase) Delete(id uuid.UUID) error {
 		}
 
 		// 2. Revert RKAS budget realization
-		pt, _ := u.paymentRepo.GetByID(ob.PaymentTypeID)
 		if u.budgetRepo != nil && pt != nil && pt.TransactionCodeID != nil && *pt.TransactionCodeID > 0 {
 			_ = u.budgetRepo.SubtractRealizationByTransactionCodeID(*pt.TransactionCodeID, ob.PaidAmount, ob.BillingMonth)
 		}
@@ -432,6 +468,11 @@ func (u *StudentObligationUsecase) Delete(id uuid.UUID) error {
 			}
 			_ = u.financeRepo.DeleteCashLedgersForObligation(id, studentName, billTitle, ptName, tcID)
 		}
+	}
+
+	// ALWAYS decrement RKAS budget quantity and recalculate planned_amount when obligation is deleted
+	if u.budgetRepo != nil && pt != nil && pt.TransactionCodeID != nil && *pt.TransactionCodeID > 0 {
+		_ = u.budgetRepo.DecrementBudgetQuantityByTransactionCodeID(*pt.TransactionCodeID, ob.AcademicYearID, ob.BillingMonth, 1)
 	}
 
 	// Delete linked bill and bill items if exists

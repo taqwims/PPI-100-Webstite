@@ -5,6 +5,7 @@ import (
 	"ppi-100-sis/internal/delivery/http/handlers"
 	"ppi-100-sis/internal/delivery/http/middleware"
 	"ppi-100-sis/internal/repository/postgres"
+	"ppi-100-sis/internal/service/storage"
 	"ppi-100-sis/internal/usecase"
 	"ppi-100-sis/internal/utils"
 
@@ -99,7 +100,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	mayarUsecase := usecase.NewMayarUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)
 	mayarHandler := handlers.NewMayarHandler(mayarUsecase)
 
-	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase, xenditUsecase, mayarUsecase)
+	// Storage Service (Cloudflare R2 + local fallback)
+	storageSvc := storage.NewStorageService(cfg)
+
+	financeHandler := handlers.NewFinanceHandler(financeUsecase, midtransUsecase, xenditUsecase, mayarUsecase, storageSvc)
 
 	// Transaction Code
 	transactionCodeRepo := postgres.NewTransactionCodeRepository(db)

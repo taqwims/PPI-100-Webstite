@@ -154,6 +154,10 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
             const qty = activeStudentCount > 0 ? activeStudentCount : (newForm.quantity > 0 ? newForm.quantity : 1);
             newForm.quantity = qty;
             newForm.unit_price = price;
+            if (singlePt.payment_schedule === 'Bulanan') {
+                newForm.period = 'Bulanan';
+                newForm.months = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+            }
             newForm.planned_amount = calcTotalPlanned(qty, price);
             if (!newForm.item_name) {
                 newForm.item_name = singlePt.name;
@@ -177,6 +181,8 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                 ...prev,
                 quantity: qty,
                 unit_price: price,
+                period: pt.payment_schedule === 'Bulanan' ? 'Bulanan' : prev.period,
+                months: pt.payment_schedule === 'Bulanan' && prev.months.length === 0 ? [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6] : prev.months,
                 planned_amount: calcTotalPlanned(qty, price),
                 item_name: prev.item_name ? prev.item_name : pt.name
             }));
@@ -504,96 +510,169 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                                 </div>
                             </div>
                         )}
+
+                        {/* Peringatan jika terhubung ke tagihan bulanan tapi user memilih non-bulanan */}
+                        {form.period !== 'Bulanan' && (
+                            matchingPaymentTypes.some(pt => pt.payment_schedule === 'Bulanan') ||
+                            (matchingPaymentTypes.length === 0 && form.item_name.toLowerCase().includes('spp'))
+                        ) && (
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2 animate-in fade-in">
+                                <span className="text-amber-600 font-bold mt-0.5">⚠️</span>
+                                <div className="flex-1">
+                                    <p className="font-bold">Pos ini merupakan Tagihan Bulanan Siswa (SPP)</p>
+                                    <p className="text-[11px] text-amber-800 mt-0.5">
+                                        Disarankan memilih periode <strong>Bulanan</strong> agar target anggaran terdistribusi ke masing-masing 12 bulan (dengan rumus: <code>Qty Siswa × Bulan × Tarif</code>) dan sinkron dengan pembayaran siswa.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => handlePeriodChange('Bulanan')}
+                                        className="mt-1.5 px-2.5 py-1 bg-amber-600 text-white rounded-lg font-bold text-[10px] hover:bg-amber-700 transition"
+                                    >
+                                        Ubah ke Periode Bulanan (12 Bulan)
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Kalkulasi Volume & Harga Satuan -> Pagu Anggaran */}
-                    <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                                <Calculator size={15} className="text-blue-600" />
-                                <span>Rincian Pagu Anggaran</span>
-                            </div>
-                            <span className="text-[11px] text-slate-400 font-medium">
-                                Otomatis: Qty × Tarif
-                            </span>
-                        </div>
+                    {(() => {
+                        const isMonthly = form.period === 'Bulanan';
+                        const monthsCount = isMonthly ? (form.months.length > 0 ? form.months.length : 12) : 1;
+                        const qty = form.quantity || 1;
+                        const unitPrice = form.unit_price || 0;
+                        const monthlyAllocation = qty * unitPrice;
+                        const totalPlannedAccumulated = isMonthly ? (qty * monthsCount * unitPrice) : monthlyAllocation;
+                        const isSuspiciousMultiply = isMonthly && activeStudentCount > 0 && form.quantity >= (activeStudentCount * 2);
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                                    Volume / Qty (Item / Siswa)
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={form.quantity}
-                                    onChange={e => {
-                                        const q = Number(e.target.value);
-                                        setForm(prev => ({
-                                            ...prev,
-                                            quantity: q,
-                                            planned_amount: calcTotalPlanned(q, prev.unit_price)
-                                        }));
-                                    }}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                                    Harga Satuan / Tarif (Rp)
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={form.unit_price || ''}
-                                    onChange={e => {
-                                        const p = Number(e.target.value);
-                                        setForm(prev => ({
-                                            ...prev,
-                                            unit_price: p,
-                                            planned_amount: calcTotalPlanned(prev.quantity, p)
-                                        }));
-                                    }}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
-                                    placeholder="Contoh: 150000"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Breakdown Penjelasan Rumus */}
-                        <div className="p-2.5 bg-blue-50/60 border border-blue-100 rounded-xl text-[11px] text-blue-900 space-y-1">
-                            <div className="flex items-center justify-between">
-                                <span className="font-semibold text-blue-700">Rumus Pagu:</span>
-                                <span className="font-bold">
-                                    {form.quantity || 1} × {formatCurrency(form.unit_price || 0)} = {formatCurrency((form.quantity || 1) * (form.unit_price || 0))}
-                                </span>
-                            </div>
-                            {form.period === 'Bulanan' && form.months.length > 1 && (
-                                <div className="flex items-center justify-between text-blue-800 pt-1 border-t border-blue-200/60 text-[10.5px]">
-                                    <span>Akumulasi ({form.months.length} Bulan Terpilih):</span>
-                                    <span className="font-black text-blue-900">
-                                        {formatCurrency((form.quantity || 1) * (form.unit_price || 0) * form.months.length)}
+                        return (
+                            <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                                        <Calculator size={15} className="text-blue-600" />
+                                        <span>Rincian Pagu Anggaran</span>
+                                    </div>
+                                    <span className="text-[11px] text-slate-500 font-semibold">
+                                        {isMonthly ? 'Rumus: Qty Siswa × Bulan × Tarif' : 'Rumus: Qty × Tarif'}
                                     </span>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Total Pagu Display */}
-                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                            <div>
-                                <span className="text-xs font-bold text-slate-700 block">Total Pagu per Item / Bulan:</span>
-                                <span className="text-[10px] text-slate-500">
-                                    {form.period === 'Bulanan' && form.months.length > 1
-                                        ? `Akan dialokasikan ke masing-masing ${form.months.length} bulan (@ ${formatCurrency(Number(form.planned_amount || (form.quantity * form.unit_price)))})`
-                                        : 'Nilai total pagu untuk pos anggaran ini'}
-                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                            {isMonthly && form.budget_type === 'Penerimaan'
+                                                ? 'Jumlah Siswa (Qty Siswa)'
+                                                : isMonthly
+                                                    ? 'Volume per Bulan (Qty)'
+                                                    : 'Volume / Qty (Item / Siswa)'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={form.quantity}
+                                            onChange={e => {
+                                                const q = Number(e.target.value);
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    quantity: q,
+                                                    planned_amount: calcTotalPlanned(q, prev.unit_price)
+                                                }));
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        {isMonthly && (
+                                            <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                                                💡 Masukkan jumlah siswa (misal: {activeStudentCount > 0 ? activeStudentCount : 50} siswa). Jangan dikalikan dengan bulan.
+                                            </p>
+                                        )}
+                                        {isSuspiciousMultiply && (
+                                            <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 font-medium">
+                                                ⚠️ Nilai {form.quantity} tampak besar. Pastikan ini adalah <strong>jumlah siswa</strong>, bukan hasil perkalian dengan bulan ({activeStudentCount} × 12 = {activeStudentCount * 12}).
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                            {isMonthly ? 'Tarif / Biaya per Bulan (Rp)' : 'Harga Satuan / Tarif (Rp)'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={form.unit_price || ''}
+                                            onChange={e => {
+                                                const p = Number(e.target.value);
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    unit_price: p,
+                                                    planned_amount: calcTotalPlanned(prev.quantity, p)
+                                                }));
+                                            }}
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Contoh: 150000"
+                                        />
+                                        {isMonthly && (
+                                            <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                                                Tarif per siswa per bulan.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Breakdown Penjelasan Rumus */}
+                                {isMonthly ? (
+                                    <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-950 space-y-1.5">
+                                        <div className="flex items-center justify-between font-semibold text-emerald-800">
+                                            <span className="flex items-center gap-1.5">
+                                                <span>📐</span> Rumus Pagu Tagihan Bulanan:
+                                            </span>
+                                            <span className="bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                                Qty Siswa × Bulan × Tarif
+                                            </span>
+                                        </div>
+                                        <div className="text-xs font-extrabold text-emerald-900 bg-white/80 p-2 rounded-lg border border-emerald-200/60">
+                                            {qty} Siswa × {monthsCount} Bulan × {formatCurrency(unitPrice)} = <span className="text-emerald-700">{formatCurrency(totalPlannedAccumulated)}</span>
+                                        </div>
+                                        <div className="text-[11px] text-emerald-700 pt-0.5 flex items-center justify-between">
+                                            <span>Alokasi Pagu per Bulan:</span>
+                                            <span className="font-bold text-emerald-800">{formatCurrency(monthlyAllocation)} / bulan ({monthsCount} bulan)</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-2.5 bg-blue-50/60 border border-blue-100 rounded-xl text-[11px] text-blue-900 flex items-center justify-between">
+                                        <span className="font-semibold text-blue-700">Rumus Pagu:</span>
+                                        <span className="font-bold">
+                                            {qty} × {formatCurrency(unitPrice)} = {formatCurrency(qty * unitPrice)}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Total Pagu Display */}
+                                <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-800 block">
+                                            {isMonthly ? 'Total Target Anggaran RKAS:' : 'Total Pagu Anggaran:'}
+                                        </span>
+                                        <span className="text-[10.5px] text-slate-500">
+                                            {isMonthly
+                                                ? `Akumulasi ${monthsCount} bulan (@ ${formatCurrency(monthlyAllocation)}/bln)`
+                                                : 'Nilai total pagu untuk pos anggaran ini'}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-base font-black text-blue-700 block">
+                                            {formatCurrency(isMonthly ? totalPlannedAccumulated : Number(form.planned_amount || (qty * unitPrice)))}
+                                        </span>
+                                        {isMonthly && monthsCount > 1 && (
+                                            <span className="text-[10px] text-slate-500 font-medium">
+                                                (@ {formatCurrency(monthlyAllocation)} per bulan)
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <span className="text-base font-black text-blue-700">
-                                {formatCurrency(Number(form.planned_amount || (form.quantity * form.unit_price)))}
-                            </span>
-                        </div>
-                    </div>
+                        );
+                    })()}
 
                     {/* Catatan */}
                     <div>

@@ -36,11 +36,12 @@ func (h *StudentObligationHandler) Create(c *gin.Context) {
 }
 
 type BulkAssignRequest struct {
-	ClassID          uint  `json:"class_id" binding:"required"`
-	PaymentTypeID    uint  `json:"payment_type_id" binding:"required"`
-	AcademicYearID   uint  `json:"academic_year_id" binding:"required"`
-	SelectedMonths   []int `json:"selected_months"`   // [1,2,3,...,12] untuk bulanan
-	InstallmentCount int   `json:"installment_count"` // Jumlah cicilan untuk tahunan (0 = tidak dicicil)
+	ClassID          uint   `json:"class_id"`
+	ClassIDs         []uint `json:"class_ids"`
+	PaymentTypeID    uint   `json:"payment_type_id" binding:"required"`
+	AcademicYearID   uint   `json:"academic_year_id" binding:"required"`
+	SelectedMonths   []int  `json:"selected_months"`   // [1,2,3,...,12] untuk bulanan
+	InstallmentCount int    `json:"installment_count"` // Jumlah cicilan untuk tahunan (0 = tidak dicicil)
 }
 
 func (h *StudentObligationHandler) BulkAssign(c *gin.Context) {
@@ -50,13 +51,27 @@ func (h *StudentObligationHandler) BulkAssign(c *gin.Context) {
 		return
 	}
 
-	count, err := h.usecase.BulkAssign(req.ClassID, req.PaymentTypeID, req.AcademicYearID, req.SelectedMonths, req.InstallmentCount)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	targetClassIDs := req.ClassIDs
+	if len(targetClassIDs) == 0 && req.ClassID > 0 {
+		targetClassIDs = append(targetClassIDs, req.ClassID)
+	}
+
+	if len(targetClassIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Pilih minimal satu kelas"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Tanggungan berhasil ditambahkan", "count": count})
+	totalCount := 0
+	for _, cid := range targetClassIDs {
+		count, err := h.usecase.BulkAssign(cid, req.PaymentTypeID, req.AcademicYearID, req.SelectedMonths, req.InstallmentCount)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		totalCount += count
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Tanggungan berhasil ditambahkan", "count": totalCount})
 }
 
 func (h *StudentObligationHandler) GetAll(c *gin.Context) {

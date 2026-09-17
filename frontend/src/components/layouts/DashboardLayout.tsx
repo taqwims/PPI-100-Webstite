@@ -24,8 +24,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <div className="flex-1 flex flex-col min-h-screen relative z-10 w-full max-w-full overflow-hidden">
                 <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
-                <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">
-                    <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <main className="flex-1 p-4 lg:p-8 overflow-x-hidden w-full">
+                    <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {children}
                     </div>
                 </main>

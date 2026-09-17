@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"ppi-100-sis/internal/domain"
+	"ppi-100-sis/internal/service/storage"
 	"ppi-100-sis/internal/usecase"
 	"ppi-100-sis/pkg/utils"
 	"strconv"
@@ -21,14 +22,16 @@ type FinanceHandler struct {
 	midtransUsecase *usecase.MidtransUsecase
 	xenditUsecase   *usecase.XenditUsecase
 	mayarUsecase    *usecase.MayarUsecase
+	storageSvc      *storage.StorageService
 }
 
-func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase, xenditUsecase *usecase.XenditUsecase, mayarUsecase *usecase.MayarUsecase) *FinanceHandler {
+func NewFinanceHandler(financeUsecase *usecase.FinanceUsecase, midtransUsecase *usecase.MidtransUsecase, xenditUsecase *usecase.XenditUsecase, mayarUsecase *usecase.MayarUsecase, storageSvc *storage.StorageService) *FinanceHandler {
 	return &FinanceHandler{
 		financeUsecase:  financeUsecase,
 		midtransUsecase: midtransUsecase,
 		xenditUsecase:   xenditUsecase,
 		mayarUsecase:    mayarUsecase,
+		storageSvc:      storageSvc,
 	}
 }
 
@@ -320,22 +323,34 @@ func (h *FinanceHandler) UploadPaymentProof(c *gin.Context) {
 	}
 
 	// Handle file upload
-	file, err := c.FormFile("file")
+	fileHeader, err := c.FormFile("file")
 	proofURL := ""
-	if err == nil && file != nil {
-		// Ensure upload directory exists
-		uploadDir := "./uploads/payment_proofs"
-		os.MkdirAll(uploadDir, os.ModePerm)
-
-		ext := filepath.Ext(file.Filename)
-		filename := fmt.Sprintf("%s_%d%s", billID, time.Now().Unix(), ext)
-		savePath := filepath.Join(uploadDir, filename)
-
-		if err := c.SaveUploadedFile(file, savePath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save proof file"})
-			return
+	if err == nil && fileHeader != nil {
+		if h.storageSvc != nil {
+			f, err := fileHeader.Open()
+			if err == nil {
+				defer f.Close()
+				uploadedURL, err := h.storageSvc.UploadFile(c.Request.Context(), f, fileHeader, "payment_proofs")
+				if err == nil {
+					proofURL = uploadedURL
+				}
+			}
 		}
-		proofURL = "/uploads/payment_proofs/" + filename
+		if proofURL == "" {
+			// Ensure upload directory exists
+			uploadDir := "./uploads/payment_proofs"
+			os.MkdirAll(uploadDir, os.ModePerm)
+
+			ext := filepath.Ext(fileHeader.Filename)
+			filename := fmt.Sprintf("%s_%d%s", billID, time.Now().Unix(), ext)
+			savePath := filepath.Join(uploadDir, filename)
+
+			if err := c.SaveUploadedFile(fileHeader, savePath); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save proof file"})
+				return
+			}
+			proofURL = "/uploads/payment_proofs/" + filename
+		}
 	}
 
 	// Record payment
@@ -634,4 +649,88 @@ func (h *FinanceHandler) DeleteBillTemplate(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Bill template deleted successfully"})
+}
+
+// POST /finance/cash-ledger/upload-proof - Upload proof for BKU (Cash Ledger)
+func (h *FinanceHandler) UploadCashLedgerProof(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File bukti tidak ditemukan"})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuka file"})
+		return
+	}
+	defer file.Close()
+
+	var fileURL string
+	if h.storageSvc != nil {
+		fileURL, err = h.storageSvc.UploadFile(c.Request.Context(), file, fileHeader, "cash_ledger_proofs")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		uploadDir := "./uploads/cash_ledger_proofs"
+		os.MkdirAll(uploadDir, os.ModePerm)
+		ext := filepath.Ext(fileHeader.Filename)
+		filename := fmt.Sprintf("%d_%s%s", time.Now().UnixNano(), uuid.New().String()[:8], ext)
+		savePath := filepath.Join(uploadDir, filename)
+		if err := c.SaveUploadedFile(fileHeader, savePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan file"})
+			return
+		}
+		fileURL = "/uploads/cash_ledger_proofs/" + filename
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Bukti berhasil diunggah",
+		"url":     fileURL,
+	})
+}
+
+// POST /finance/upload - Generic file upload connected to R2
+func (h *FinanceHandler) UploadGenericFile(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File tidak ditemukan"})
+		return
+	}
+
+	folder := c.DefaultPostForm("folder", "general")
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuka file"})
+		return
+	}
+	defer file.Close()
+
+	var fileURL string
+	if h.storageSvc != nil {
+		fileURL, err = h.storageSvc.UploadFile(c.Request.Context(), file, fileHeader, folder)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		uploadDir := filepath.Join("./uploads", folder)
+		os.MkdirAll(uploadDir, os.ModePerm)
+		ext := filepath.Ext(fileHeader.Filename)
+		filename := fmt.Sprintf("%d_%s%s", time.Now().UnixNano(), uuid.New().String()[:8], ext)
+		savePath := filepath.Join(uploadDir, filename)
+		if err := c.SaveUploadedFile(fileHeader, savePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan file"})
+			return
+		}
+		fileURL = fmt.Sprintf("/uploads/%s/%s", folder, filename)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "File berhasil diunggah",
+		"url":     fileURL,
+	})
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Users, X, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../services/api';
 import { AcademicYear, ClassOption, PaymentType } from './types';
@@ -24,9 +24,17 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
 }) => {
     const [submitting, setSubmitting] = useState(false);
     const [assignTarget, setAssignTarget] = useState<'class' | 'student'>('class');
-    const [bulkForm, setBulkForm] = useState({ class_id: '', payment_type_ids: [] as string[], academic_year_id: filterYearId });
-    const [studentId, setStudentId] = useState('');
+    const [bulkForm, setBulkForm] = useState({ payment_type_ids: [] as string[], academic_year_id: filterYearId });
+    
+    // Multi-class selection state
+    const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+    const [classSearch, setClassSearch] = useState('');
+
+    // Multi-student selection state
     const [filterAssignClassId, setFilterAssignClassId] = useState('');
+    const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+    const [studentSearch, setStudentSearch] = useState('');
+
     const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
     const [installmentCount, setInstallmentCount] = useState(1);
 
@@ -40,14 +48,39 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
 
     useEffect(() => {
         if (isOpen) {
-            setBulkForm({ class_id: '', payment_type_ids: [], academic_year_id: filterYearId });
+            setBulkForm({ payment_type_ids: [], academic_year_id: filterYearId });
             setAssignTarget('class');
-            setStudentId('');
+            setSelectedClassIds([]);
+            setClassSearch('');
+            setSelectedStudentIds([]);
+            setStudentSearch('');
             setFilterAssignClassId('');
             setSelectedMonths(getCurrentSemesterMonths());
             setInstallmentCount(1);
         }
     }, [isOpen, filterYearId]);
+
+    // Filter classes for search
+    const filteredClasses = useMemo(() => {
+        if (!classSearch.trim()) return classes;
+        const q = classSearch.toLowerCase();
+        return classes.filter(c => c.name.toLowerCase().includes(q));
+    }, [classes, classSearch]);
+
+    // Filter students for search & class
+    const filteredStudents = useMemo(() => {
+        return students.filter(s => {
+            if (filterAssignClassId && String(s.student?.class?.id) !== filterAssignClassId) return false;
+            if (studentSearch.trim()) {
+                const q = studentSearch.toLowerCase();
+                const nameMatch = s.name?.toLowerCase().includes(q);
+                const nisMatch = s.student?.nis?.toLowerCase().includes(q);
+                const classMatch = s.student?.class?.name?.toLowerCase().includes(q);
+                return nameMatch || nisMatch || classMatch;
+            }
+            return true;
+        });
+    }, [students, filterAssignClassId, studentSearch]);
 
     if (!isOpen) return null;
 
@@ -55,12 +88,61 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
     const hasMonthly = selectedPTs.some(pt => pt.payment_schedule === 'Bulanan');
     const hasYearly = selectedPTs.some(pt => pt.payment_schedule === 'Tahunan');
 
+    // Class selection helpers
+    const handleToggleAllClasses = () => {
+        const visibleIds = filteredClasses.map(c => String(c.id));
+        const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedClassIds.includes(id));
+        if (allSelected) {
+            setSelectedClassIds(prev => prev.filter(id => !visibleIds.includes(id)));
+        } else {
+            const set = new Set([...selectedClassIds, ...visibleIds]);
+            setSelectedClassIds(Array.from(set));
+        }
+    };
+
+    const handleToggleClass = (id: string) => {
+        setSelectedClassIds(prev => 
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    // Student selection helpers
+    const handleToggleAllStudents = () => {
+        const visibleIds = filteredStudents.map(s => String(s.student?.id)).filter(Boolean);
+        const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedStudentIds.includes(id));
+        if (allSelected) {
+            setSelectedStudentIds(prev => prev.filter(id => !visibleIds.includes(id)));
+        } else {
+            const set = new Set([...selectedStudentIds, ...visibleIds]);
+            setSelectedStudentIds(Array.from(set));
+        }
+    };
+
+    const handleToggleStudent = (id: string) => {
+        setSelectedStudentIds(prev => 
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
     const handleAssign = async (e: React.FormEvent) => {
         e.preventDefault();
         if (bulkForm.payment_type_ids.length === 0) {
             toast.error('Pilih minimal satu jenis pembayaran');
             return;
         }
+
+        if (assignTarget === 'class') {
+            if (selectedClassIds.length === 0) {
+                toast.error('Pilih minimal satu kelas');
+                return;
+            }
+        } else {
+            if (selectedStudentIds.length === 0) {
+                toast.error('Pilih minimal satu siswa');
+                return;
+            }
+        }
+
         setSubmitting(true);
         try {
             let totalCount = 0;
@@ -68,7 +150,7 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                 const pt = paymentTypes.find(p => p.id === Number(pt_id));
                 if (assignTarget === 'class') {
                     const payload: any = {
-                        class_id: Number(bulkForm.class_id),
+                        class_ids: selectedClassIds.map(Number),
                         payment_type_id: Number(pt_id),
                         academic_year_id: Number(bulkForm.academic_year_id),
                     };
@@ -81,98 +163,233 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                     const res = await api.post('/finance/student-obligations/bulk-assign', payload);
                     totalCount += res.data?.count || 0;
                 } else {
-                    if (pt?.payment_schedule === 'Bulanan' && selectedMonths.length > 0) {
-                        for (const month of selectedMonths) {
+                    for (const studentId of selectedStudentIds) {
+                        if (pt?.payment_schedule === 'Bulanan' && selectedMonths.length > 0) {
+                            for (const month of selectedMonths) {
+                                await api.post('/finance/student-obligations', {
+                                    student_id: studentId,
+                                    payment_type_id: Number(pt_id),
+                                    academic_year_id: Number(bulkForm.academic_year_id),
+                                    billing_month: month
+                                });
+                                totalCount += 1;
+                            }
+                        } else if (pt?.payment_schedule === 'Tahunan' && installmentCount > 1) {
+                            for (let i = 1; i <= installmentCount; i++) {
+                                await api.post('/finance/student-obligations', {
+                                    student_id: studentId,
+                                    payment_type_id: Number(pt_id),
+                                    academic_year_id: Number(bulkForm.academic_year_id),
+                                    installment_number: i,
+                                    total_installments: installmentCount
+                                });
+                                totalCount += 1;
+                            }
+                        } else {
                             await api.post('/finance/student-obligations', {
                                 student_id: studentId,
                                 payment_type_id: Number(pt_id),
                                 academic_year_id: Number(bulkForm.academic_year_id),
-                                billing_month: month
                             });
                             totalCount += 1;
                         }
-                    } else if (pt?.payment_schedule === 'Tahunan' && installmentCount > 1) {
-                        for (let i = 1; i <= installmentCount; i++) {
-                            await api.post('/finance/student-obligations', {
-                                student_id: studentId,
-                                payment_type_id: Number(pt_id),
-                                academic_year_id: Number(bulkForm.academic_year_id),
-                                installment_number: i,
-                                total_installments: installmentCount
-                            });
-                            totalCount += 1;
-                        }
-                    } else {
-                        await api.post('/finance/student-obligations', {
-                            student_id: studentId,
-                            payment_type_id: Number(pt_id),
-                            academic_year_id: Number(bulkForm.academic_year_id),
-                        });
-                        totalCount += 1;
                     }
                 }
             }
+
             if (assignTarget === 'class') {
-                toast.success(`${totalCount} item tanggungan berhasil ditambahkan`);
+                toast.success(`${totalCount} item tanggungan berhasil ditambahkan untuk ${selectedClassIds.length} kelas`);
             } else {
-                toast.success(`${totalCount} tanggungan berhasil ditambahkan untuk siswa`);
+                toast.success(`${totalCount} item tanggungan berhasil ditambahkan untuk ${selectedStudentIds.length} siswa`);
             }
             onSuccess();
             onClose();
         } catch (err: any) {
-             console.error(err);
+            console.error(err);
+            toast.error(err.response?.data?.error || 'Gagal menambahkan tanggungan');
         } finally { 
             setSubmitting(false); 
         }
     };
 
+    const isAllClassesSelected = filteredClasses.length > 0 && filteredClasses.every(c => selectedClassIds.includes(String(c.id)));
+    const isAllStudentsSelected = filteredStudents.length > 0 && filteredStudents.every(s => selectedStudentIds.includes(String(s.student?.id)));
+
     return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Users size={20} className="text-blue-600" /> Assign Tanggungan</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Users size={20} className="text-blue-600" /> Assign Tanggungan
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Tetapkan tagihan massal untuk beberapa kelas atau beberapa siswa sekaligus
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition">
+                        <X size={20} />
+                    </button>
                 </div>
+
                 <div className="overflow-y-auto w-full max-h-full">
                     <form onSubmit={handleAssign} className="p-6 space-y-4">
-                        <div className="flex gap-4 border-b border-slate-200 pb-2 mb-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" checked={assignTarget === 'class'} onChange={() => setAssignTarget('class')} className="text-blue-600" />
-                                <span className="text-sm font-medium text-slate-700">Per Kelas</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" checked={assignTarget === 'student'} onChange={() => setAssignTarget('student')} className="text-blue-600" />
-                                <span className="text-sm font-medium text-slate-700">Per Siswa</span>
-                            </label>
+                        {/* Tab Mode: Per Kelas vs Per Siswa */}
+                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                            <button
+                                type="button"
+                                onClick={() => setAssignTarget('class')}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
+                                    assignTarget === 'class' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                Per Beberapa Kelas
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAssignTarget('student')}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
+                                    assignTarget === 'student' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                Per Beberapa Siswa
+                            </button>
                         </div>
 
+                        {/* MODE: PER KELAS */}
                         {assignTarget === 'class' ? (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Kelas</label>
-                                <select value={bulkForm.class_id} onChange={e => setBulkForm({ ...bulkForm, class_id: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" required={assignTarget === 'class'}>
-                                    <option value="">Pilih kelas</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-medium text-slate-700">
+                                        Pilih Kelas <span className="text-xs text-blue-600 font-semibold">({selectedClassIds.length} dipilih)</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleAllClasses}
+                                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                    >
+                                        {isAllClassesSelected ? 'Batal Pilih Semua' : 'Pilih Semua Kelas'}
+                                    </button>
+                                </div>
+
+                                {classes.length > 5 && (
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={classSearch}
+                                            onChange={e => setClassSearch(e.target.value)}
+                                            placeholder="Cari kelas..."
+                                            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl p-2.5 bg-slate-50/50 space-y-1">
+                                    {filteredClasses.map(c => {
+                                        const isChecked = selectedClassIds.includes(String(c.id));
+                                        return (
+                                            <label
+                                                key={c.id}
+                                                className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition text-sm ${
+                                                    isChecked ? 'bg-blue-50/80 text-blue-900 font-medium' : 'hover:bg-white text-slate-700'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                    checked={isChecked}
+                                                    onChange={() => handleToggleClass(String(c.id))}
+                                                />
+                                                <span>{c.name}</span>
+                                            </label>
+                                        );
+                                    })}
+                                    {filteredClasses.length === 0 && (
+                                        <p className="text-xs text-slate-400 text-center py-3">Kelas tidak ditemukan</p>
+                                    )}
+                                </div>
                             </div>
                         ) : (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Filter Kelas</label>
-                                <select value={filterAssignClassId} onChange={e => { setFilterAssignClassId(e.target.value); setStudentId(''); }} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl mb-3 text-sm">
-                                    <option value="">-- Semua Kelas --</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                            /* MODE: PER SISWA */
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Filter Kelas</label>
+                                    <select
+                                        value={filterAssignClassId}
+                                        onChange={e => setFilterAssignClassId(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+                                    >
+                                        <option value="">-- Semua Kelas --</option>
+                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
 
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Siswa</label>
-                                <select value={studentId} onChange={e => setStudentId(e.target.value)} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" required={assignTarget === 'student'}>
-                                    <option value="">Pilih Siswa</option>
-                                    {students.filter(s => filterAssignClassId ? String(s.student?.class?.id) === filterAssignClassId : true).map(s => <option key={s.student?.id} value={s.student?.id}>{s.name} ({s.student?.class?.name || 'Belum ada kelas'})</option>)}
-                                </select>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-sm font-medium text-slate-700">
+                                            Pilih Siswa <span className="text-xs text-blue-600 font-semibold">({selectedStudentIds.length} dipilih)</span>
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleAllStudents}
+                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                        >
+                                            {isAllStudentsSelected ? 'Batal Pilih Semua' : 'Pilih Semua Siswa'}
+                                        </button>
+                                    </div>
+
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={studentSearch}
+                                            onChange={e => setStudentSearch(e.target.value)}
+                                            placeholder="Cari nama atau NIS siswa..."
+                                            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+
+                                    <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-2.5 bg-slate-50/50 space-y-1">
+                                        {filteredStudents.map(s => {
+                                            const sId = String(s.student?.id);
+                                            const isChecked = selectedStudentIds.includes(sId);
+                                            return (
+                                                <label
+                                                    key={sId}
+                                                    className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition text-sm ${
+                                                        isChecked ? 'bg-blue-50/80 text-blue-900 font-medium' : 'hover:bg-white text-slate-700'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                        checked={isChecked}
+                                                        onChange={() => handleToggleStudent(sId)}
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="truncate text-xs font-semibold">{s.name}</p>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            {s.student?.class?.name || 'Tanpa kelas'} {s.student?.nis ? `• NIS: ${s.student?.nis}` : ''}
+                                                        </p>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                        {filteredStudents.length === 0 && (
+                                            <p className="text-xs text-slate-400 text-center py-4">Tidak ada siswa ditemukan</p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
 
+                        {/* Jenis Pembayaran */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Jenis Pembayaran (Bisa Pilih Lebih dari 1)</label>
-                            <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Jenis Pembayaran <span className="text-xs text-slate-400 font-normal">(Bisa pilih lebih dari 1)</span>
+                            </label>
+                            <div className="space-y-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2.5 bg-slate-50">
                                 {paymentTypes.filter(pt => pt.is_active).map(pt => (
                                     <label key={pt.id} className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded-lg transition border border-transparent hover:border-slate-200">
                                         <input 
@@ -190,8 +407,8 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                                             }}
                                         />
                                         <div className="flex-1">
-                                            <p className="text-sm font-medium text-slate-800">[{pt.code}] {pt.name}</p>
-                                            <p className="text-xs text-slate-500">{formatCurrency(pt.amount)}</p>
+                                            <p className="text-xs font-medium text-slate-800">[{pt.code}] {pt.name}</p>
+                                            <p className="text-[11px] text-slate-500">{formatCurrency(pt.amount)} • {pt.payment_schedule}</p>
                                         </div>
                                     </label>
                                 ))}
@@ -200,9 +417,11 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                                 )}
                             </div>
                         </div>
+
+                        {/* Tahun Ajaran */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Tahun Ajaran</label>
-                            <select value={bulkForm.academic_year_id} onChange={e => setBulkForm({ ...bulkForm, academic_year_id: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" required>
+                            <select value={bulkForm.academic_year_id} onChange={e => setBulkForm({ ...bulkForm, academic_year_id: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white" required>
                                 <option value="">Pilih tahun ajaran</option>
                                 {academicYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
                             </select>
@@ -264,8 +483,14 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                         )}
 
                         <div className="flex gap-3 pt-4 shrink-0">
-                            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl font-medium text-slate-600">Batal</button>
-                            <button type="submit" disabled={submitting} className="flex-[2] bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center">
+                            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl font-medium text-slate-600 hover:bg-slate-50 transition">
+                                Batal
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={submitting}
+                                className="flex-[2] bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center py-2.5 transition disabled:opacity-50"
+                            >
                                 {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Assign Tagihan'}
                             </button>
                         </div>

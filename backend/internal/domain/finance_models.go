@@ -186,6 +186,8 @@ type CashLedger struct {
 	Type              string           `gorm:"not null" json:"type"` // Income, Expense
 	Amount            float64          `gorm:"not null" json:"amount"`
 	Category          string           `gorm:"not null" json:"category"` // Operasional, Hutang Pihak ke 3, dll
+	Component         string           `gorm:"type:varchar(255)" json:"component"` // Turunan dari kategori
+	ProofURL          string           `gorm:"type:text" json:"proof_url"` // Bukti upload gambar
 	FundSource        string           `gorm:"default:'Kas Umum'" json:"fund_source"` // Kas Umum, Infaq, Tabungan Siswa
 	Notes             string           `json:"notes"`
 	CreatedBy         uuid.UUID        `gorm:"type:uuid" json:"created_by"`
@@ -303,6 +305,7 @@ type TransactionCode struct {
 	Name          string            `gorm:"not null" json:"name"`               // "Pendapatan SPP"
 	Type          string            `gorm:"not null" json:"type"`               // "Income", "Expense"
 	Category      string            `gorm:"not null" json:"category"`           // "SPP", "Gaji", "Infaq", "Operasional"
+	Component     string            `json:"component"`                          // Turunan dari kategori
 	Description   string            `json:"description"`
 	ParentCodeID  *uint             `json:"parent_code_id"`                     // NULL = master/induk, non-NULL = anak
 	ParentCode    *TransactionCode  `gorm:"foreignKey:ParentCodeID" json:"parent_code,omitempty"`
@@ -323,12 +326,24 @@ type BillItem struct {
 
 // ------------------- RAB / RKAS (Budget) -------------------
 type BudgetCategory struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"not null" json:"name"`
-	Description string    `json:"description"`
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uint              `gorm:"primaryKey" json:"id"`
+	Name        string            `gorm:"not null" json:"name"`
+	Description string            `json:"description"`
+	IsActive    bool              `gorm:"default:true" json:"is_active"`
+	Components  []BudgetComponent `gorm:"foreignKey:CategoryID" json:"components,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}
+
+type BudgetComponent struct {
+	ID          uint            `gorm:"primaryKey" json:"id"`
+	CategoryID  uint            `gorm:"not null;index" json:"category_id"`
+	Category    *BudgetCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	Name        string          `gorm:"not null" json:"name"`
+	Description string          `json:"description"`
+	IsActive    bool            `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type Budget struct {

@@ -78,6 +78,76 @@ func (h *BudgetHandler) DeleteCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
+// ------------------- Budget Component -------------------
+
+func (h *BudgetHandler) CreateComponent(c *gin.Context) {
+	var req domain.BudgetComponent
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.CategoryID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "category_id is required"})
+		return
+	}
+	if err := h.usecase.CreateComponent(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, req)
+}
+
+func (h *BudgetHandler) GetComponents(c *gin.Context) {
+	var catID uint
+	if v := c.Query("category_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
+			catID = uint(n)
+		}
+	}
+	comps, err := h.usecase.GetComponents(catID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, comps)
+}
+
+func (h *BudgetHandler) UpdateComponent(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req domain.BudgetComponent
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.ID = uint(id)
+
+	if err := h.usecase.UpdateComponent(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "updated"})
+}
+
+func (h *BudgetHandler) DeleteComponent(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.usecase.DeleteComponent(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
 // ------------------- Budget CRUD -------------------
 
 func (h *BudgetHandler) Create(c *gin.Context) {

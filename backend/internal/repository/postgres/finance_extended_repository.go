@@ -351,12 +351,20 @@ func (r *financeExtendedRepository) GetCashLedgerByID(id string) (*domain.CashLe
 
 func (r *financeExtendedRepository) UpdateCashLedgerEntry(req *domain.CashLedger) error {
 	updates := map[string]interface{}{
-		"source":    req.Source,
-		"item_name": req.ItemName,
-		"type":      req.Type,
-		"amount":    req.Amount,
-		"category":  req.Category,
-		"notes":     req.Notes,
+		"source":      req.Source,
+		"item_name":   req.ItemName,
+		"type":        req.Type,
+		"amount":      req.Amount,
+		"category":    req.Category,
+		"component":   req.Component,
+		"fund_source": req.FundSource,
+		"notes":       req.Notes,
+	}
+	if req.ProofURL != "" {
+		updates["proof_url"] = req.ProofURL
+	}
+	if req.ResponsibleID != nil {
+		updates["responsible_id"] = req.ResponsibleID
 	}
 	if req.InvoiceNumber != "" {
 		updates["invoice_number"] = req.InvoiceNumber

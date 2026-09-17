@@ -55,6 +55,13 @@ type Config struct {
 	// Backup
 	BackupDir          string
 	DBDockerContainer  string // If set, use 'docker exec <container>' for pg_dump/pg_restore
+
+	// Cloudflare R2 Storage
+	R2AccountID       string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2BucketName      string
+	R2PublicURL       string
 }
 
 // FeatureMap returns a map of feature flags for the API response
@@ -142,6 +149,13 @@ func LoadConfig() (*Config, error) {
 		// Backup
 		BackupDir:         getEnv("BACKUP_DIR", "./backups"),
 		DBDockerContainer: getEnv("DB_DOCKER_CONTAINER", ""),
+
+		// Cloudflare R2 Storage
+		R2AccountID:       getEnv("R2_ACCOUNT_ID", ""),
+		R2AccessKeyID:     getEnv("R2_ACCESS_KEY_ID", ""),
+		R2SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY", ""),
+		R2BucketName:      getEnv("R2_BUCKET_NAME", ""),
+		R2PublicURL:       getEnv("R2_PUBLIC_URL", ""),
 	}, nil
 }
 

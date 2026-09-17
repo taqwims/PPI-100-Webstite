@@ -19,6 +19,8 @@ export const useCashLedger = () => {
         type: 'Expense',
         amount: '',
         category: 'Operasional',
+        component: '',
+        proof_url: '',
         fund_source: 'Kas Umum',
         notes: '',
         responsible_id: '',
@@ -93,6 +95,7 @@ export const useCashLedger = () => {
             ...prev,
             transaction_code_id: codeId,
             category: tc ? tc.category : prev.category,
+            component: tc?.component ? tc.component : prev.component,
             type: tc ? (tc.type as 'Income' | 'Expense') : prev.type,
             item_name: (!prev.item_name || prev.item_name.trim() === '') && tc ? tc.name : prev.item_name,
         }));
@@ -100,7 +103,7 @@ export const useCashLedger = () => {
 
     const openCreateModal = () => {
         setEditingEntry(null);
-        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '', invoice_number: '' });
+        setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: 'Operasional', component: '', proof_url: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '', invoice_number: '' });
         setShowModal(true);
     };
 
@@ -112,6 +115,8 @@ export const useCashLedger = () => {
             type: entry.type,
             amount: String(entry.amount),
             category: entry.category,
+            component: entry.component || '',
+            proof_url: entry.proof_url || '',
             fund_source: entry.fund_source || 'Kas Umum',
             notes: entry.notes || '',
             responsible_id: entry.responsible_id || '',
@@ -131,6 +136,8 @@ export const useCashLedger = () => {
                 type: formData.type,
                 amount: parseFloat(formData.amount),
                 category: formData.category,
+                component: formData.component,
+                proof_url: formData.proof_url,
                 fund_source: formData.fund_source,
                 notes: formData.notes
             };
@@ -152,7 +159,7 @@ export const useCashLedger = () => {
             }
             setShowModal(false);
             setEditingEntry(null);
-            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '', invoice_number: '' });
+            setFormData({ source: '', item_name: '', type: 'Expense', amount: '', category: '', component: '', proof_url: '', fund_source: 'Kas Umum', notes: '', responsible_id: '', transaction_code_id: '', invoice_number: '' });
             fetchLedger();
             toast.success(editingEntry ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil disimpan');
         } catch (error: any) {

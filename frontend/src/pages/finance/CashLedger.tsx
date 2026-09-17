@@ -72,9 +72,8 @@ const CashLedger = () => {
     } = useCashLedger();
 
     return (
-        <div className="space-y-6">
-            <div className="space-y-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-6 w-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Buku Kas Umum</h1>
                         <p className="text-slate-500 mt-1">Pencatatan sirkulasi seluruh dana operasional sekolah.</p>
@@ -177,7 +176,6 @@ const CashLedger = () => {
                     exportFormat={exportFormat} setExportFormat={setExportFormat}
                     handleExport={handleExport}
                 />
-            </div>
 
             <ConfirmDialog
                 isOpen={!!confirmDelete}

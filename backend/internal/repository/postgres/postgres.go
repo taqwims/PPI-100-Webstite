@@ -67,6 +67,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.TransactionCode{},
 		&domain.BillItem{},
 		&domain.BudgetCategory{},
+		&domain.BudgetComponent{},
 		&domain.Budget{},
 		&domain.BillTemplate{},
 		&domain.PaymentType{},

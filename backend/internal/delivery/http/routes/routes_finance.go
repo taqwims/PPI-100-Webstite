@@ -130,7 +130,9 @@ func RegisterFinanceRoutes(
 			finance.GET("/cash-ledger", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetCashLedger)
 			finance.PUT("/cash-ledger/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.UpdateCashLedgerEntry)
 			finance.DELETE("/cash-ledger/:id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.DeleteCashLedgerEntry)
+			finance.POST("/cash-ledger/upload-proof", middleware.RoleMiddleware(1, 9, 11), financeHandler.UploadCashLedgerProof)
 		}
+		finance.POST("/upload", middleware.RoleMiddleware(1, 2, 3, 9, 11), financeHandler.UploadGenericFile)
 
 		// ── Infaq Harian ──
 		if cfg.FeatureInfaq {
@@ -168,13 +170,19 @@ func RegisterFinanceRoutes(
 		finance.DELETE("/transaction-codes/:id", middleware.RoleMiddleware(1, 9, 11), transactionCodeHandler.Delete)
 		finance.GET("/global-transactions", middleware.RoleMiddleware(1, 8, 9, 10, 11), transactionCodeHandler.GetGlobalTransactions)
 
+		// ── Master Kategori & Komponen (Untuk RKAS & BKU) ──
+		finance.POST("/budget-categories", middleware.RoleMiddleware(1, 9), budgetHandler.CreateCategory)
+		finance.GET("/budget-categories", middleware.RoleMiddleware(1, 8, 9, 10, 11), budgetHandler.GetAllCategories)
+		finance.PUT("/budget-categories/:id", middleware.RoleMiddleware(1, 9), budgetHandler.UpdateCategory)
+		finance.DELETE("/budget-categories/:id", middleware.RoleMiddleware(1, 9), budgetHandler.DeleteCategory)
+
+		finance.POST("/budget-components", middleware.RoleMiddleware(1, 9), budgetHandler.CreateComponent)
+		finance.GET("/budget-components", middleware.RoleMiddleware(1, 8, 9, 10, 11), budgetHandler.GetComponents)
+		finance.PUT("/budget-components/:id", middleware.RoleMiddleware(1, 9), budgetHandler.UpdateComponent)
+		finance.DELETE("/budget-components/:id", middleware.RoleMiddleware(1, 9), budgetHandler.DeleteComponent)
+
 		// ── RKAS / RAB (Budgeting) ──
 		if cfg.FeatureRKAS {
-			finance.POST("/budget-categories", middleware.RoleMiddleware(1, 9), budgetHandler.CreateCategory)
-			finance.GET("/budget-categories", middleware.RoleMiddleware(1, 8, 9), budgetHandler.GetAllCategories)
-			finance.PUT("/budget-categories/:id", middleware.RoleMiddleware(1, 9), budgetHandler.UpdateCategory)
-			finance.DELETE("/budget-categories/:id", middleware.RoleMiddleware(1, 9), budgetHandler.DeleteCategory)
-
 			finance.POST("/budgets", middleware.RoleMiddleware(1, 9), budgetHandler.Create)
 			finance.GET("/budgets", middleware.RoleMiddleware(1, 8, 9), budgetHandler.GetAll)
 			finance.PUT("/budgets/:id", middleware.RoleMiddleware(1, 9), budgetHandler.Update)

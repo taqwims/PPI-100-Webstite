@@ -48,6 +48,24 @@ func (u *BudgetUsecase) DeleteCategory(id uint) error {
 	return u.repo.DeleteCategory(id)
 }
 
+// ------------------- Component -------------------
+
+func (u *BudgetUsecase) CreateComponent(comp *domain.BudgetComponent) error {
+	return u.repo.CreateComponent(comp)
+}
+
+func (u *BudgetUsecase) GetComponents(categoryID uint) ([]domain.BudgetComponent, error) {
+	return u.repo.GetComponents(categoryID)
+}
+
+func (u *BudgetUsecase) UpdateComponent(comp *domain.BudgetComponent) error {
+	return u.repo.UpdateComponent(comp)
+}
+
+func (u *BudgetUsecase) DeleteComponent(id uint) error {
+	return u.repo.DeleteComponent(id)
+}
+
 // ------------------- Budget -------------------
 
 func (u *BudgetUsecase) CreateBudget(b *domain.Budget) error {
