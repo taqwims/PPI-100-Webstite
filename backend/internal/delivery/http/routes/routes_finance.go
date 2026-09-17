@@ -99,29 +99,29 @@ func RegisterFinanceRoutes(
 
 		// ── Savings (Tabungan Siswa) ──
 		if cfg.FeatureSavings {
-			finance.GET("/savings", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetAllSavingAccounts)
+			finance.GET("/savings", middleware.RoleMiddleware(1, 8, 9, 10, 11), financeExtendedHandler.GetAllSavingAccounts)
 			finance.POST("/savings/transactions", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.ProcessSavingTransaction)
 			finance.PUT("/savings/transactions/:id", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.UpdateSavingTransaction)
 			finance.DELETE("/savings/transactions/:id", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.DeleteSavingTransaction)
 			finance.POST("/savings/transfer", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.TransferSavings)
-			finance.GET("/savings/transactions/:account_id", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingTransactions)
+			finance.GET("/savings/transactions/:account_id", middleware.RoleMiddleware(1, 8, 9, 10, 11), financeExtendedHandler.GetSavingTransactions)
 			finance.GET("/savings/my", middleware.RoleMiddleware(6, 7), financeExtendedHandler.GetMySavings)
 			finance.GET("/savings/my-children", middleware.RoleMiddleware(7), financeExtendedHandler.GetMyChildrenSavings)
-			finance.GET("/savings/student/:student_id", middleware.RoleMiddleware(1, 6, 7, 9, 10, 11), financeExtendedHandler.GetStudentSavings)
+			finance.GET("/savings/student/:student_id", middleware.RoleMiddleware(1, 6, 7, 8, 9, 10, 11), financeExtendedHandler.GetStudentSavings)
 
 			// Savings Operational (Pool-level)
 			finance.POST("/savings/operational/withdraw", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.WithdrawSavingsOperational)
 			finance.POST("/savings/operational/return", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.ReturnSavingsOperational)
-			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsOperationalHistory)
-			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.GetSavingsOperationalReturns)
-			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsPoolSummary)
-			finance.GET("/savings/recap", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsRecap)
+			finance.GET("/savings/operational/history", middleware.RoleMiddleware(1, 8, 9, 10, 11), financeExtendedHandler.GetSavingsOperationalHistory)
+			finance.GET("/savings/operational/returns/:withdrawal_id", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetSavingsOperationalReturns)
+			finance.GET("/savings/operational/summary", middleware.RoleMiddleware(1, 8, 9, 10, 11), financeExtendedHandler.GetSavingsPoolSummary)
+			finance.GET("/savings/recap", middleware.RoleMiddleware(1, 8, 9, 10, 11), financeExtendedHandler.GetSavingsRecap)
 
 			// Savings Receivable / Piutang (Pool-level)
 			finance.POST("/savings/receivable/withdraw", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.WithdrawSavingsReceivable)
 			finance.POST("/savings/receivable/return", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.ReturnSavingsReceivable)
-			finance.GET("/savings/receivable/history", middleware.RoleMiddleware(1, 9, 10, 11), financeExtendedHandler.GetSavingsReceivableHistory)
-			finance.GET("/savings/receivable/returns/:withdrawal_id", middleware.RoleMiddleware(1, 9, 11), financeExtendedHandler.GetSavingsReceivableReturns)
+			finance.GET("/savings/receivable/history", middleware.RoleMiddleware(1, 8, 9, 10, 11), financeExtendedHandler.GetSavingsReceivableHistory)
+			finance.GET("/savings/receivable/returns/:withdrawal_id", middleware.RoleMiddleware(1, 8, 9, 11), financeExtendedHandler.GetSavingsReceivableReturns)
 		}
 
 		// ── Cash Ledger (BKU) ──

@@ -165,7 +165,7 @@ function App() {
                                         </RoleRoute>
                                     } />
                                     <Route path="finance/savings" element={
-                                        <RoleRoute allowedRoles={[1, 9, 10, 11]}>
+                                        <RoleRoute allowedRoles={[1, 8, 9, 10, 11]}>
                                             <Savings />
                                         </RoleRoute>
                                     } />

@@ -482,32 +482,41 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 	analytics := make(map[string]interface{})
 
 	var totalStudents int64
-	r.db.Model(&domain.Student{}).Count(&totalStudents)
+	r.db.Model(&domain.Student{}).Where("deleted_at IS NULL").Count(&totalStudents)
 	analytics["total_students"] = totalStudents
 
 	var totalTeachers int64
 	r.db.Model(&domain.Teacher{}).Count(&totalTeachers)
 	analytics["total_teachers"] = totalTeachers
 
-	// SPP Statistics
+	var totalClasses int64
+	r.db.Model(&domain.Class{}).Count(&totalClasses)
+	analytics["total_classes"] = totalClasses
+
+	// Real SPP / Student Obligation Statistics
 	var paidSpp int64
-	r.db.Model(&domain.Bill{}).Where("bill_type = ? AND status = ?", "SPP", "Paid").Count(&paidSpp)
-	analytics["paid_spp_count"] = paidSpp
-
 	var unpaidSpp int64
-	r.db.Model(&domain.Bill{}).Where("bill_type = ? AND status IN ?", "SPP", []string{"Unpaid", "Partial", "Overdue"}).Count(&unpaidSpp)
+	var totalSppPaidNominal sql.NullFloat64
+	var totalSppUnpaidNominal sql.NullFloat64
+
+	r.db.Model(&domain.StudentObligation{}).Where("status = ?", "Paid").Count(&paidSpp)
+	r.db.Model(&domain.StudentObligation{}).Where("status != ?", "Paid").Count(&unpaidSpp)
+	r.db.Model(&domain.StudentObligation{}).Select("COALESCE(sum(paid_amount), 0)").Row().Scan(&totalSppPaidNominal)
+	r.db.Model(&domain.StudentObligation{}).Where("status != ?", "Paid").Select("COALESCE(sum(amount - paid_amount), 0)").Row().Scan(&totalSppUnpaidNominal)
+
+	if paidSpp == 0 && unpaidSpp == 0 {
+		// Fallback to bills table if student_obligations table has no data
+		r.db.Model(&domain.Bill{}).Where("status = ?", "Paid").Count(&paidSpp)
+		r.db.Model(&domain.Bill{}).Where("status IN ?", []string{"Unpaid", "Partial", "Overdue"}).Count(&unpaidSpp)
+	}
+
+	analytics["paid_spp_count"] = paidSpp
 	analytics["unpaid_spp_count"] = unpaidSpp
+	analytics["total_spp_paid_nominal"] = totalSppPaidNominal.Float64
+	analytics["total_spp_unpaid_nominal"] = totalSppUnpaidNominal.Float64
+	analytics["total_school_receivables"] = totalSppUnpaidNominal.Float64
 
-	// PIUTANG NOMINAL (Total Unpaid Bills)
-	var totalUnpaidBills sql.NullFloat64
-	r.db.Table("bills b").
-		Joins("LEFT JOIN (SELECT bill_id, sum(amount) as total_paid FROM payments WHERE status = 'Success' GROUP BY bill_id) p ON b.id = p.bill_id").
-		Where("b.status != ?", "Paid").
-		Select("COALESCE(sum(b.amount - COALESCE(p.total_paid, 0)), 0)").
-		Row().Scan(&totalUnpaidBills)
-	analytics["total_school_receivables"] = totalUnpaidBills.Float64
-
-	// Savings Receivables (Total Balances) — use NullFloat64 to handle empty table
+	// Savings Receivables (Total Balances)
 	var totalSavings sql.NullFloat64
 	r.db.Model(&domain.SavingAccount{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&totalSavings)
 	analytics["total_student_savings"] = totalSavings.Float64
@@ -545,6 +554,298 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 	analytics["total_receivable_debt"] = receivableDebtRemaining.Float64
 
 	analytics["total_school_debt"] = externalDebtRemaining.Float64 + operationalDebtRemaining.Float64 + bkuDebtRemaining + receivableDebtRemaining.Float64
+
+	// 5. Classes Summary with Student List and Obligation Breakdown
+	var classes []domain.Class
+	r.db.Preload("HomeroomTeacher.User").Order("name ASC").Find(&classes)
+
+	type studentBrief struct {
+		ID                 string  `json:"id"`
+		Name               string  `json:"name"`
+		NISN               string  `json:"nisn"`
+		Status             string  `json:"status"`
+		PaidCount          int64   `json:"paid_count"`
+		UnpaidCount        int64   `json:"unpaid_count"`
+		TotalPaidNominal   float64 `json:"total_paid_nominal"`
+		TotalUnpaidNominal float64 `json:"total_unpaid_nominal"`
+	}
+
+	type classSummary struct {
+		ClassID            uint           `json:"class_id"`
+		ClassName          string         `json:"class_name"`
+		HomeroomTeacher    string         `json:"homeroom_teacher"`
+		StudentCount       int            `json:"student_count"`
+		PaidCount          int64          `json:"paid_count"`
+		UnpaidCount        int64          `json:"unpaid_count"`
+		TotalPaidNominal   float64        `json:"total_paid_nominal"`
+		TotalUnpaidNominal float64        `json:"total_unpaid_nominal"`
+		CollectionRate     float64        `json:"collection_rate"`
+		Students           []studentBrief `json:"students"`
+	}
+
+	var classesSummaryList []classSummary
+	for _, c := range classes {
+		teacherName := "-"
+		if c.HomeroomTeacher != nil && c.HomeroomTeacher.User.Name != "" {
+			teacherName = c.HomeroomTeacher.User.Name
+		}
+
+		var rawStudents []struct {
+			ID     uuid.UUID
+			NISN   string
+			Status string
+			Name   string
+		}
+		r.db.Table("students s").
+			Select("s.id, s.nisn, s.status, u.name").
+			Joins("JOIN users u ON s.user_id = u.id").
+			Where("s.class_id = ? AND s.deleted_at IS NULL", c.ID).
+			Order("u.name ASC").
+			Scan(&rawStudents)
+
+		var classPaidCount int64
+		var classUnpaidCount int64
+		var classPaidNominal float64
+		var classUnpaidNominal float64
+		var studentBriefs []studentBrief
+
+		for _, st := range rawStudents {
+			var spPaidCount int64
+			var spUnpaidCount int64
+			var spPaidNominal sql.NullFloat64
+			var spUnpaidNominal sql.NullFloat64
+
+			r.db.Model(&domain.StudentObligation{}).Where("student_id = ? AND status = 'Paid'", st.ID).Count(&spPaidCount)
+			r.db.Model(&domain.StudentObligation{}).Where("student_id = ? AND status != 'Paid'", st.ID).Count(&spUnpaidCount)
+			r.db.Model(&domain.StudentObligation{}).Where("student_id = ?", st.ID).Select("COALESCE(sum(paid_amount), 0)").Row().Scan(&spPaidNominal)
+			r.db.Model(&domain.StudentObligation{}).Where("student_id = ? AND status != 'Paid'", st.ID).Select("COALESCE(sum(amount - paid_amount), 0)").Row().Scan(&spUnpaidNominal)
+
+			classPaidCount += spPaidCount
+			classUnpaidCount += spUnpaidCount
+			classPaidNominal += spPaidNominal.Float64
+			classUnpaidNominal += spUnpaidNominal.Float64
+
+			studentBriefs = append(studentBriefs, studentBrief{
+				ID:                 st.ID.String(),
+				Name:               st.Name,
+				NISN:               st.NISN,
+				Status:             st.Status,
+				PaidCount:          spPaidCount,
+				UnpaidCount:        spUnpaidCount,
+				TotalPaidNominal:   spPaidNominal.Float64,
+				TotalUnpaidNominal: spUnpaidNominal.Float64,
+			})
+		}
+
+		collectionRate := 0.0
+		totalTarget := classPaidNominal + classUnpaidNominal
+		if totalTarget > 0 {
+			collectionRate = (classPaidNominal / totalTarget) * 100
+		}
+
+		classesSummaryList = append(classesSummaryList, classSummary{
+			ClassID:            c.ID,
+			ClassName:          c.Name,
+			HomeroomTeacher:    teacherName,
+			StudentCount:       len(rawStudents),
+			PaidCount:          classPaidCount,
+			UnpaidCount:        classUnpaidCount,
+			TotalPaidNominal:   classPaidNominal,
+			TotalUnpaidNominal: classUnpaidNominal,
+			CollectionRate:     collectionRate,
+			Students:           studentBriefs,
+		})
+	}
+	analytics["classes_summary"] = classesSummaryList
+
+	// 6. Activities Summary (Kegiatan Siswa)
+	var activities []domain.Activity
+	r.db.Order("start_date DESC").Find(&activities)
+
+	type activityDetailDTO struct {
+		ID             string    `json:"id"`
+		Name           string    `json:"name"`
+		Description    string    `json:"description"`
+		Status         string    `json:"status"`
+		TargetAmount   float64   `json:"target_amount"`
+		StartDate      time.Time `json:"start_date"`
+		EndDate        time.Time `json:"end_date"`
+		Participants   int64     `json:"participants"`
+		TotalTarget    float64   `json:"total_target"`
+		TotalCollected float64   `json:"total_collected"`
+		TotalExpense   float64   `json:"total_expense"`
+		Balance        float64   `json:"balance"`
+		CollectionRate float64   `json:"collection_rate"`
+	}
+
+	var activeActivitiesList []activityDetailDTO
+	var allActivitiesList []activityDetailDTO
+
+	for _, act := range activities {
+		var obStats struct {
+			Participants   int64   `gorm:"column:participants"`
+			TotalTarget    float64 `gorm:"column:total_target"`
+			TotalCollected float64 `gorm:"column:total_collected"`
+		}
+		r.db.Table("activity_obligations").
+			Where("activity_id = ?", act.ID).
+			Select("count(*) as participants, COALESCE(sum(amount), 0) as total_target, COALESCE(sum(paid_amount), 0) as total_collected").
+			Scan(&obStats)
+
+		var actExpense sql.NullFloat64
+		r.db.Table("activity_transactions").
+			Where("activity_id = ? AND transaction_type = 'Expense'", act.ID).
+			Select("COALESCE(sum(amount), 0)").Row().Scan(&actExpense)
+
+		rate := 0.0
+		if obStats.TotalTarget > 0 {
+			rate = (obStats.TotalCollected / obStats.TotalTarget) * 100
+		}
+
+		item := activityDetailDTO{
+			ID:             act.ID.String(),
+			Name:           act.Name,
+			Description:    act.Description,
+			Status:         act.Status,
+			TargetAmount:   act.TargetAmount,
+			StartDate:      act.StartDate,
+			EndDate:        act.EndDate,
+			Participants:   obStats.Participants,
+			TotalTarget:    obStats.TotalTarget,
+			TotalCollected: obStats.TotalCollected,
+			TotalExpense:   actExpense.Float64,
+			Balance:        obStats.TotalCollected - actExpense.Float64,
+			CollectionRate: rate,
+		}
+
+		allActivitiesList = append(allActivitiesList, item)
+		if act.Status == "Active" {
+			activeActivitiesList = append(activeActivitiesList, item)
+		}
+	}
+
+	analytics["activities_summary"] = map[string]interface{}{
+		"active_count": len(activeActivitiesList),
+		"total_count":  len(allActivitiesList),
+		"active_list":  activeActivitiesList,
+		"all_list":     allActivitiesList,
+	}
+
+	// 7. Cash Ledger (BKU) Summary
+	var totalCashIncome sql.NullFloat64
+	var totalCashExpense sql.NullFloat64
+	r.db.Model(&domain.CashLedger{}).Where("type = 'Income'").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalCashIncome)
+	r.db.Model(&domain.CashLedger{}).Where("type = 'Expense'").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalCashExpense)
+
+	var recentLedgers []domain.CashLedger
+	r.db.Preload("TransactionCode").Order("date DESC").Limit(6).Find(&recentLedgers)
+
+	analytics["cash_ledger"] = map[string]interface{}{
+		"total_income":        totalCashIncome.Float64,
+		"total_expense":       totalCashExpense.Float64,
+		"current_balance":     totalCashIncome.Float64 - totalCashExpense.Float64,
+		"recent_transactions": recentLedgers,
+	}
+
+	// 8. RKAS Summary
+	var rkasPlannedPenerimaan sql.NullFloat64
+	var rkasRealizedPenerimaan sql.NullFloat64
+	var rkasPlannedPengeluaran sql.NullFloat64
+	var rkasRealizedPengeluaran sql.NullFloat64
+
+	r.db.Model(&domain.Budget{}).Where("budget_type = 'Penerimaan'").Select("COALESCE(sum(planned_amount), 0)").Row().Scan(&rkasPlannedPenerimaan)
+	r.db.Model(&domain.Budget{}).Where("budget_type = 'Penerimaan'").Select("COALESCE(sum(realized_amount), 0)").Row().Scan(&rkasRealizedPenerimaan)
+	r.db.Model(&domain.Budget{}).Where("budget_type = 'Pengeluaran'").Select("COALESCE(sum(planned_amount), 0)").Row().Scan(&rkasPlannedPengeluaran)
+	r.db.Model(&domain.Budget{}).Where("budget_type = 'Pengeluaran'").Select("COALESCE(sum(realized_amount), 0)").Row().Scan(&rkasRealizedPengeluaran)
+
+	serapanPct := 0.0
+	if rkasPlannedPengeluaran.Float64 > 0 {
+		serapanPct = (rkasRealizedPengeluaran.Float64 / rkasPlannedPengeluaran.Float64) * 100
+	}
+
+	analytics["rkas_summary"] = map[string]interface{}{
+		"planned_penerimaan":      rkasPlannedPenerimaan.Float64,
+		"realized_penerimaan":     rkasRealizedPenerimaan.Float64,
+		"planned_pengeluaran":     rkasPlannedPengeluaran.Float64,
+		"realized_pengeluaran":    rkasRealizedPengeluaran.Float64,
+		"serapan_pengeluaran_pct": serapanPct,
+	}
+
+	// 9. Monthly Cash Flow Trend
+	type monthlyRow struct {
+		Month   string  `json:"month"`
+		Income  float64 `json:"income"`
+		Expense float64 `json:"expense"`
+	}
+	var monthlyResults []monthlyRow
+	r.db.Raw(`
+		SELECT 
+			TO_CHAR(date, 'YYYY-MM') as month,
+			COALESCE(SUM(CASE WHEN type = 'Income' THEN amount ELSE 0 END), 0) as income,
+			COALESCE(SUM(CASE WHEN type = 'Expense' THEN amount ELSE 0 END), 0) as expense
+		FROM cash_ledgers
+		GROUP BY TO_CHAR(date, 'YYYY-MM')
+		ORDER BY month ASC
+		LIMIT 12
+	`).Scan(&monthlyResults)
+	analytics["monthly_trend"] = monthlyResults
+
+	// 10. Savings Detailed Summary
+	var totalSavingsAccountsCount int64
+	r.db.Model(&domain.SavingAccount{}).Count(&totalSavingsAccountsCount)
+
+	var totalDepositNominal sql.NullFloat64
+	r.db.Model(&domain.SavingTransaction{}).Where("LOWER(type) = 'deposit'").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalDepositNominal)
+
+	var totalWithdrawalNominal sql.NullFloat64
+	r.db.Model(&domain.SavingTransaction{}).Where("LOWER(type) = 'withdrawal'").Select("COALESCE(sum(amount), 0)").Row().Scan(&totalWithdrawalNominal)
+
+	type classSavingsSummary struct {
+		ClassName     string  `json:"class_name"`
+		AccountsCount int64   `json:"accounts_count"`
+		TotalBalance  float64 `json:"total_balance"`
+	}
+	var classSavingsList []classSavingsSummary
+	r.db.Raw(`
+		SELECT c.name as class_name, count(sa.id) as accounts_count, COALESCE(sum(sa.balance), 0) as total_balance
+		FROM classes c
+		JOIN students s ON s.class_id = c.id
+		JOIN saving_accounts sa ON sa.student_id = s.id
+		GROUP BY c.id, c.name
+		ORDER BY total_balance DESC
+	`).Scan(&classSavingsList)
+
+	type recentSavingTxDTO struct {
+		ID          string    `json:"id"`
+		StudentName string    `json:"student_name"`
+		ClassName   string    `json:"class_name"`
+		Type        string    `json:"type"`
+		Amount      float64   `json:"amount"`
+		Date        time.Time `json:"date"`
+	}
+	var recentSavingTxList []recentSavingTxDTO
+	r.db.Raw(`
+		SELECT st.id::text, u.name as student_name, c.name as class_name, st.type, st.amount, st.date
+		FROM saving_transactions st
+		JOIN saving_accounts sa ON st.account_id = sa.id
+		JOIN students s ON sa.student_id = s.id
+		JOIN users u ON s.user_id = u.id
+		JOIN classes c ON s.class_id = c.id
+		ORDER BY st.date DESC
+		LIMIT 6
+	`).Scan(&recentSavingTxList)
+
+	analytics["savings_summary"] = map[string]interface{}{
+		"total_accounts":      totalSavingsAccountsCount,
+		"total_balance":       totalSavings.Float64,
+		"total_deposits":      totalDepositNominal.Float64,
+		"total_withdrawals":   totalWithdrawalNominal.Float64,
+		"operational_debt":    operationalDebtRemaining.Float64,
+		"receivable_debt":     receivableDebtRemaining.Float64,
+		"available_cash":      totalSavings.Float64 - operationalDebtRemaining.Float64 - receivableDebtRemaining.Float64,
+		"classes_breakdown":   classSavingsList,
+		"recent_transactions": recentSavingTxList,
+	}
 
 	return analytics, nil
 }

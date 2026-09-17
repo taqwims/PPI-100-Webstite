@@ -35,6 +35,7 @@ const Savings = () => {
     const { user } = useAuth();
     const { units: activeUnits } = useUnits();
     const canManage = [1, 9, 10, 11].includes(user?.role_id || 0);
+    const canView = [1, 8, 9, 10, 11].includes(user?.role_id || 0);
 
     const getDefaultUnitID = () => {
         if (user?.unit_id) return user.unit_id;
@@ -127,18 +128,18 @@ const Savings = () => {
     const isFirstRender = React.useRef(true);
 
     useEffect(() => {
-        if (canManage) { fetchAccounts(classFilter || undefined); fetchStudents(); fetchClasses(); fetchPoolSummary(); }
-    }, [canManage, fetchAccounts, fetchStudents, fetchClasses, fetchPoolSummary, unitID]);
+        if (canView) { fetchAccounts(classFilter || undefined); fetchStudents(); fetchClasses(); fetchPoolSummary(); }
+    }, [canView, fetchAccounts, fetchStudents, fetchClasses, fetchPoolSummary, unitID]);
 
     useEffect(() => {
         if (isFirstRender.current) { isFirstRender.current = false; return; }
-        if (canManage) fetchAccounts(classFilter || undefined);
-    }, [classFilter, canManage, fetchAccounts]);
+        if (canView) fetchAccounts(classFilter || undefined);
+    }, [classFilter, canView, fetchAccounts]);
 
     useEffect(() => {
-        if (canManage && activeTab === 'operational') fetchOpHistory();
-        if (canManage && activeTab === 'receivable') fetchRecHistory();
-    }, [canManage, fetchOpHistory, fetchRecHistory, activeTab]);
+        if (canView && activeTab === 'operational') fetchOpHistory();
+        if (canView && activeTab === 'receivable') fetchRecHistory();
+    }, [canView, fetchOpHistory, fetchRecHistory, activeTab]);
 
     const openDepositModal = (studentId?: string) => {
         setTrxModalType('Deposit');
@@ -175,7 +176,7 @@ const Savings = () => {
             await api.put(`/finance/savings/transactions/${editingTrx.id}`, {
                 amount: Number(editAmount),
                 notes: editNotes,
-                date: editDate || undefined,
+                transaction_date: editDate ? new Date(editDate).toISOString() : undefined,
             });
             // Refresh history
             if (historyAccount) {
@@ -186,7 +187,7 @@ const Savings = () => {
                 fetchAccounts(classFilter || undefined);
             }
             setEditingTrx(null);
-            toast.success('Transaksi berhasil diperbarui');
+            toast.success('Transaksi berhasil diupdate');
         } catch (error) { console.error(error); toast.error('Gagal mengupdate transaksi'); }
         finally { setSavingEdit(false); }
     };
@@ -214,8 +215,8 @@ const Savings = () => {
         finally { setSavingEdit(false); }
     };
 
-    if (!canManage) {
-        return (<div className="flex items-center justify-center h-96"><div className="text-center"><Wallet size={48} className="mx-auto text-slate-300 mb-3" /><p className="text-slate-500 text-lg">Halaman ini hanya untuk petugas tabungan.</p></div></div>);
+    if (!canView) {
+        return (<div className="flex items-center justify-center h-96"><div className="text-center"><Wallet size={48} className="mx-auto text-slate-300 mb-3" /><p className="text-slate-500 text-lg">Halaman ini hanya untuk petugas tabungan atau pimpinan.</p></div></div>);
     }
 
     const unitAccounts = accounts.filter(acc => students.some(s => s.id === acc.student_id));
@@ -234,36 +235,38 @@ const Savings = () => {
                         </div>
                         Kelola Tabungan
                     </h1>
-                    <p className="text-slate-500 text-sm md:text-base font-medium">Input setoran, tarik dana, dan kelola dana operasional sekolah.</p>
+                    <p className="text-slate-500 text-sm md:text-base font-medium">Monitoring tabungan siswa, dana operasional, dan piutang sekolah.</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                    {[1, 9, 10, 11].includes(user?.role_id || 0) && (
+                    {[1, 8, 9, 10, 11].includes(user?.role_id || 0) && (
                         <div className="p-1.5 bg-slate-100/80 backdrop-blur rounded-2xl flex shadow-inner border border-slate-200 w-full sm:w-auto">
                             {activeUnits.map(u => (
                                 <button key={u.id} onClick={() => { setUnitID(u.id); setClassFilter(''); }} className={clsx("px-5 py-2 text-sm font-bold rounded-xl transition-all flex-1 justify-center flex", unitID === u.id ? "bg-white text-emerald-700 shadow-sm scale-105" : "text-slate-500 hover:text-slate-700 hover:bg-white/50")}>{u.name}</button>
                             ))}
                         </div>
                     )}
-                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full lg:w-auto">
-                        {/* Button Setor */}
-                        <button onClick={() => openDepositModal()} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-3 py-2 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all font-bold group whitespace-nowrap text-sm">
-                            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-                            <span>Setor</span>
-                        </button>
+                    {canManage && (
+                        <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full lg:w-auto">
+                            {/* Button Setor */}
+                            <button onClick={() => openDepositModal()} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-3 py-2 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all font-bold group whitespace-nowrap text-sm">
+                                <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+                                <span>Setor</span>
+                            </button>
 
-                        {/* Button Ambil Operasional */}
-                        <button onClick={() => setIsWithdrawOpOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-amber-600 border-2 border-amber-100 px-3 py-2 rounded-xl hover:bg-amber-50 shadow-sm transition-all font-bold whitespace-nowrap text-sm">
-                            <TrendingDown size={18} />
-                            <span>Ambil Operasional</span>
-                        </button>
+                            {/* Button Ambil Operasional */}
+                            <button onClick={() => setIsWithdrawOpOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-amber-600 border-2 border-amber-100 px-3 py-2 rounded-xl hover:bg-amber-50 shadow-sm transition-all font-bold whitespace-nowrap text-sm">
+                                <TrendingDown size={18} />
+                                <span>Ambil Operasional</span>
+                            </button>
 
-                        {/* Button Ambil Piutang */}
-                        <button onClick={() => setIsWithdrawRecOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-rose-600 border-2 border-rose-100 px-3 py-2 rounded-xl hover:bg-rose-50 shadow-sm transition-all font-bold whitespace-nowrap text-sm">
-                            <TrendingDown size={18} />
-                            <span>Ambil Piutang</span>
-                        </button>
-                    </div>
+                            {/* Button Ambil Piutang */}
+                            <button onClick={() => setIsWithdrawRecOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-white text-rose-600 border-2 border-rose-100 px-3 py-2 rounded-xl hover:bg-rose-50 shadow-sm transition-all font-bold whitespace-nowrap text-sm">
+                                <TrendingDown size={18} />
+                                <span>Ambil Piutang</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
