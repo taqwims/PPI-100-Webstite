@@ -11,6 +11,7 @@ tmp/
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Node.js / Frontend (Vite & React)
 node_modules/
