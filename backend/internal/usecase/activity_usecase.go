@@ -27,6 +27,9 @@ func (u *ActivityUsecase) Create(req *domain.Activity) error {
 	if req.Name == "" || req.TargetAmount < 0 {
 		return errors.New("invalid activity data")
 	}
+	if req.PaymentSchedule == "Bertahap" {
+		req.IsInstallment = true
+	}
 	return u.activityRepo.Create(req)
 }
 
@@ -53,6 +56,8 @@ func (u *ActivityUsecase) Update(req *domain.Activity) error {
 	existing.StartDate = req.StartDate
 	existing.EndDate = req.EndDate
 	existing.Status = req.Status
+	existing.PaymentSchedule = req.PaymentSchedule
+	existing.IsInstallment = req.IsInstallment || req.PaymentSchedule == "Bertahap"
 	return u.activityRepo.Update(existing)
 }
 

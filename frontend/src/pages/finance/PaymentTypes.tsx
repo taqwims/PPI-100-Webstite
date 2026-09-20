@@ -310,9 +310,9 @@ const PaymentTypes = () => {
                                 >
                                     <option value="">-- Pilih Pos Akun Penerimaan / RKAS --</option>
                                     {masterTransactionCodes.map(tc => (
-                                        <optgroup key={tc.id} label={`${tc.code} — ${tc.name}`}>
+                                        <React.Fragment key={tc.id}>
                                             <option value={tc.id}>
-                                                {tc.code} — {tc.name} ({tc.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'})
+                                                {tc.code} — {tc.name} ({tc.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'} - Induk)
                                             </option>
                                             {transactionCodes
                                                 .filter(child => child.parent_code_id === tc.id)
@@ -321,18 +321,13 @@ const PaymentTypes = () => {
                                                         &nbsp;&nbsp;↳ {child.code} — {child.name}
                                                     </option>
                                                 ))}
-                                        </optgroup>
+                                        </React.Fragment>
                                     ))}
-                                    {/* Also show codes without parents (non-master) that have no parent_code_id but aren't masters */}
-                                    {transactionCodes.filter(tc => tc.parent_code_id === null && !masterTransactionCodes.find(m => m.id === tc.id)).length > 0 && (
-                                        <optgroup label="Lainnya">
-                                            {transactionCodes.filter(tc => tc.parent_code_id === null).map(tc => (
-                                                <option key={tc.id} value={tc.id}>
-                                                    {tc.code} — {tc.name}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    )}
+                                    {transactionCodes.filter(tc => tc.parent_code_id === null && !masterTransactionCodes.find(m => m.id === tc.id)).map(tc => (
+                                        <option key={tc.id} value={tc.id}>
+                                            {tc.code} — {tc.name}
+                                        </option>
+                                    ))}
                                 </select>
                                 <p className="mt-1 text-xs text-slate-500">
                                     Wajib dipilih agar setiap pembayaran siswa otomatis tercatat di <strong>Buku Kas Umum</strong> dan merealisasikan pos anggaran <strong>RKAS Penerimaan</strong>.

@@ -37,13 +37,19 @@ const CashLedger = () => {
         totalExpense,
 
         searchQuery, setSearchQuery,
+        filterType, setFilterType,
         filterStartDate, setFilterStartDate,
         filterEndDate, setFilterEndDate,
         selectedSemester, setSelectedSemester,
+        selectedSemesters, setSelectedSemesters,
         filterTransactionCodeId, setFilterTransactionCodeId,
+        filterTransactionCodeIds, setFilterTransactionCodeIds,
+        filterFundSource, setFilterFundSource,
+        filterFundSources, setFilterFundSources,
         sortOrder, setSortOrder,
         itemsPerPage, setItemsPerPage,
         currentPage, setCurrentPage,
+        resetFilters,
 
         showModal, setShowModal,
         editingEntry, setEditingEntry,
@@ -119,20 +125,28 @@ const CashLedger = () => {
                     currentSaldo={currentSaldo} 
                     totalIncome={totalIncome} 
                     totalExpense={totalExpense} 
-                    formatCurrency={formatCurrency} 
+                    formatCurrency={formatCurrency}
+                    activeType={filterType}
+                    onSelectType={(t) => { setFilterType(t); setCurrentPage(1); }}
                 />
 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <CashLedgerFilter 
                         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+                        filterType={filterType} setFilterType={setFilterType}
                         filterStartDate={filterStartDate} setFilterStartDate={setFilterStartDate}
                         filterEndDate={filterEndDate} setFilterEndDate={setFilterEndDate}
                         selectedSemester={selectedSemester} setSelectedSemester={setSelectedSemester}
+                        selectedSemesters={selectedSemesters} setSelectedSemesters={setSelectedSemesters}
                         filterTransactionCodeId={filterTransactionCodeId} setFilterTransactionCodeId={setFilterTransactionCodeId}
+                        filterTransactionCodeIds={filterTransactionCodeIds} setFilterTransactionCodeIds={setFilterTransactionCodeIds}
+                        filterFundSource={filterFundSource} setFilterFundSource={setFilterFundSource}
+                        filterFundSources={filterFundSources} setFilterFundSources={setFilterFundSources}
                         transactionCodes={transactionCodes}
                         sortOrder={sortOrder} setSortOrder={setSortOrder}
                         itemsPerPage={itemsPerPage} setItemsPerPage={setItemsPerPage}
                         setCurrentPage={setCurrentPage}
+                        resetFilters={resetFilters}
                     />
 
                     <CashLedgerTable 

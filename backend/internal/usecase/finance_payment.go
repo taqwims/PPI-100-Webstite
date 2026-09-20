@@ -23,18 +23,29 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 		PaidAt:        time.Now(),
 	}
 
+	if amount <= 0 {
+		return fmt.Errorf("nominal pembayaran harus lebih besar dari 0")
+	}
+
 	bill, err := u.financeRepo.GetBillByID(billID.String())
 	if err != nil {
 		// Fallback to basic creation if bill doesn't exist (shouldn't happen)
 		return u.financeRepo.CreatePayment(payment)
 	}
 
-	totalPaid := amount
+	var alreadyPaid float64
 	for _, p := range bill.Payments {
 		if p.Status == "Success" {
-			totalPaid += p.Amount
+			alreadyPaid += p.Amount
 		}
 	}
+
+	remaining := bill.Amount - alreadyPaid
+	if amount > remaining {
+		return fmt.Errorf("nominal pembayaran (Rp %.0f) melebihi sisa tanggungan (Rp %.0f)", amount, remaining)
+	}
+
+	totalPaid := alreadyPaid + amount
 
 	var newStatus string
 	if status == "Success" {

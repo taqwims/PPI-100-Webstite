@@ -131,6 +131,28 @@ func AutoMigrate(db *gorm.DB) error {
 		ALTER TABLE bill_items ADD CONSTRAINT fk_bills_items FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE;
 	`).Error
 
+	// Sync is_installment for Bertahap bills
+	_ = db.Exec(`
+		UPDATE bills SET is_installment = true 
+		WHERE obligation_id IN (
+			SELECT so.id FROM student_obligations so 
+			JOIN payment_types pt ON so.payment_type_id = pt.id 
+			WHERE pt.payment_schedule = 'Bertahap'
+		);
+		UPDATE bills SET is_installment = true 
+		WHERE activity_obligation_id IN (
+			SELECT ao.id FROM activity_obligations ao 
+			JOIN activities a ON ao.activity_id = a.id 
+			WHERE a.payment_schedule = 'Bertahap' OR a.is_installment = true
+		);
+		UPDATE bills SET is_installment = true 
+		WHERE bill_type ILIKE '%bertahap%' OR title ILIKE '%bertahap%';
+		UPDATE bills SET is_installment = true 
+		WHERE bill_type IN (SELECT name FROM payment_types WHERE payment_schedule = 'Bertahap')
+		   OR title IN (SELECT name FROM payment_types WHERE payment_schedule = 'Bertahap')
+		   OR title IN (SELECT name FROM activities WHERE payment_schedule = 'Bertahap' OR is_installment = true);
+	`).Error
+
 	return nil
 }
 

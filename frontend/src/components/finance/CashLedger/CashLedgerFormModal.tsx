@@ -304,16 +304,16 @@ const CashLedgerFormModal: React.FC<Props> = ({
                                 {relevantMasters.map(master => {
                                     const children = matchingCodes.filter(c => c.parent_code_id === master.id && c.is_active);
                                     return (
-                                        <optgroup key={master.id} label={`📁 [${master.code}] ${master.name} (${master.type === 'Income' ? 'Penerimaan' : 'Pengeluaran'})`}>
+                                        <React.Fragment key={master.id}>
                                             <option value={master.id}>
-                                                📁 [${master.code}] ${master.name} (Induk - ${master.category})
+                                                📁 [{master.code}] {master.name} (Induk - {master.category})
                                             </option>
                                             {children.map(child => (
                                                 <option key={child.id} value={child.id}>
-                                                    &nbsp;&nbsp;&nbsp;&nbsp;↳ 📄 [${child.code}] ${child.name}
+                                                    &nbsp;&nbsp;&nbsp;&nbsp;↳ 📄 [{child.code}] {child.name}
                                                 </option>
                                             ))}
-                                        </optgroup>
+                                        </React.Fragment>
                                     );
                                 })}
                             </select>

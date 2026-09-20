@@ -13,6 +13,7 @@ export interface Bill {
         name: string;
     };
     is_installment?: boolean;
+    obligation?: any;
     invoice_number?: string;
     verification_code?: string;
     student?: {

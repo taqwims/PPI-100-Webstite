@@ -493,7 +493,7 @@ const FinancialMappingMatrix: React.FC = () => {
                                                         >
                                                             <option value="">-- Pilih Kode Transaksi --</option>
                                                             {masterIncomeCodes.map(master => (
-                                                                <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
+                                                                <React.Fragment key={master.id}>
                                                                     <option value={master.id}>
                                                                         {master.code} — {master.name} (Induk)
                                                                     </option>
@@ -504,7 +504,7 @@ const FinancialMappingMatrix: React.FC = () => {
                                                                                 &nbsp;&nbsp;↳ {child.code} — {child.name} (Turunan)
                                                                             </option>
                                                                         ))}
-                                                                </optgroup>
+                                                                </React.Fragment>
                                                             ))}
                                                         </select>
                                                         

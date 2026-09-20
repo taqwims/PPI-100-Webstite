@@ -49,7 +49,8 @@ func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("AcademicYear").
-		Preload("Obligation").
+		Preload("TransactionCode").
+		Preload("Obligation.PaymentType").
 		Find(&bills).Error
 	return bills, err
 }
@@ -64,7 +65,8 @@ func (r *FinanceRepository) GetBillsByStudentIDs(studentIDs []uuid.UUID) ([]doma
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("AcademicYear").
-		Preload("Obligation").
+		Preload("TransactionCode").
+		Preload("Obligation.PaymentType").
 		Order("created_at desc").
 		Find(&bills).Error
 	return bills, err
@@ -170,7 +172,7 @@ func (r *FinanceRepository) GetBillByID(id string) (*domain.Bill, error) {
 		Preload("Student.Class").
 		Preload("AcademicYear").
 		Preload("TransactionCode").
-		Preload("Obligation").
+		Preload("Obligation.PaymentType").
 		First(&bill).Error
 	if err != nil {
 		return nil, err
@@ -316,7 +318,7 @@ func (r *FinanceRepository) GetBillsByIDsOrObligationIDs(ids []string) ([]domain
 		Preload("Student.Class").
 		Preload("AcademicYear").
 		Preload("TransactionCode").
-		Preload("Obligation").
+		Preload("Obligation.PaymentType").
 		Find(&bills).Error
 	return bills, err
 }
@@ -333,7 +335,7 @@ func (r *FinanceRepository) GetBillsByIDs(ids []string) ([]domain.Bill, error) {
 		Preload("Student.Class").
 		Preload("AcademicYear").
 		Preload("TransactionCode").
-		Preload("Obligation").
+		Preload("Obligation.PaymentType").
 		Find(&bills).Error
 	return bills, err
 }

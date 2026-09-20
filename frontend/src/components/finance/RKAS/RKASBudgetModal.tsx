@@ -372,14 +372,14 @@ export const RKASBudgetModal: React.FC<RKASBudgetModalProps> = ({
                                     {form.budget_type === 'Pengeluaran' ? '-- Pilih Pos Belanja --' : '-- Pilih Pos Penerimaan --'}
                                 </option>
                                 {masterFilteredCodes.map(master => (
-                                    <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
+                                    <React.Fragment key={master.id}>
                                         <option value={master.id}>{master.code} — {master.name} (Induk)</option>
                                         {filteredCodes
                                             .filter(child => child.parent_code_id === master.id)
                                             .map(child => (
                                                 <option key={child.id} value={child.id}>&nbsp;&nbsp;↳ {child.code} — {child.name}</option>
                                             ))}
-                                    </optgroup>
+                                    </React.Fragment>
                                 ))}
                             </select>
                         </div>

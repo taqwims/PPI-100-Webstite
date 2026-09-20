@@ -39,6 +39,7 @@ func (r *BudgetRepository) UpdateCategory(cat *domain.BudgetCategory) error {
 }
 
 func (r *BudgetRepository) DeleteCategory(id uint) error {
+	_ = r.db.Delete(&domain.BudgetComponent{}, "category_id = ?", id).Error
 	return r.db.Delete(&domain.BudgetCategory{}, "id = ?", id).Error
 }
 

@@ -65,7 +65,25 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
     // -------------------------------------------------------------
     // VIEW 3: FORM VIEW (Pilih Jumlah & Metode Pembayaran Baru)
     // -------------------------------------------------------------
-    if (!showPayModal) return null;
+    const remaining = getRemainingAmount(selectedBill);
+    const isInstallment = Boolean(
+        selectedBill.is_installment ||
+        selectedBill.bill_type === 'Bertahap' ||
+        selectedBill.bill_type?.toLowerCase().includes('bertahap') ||
+        selectedBill.title?.toLowerCase().includes('bertahap') ||
+        selectedBill.obligation?.payment_type?.payment_schedule === 'Bertahap' ||
+        selectedBill.obligation?.payment_type?.payment_schedule?.toLowerCase().includes('bertahap') ||
+        (selectedBill as any).payment_type?.payment_schedule === 'Bertahap' ||
+        (selectedBill.obligation && selectedBill.obligation.total_installments > 0) ||
+        selectedBill.status === 'Partial'
+    );
+
+    const isOverAmount = paymentAmount > remaining;
+    const isZeroOrNegative = paymentAmount <= 0;
+    const calculatedRemainingAfter = Math.max(0, remaining - (paymentAmount || 0));
+
+    // Preset shortcuts for installment
+    const presetAmounts = [50000, 100000, 200000, 500000].filter(p => p < remaining);
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -83,10 +101,24 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                 <div className="overflow-y-auto flex-1 p-6 space-y-5">
                     {/* Bill Info Card */}
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                        <p className="text-sm font-semibold text-slate-700">{selectedBill.title}</p>
-                        <div className="flex justify-between items-end mt-2">
-                            <p className="text-xs font-medium text-slate-500">Sisa Tagihan:</p>
-                            <p className="text-2xl font-extrabold text-slate-900">{formatCurrency(getRemainingAmount(selectedBill))}</p>
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-semibold text-slate-700">{selectedBill.title}</p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                    <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">
+                                        {selectedBill.bill_type || 'SPP'}
+                                    </span>
+                                    {isInstallment && (
+                                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded uppercase">
+                                            Bisa Dicicil
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-medium text-slate-500">Sisa Tanggungan:</p>
+                                <p className="text-xl font-extrabold text-slate-900">{formatCurrency(remaining)}</p>
+                            </div>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-2">Jatuh tempo: {new Date(selectedBill.due_date).toLocaleDateString('id-ID')}</p>
                     </div>
@@ -111,24 +143,110 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                         </div>
                     )}
 
-                    {/* Amount Input */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Jumlah Pembayaran</label>
-                        {selectedBill.is_installment ? (
-                            <div className="relative">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>
-                                <input
-                                    type="number"
-                                    value={paymentAmount}
-                                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                                    max={getRemainingAmount(selectedBill)}
-                                    className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 text-lg font-extrabold text-slate-900"
-                                />
-                                <p className="text-xs text-blue-600 mt-1">Tagihan ini dapat dibayar sebagian (cicil).</p>
+                    {/* Amount Input & Real-Time Calculation */}
+                    <div className="space-y-2.5">
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                Nominal Pembayaran
+                            </label>
+                            {isInstallment && (
+                                <span className="text-[11px] font-medium text-blue-600">
+                                    Bisa bayar bertahap (cicil)
+                                </span>
+                            )}
+                        </div>
+
+                        {isInstallment ? (
+                            <div className="space-y-2">
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>
+                                    <input
+                                        type="number"
+                                        value={paymentAmount || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                            setPaymentAmount(val);
+                                        }}
+                                        min={1}
+                                        max={remaining}
+                                        placeholder="Masukkan nominal yang ingin dibayar..."
+                                        className={clsx(
+                                            "w-full pl-11 pr-4 py-3 rounded-2xl border text-lg font-extrabold focus:ring-2 transition",
+                                            isOverAmount
+                                                ? "border-red-500 bg-red-50/30 text-red-900 focus:ring-red-500"
+                                                : "border-slate-200 text-slate-900 focus:ring-indigo-500"
+                                        )}
+                                    />
+                                </div>
+
+                                {/* Preset Shortcut Buttons */}
+                                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentAmount(remaining)}
+                                        className={clsx(
+                                            "px-2.5 py-1 rounded-xl text-xs font-bold transition",
+                                            paymentAmount === remaining
+                                                ? "bg-indigo-600 text-white shadow-xs"
+                                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                        )}
+                                    >
+                                        Bayar Lunas ({formatCurrency(remaining)})
+                                    </button>
+                                    {presetAmounts.map(p => (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            onClick={() => setPaymentAmount(p)}
+                                            className={clsx(
+                                                "px-2.5 py-1 rounded-xl text-xs font-bold transition",
+                                                paymentAmount === p
+                                                    ? "bg-indigo-600 text-white shadow-xs"
+                                                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                            )}
+                                        >
+                                            {formatCurrency(p)}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Over-amount Warning Alert */}
+                                {isOverAmount && (
+                                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold animate-in fade-in">
+                                        ⚠️ Nominal pembayaran tidak boleh melebihi sisa tanggungan! Maksimal {formatCurrency(remaining)}.
+                                    </div>
+                                )}
+
+                                {/* Real-time Remaining Calculation Breakdown */}
+                                {!isOverAmount && paymentAmount > 0 && (
+                                    <div className="p-3.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-1.5 text-xs text-slate-700">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Sisa Tanggungan Saat Ini:</span>
+                                            <span className="font-semibold text-slate-800">{formatCurrency(remaining)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Nominal Akan Dibayar:</span>
+                                            <span className="font-bold text-indigo-700">- {formatCurrency(paymentAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between pt-1.5 border-t border-indigo-100/80 font-bold">
+                                            <span className="text-slate-800">Sisa Tanggungan Setelah Ini:</span>
+                                            <span className={clsx(
+                                                calculatedRemainingAfter === 0 ? "text-emerald-600" : "text-amber-600"
+                                            )}>
+                                                {calculatedRemainingAfter === 0 ? 'LUNAS (Rp 0)' : formatCurrency(calculatedRemainingAfter)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <div className="px-4 py-3 bg-slate-100 rounded-2xl border border-slate-200 text-slate-900 font-extrabold text-lg">
-                                {formatCurrency(paymentAmount)}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between px-4 py-3 bg-slate-100/80 rounded-2xl border border-slate-200 text-slate-900 font-extrabold text-lg">
+                                    <span>{formatCurrency(remaining)}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 italic">
+                                    * Tagihan ini bukan pembayaran bertahap sehingga dibayar sesuai nominal penuh.
+                                </p>
                             </div>
                         )}
                     </div>
@@ -224,8 +342,8 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                     {paymentMethod === 'Midtrans' ? (
                         <button
                             onClick={() => handleMidtransPayment()}
-                            disabled={loadingSnap}
-                            className="w-2/3 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2"
+                            disabled={loadingSnap || isOverAmount || isZeroOrNegative}
+                            className="w-2/3 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loadingSnap ? (
                                 <>
@@ -240,8 +358,8 @@ const BillingPaymentModal: React.FC<BillingPaymentModalProps> = ({
                     ) : (
                         <button
                             onClick={handleSubmitPayment}
-                            disabled={submitting || !proofFile}
-                            className="w-2/3 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                            disabled={submitting || !proofFile || isOverAmount || isZeroOrNegative}
+                            className="w-2/3 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {submitting ? (
                                 <>

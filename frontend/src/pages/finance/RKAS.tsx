@@ -12,7 +12,7 @@ import { RKASBudgetModal } from '../../components/finance/RKAS/RKASBudgetModal';
 import { RKASRealizeModal } from '../../components/finance/RKAS/RKASRealizeModal';
 import { RKASCategoryModal } from '../../components/finance/RKAS/RKASCategoryModal';
 import FinancialFlowGuideModal from '../../components/finance/FinancialFlowGuideModal';
-import { Budget, AcademicYear, TransactionCode, BudgetCategory, BudgetSummary } from '../../components/finance/RKAS/types';
+import { Budget, AcademicYear, TransactionCode, BudgetCategory, BudgetComponent, BudgetSummary } from '../../components/finance/RKAS/types';
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
 
@@ -42,6 +42,9 @@ const RKAS: React.FC = () => {
     const { data: categories = [] } = useQuery<BudgetCategory[]>({
         queryKey: ['budget-categories'], queryFn: async () => (await api.get('/finance/budget-categories')).data,
     });
+    const { data: components = [] } = useQuery<BudgetComponent[]>({
+        queryKey: ['budget-components'], queryFn: async () => (await api.get('/finance/budget-components')).data || [],
+    });
     const { data: budgets = [], isLoading } = useQuery<Budget[]>({
         queryKey: ['budgets', yearFilter],
         queryFn: async () => {
@@ -65,8 +68,10 @@ const RKAS: React.FC = () => {
     const updateBudget = useMutation({ mutationFn: (d: any) => api.put(`/finance/budgets/${d.id}`, d), onSuccess: () => { invalidateAll(); setShowModal(false); setEditItem(null); } });
     const deleteBudget = useMutation({ mutationFn: (id: string) => api.delete(`/finance/budgets/${id}`), onSuccess: invalidateAll });
     const realizeBudget = useMutation({ mutationFn: (d: any) => api.put(`/finance/budgets/${d.id}/realize`, { ...d, amount: Number(d.amount), transaction_code_id: Number(d.transaction_code_id) }), onSuccess: () => { invalidateAll(); setShowRealizeModal(false); } });
-    const createCat = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-categories', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); setShowCatModal(false); } });
-    const deleteCat = useMutation({ mutationFn: (id: number) => api.delete(`/finance/budget-categories/${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budget-categories'] }) });
+    const createCat = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-categories', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); setShowCatModal(false); toast.success('Kategori berhasil dibuat'); } });
+    const deleteCat = useMutation({ mutationFn: (id: number) => api.delete(`/finance/budget-categories/${id}`), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); queryClient.invalidateQueries({ queryKey: ['budget-components'] }); toast.success('Kategori berhasil dihapus'); } });
+    const createComp = useMutation({ mutationFn: (d: any) => api.post('/finance/budget-components', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-components'] }); toast.success('Komponen berhasil dibuat'); } });
+    const deleteComp = useMutation({ mutationFn: (id: number) => api.delete(`/finance/budget-components/${id}`), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budget-components'] }); toast.success('Komponen berhasil dihapus'); } });
 
     const reconcileMutation = useMutation({
         mutationFn: (yearId?: string) => api.post(`/finance/budgets/reconcile${yearId ? `?academic_year_id=${yearId}` : ''}`, {}),
@@ -233,9 +238,16 @@ const RKAS: React.FC = () => {
                 )}
             </div>
 
-            {/* Categories Tab */}
+            {/* Categories & Components Tab */}
             {tab === 'categories' && canEdit && (
-                <RKASCategoriesTab categories={categories || []} onDelete={(id: number) => deleteCat.mutate(id)} />
+                <RKASCategoriesTab
+                    categories={categories || []}
+                    components={components || []}
+                    onDeleteCategory={(id: number) => deleteCat.mutate(id)}
+                    onDeleteComponent={(id: number) => deleteComp.mutate(id)}
+                    onCreateCategory={(d) => createCat.mutate(d)}
+                    onCreateComponent={(d) => createComp.mutate(d)}
+                />
             )}
             
             {/* Budgets Table */}

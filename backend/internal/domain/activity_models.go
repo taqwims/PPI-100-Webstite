@@ -18,6 +18,8 @@ type Activity struct {
 	StartDate      time.Time `gorm:"not null" json:"start_date"`
 	EndDate        time.Time `gorm:"not null" json:"end_date"`
 	Status         string    `gorm:"not null;default:'Active'" json:"status"` // Active, Completed
+	PaymentSchedule string   `gorm:"default:'Sekali Bayar'" json:"payment_schedule"` // "Sekali Bayar", "Bertahap"
+	IsInstallment  bool      `gorm:"default:false" json:"is_installment"`
 	CreatedByID    uuid.UUID `gorm:"type:uuid;not null" json:"created_by_id"`
 	CreatedBy      User      `gorm:"foreignKey:CreatedByID" json:"created_by"`
 	CreatedAt      time.Time `json:"created_at"`

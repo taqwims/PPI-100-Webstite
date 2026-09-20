@@ -169,12 +169,12 @@ const DailyInfaqFormModal: React.FC<DailyInfaqFormModalProps> = ({
                             >
                                 <option value="">-- Pilih Kode Transaksi --</option>
                                 {transactionCodes.filter(tc => tc.is_active && !tc.parent_code_id).map(master => (
-                                    <optgroup key={master.id} label={`${master.code} — ${master.name}`}>
-                                        <option value={master.id}>{master.code} — {master.name}</option>
+                                    <React.Fragment key={master.id}>
+                                        <option value={master.id}>{master.code} — {master.name} (Induk)</option>
                                         {transactionCodes.filter(c => c.parent_code_id === master.id && c.is_active).map(child => (
                                             <option key={child.id} value={child.id}>&nbsp;&nbsp;↳ {child.code} — {child.name}</option>
                                         ))}
-                                    </optgroup>
+                                    </React.Fragment>
                                 ))}
                             </select>
                         </div>

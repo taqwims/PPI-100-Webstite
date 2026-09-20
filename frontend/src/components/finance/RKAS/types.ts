@@ -11,6 +11,14 @@ export interface BudgetCategory {
     description: string; 
     is_active: boolean; 
 }
+export interface BudgetComponent {
+    id: number;
+    category_id: number;
+    name: string;
+    description?: string;
+    is_active?: boolean;
+    category?: BudgetCategory;
+}
 export interface Budget {
     id: string;
     academic_year_id: number;

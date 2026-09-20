@@ -36,13 +36,18 @@ export const useCashLedger = () => {
     const [entryToPrint, setEntryToPrint] = useState<CashLedgerEntry | null>(null);
 
     // Filters & Pagination
+    const [filterType, setFilterType] = useState<'all' | 'Income' | 'Expense'>('all');
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [itemsPerPage, setItemsPerPage] = useState<number>(20);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [selectedSemester, setSelectedSemester] = useState<string>('all');
+    const [selectedSemesters, setSelectedSemesters] = useState<string[]>([]);
     const [filterTransactionCodeId, setFilterTransactionCodeId] = useState<string>('all');
+    const [filterTransactionCodeIds, setFilterTransactionCodeIds] = useState<number[]>([]);
+    const [filterFundSource, setFilterFundSource] = useState<string>('all');
+    const [filterFundSources, setFilterFundSources] = useState<string[]>([]);
 
     // Export modal state
     const [showExportModal, setShowExportModal] = useState(false);
@@ -224,9 +229,32 @@ export const useCashLedger = () => {
         generateCashLedgerReport(processedEntries, start, end);
     };
 
+    const resetFilters = () => {
+        setSearchQuery('');
+        setFilterType('all');
+        setFilterStartDate('');
+        setFilterEndDate('');
+        setSelectedSemester('all');
+        setSelectedSemesters([]);
+        setFilterTransactionCodeId('all');
+        setFilterTransactionCodeIds([]);
+        setFilterFundSource('all');
+        setFilterFundSources([]);
+        setSortOrder('desc');
+        setCurrentPage(1);
+    };
+
     // Filter, Sort and Paginate
     let processedEntries = entries.filter(e => {
         let match = true;
+        if (filterType !== 'all' && e.type !== filterType) {
+            match = false;
+        }
+        if (filterFundSources.length > 0) {
+            if (!filterFundSources.includes(e.fund_source)) match = false;
+        } else if (filterFundSource !== 'all' && e.fund_source !== filterFundSource) {
+            match = false;
+        }
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             if (!(
@@ -235,6 +263,7 @@ export const useCashLedger = () => {
                 e.source?.toLowerCase().includes(q) ||
                 e.notes?.toLowerCase().includes(q) ||
                 e.category?.toLowerCase().includes(q) ||
+                e.component?.toLowerCase().includes(q) ||
                 e.responsible?.name?.toLowerCase().includes(q) ||
                 e.transaction_code?.code?.toLowerCase().includes(q) ||
                 e.transaction_code?.name?.toLowerCase().includes(q) ||
@@ -244,13 +273,24 @@ export const useCashLedger = () => {
         }
         if (filterStartDate && e.date.split('T')[0] < filterStartDate) match = false;
         if (filterEndDate && e.date.split('T')[0] > filterEndDate) match = false;
-        if (selectedSemester !== 'all') {
+        
+        if (selectedSemesters.length > 0) {
+            const month = new Date(e.date).getMonth() + 1;
+            const isSem1 = month >= 7 && month <= 12; // Jul-Dec
+            const semStr = isSem1 ? '1' : '2';
+            if (!selectedSemesters.includes(semStr)) match = false;
+        } else if (selectedSemester !== 'all') {
             const month = new Date(e.date).getMonth() + 1;
             const isSem1 = month >= 7 && month <= 12; // Jul-Dec
             if (selectedSemester === '1' && !isSem1) match = false;
             if (selectedSemester === '2' && isSem1) match = false;
         }
-        if (filterTransactionCodeId !== 'all') {
+
+        if (filterTransactionCodeIds.length > 0) {
+            const tcMatches = (e.transaction_code_id != null && filterTransactionCodeIds.includes(e.transaction_code_id)) ||
+                              (e.transaction_code?.parent_code_id != null && filterTransactionCodeIds.includes(e.transaction_code.parent_code_id));
+            if (!tcMatches) match = false;
+        } else if (filterTransactionCodeId !== 'all') {
             const targetId = Number(filterTransactionCodeId);
             const tcMatches = e.transaction_code_id === targetId ||
                               e.transaction_code?.parent_code_id === targetId;
@@ -283,13 +323,19 @@ export const useCashLedger = () => {
         totalExpense,
         
         searchQuery, setSearchQuery,
+        filterType, setFilterType,
         filterStartDate, setFilterStartDate,
         filterEndDate, setFilterEndDate,
         selectedSemester, setSelectedSemester,
+        selectedSemesters, setSelectedSemesters,
         filterTransactionCodeId, setFilterTransactionCodeId,
+        filterTransactionCodeIds, setFilterTransactionCodeIds,
+        filterFundSource, setFilterFundSource,
+        filterFundSources, setFilterFundSources,
         sortOrder, setSortOrder,
         itemsPerPage, setItemsPerPage,
         currentPage, setCurrentPage,
+        resetFilters,
 
         showModal, setShowModal,
         editingEntry, setEditingEntry,

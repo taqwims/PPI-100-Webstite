@@ -415,9 +415,11 @@ const StudentBills: React.FC = () => {
                                             <td className="p-4">
                                                 <p className="font-semibold text-slate-800">{bill.title}</p>
                                                 <div className="mt-1 flex items-center gap-2">
-                                                    <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded inline-block">{bill.bill_type || 'SPP'}</span>
-                                                    {bill.academic_year && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded inline-block">{bill.academic_year.name}</span>}
-                                                    {bill.is_installment && <span className="text-[10px] font-semibold uppercase bg-blue-50 text-blue-600 px-2 py-0.5 rounded inline-block border border-blue-100">Dapat Dicicil</span>}
+                                                    {(bill.is_installment || bill.bill_type === 'Bertahap' || bill.bill_type?.toLowerCase().includes('bertahap')) && (
+                                                        <span className="text-[10px] font-semibold uppercase bg-blue-50 text-blue-600 px-2 py-0.5 rounded inline-block border border-blue-100">
+                                                            Dapat Dicicil
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="p-4 text-right text-slate-500 text-sm whitespace-nowrap">{formatCurrency(bill.amount)}</td>

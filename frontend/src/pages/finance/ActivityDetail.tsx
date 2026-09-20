@@ -181,7 +181,18 @@ const ActivityDetail = () => {
                     <ArrowLeft size={20} />
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{activity.name}</h1>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{activity.name}</h1>
+                        {activity.payment_schedule === 'Bertahap' || activity.is_installment ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                                Bertahap (Cicil)
+                            </span>
+                        ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                                Sekali Bayar
+                            </span>
+                        )}
+                    </div>
                     <p className="text-slate-500 text-sm mt-0.5">{activity.academic_year?.name} • Tagihan: {formatCurrency(activity.target_amount)}/siswa</p>
                 </div>
             </div>

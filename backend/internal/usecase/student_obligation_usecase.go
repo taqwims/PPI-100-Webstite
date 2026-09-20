@@ -74,7 +74,8 @@ func (u *StudentObligationUsecase) Create(ob *domain.StudentObligation) error {
 		}
 
 		billDueDate := *ob.DueDate
-		_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &ob.AcademicYearID, pt.TransactionCodeID, false, &obID, nil)
+		isInstallment := pt.PaymentSchedule == "Bertahap"
+		_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &ob.AcademicYearID, pt.TransactionCodeID, isInstallment, &obID, nil)
 
 		// Sync RKAS: Increment Quantity and PlannedAmount for existing budgets
 		if u.budgetRepo != nil && pt.TransactionCodeID != nil && *pt.TransactionCodeID > 0 {
@@ -223,7 +224,8 @@ func (u *StudentObligationUsecase) BulkAssign(classID uint, paymentTypeID uint, 
 				title = pt.Name + " - Cicilan " + strconv.Itoa(ob.InstallmentNumber) + "/" + strconv.Itoa(ob.TotalInstallments)
 			}
 
-			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, pt.TransactionCodeID, false, &obID, nil)
+			isInstallment := pt.PaymentSchedule == "Bertahap"
+			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, pt.TransactionCodeID, isInstallment, &obID, nil)
 		}
 	}
 
@@ -366,7 +368,8 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 				title = pt.Name + " - Cicilan " + strconv.Itoa(ob.InstallmentNumber) + "/" + strconv.Itoa(ob.TotalInstallments)
 			}
 
-			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, pt.TransactionCodeID, false, &obID, nil)
+			isInstallment := pt.PaymentSchedule == "Bertahap"
+			_ = u.financeUsecase.CreateBill(ob.StudentID, title, ob.Amount, billDueDate, pt.Name, &academicYearID, pt.TransactionCodeID, isInstallment, &obID, nil)
 		}
 	}
 

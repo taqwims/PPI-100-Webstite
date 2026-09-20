@@ -48,7 +48,16 @@ func (r *ActivityRepository) GetByID(id uuid.UUID) (*domain.Activity, error) {
 }
 
 func (r *ActivityRepository) Update(activity *domain.Activity) error {
-	return r.db.Save(activity).Error
+	if err := r.db.Save(activity).Error; err != nil {
+		return err
+	}
+	isInst := activity.IsInstallment || activity.PaymentSchedule == "Bertahap"
+	return r.db.Exec(`
+		UPDATE bills SET is_installment = ? 
+		WHERE activity_obligation_id IN (
+			SELECT id FROM activity_obligations WHERE activity_id = ?
+		)
+	`, isInst, activity.ID).Error
 }
 
 func (r *ActivityRepository) Delete(id uuid.UUID) error {
@@ -118,6 +127,7 @@ func (r *ActivityRepository) BulkAssignClass(activityID uuid.UUID, classID uint,
 			
 			// Auto create Bill with link to ActivityObligation
 			obID := ob.ID
+			isInstallment := activity.IsInstallment || activity.PaymentSchedule == "Bertahap"
 			bill := domain.Bill{
 				StudentID:            student.ID,
 				Title:                activity.Name,
@@ -127,7 +137,7 @@ func (r *ActivityRepository) BulkAssignClass(activityID uuid.UUID, classID uint,
 				BillType:             "Kegiatan",
 				AcademicYearID:       &activity.AcademicYearID,
 				ActivityObligationID: &obID,
-				IsInstallment:        false,
+				IsInstallment:        isInstallment,
 				InvoiceNumber:        fmt.Sprintf("INV-%d-%s", time.Now().UnixMilli(), student.ID.String()[:8]),
 			}
 			r.db.Create(&bill)
@@ -164,6 +174,7 @@ func (r *ActivityRepository) AssignStudent(activityID uuid.UUID, studentID uuid.
 
 	// Auto create Bill with link to ActivityObligation
 	obID := ob.ID
+	isInstallment := activity.IsInstallment || activity.PaymentSchedule == "Bertahap"
 	bill := domain.Bill{
 		StudentID:            studentID,
 		Title:                activity.Name,
@@ -173,7 +184,7 @@ func (r *ActivityRepository) AssignStudent(activityID uuid.UUID, studentID uuid.
 		BillType:             "Kegiatan",
 		AcademicYearID:       &activity.AcademicYearID,
 		ActivityObligationID: &obID,
-		IsInstallment:        false,
+		IsInstallment:        isInstallment,
 		InvoiceNumber:        fmt.Sprintf("INV-%d-%s", time.Now().UnixMilli(), studentID.String()[:8]),
 	}
 	r.db.Create(&bill)

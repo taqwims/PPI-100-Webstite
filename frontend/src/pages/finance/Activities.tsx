@@ -20,6 +20,8 @@ interface Activity {
     start_date: string;
     end_date: string;
     status: string;
+    payment_schedule?: string;
+    is_installment?: boolean;
 }
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
@@ -38,7 +40,8 @@ const Activities = () => {
     const [editItem, setEditItem] = useState<Activity | null>(null);
     const [form, setForm] = useState({
         academic_year_id: '', name: '', description: '',
-        target_amount: '', start_date: '', end_date: '', status: 'Active'
+        target_amount: '', start_date: '', end_date: '', status: 'Active',
+        payment_schedule: 'Sekali Bayar'
     });
 
     useEffect(() => {
@@ -113,7 +116,8 @@ const Activities = () => {
             target_amount: String(a.target_amount),
             start_date: a.start_date.split('T')[0],
             end_date: a.end_date.split('T')[0],
-            status: a.status
+            status: a.status,
+            payment_schedule: a.payment_schedule || (a.is_installment ? 'Bertahap' : 'Sekali Bayar')
         });
         setShowModal(true);
     };
@@ -172,7 +176,7 @@ const Activities = () => {
                     {canManage && (
                         <button onClick={() => {
                             setEditItem(null);
-                            setForm({ academic_year_id: filterYearId, name: '', description: '', target_amount: '', start_date: '', end_date: '', status: 'Active' });
+                            setForm({ academic_year_id: filterYearId, name: '', description: '', target_amount: '', start_date: '', end_date: '', status: 'Active', payment_schedule: 'Sekali Bayar' });
                             setShowModal(true);
                         }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 shadow-sm transition h-10">
                             <Plus size={18} /> Buat Kegiatan Baru
@@ -207,11 +211,20 @@ const Activities = () => {
                                 <div key={a.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-md transition-all group group/card">
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 <h3 className="font-bold text-slate-900 line-clamp-1">{a.name}</h3>
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${a.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
                                                     {a.status === 'Active' ? 'Berjalan' : 'Selesai'}
                                                 </span>
+                                                {a.payment_schedule === 'Bertahap' || a.is_installment ? (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                                                        Bertahap (Cicil)
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                                                        Sekali Bayar
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-xs text-slate-500 flex items-center gap-1.5 line-clamp-1">
                                                 <Calendar size={12} /> {formatDate(a.start_date)} - {formatDate(a.end_date)}
@@ -268,9 +281,22 @@ const Activities = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Deskripsi & Tujuan</label>
                                 <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" rows={2} placeholder="Opsional" />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Nominal Tagihan per Siswa (Rp)</label>
-                                <input type="number" value={form.target_amount} onChange={e => setForm({ ...form, target_amount: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" required min="0" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nominal Tagihan per Siswa (Rp)</label>
+                                    <input type="number" value={form.target_amount} onChange={e => setForm({ ...form, target_amount: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" required min="0" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Skema Pembayaran</label>
+                                    <select
+                                        value={form.payment_schedule}
+                                        onChange={e => setForm({ ...form, payment_schedule: e.target.value })}
+                                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white font-medium"
+                                    >
+                                        <option value="Sekali Bayar">Sekali Bayar (Lunas Langsung)</option>
+                                        <option value="Bertahap">Bertahap (Dapat Dicicil)</option>
+                                    </select>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
