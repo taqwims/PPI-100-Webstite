@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"fmt"
-	"strconv"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 
@@ -91,45 +90,19 @@ func (u *BudgetUsecase) CreateBudgetFromTemplate(b *domain.Budget, templateCodeI
 		}
 	}
 	
-	if catID == 0 {
+	if catID == 0 && template.Category != "" {
 		newCat := domain.BudgetCategory{
-			Name: template.Category,
-			Description: "Auto generated from Transaction Code",
-			IsActive: true,
+			Name:        template.Category,
+			Description: "Kategori " + template.Type,
+			IsActive:    true,
 		}
-		if err := u.repo.CreateCategory(&newCat); err != nil {
-			return fmt.Errorf("failed to auto-create category: %w", err)
+		if err := u.repo.CreateCategory(&newCat); err == nil {
+			catID = newCat.ID
 		}
-		catID = newCat.ID
 	}
 
-	lastCode, err := u.tcRepo.GetLastCodeByPrefix(template.Code)
-	newCodeSuffix := 1
-	if err == nil && lastCode != "" && len(lastCode) > len(template.Code) {
-		suffixStr := lastCode[len(template.Code):]
-		if suffixVal, err := strconv.Atoi(suffixStr); err == nil {
-			newCodeSuffix = suffixVal + 1
-		}
-	}
-	
-	newCodeStr := fmt.Sprintf("%s%d", template.Code, newCodeSuffix)
-	
-	newTc := domain.TransactionCode{
-		Code:         newCodeStr,
-		Name:         b.ItemName, // Nama menggunakan nama item/anggaran yang diinput
-		Type:         template.Type,
-		Category:     template.Category,
-		Description:  "RKAS Item: " + b.ItemName,
-		IsActive:     true,
-		ParentCodeID: &template.ID,
-	}
-	
-	if err := u.tcRepo.Create(&newTc); err != nil {
-		return fmt.Errorf("failed to create new transaction code: %w", err)
-	}
-	
 	b.CategoryID = catID
-	b.TransactionCodeID = &newTc.ID
+	b.TransactionCodeID = &template.ID
 	b.Status = "Approved"
 	
 	if len(months) > 0 {
@@ -157,13 +130,6 @@ func (u *BudgetUsecase) GetBudgetByID(id uuid.UUID) (*domain.Budget, error) {
 }
 
 func (u *BudgetUsecase) UpdateBudget(b *domain.Budget) error {
-	if b.TransactionCodeID != nil && *b.TransactionCodeID > 0 && b.ItemName != "" {
-		if tc, err := u.tcRepo.GetByID(*b.TransactionCodeID); err == nil && tc != nil {
-			tc.Name = b.ItemName
-			tc.Description = "RKAS Item: " + b.ItemName
-			_ = u.tcRepo.Update(tc)
-		}
-	}
 	return u.repo.Update(b)
 }
 

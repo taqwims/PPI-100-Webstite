@@ -396,7 +396,7 @@ const TransactionCodes: React.FC = () => {
             code: '',
             name: '',
             type: 'Income',
-            category: incomeCategories[0] || 'Penerimaan',
+            category: '',
             description: '',
             parent_code_id: '',
             is_active: true
@@ -406,11 +406,12 @@ const TransactionCodes: React.FC = () => {
 
     const handleOpenAddSubCode = (parent: TransactionCode) => {
         setEditCodeItem(null);
+        const defaultSubCat = parent.category || (parent.type === 'Income' ? (incomeCategories[0] || 'SPP') : (expenseCategories[0] || 'Operasional'));
         setCodeForm({
             code: `${parent.code}.`,
             name: '',
             type: parent.type,
-            category: parent.category || '',
+            category: defaultSubCat,
             description: '',
             parent_code_id: String(parent.id),
             is_active: true
@@ -518,7 +519,7 @@ const TransactionCodes: React.FC = () => {
     }, [codes]);
 
     const getChildrenCodes = (parentId: number) => {
-        return codes.filter(c => c.parent_code_id === parentId);
+        return codes.filter(c => c.parent_code_id === parentId && !c.description?.startsWith('RKAS Item: '));
     };
 
     const getPaymentTypesForCode = (codeId: number) => {
@@ -840,10 +841,8 @@ const TransactionCodes: React.FC = () => {
                                                             </span>
                                                         </td>
 
-                                                        <td className="px-4 py-4 text-xs font-semibold text-slate-600">
-                                                            <span className="bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/70">
-                                                                {master.category || 'Umum'}
-                                                            </span>
+                                                        <td className="px-4 py-4 text-xs font-semibold text-slate-400">
+                                                            —
                                                         </td>
 
                                                         <td className="px-4 py-4 text-right text-xs text-slate-400 font-mono">
@@ -1018,8 +1017,10 @@ const TransactionCodes: React.FC = () => {
                                                                                 </span>
                                                                             </td>
 
-                                                                            <td className="px-4 py-3.5 text-xs text-slate-500">
-                                                                                {sub.category}
+                                                                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-700">
+                                                                                <span className="bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/70">
+                                                                                    {sub.category || 'Umum'}
+                                                                                </span>
                                                                             </td>
 
                                                                             <td className="px-4 py-3.5 text-right text-xs text-slate-400 font-mono">
@@ -1258,7 +1259,8 @@ const TransactionCodes: React.FC = () => {
                                         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-emerald-500"
                                         required
                                     />
-                                                   <div>
+                                </div>
+                                <div>
                                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Tipe Transaksi *</label>
                                     <select
                                         value={codeForm.type}
@@ -1305,90 +1307,96 @@ const TransactionCodes: React.FC = () => {
                                 </select>
                             </div>
 
-                            {/* Kategori Pos */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                                        Kategori Pos ({codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}) *
-                                    </label>
-                                    {!showAddCategory && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAddCategory(true)}
-                                            className="text-xs text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1"
-                                        >
-                                            <Plus size={13} /> Tambah Kategori
-                                        </button>
-                                    )}
-                                </div>
-
-                                {showAddCategory ? (
-                                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
-                                        <label className="text-xs text-emerald-900 font-bold">
-                                            Kategori {codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'} Baru
+                            {/* Kategori Pos (Hanya untuk Sub-Kode / Child) */}
+                            {codeForm.parent_code_id ? (
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                            Kategori Pos Sub-Kode ({codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}) *
                                         </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={newCategoryName}
-                                                onChange={e => setNewCategoryName(e.target.value)}
-                                                placeholder="Contoh: Operasional, Sarpras..."
-                                                className="flex-1 px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs"
-                                                autoFocus
-                                            />
+                                        {!showAddCategory && (
                                             <button
                                                 type="button"
-                                                disabled={addingCategory || !newCategoryName.trim()}
-                                                onClick={handleCreateCategory}
-                                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                                                onClick={() => setShowAddCategory(true)}
+                                                className="text-xs text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 cursor-pointer"
                                             >
-                                                {addingCategory ? 'Menyimpan...' : 'Simpan'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
-                                                className="px-2.5 py-1.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-xs hover:bg-slate-50"
-                                            >
-                                                Batal
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-2 items-center">
-                                        <select
-                                            value={codeForm.category}
-                                            onChange={e => {
-                                                if (e.target.value === '__NEW__') setShowAddCategory(true);
-                                                else setCodeForm({ ...codeForm, category: e.target.value });
-                                            }}
-                                            className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
-                                            required
-                                        >
-                                            <option value="">-- Pilih Kategori ({codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}) --</option>
-                                            {currentTypeCategories.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                            <option value="__NEW__" className="text-emerald-700 font-bold">+ Tambah Kategori Baru...</option>
-                                        </select>
-                                        {codeForm.category && budgetCategories.some(c => c.name.toLowerCase() === codeForm.category.toLowerCase()) && (
-                                            <button
-                                                type="button"
-                                                title="Hapus kategori ini dari database"
-                                                onClick={() => {
-                                                    const targetCat = budgetCategories.find(c => c.name.toLowerCase() === codeForm.category.toLowerCase());
-                                                    if (targetCat && confirm(`Hapus kategori "${targetCat.name}" beserta komponen di dalamnya?`)) {
-                                                        deleteCategoryMutation.mutate(targetCat.id);
-                                                        setCodeForm(prev => ({ ...prev, category: '' }));
-                                                    }
-                                                }}
-                                                className="p-2.5 text-red-500 hover:bg-red-50 border border-red-200 rounded-xl transition cursor-pointer"
-                                            >
-                                                <Trash2 size={16} />
+                                                <Plus size={13} /> Tambah Kategori
                                             </button>
                                         )}
                                     </div>
-                                )}
-                            </div>                    </div>
+
+                                    {showAddCategory ? (
+                                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                                            <label className="text-xs text-emerald-900 font-bold">
+                                                Kategori {codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'} Baru
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newCategoryName}
+                                                    onChange={e => setNewCategoryName(e.target.value)}
+                                                    placeholder="Contoh: Operasional, Sarpras..."
+                                                    className="flex-1 px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs"
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={addingCategory || !newCategoryName.trim()}
+                                                    onClick={handleCreateCategory}
+                                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                                                >
+                                                    {addingCategory ? 'Menyimpan...' : 'Simpan'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                                                    className="px-2.5 py-1.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-xs hover:bg-slate-50"
+                                                >
+                                                    Batal
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2 items-center">
+                                            <select
+                                                value={codeForm.category}
+                                                onChange={e => {
+                                                    if (e.target.value === '__NEW__') setShowAddCategory(true);
+                                                    else setCodeForm({ ...codeForm, category: e.target.value });
+                                                }}
+                                                className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                                                required
+                                            >
+                                                <option value="">-- Pilih Kategori ({codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}) --</option>
+                                                {currentTypeCategories.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                                <option value="__NEW__" className="text-emerald-700 font-bold">+ Tambah Kategori Baru...</option>
+                                            </select>
+                                            {codeForm.category && budgetCategories.some(c => c.name.toLowerCase() === codeForm.category.toLowerCase()) && (
+                                                <button
+                                                    type="button"
+                                                    title="Hapus kategori ini dari database"
+                                                    onClick={() => {
+                                                        const targetCat = budgetCategories.find(c => c.name.toLowerCase() === codeForm.category.toLowerCase());
+                                                        if (targetCat && confirm(`Hapus kategori "${targetCat.name}" beserta komponen di dalamnya?`)) {
+                                                            deleteCategoryMutation.mutate(targetCat.id);
+                                                            setCodeForm(prev => ({ ...prev, category: '' }));
+                                                        }
+                                                    }}
+                                                    className="p-2.5 text-red-500 hover:bg-red-50 border border-red-200 rounded-xl transition cursor-pointer"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+                                    ℹ️ <strong>Kode Induk:</strong> Kategori pos tidak diperlukan pada kode induk. Kategori akan ditentukan secara spesifik pada masing-masing <strong>Sub-Kode (Child)</strong> di bawahnya.
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Deskripsi / Keterangan</label>
