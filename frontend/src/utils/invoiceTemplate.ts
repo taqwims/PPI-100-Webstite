@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import api from '../services/api';
 
 // ─── Types ───
 export interface StakeholderSignature {
@@ -589,19 +590,33 @@ export async function generateInvoiceA5(params: {
     y += 6;
 
     // Signatures & verification
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'INVOICE-A5',
-        invoiceNumber,
-        totalAmount,
-        date,
-    );
-    const sigsToUse = params.signatures || signatures;
+    let sigsToUse = params.signatures;
+    let codeToUse = (params as any).verificationCode;
+
+    if (!sigsToUse || !codeToUse) {
+        try {
+            const resp = await api.post('/finance/invoice/sign', {
+                invoice_type: 'Bill',
+                reference_id: invoiceNumber,
+                amount: totalAmount,
+                date_str: date,
+                invoice_number: invoiceNumber
+            });
+            sigsToUse = resp.data.signatures;
+            codeToUse = resp.data.verification_code || resp.data.code;
+        } catch {
+            const local = await generateLocalSignatures('Bill', invoiceNumber, totalAmount, date);
+            sigsToUse = local.signatures;
+            codeToUse = local.verificationCode;
+        }
+    }
+
     const finalSigs = params.selectedRoles && params.selectedRoles.length > 0
-        ? sigsToUse.filter(s => params.selectedRoles?.includes(s.role))
-        : sigsToUse;
+        ? (sigsToUse || []).filter(s => params.selectedRoles?.includes(s.role))
+        : (sigsToUse || []);
 
     y = await drawSignatureBlockCompact(doc, y, finalSigs);
-    y = await drawVerificationFooterCompact(doc, y, verificationCode);
+    y = await drawVerificationFooterCompact(doc, y, codeToUse);
 
     doc.save(`invoice-a5-${invoiceNumber}.pdf`);
 }
@@ -715,19 +730,33 @@ export async function generateMultiPaymentInvoice(params: {
     y += 8;
 
     // Generate signatures & verification
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'MULTI-PAYMENT',
-        invoiceNumber,
-        totalAmount,
-        date,
-    );
-    const sigsToUse = params.signatures || signatures;
+    let sigsToUse = params.signatures;
+    let codeToUse = (params as any).verificationCode;
+
+    if (!sigsToUse || !codeToUse) {
+        try {
+            const resp = await api.post('/finance/invoice/sign', {
+                invoice_type: 'Bill',
+                reference_id: invoiceNumber,
+                amount: totalAmount,
+                date_str: date,
+                invoice_number: invoiceNumber
+            });
+            sigsToUse = resp.data.signatures;
+            codeToUse = resp.data.verification_code || resp.data.code;
+        } catch {
+            const local = await generateLocalSignatures('Bill', invoiceNumber, totalAmount, date);
+            sigsToUse = local.signatures;
+            codeToUse = local.verificationCode;
+        }
+    }
+
     const finalSigs = params.selectedRoles && params.selectedRoles.length > 0
-        ? sigsToUse.filter(s => params.selectedRoles?.includes(s.role))
-        : sigsToUse;
+        ? (sigsToUse || []).filter(s => params.selectedRoles?.includes(s.role))
+        : (sigsToUse || []);
 
     y = await drawSignatureBlock(doc, y, finalSigs);
-    y = await drawVerificationFooter(doc, y, verificationCode);
+    y = await drawVerificationFooter(doc, y, codeToUse);
 
     addPageFooters(doc);
 
@@ -744,6 +773,7 @@ export interface InvoiceA5Params {
     date: string;
     signatures?: StakeholderSignature[];
     selectedRoles?: string[];
+    verificationCode?: string;
 }
 
 /**
@@ -879,16 +909,30 @@ async function renderInvoiceSection(
     doc.line(labelX, y, pageWidth - 10, y);
     y += 3;
 
-    const { signatures, verificationCode } = await generateLocalSignatures(
-        'INVOICE-A5',
-        invoiceNumber,
-        totalAmount,
-        date,
-    );
-    const sigsToUse = params.signatures || signatures;
+    let sectionSigs = params.signatures;
+    let sectionCode = params.verificationCode;
+
+    if (!sectionSigs || !sectionCode) {
+        try {
+            const resp = await api.post('/finance/invoice/sign', {
+                invoice_type: 'Bill',
+                reference_id: invoiceNumber,
+                amount: totalAmount,
+                date_str: date,
+                invoice_number: invoiceNumber
+            });
+            sectionSigs = resp.data.signatures;
+            sectionCode = resp.data.verification_code || resp.data.code;
+        } catch {
+            const local = await generateLocalSignatures('Bill', invoiceNumber, totalAmount, date);
+            sectionSigs = local.signatures;
+            sectionCode = local.verificationCode;
+        }
+    }
+
     const finalSigs = params.selectedRoles && params.selectedRoles.length > 0
-        ? sigsToUse.filter(s => params.selectedRoles?.includes(s.role))
-        : sigsToUse;
+        ? (sectionSigs || []).filter(s => params.selectedRoles?.includes(s.role))
+        : (sectionSigs || []);
 
     const colW = (pageWidth - 20) / Math.max(finalSigs.length, 1);
     for (let i = 0; i < finalSigs.length; i++) {
@@ -900,7 +944,8 @@ async function renderInvoiceSection(
         doc.text(sig.role_label + ',', x, y + 3);
 
         try {
-            const sigQr = await QRCode.toDataURL(sig.short_code, {
+            const verifyUrl = `${window.location.origin}/verify?code=${encodeURIComponent(sig.short_code)}`;
+            const sigQr = await QRCode.toDataURL(verifyUrl, {
                 margin: 0, width: 40,
                 color: { dark: '#1e293b', light: '#ffffff' }
             });
@@ -925,7 +970,7 @@ async function renderInvoiceSection(
     // ── Compact verification footer ──
     try {
         const qrDataUrl = await QRCode.toDataURL(
-            `${window.location.origin}/verify?code=${verificationCode}`,
+            `${window.location.origin}/verify?code=${encodeURIComponent(sectionCode || '—')}`,
             { width: 60, margin: 1, color: { dark: '#1e293b', light: '#ffffff' } }
         );
         doc.addImage(qrDataUrl, 'PNG', labelX, y, 12, 12);
@@ -934,9 +979,9 @@ async function renderInvoiceSection(
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(5.5);
     doc.setFont('helvetica', 'normal');
-    doc.text('Ditandatangani digital.', labelX + 14, y + 4);
+    doc.text('Ditandatangani digital & sah.', labelX + 14, y + 4);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Verifikasi: ${verificationCode}`, labelX + 14, y + 8);
+    doc.text(`Verifikasi: ${sectionCode}`, labelX + 14, y + 8);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(5);
     const printedDate = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });

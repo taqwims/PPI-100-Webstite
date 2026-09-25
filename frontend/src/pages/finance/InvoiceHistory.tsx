@@ -121,7 +121,7 @@ const InvoiceHistory: React.FC = () => {
                         const dateStr = paidDate.split('T')[0];
 
                         if (format === 'A5') {
-                            const sigData = await fetchInvoiceSignatures('Bill', bill.id, bill.amount, dateStr);
+                            const sigData = await fetchInvoiceSignatures('Bill', bill.id, bill.amount, dateStr, inv.invoice_number);
                             
                             // A5 Double
                             await generateInvoiceA5Double(
@@ -134,6 +134,7 @@ const InvoiceHistory: React.FC = () => {
                                     date: dateStr,
                                     selectedRoles,
                                     signatures: sigData.signatures,
+                                    verificationCode: sigData.verificationCode,
                                 },
                                 {
                                     invoiceNumber: inv.invoice_number,
@@ -144,6 +145,7 @@ const InvoiceHistory: React.FC = () => {
                                     date: dateStr,
                                     selectedRoles,
                                     signatures: sigData.signatures,
+                                    verificationCode: sigData.verificationCode,
                                 }
                             );
                         } else {
