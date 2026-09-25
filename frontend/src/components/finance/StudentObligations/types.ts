@@ -18,6 +18,15 @@ export interface PaymentType {
     payment_schedule: string; 
     amount: number;
     academic_year_id: number; 
+    transaction_code_id?: number | null;
+    transaction_code?: {
+        id: number;
+        code: string;
+        name: string;
+        type?: string;
+        category?: string;
+        parent_code_id?: number | null;
+    } | null;
     is_active: boolean;
 }
 

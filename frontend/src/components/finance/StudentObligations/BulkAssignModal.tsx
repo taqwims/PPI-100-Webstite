@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, X, Search } from 'lucide-react';
+import { Users, X, Search, Tag, CreditCard, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../services/api';
 import { AcademicYear, ClassOption, PaymentType } from './types';
@@ -14,6 +14,13 @@ interface BulkAssignModalProps {
     academicYears: AcademicYear[];
     paymentTypes: PaymentType[];
     semesterMonths: { semester1: number[]; semester2: number[] };
+}
+
+interface PTGroup {
+    key: string;
+    code: string;
+    name: string;
+    items: PaymentType[];
 }
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
@@ -35,6 +42,10 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
     const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
     const [studentSearch, setStudentSearch] = useState('');
 
+    // Hierarchical Payment Types state
+    const [ptSearch, setPtSearch] = useState('');
+    const [expandedPtGroups, setExpandedPtGroups] = useState<Record<string, boolean>>({});
+
     const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
     const [installmentCount, setInstallmentCount] = useState(1);
 
@@ -45,6 +56,26 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
         if (semesterMonths.semester2.includes(currentMonth)) return semesterMonths.semester2;
         return [...semesterMonths.semester1, ...semesterMonths.semester2];
     };
+
+    // Group payment types hierarchically by transaction code
+    const groupedPaymentTypes = useMemo(() => {
+        const active = paymentTypes.filter(pt => pt.is_active);
+        const groupsMap = new Map<string, PTGroup>();
+
+        active.forEach(pt => {
+            const tc = pt.transaction_code;
+            const key = tc ? `tc_${tc.id}` : 'tc_unmapped';
+            const code = tc ? tc.code : 'NON-POS';
+            const name = tc ? tc.name : 'Lainnya / Tanpa Pos Transaksi';
+
+            if (!groupsMap.has(key)) {
+                groupsMap.set(key, { key, code, name, items: [] });
+            }
+            groupsMap.get(key)!.items.push(pt);
+        });
+
+        return Array.from(groupsMap.values());
+    }, [paymentTypes]);
 
     useEffect(() => {
         if (isOpen) {
@@ -57,8 +88,37 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
             setFilterAssignClassId('');
             setSelectedMonths(getCurrentSemesterMonths());
             setInstallmentCount(1);
+            setPtSearch('');
+
+            // Expand all payment groups by default
+            const initExpanded: Record<string, boolean> = {};
+            groupedPaymentTypes.forEach(g => {
+                initExpanded[g.key] = true;
+            });
+            setExpandedPtGroups(initExpanded);
         }
-    }, [isOpen, filterYearId]);
+    }, [isOpen, filterYearId, groupedPaymentTypes]);
+
+    const togglePtGroup = (key: string) => {
+        setExpandedPtGroups(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const handleToggleGroup = (groupItems: PaymentType[]) => {
+        const itemIds = groupItems.map(i => String(i.id));
+        const allSelected = itemIds.length > 0 && itemIds.every(id => bulkForm.payment_type_ids.includes(id));
+        if (allSelected) {
+            setBulkForm(prev => ({
+                ...prev,
+                payment_type_ids: prev.payment_type_ids.filter(id => !itemIds.includes(id))
+            }));
+        } else {
+            const set = new Set([...bulkForm.payment_type_ids, ...itemIds]);
+            setBulkForm(prev => ({
+                ...prev,
+                payment_type_ids: Array.from(set)
+            }));
+        }
+    };
 
     // Filter classes for search
     const filteredClasses = useMemo(() => {
@@ -382,38 +442,146 @@ export const BulkAssignModal: React.FC<BulkAssignModalProps> = ({
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        )}                        {/* Jenis Pembayaran - Hierarkis Parent Child */}
+                        <div className="space-y-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <label className="block text-sm font-semibold text-slate-800">
+                                    Jenis Pembayaran <span className="text-xs text-slate-400 font-normal">(Hierarki Pos Transaksi RKAS)</span>
+                                </label>
+                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                                    {bulkForm.payment_type_ids.length} jenis dipilih
+                                </span>
+                            </div>
 
-                        {/* Jenis Pembayaran */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Jenis Pembayaran <span className="text-xs text-slate-400 font-normal">(Bisa pilih lebih dari 1)</span>
-                            </label>
-                            <div className="space-y-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2.5 bg-slate-50">
-                                {paymentTypes.filter(pt => pt.is_active).map(pt => (
-                                    <label key={pt.id} className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded-lg transition border border-transparent hover:border-slate-200">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" 
-                                            checked={bulkForm.payment_type_ids.includes(String(pt.id))} 
-                                            onChange={(e) => {
-                                                const checked = e.target.checked;
-                                                setBulkForm(prev => ({
-                                                    ...prev,
-                                                    payment_type_ids: checked 
-                                                        ? [...prev.payment_type_ids, String(pt.id)] 
-                                                        : prev.payment_type_ids.filter(id => id !== String(pt.id))
-                                                }));
-                                            }}
-                                        />
-                                        <div className="flex-1">
-                                            <p className="text-xs font-medium text-slate-800">[{pt.code}] {pt.name}</p>
-                                            <p className="text-[11px] text-slate-500">{formatCurrency(pt.amount)} • {pt.payment_schedule}</p>
+                            {/* Search Filter for PT */}
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari jenis bayar / pos transaksi..."
+                                    value={ptSearch}
+                                    onChange={e => setPtSearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 font-medium"
+                                />
+                            </div>
+
+                            <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-200 rounded-2xl p-2.5 bg-slate-50/70 divide-y divide-slate-100">
+                                {groupedPaymentTypes.map(group => {
+                                    const isGroupExpanded = expandedPtGroups[group.key] ?? true;
+                                    const filteredItems = group.items.filter(pt => {
+                                        if (!ptSearch.trim()) return true;
+                                        const q = ptSearch.toLowerCase();
+                                        return pt.name.toLowerCase().includes(q) ||
+                                               pt.code.toLowerCase().includes(q) ||
+                                               group.name.toLowerCase().includes(q) ||
+                                               group.code.toLowerCase().includes(q);
+                                    });
+
+                                    if (filteredItems.length === 0) return null;
+
+                                    const groupItemIds = filteredItems.map(i => String(i.id));
+                                    const allSelected = groupItemIds.length > 0 && groupItemIds.every(id => bulkForm.payment_type_ids.includes(id));
+                                    const someSelected = groupItemIds.some(id => bulkForm.payment_type_ids.includes(id)) && !allSelected;
+                                    const selectedCount = groupItemIds.filter(id => bulkForm.payment_type_ids.includes(id)).length;
+
+                                    return (
+                                        <div key={group.key} className="pt-2 first:pt-0 space-y-1.5">
+                                            {/* Parent Group Header */}
+                                            <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-200/80 shadow-xs">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => togglePtGroup(group.key)}
+                                                        className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition"
+                                                    >
+                                                        {isGroupExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                                    </button>
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono font-bold text-[10px]">
+                                                        <Tag size={10} className="text-emerald-600" />
+                                                        {group.code}
+                                                    </span>
+                                                    <span className="text-xs font-bold text-slate-800 truncate">
+                                                        {group.name}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="text-[11px] text-slate-400 font-medium">
+                                                        {selectedCount}/{groupItemIds.length}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleGroup(filteredItems)}
+                                                        className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border transition ${
+                                                            allSelected
+                                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                                : someSelected
+                                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        {allSelected ? 'Batal Semua' : 'Pilih Pos'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Child Payment Types */}
+                                            {isGroupExpanded && (
+                                                <div className="pl-4 space-y-1">
+                                                    {filteredItems.map(pt => {
+                                                        const isChecked = bulkForm.payment_type_ids.includes(String(pt.id));
+                                                        return (
+                                                            <label
+                                                                key={pt.id}
+                                                                className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition border ${
+                                                                    isChecked
+                                                                        ? 'bg-blue-50/80 border-blue-200 text-blue-950'
+                                                                        : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-700'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                                    checked={isChecked}
+                                                                    onChange={e => {
+                                                                        const checked = e.target.checked;
+                                                                        setBulkForm(prev => ({
+                                                                            ...prev,
+                                                                            payment_type_ids: checked
+                                                                                ? [...prev.payment_type_ids, String(pt.id)]
+                                                                                : prev.payment_type_ids.filter(id => id !== String(pt.id))
+                                                                        }));
+                                                                    }}
+                                                                />
+                                                                <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-[10px] font-bold shrink-0">
+                                                                            <CreditCard size={10} />
+                                                                            {pt.code}
+                                                                        </span>
+                                                                        <span className="text-xs font-semibold truncate">
+                                                                            {pt.name}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">
+                                                                            {pt.payment_schedule}
+                                                                        </span>
+                                                                        <span className="text-xs font-bold text-slate-900 font-mono">
+                                                                            {formatCurrency(pt.amount)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
-                                    </label>
-                                ))}
-                                {paymentTypes.filter(pt => pt.is_active).length === 0 && (
-                                    <p className="text-xs text-slate-500 text-center py-2">Belum ada jenis pembayaran aktif</p>
+                                    );
+                                })}
+                                {groupedPaymentTypes.length === 0 && (
+                                    <p className="text-xs text-slate-500 text-center py-4">Belum ada jenis pembayaran aktif</p>
                                 )}
                             </div>
                         </div>

@@ -119,8 +119,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Pengaturan Keuangan',
             items: [
                 { icon: Layers, label: 'Pusat Master Keuangan', path: '/dashboard/finance/master-hub', feature: 'student_obligations' },
-                { icon: Tag, label: 'Kode Transaksi', path: '/dashboard/finance/transaction-codes' },
-                { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types', feature: 'student_obligations' },
+                { icon: Tag, label: 'Kode Transaksi & Pos Bayar', path: '/dashboard/finance/transaction-codes', feature: 'student_obligations' },
                 { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types', feature: 'infaq' },
                 { icon: MessageCircle, label: 'Pengaturan Notifikasi', path: '/dashboard/finance/notification-settings', feature: 'wa_gateway' },
                 { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings', feature: 'savings' },
@@ -232,8 +231,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const transactionalTellerPengaturan: MenuGroup = {
             title: 'Pengaturan Keuangan',
             items: [
-                { icon: Tag, label: 'Kode Transaksi', path: '/dashboard/finance/transaction-codes' },
-                { icon: CreditCard, label: 'Jenis Pembayaran', path: '/dashboard/finance/payment-types', feature: 'student_obligations' },
+                { icon: Tag, label: 'Kode Transaksi & Pos Bayar', path: '/dashboard/finance/transaction-codes', feature: 'student_obligations' },
                 { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types', feature: 'infaq' },
                 { icon: MessageCircle, label: 'Pengaturan Notifikasi', path: '/dashboard/finance/notification-settings', feature: 'wa_gateway' },
                 { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings', feature: 'savings' },

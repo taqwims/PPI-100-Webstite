@@ -58,6 +58,11 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
     const [lateHourlyRate, setLateHourlyRate] = useState<number | ''>('');
     const [showLateCalc, setShowLateCalc] = useState(false);
 
+    // Transport Allowance Calculator State: kehadiran (hari) * harga/tarif
+    const [transportDays, setTransportDays] = useState<number | ''>('');
+    const [transportDailyRate, setTransportDailyRate] = useState<number | ''>('');
+    const [showTransportCalc, setShowTransportCalc] = useState(false);
+
     // Infaq State: 2.5% of total income
     const [autoInfaq, setAutoInfaq] = useState<boolean>(true);
 
@@ -115,6 +120,9 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                 setLateMinutes('');
                 setLateHourlyRate('');
                 setShowLateCalc(false);
+                setTransportDays('');
+                setTransportDailyRate('');
+                setShowTransportCalc(false);
                 // Check if existing infaq matches standard 2.5%
                 const currentGross = (editingPayroll.base_salary || 0) +
                     (editingPayroll.functional_allowance || 0) +
@@ -130,6 +138,9 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                 setLateMinutes('');
                 setLateHourlyRate('');
                 setShowLateCalc(false);
+                setTransportDays('');
+                setTransportDailyRate('');
+                setShowTransportCalc(false);
                 setAutoInfaq(true);
             }
         }
@@ -183,6 +194,32 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                 setAutoInfaq(true);
             }
         }
+    };
+
+    // Transport Allowance Calculator: kehadiran (hari) * tarif per hari
+    const handleTransportDaysChange = (daysVal: string) => {
+        const days = daysVal === '' ? '' : Math.max(0, parseFloat(daysVal) || 0);
+        setTransportDays(days);
+        if (days !== '' && typeof transportDailyRate === 'number' && transportDailyRate > 0) {
+            const calculated = Math.round(days * transportDailyRate);
+            setFormData(prev => ({ ...prev, transport_allowance: calculated }));
+        }
+    };
+
+    const handleTransportRateChange = (rateVal: string) => {
+        const rate = rateVal === '' ? '' : Math.max(0, parseFloat(rateVal) || 0);
+        setTransportDailyRate(rate);
+        if (typeof transportDays === 'number' && transportDays > 0 && rate !== '') {
+            const calculated = Math.round(transportDays * rate);
+            setFormData(prev => ({ ...prev, transport_allowance: calculated }));
+        }
+    };
+
+    const applyTransportCalc = () => {
+        const days = typeof transportDays === 'number' ? transportDays : 0;
+        const rate = typeof transportDailyRate === 'number' ? transportDailyRate : 0;
+        const calculated = Math.round(days * rate);
+        setFormData(prev => ({ ...prev, transport_allowance: calculated }));
     };
 
     // Calculate late penalty whenever lateMinutes or lateHourlyRate changes: (menit / 60) * harga
@@ -334,9 +371,78 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                                         <label className="text-sm text-slate-600">Tunj. Fungsional</label>
                                         <input type="number" name="functional_allowance" value={formData.functional_allowance === 0 ? '' : formData.functional_allowance} placeholder="0" onChange={handleInput} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-emerald-500 transition-all" />
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-sm text-slate-600">Tunj. Transport</label>
-                                        <input type="number" name="transport_allowance" value={formData.transport_allowance === 0 ? '' : formData.transport_allowance} placeholder="0" onChange={handleInput} className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-emerald-500 transition-all" />
+                                    {/* TUNJANGAN TRANSPORT DENGAN KALKULATOR KEHADIRAN X TARIF */}
+                                    <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-sm font-medium text-slate-700">Tunj. Transport</label>
+                                            <input
+                                                type="number"
+                                                name="transport_allowance"
+                                                value={formData.transport_allowance === 0 ? '' : formData.transport_allowance}
+                                                placeholder="0"
+                                                onChange={handleInput}
+                                                className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-emerald-500 transition-all font-semibold text-emerald-700"
+                                            />
+                                        </div>
+
+                                        {/* Toggle Mini Calculator */}
+                                        <div className="pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowTransportCalc(!showTransportCalc)}
+                                                className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 font-medium transition"
+                                            >
+                                                <Calculator size={13} />
+                                                <span>Kalkulator Transport (Kehadiran × Tarif/Hari)</span>
+                                                {showTransportCalc ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                            </button>
+
+                                            {showTransportCalc && (
+                                                <div className="mt-2 p-3 bg-white rounded-lg border border-emerald-100 shadow-sm space-y-2 animate-in fade-in">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="text-[11px] font-semibold text-slate-500 block mb-1">
+                                                                Hari Kehadiran
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Contoh: 20"
+                                                                value={transportDays}
+                                                                onChange={(e) => handleTransportDaysChange(e.target.value)}
+                                                                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-400 text-right font-medium"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[11px] font-semibold text-slate-500 block mb-1">
+                                                                Tarif Transport / Hari (Rp)
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Contoh: 25000"
+                                                                value={transportDailyRate}
+                                                                onChange={(e) => handleTransportRateChange(e.target.value)}
+                                                                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-400 text-right font-medium"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {typeof transportDays === 'number' && typeof transportDailyRate === 'number' && (
+                                                        <div className="flex items-center justify-between bg-emerald-50/80 p-2 rounded-lg text-xs text-emerald-900 border border-emerald-100">
+                                                            <span>
+                                                                {transportDays} hari × {formatCurrency(transportDailyRate)} = <strong>{formatCurrency(Math.round(transportDays * transportDailyRate))}</strong>
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={applyTransportCalc}
+                                                                className="px-2 py-1 bg-emerald-600 text-white rounded text-[11px] font-bold hover:bg-emerald-700 transition"
+                                                            >
+                                                                Terapkan
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <label className="text-sm text-slate-600">Tugas Tambahan</label>

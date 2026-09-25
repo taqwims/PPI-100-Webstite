@@ -122,11 +122,31 @@ export const BulkDeleteModal: React.FC<Props> = ({
                         <select 
                             value={selectedPaymentTypeId} 
                             onChange={e => setSelectedPaymentTypeId(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium"
                             required
                         >
-                            <option value="">Pilih Jenis Pembayaran</option>
-                            {paymentTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            <option value="">-- Pilih Jenis Pembayaran --</option>
+                            {(() => {
+                                const groupsMap = new Map<string, { label: string; items: PaymentType[] }>();
+                                paymentTypes.filter(pt => pt.is_active).forEach(pt => {
+                                    const tc = pt.transaction_code;
+                                    const key = tc ? `tc_${tc.id}` : 'tc_unmapped';
+                                    const label = tc ? `Pos: [${tc.code}] ${tc.name}` : 'Lainnya / Tanpa Pos Transaksi';
+                                    if (!groupsMap.has(key)) {
+                                        groupsMap.set(key, { label, items: [] });
+                                    }
+                                    groupsMap.get(key)!.items.push(pt);
+                                });
+                                return Array.from(groupsMap.entries()).map(([k, g]) => (
+                                    <optgroup key={k} label={g.label}>
+                                        {g.items.map(t => (
+                                            <option key={t.id} value={t.id}>
+                                                &nbsp;&nbsp;↳ [{t.code}] {t.name} ({t.payment_schedule})
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                ));
+                            })()}
                         </select>
                     </div>
 

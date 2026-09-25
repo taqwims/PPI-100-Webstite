@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { CreditCard, Tag, Link2, BarChart2, Sparkles, Building2, ArrowRightCircle } from 'lucide-react';
+import { Tag, Link2, BarChart2, Sparkles, Building2, ArrowRightCircle, Layers } from 'lucide-react';
 import clsx from 'clsx';
 
 // Import sub-page components
-import PaymentTypes from './PaymentTypes';
 import TransactionCodes from './TransactionCodes';
 import FinancialMappingMatrix from '../../components/finance/FinancialMappingMatrix';
 import RKAS from './RKAS';
 
 const FinancialMasterHub: React.FC = () => {
-    // Sequentially aligned flow: Step 1 = codes, Step 2 = types, Step 3 = mapping, Step 4 = rkas
-    const [activeTab, setActiveTab] = useState<'codes' | 'types' | 'mapping' | 'rkas'>('codes');
+    // Aligned 3-step master financial flow
+    const [activeTab, setActiveTab] = useState<'codes' | 'mapping' | 'rkas'>('codes');
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -26,7 +25,7 @@ const FinancialMasterHub: React.FC = () => {
                         </div>
                         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Pusat Master & Pemetaan Keuangan</h1>
                         <p className="text-slate-300 text-sm mt-1 max-w-2xl">
-                            Kelola Kode Pos Transaksi, Jenis Pembayaran Siswa, Matriks Pemetaan Alur, dan Realisasi Anggaran RKAS secara efisien dalam 1 alur terpadu.
+                            Kelola Kode Transaksi & Pos Pembayaran Siswa (Parent-Child), Matriks Pemetaan Alur, dan Realisasi Anggaran RKAS secara efisien dalam 1 alur terpadu.
                         </p>
                     </div>
 
@@ -42,116 +41,84 @@ const FinancialMasterHub: React.FC = () => {
                 <div className="flex items-center justify-between">
                     <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                         <ArrowRightCircle size={16} className="text-emerald-600" />
-                        Alur Pengaturan & Otomatisasi Keuangan Sekolah (Step by Step)
+                        Alur Pengaturan & Otomatisasi Keuangan Sekolah
                     </h3>
-                    <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Klik langkah untuk berpindah tab</span>
+                    <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Klik langkah untuk berpindah modul</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Step 1 */}
                     <button
                         type="button"
                         onClick={() => setActiveTab('codes')}
                         className={clsx(
-                            "p-3.5 rounded-xl border text-left transition-all relative overflow-hidden group",
-                            activeTab === 'codes' ? "bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm" : "bg-slate-50/80 border-slate-200 hover:bg-slate-100"
+                            "p-4 rounded-2xl border text-left transition-all relative overflow-hidden group",
+                            activeTab === 'codes' ? "bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm" : "bg-slate-50/80 border-slate-200 hover:bg-slate-100"
                         )}
                     >
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className={clsx("text-[10px] font-extrabold px-2 py-0.5 rounded-md", activeTab === 'codes' ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700")}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className={clsx("text-[10px] font-extrabold px-2.5 py-0.5 rounded-md", activeTab === 'codes' ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700")}>
                                 LANGKAH 1
                             </span>
-                            <Tag size={16} className={activeTab === 'codes' ? "text-indigo-600" : "text-slate-400"} />
+                            <Layers size={18} className={activeTab === 'codes' ? "text-emerald-600" : "text-slate-400"} />
                         </div>
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition">1. Kode Transaksi</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Kode Induk & Turunan untuk Belanja Operasional, Gaji, dan Penerimaan</p>
+                        <p className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition">1. Kode Transaksi & Jenis Bayar</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Kelola struktur hierarki kode pos RKAS dan tarif tagihan siswa (Parent-Child).</p>
                     </button>
 
                     {/* Step 2 */}
                     <button
                         type="button"
-                        onClick={() => setActiveTab('types')}
+                        onClick={() => setActiveTab('mapping')}
                         className={clsx(
-                            "p-3.5 rounded-xl border text-left transition-all relative overflow-hidden group",
-                            activeTab === 'types' ? "bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm" : "bg-slate-50/80 border-slate-200 hover:bg-slate-100"
+                            "p-4 rounded-2xl border text-left transition-all relative overflow-hidden group",
+                            activeTab === 'mapping' ? "bg-teal-50/90 border-teal-500 ring-2 ring-teal-500/20 shadow-sm" : "bg-slate-50/80 border-slate-200 hover:bg-slate-100"
                         )}
                     >
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className={clsx("text-[10px] font-extrabold px-2 py-0.5 rounded-md", activeTab === 'types' ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700")}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className={clsx("text-[10px] font-extrabold px-2.5 py-0.5 rounded-md", activeTab === 'mapping' ? "bg-teal-600 text-white" : "bg-slate-200 text-slate-700")}>
                                 LANGKAH 2
                             </span>
-                            <CreditCard size={16} className={activeTab === 'types' ? "text-emerald-600" : "text-slate-400"} />
+                            <Link2 size={18} className={activeTab === 'mapping' ? "text-teal-600" : "text-slate-400"} />
                         </div>
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition">2. Tarif Tagihan Siswa</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Atur tarif SPP/biaya per jenjang & hubungkan ke Kode Transaksi</p>
+                        <p className="text-sm font-bold text-slate-900 group-hover:text-teal-700 transition">2. Matriks Pemetaan</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Cek alur Siswa, Belanja Operasional, dan Infaq ke RKAS secara otomatis.</p>
                     </button>
 
                     {/* Step 3 */}
                     <button
                         type="button"
-                        onClick={() => setActiveTab('mapping')}
-                        className={clsx(
-                            "p-3.5 rounded-xl border text-left transition-all relative overflow-hidden group",
-                            activeTab === 'mapping' ? "bg-teal-50/90 border-teal-500 ring-2 ring-teal-500/20 shadow-sm" : "bg-slate-50/80 border-slate-200 hover:bg-slate-100"
-                        )}
-                    >
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className={clsx("text-[10px] font-extrabold px-2 py-0.5 rounded-md", activeTab === 'mapping' ? "bg-teal-600 text-white" : "bg-slate-200 text-slate-700")}>
-                                LANGKAH 3
-                            </span>
-                            <Link2 size={16} className={activeTab === 'mapping' ? "text-teal-600" : "text-slate-400"} />
-                        </div>
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition">3. Matriks Pemetaan</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Cek alur Siswa, Belanja Operasional, dan Infaq ke RKAS secara cerdas</p>
-                    </button>
-
-                    {/* Step 4 */}
-                    <button
-                        type="button"
                         onClick={() => setActiveTab('rkas')}
                         className={clsx(
-                            "p-3.5 rounded-xl border text-left transition-all relative overflow-hidden group",
+                            "p-4 rounded-2xl border text-left transition-all relative overflow-hidden group",
                             activeTab === 'rkas' ? "bg-amber-50/90 border-amber-500 ring-2 ring-amber-500/20 shadow-sm" : "bg-slate-50/80 border-slate-200 hover:bg-slate-100"
                         )}
                     >
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className={clsx("text-[10px] font-extrabold px-2 py-0.5 rounded-md", activeTab === 'rkas' ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-700")}>
-                                LANGKAH 4
+                        <div className="flex items-center justify-between mb-2">
+                            <span className={clsx("text-[10px] font-extrabold px-2.5 py-0.5 rounded-md", activeTab === 'rkas' ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-700")}>
+                                LANGKAH 3
                             </span>
-                            <BarChart2 size={16} className={activeTab === 'rkas' ? "text-amber-600" : "text-slate-400"} />
+                            <BarChart2 size={18} className={activeTab === 'rkas' ? "text-amber-600" : "text-slate-400"} />
                         </div>
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition">4. Realisasi RKAS</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Pantau anggaran vs realisasi live dari BKU kas dan pembayaran siswa</p>
+                        <p className="text-sm font-bold text-slate-900 group-hover:text-amber-700 transition">3. Realisasi RKAS</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Pantau anggaran vs realisasi live dari BKU kas dan pembayaran siswa.</p>
                     </button>
                 </div>
             </div>
 
-            {/* 4 Main Navigation Tabs (Sequentially Ordered) */}
-            <div className="flex p-1.5 bg-slate-100/90 rounded-2xl gap-1 border border-slate-200 shadow-inner overflow-x-auto">
+            {/* 3 Main Navigation Tabs */}
+            <div className="flex p-1.5 bg-slate-100/90 rounded-2xl gap-1.5 border border-slate-200 shadow-inner overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('codes')}
                     className={clsx(
                         "flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 whitespace-nowrap",
                         activeTab === 'codes'
-                            ? "bg-white text-indigo-800 shadow-md border border-slate-200/80"
-                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                    )}
-                >
-                    <Tag size={18} className={clsx(activeTab === 'codes' ? "text-indigo-600" : "text-slate-400")} />
-                    1. Kode Transaksi
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('types')}
-                    className={clsx(
-                        "flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 whitespace-nowrap",
-                        activeTab === 'types'
                             ? "bg-white text-emerald-800 shadow-md border border-slate-200/80"
                             : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     )}
                 >
-                    <CreditCard size={18} className={clsx(activeTab === 'types' ? "text-emerald-600" : "text-slate-400")} />
-                    2. Jenis Pembayaran
+                    <Tag size={18} className={clsx(activeTab === 'codes' ? "text-emerald-600" : "text-slate-400")} />
+                    1. Kode Transaksi & Jenis Bayar
                 </button>
 
                 <button
@@ -164,7 +131,7 @@ const FinancialMasterHub: React.FC = () => {
                     )}
                 >
                     <Link2 size={18} className={clsx(activeTab === 'mapping' ? "text-teal-600" : "text-slate-400")} />
-                    3. Matriks Pemetaan Keuangan
+                    2. Matriks Pemetaan Keuangan
                 </button>
 
                 <button
@@ -177,14 +144,13 @@ const FinancialMasterHub: React.FC = () => {
                     )}
                 >
                     <BarChart2 size={18} className={clsx(activeTab === 'rkas' ? "text-amber-600" : "text-slate-400")} />
-                    4. Realisasi RKAS
+                    3. Realisasi RKAS
                 </button>
             </div>
 
             {/* Tab Contents */}
             <div className="animate-in fade-in duration-200">
                 {activeTab === 'codes' && <TransactionCodes />}
-                {activeTab === 'types' && <PaymentTypes />}
                 {activeTab === 'mapping' && <FinancialMappingMatrix />}
                 {activeTab === 'rkas' && <RKAS />}
             </div>
