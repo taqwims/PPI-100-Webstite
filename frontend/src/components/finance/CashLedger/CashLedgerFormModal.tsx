@@ -33,7 +33,7 @@ const CashLedgerFormModal: React.FC<Props> = ({
   const [showAllTypes, setShowAllTypes] = useState(false);
 
   // Fetch admin budget-categories
-  const { data: budgetCategories = [] } = useQuery<{ id: number; name: string }[]>({
+  const { data: budgetCategories = [], refetch: refetchBudgetCategories } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['budget-categories'],
     queryFn: async () => (await api.get('/finance/budget-categories')).data || [],
     enabled: showModal,
@@ -84,6 +84,7 @@ const CashLedgerFormModal: React.FC<Props> = ({
           description: 'Dibuat otomatis dari BKU'
         });
         catId = resCat.data?.id;
+        await refetchBudgetCategories();
       }
       if (catId) {
         await api.post('/finance/budget-components', {
@@ -101,6 +102,47 @@ const CashLedgerFormModal: React.FC<Props> = ({
       toast.error(err.response?.data?.error || 'Gagal menambahkan komponen');
     } finally {
       setAddingComponent(false);
+    }
+  };
+
+  const handleDeleteSelectedComponent = async () => {
+    if (!formData.component) return;
+    const targetComp = allComponents.find(c =>
+      c.name.trim().toLowerCase() === formData.component.trim().toLowerCase() &&
+      (!selectedCatObj || c.category_id === selectedCatObj.id || c.category?.name.trim().toLowerCase() === formData.category.trim().toLowerCase())
+    );
+    if (!targetComp) {
+      // Just clear from form
+      setFormData((prev: any) => ({ ...prev, component: '' }));
+      return;
+    }
+    if (confirm(`Hapus komponen "${formData.component}" dari daftar anggaran?`)) {
+      try {
+        await api.delete(`/finance/budget-components/${targetComp.id}`);
+        await refetchComponents();
+        setFormData((prev: any) => ({ ...prev, component: '' }));
+        toast.success('Komponen berhasil dihapus');
+      } catch (err: any) {
+        toast.error(err.response?.data?.error || 'Gagal menghapus komponen');
+      }
+    }
+  };
+
+  const handleDeleteSelectedCategory = async () => {
+    if (!selectedCatObj) {
+      setFormData((prev: any) => ({ ...prev, category: '', component: '' }));
+      return;
+    }
+    if (confirm(`Hapus kategori "${selectedCatObj.name}" dan semua komponen di dalamnya?`)) {
+      try {
+        await api.delete(`/finance/budget-categories/${selectedCatObj.id}`);
+        await refetchBudgetCategories();
+        await refetchComponents();
+        setFormData((prev: any) => ({ ...prev, category: '', component: '' }));
+        toast.success('Kategori berhasil dihapus');
+      } catch (err: any) {
+        toast.error(err.response?.data?.error || 'Gagal menghapus kategori');
+      }
     }
   };
 
@@ -136,11 +178,40 @@ const CashLedgerFormModal: React.FC<Props> = ({
 
   const categoryOptions = useMemo(() => {
     const set = new Set<string>();
-    budgetCategories.forEach(c => { if (c.name) set.add(c.name.trim()); });
-    transactionCodes.forEach(c => { if (c.category) set.add(c.category.trim()); });
+    const isIncome = formData.type === 'Income' || formData.type === 'Penerimaan';
+
+    // Categories from transaction codes matching current type
+    transactionCodes
+      .filter(tc => {
+        const tcIsIncome = tc.type === 'Income' || tc.type === 'Penerimaan';
+        return isIncome ? tcIsIncome : !tcIsIncome;
+      })
+      .forEach(c => {
+        if (c.category) set.add(c.category.trim());
+      });
+
+    // Budget categories
+    budgetCategories.forEach(c => {
+      const name = c.name?.trim();
+      if (!name) return;
+      const usedInOpposite = transactionCodes.some(tc => {
+        const tcIsIncome = tc.type === 'Income' || tc.type === 'Penerimaan';
+        const isOpposite = isIncome ? !tcIsIncome : tcIsIncome;
+        return isOpposite && tc.category?.toLowerCase() === name.toLowerCase();
+      });
+      const usedInCurrent = transactionCodes.some(tc => {
+        const tcIsIncome = tc.type === 'Income' || tc.type === 'Penerimaan';
+        const isCurrent = isIncome ? tcIsIncome : !tcIsIncome;
+        return isCurrent && tc.category?.toLowerCase() === name.toLowerCase();
+      });
+      if (usedInCurrent || !usedInOpposite) {
+        set.add(name);
+      }
+    });
+
     if (formData.category) set.add(formData.category.trim());
     return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
-  }, [budgetCategories, transactionCodes, formData.category]);
+  }, [budgetCategories, transactionCodes, formData.type, formData.category]);
 
   // Selected Transaction Code & its parent (if child)
   const selectedTC = useMemo(() => {
@@ -428,9 +499,21 @@ const CashLedgerFormModal: React.FC<Props> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Kategori */}
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                                    🏷️ Kategori <span className="text-red-500">*</span>
-                                </label>
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <label className="block text-xs font-semibold text-slate-700">
+                                        🏷️ Kategori <span className="text-red-500">*</span>
+                                    </label>
+                                    {formData.category && selectedCatObj && (
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteSelectedCategory}
+                                            title={`Hapus kategori ${formData.category}`}
+                                            className="text-[11px] text-red-500 hover:text-red-700 font-semibold flex items-center gap-1 transition cursor-pointer"
+                                        >
+                                            <Trash2 size={12} /> Hapus Kategori
+                                        </button>
+                                    )}
+                                </div>
                                 <select
                                     name="category"
                                     value={formData.category}
@@ -455,15 +538,27 @@ const CashLedgerFormModal: React.FC<Props> = ({
                                     <label className="block text-xs font-semibold text-slate-700">
                                         🧩 Komponen
                                     </label>
-                                    {formData.category && !showAddComponent && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAddComponent(true)}
-                                            className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 transition cursor-pointer"
-                                        >
-                                            <Plus size={13} /> Tambah Baru
-                                        </button>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {formData.component && (
+                                            <button
+                                                type="button"
+                                                onClick={handleDeleteSelectedComponent}
+                                                title={`Hapus komponen ${formData.component}`}
+                                                className="text-[11px] text-red-500 hover:text-red-700 font-semibold flex items-center gap-1 transition cursor-pointer"
+                                            >
+                                                <Trash2 size={12} /> Hapus Komponen
+                                            </button>
+                                        )}
+                                        {formData.category && !showAddComponent && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAddComponent(true)}
+                                                className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 transition cursor-pointer"
+                                            >
+                                                <Plus size={13} /> Tambah Baru
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {showAddComponent ? (

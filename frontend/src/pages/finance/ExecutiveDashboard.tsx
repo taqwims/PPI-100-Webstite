@@ -34,7 +34,8 @@ const CHART_COLORS = {
 const BAR_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
 const ExecutiveDashboard: React.FC = () => {
-    const [showRkasDetail, setShowRkasDetail] = useState(false);
+    const [showRkasExpenseDetail, setShowRkasExpenseDetail] = useState(false);
+    const [showRkasIncomeDetail, setShowRkasIncomeDetail] = useState(false);
 
     const { data: analytics } = useQuery<DashboardData>({
         queryKey: ['finance-dashboard'],
@@ -103,14 +104,41 @@ const ExecutiveDashboard: React.FC = () => {
         { name: 'Pengeluaran', Anggaran: totalPengeluaranPlanned, Realisasi: totalPengeluaranRealized }
     ];
 
-    // RKAS Category
-    const rkasCategoryData = budgetSummary.map(s => ({
-        name: s.category.length > 18 ? s.category.substring(0, 16) + '…' : s.category,
-        fullName: s.category,
-        Anggaran: s.planned,
-        Realisasi: s.realized,
-        pct: s.percentage,
-    }));
+    // RKAS Category Breakdown (Pengeluaran)
+    const expenseCategoryData = React.useMemo(() => {
+        const catMap: Record<string, { category: string; planned: number; realized: number }> = {};
+        rkasBudgets.filter(b => b.budget_type === 'Pengeluaran').forEach(b => {
+            const catName = b.category?.name || 'Operasional';
+            if (!catMap[catName]) catMap[catName] = { category: catName, planned: 0, realized: 0 };
+            catMap[catName].planned += b.planned_amount || 0;
+            catMap[catName].realized += b.realized_amount || 0;
+        });
+        const list = Object.values(catMap).map(item => ({
+            category: item.category,
+            planned: item.planned,
+            realized: item.realized,
+            percentage: item.planned > 0 ? (item.realized / item.planned) * 100 : 0
+        }));
+        if (list.length > 0) return list.sort((a, b) => b.planned - a.planned);
+        return budgetSummary;
+    }, [rkasBudgets, budgetSummary]);
+
+    // RKAS Category Breakdown (Pemasukan)
+    const incomeCategoryData = React.useMemo(() => {
+        const catMap: Record<string, { category: string; planned: number; realized: number }> = {};
+        rkasBudgets.filter(b => b.budget_type === 'Penerimaan').forEach(b => {
+            const catName = b.category?.name || 'Penerimaan';
+            if (!catMap[catName]) catMap[catName] = { category: catName, planned: 0, realized: 0 };
+            catMap[catName].planned += b.planned_amount || 0;
+            catMap[catName].realized += b.realized_amount || 0;
+        });
+        return Object.values(catMap).map(item => ({
+            category: item.category,
+            planned: item.planned,
+            realized: item.realized,
+            percentage: item.planned > 0 ? (item.realized / item.planned) * 100 : 0
+        })).sort((a, b) => b.planned - a.planned);
+    }, [rkasBudgets]);
 
     // Monthly trend
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -280,43 +308,44 @@ const ExecutiveDashboard: React.FC = () => {
                 </ChartCard>
             </div>
 
-            {/* ─── Row 5: RKAS per Kategori (collapsible) ─── */}
-            {rkasCategoryData.length > 0 && (
+            {/* ─── Row 5: Realisasi Anggaran Kategori Pengeluaran (collapsible) ─── */}
+            {expenseCategoryData.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                     <button
-                        onClick={() => setShowRkasDetail(!showRkasDetail)}
-                        className="w-full flex items-center justify-between px-6 py-5 hover:bg-slate-50/50 transition-colors group"
+                        type="button"
+                        onClick={() => setShowRkasExpenseDetail(!showRkasExpenseDetail)}
+                        className="w-full flex items-center justify-between px-6 py-5 hover:bg-slate-50/50 transition-colors group cursor-pointer"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-50 rounded-lg text-slate-500 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-colors">
-                                <BarChart3 size={18} />
+                            <div className="p-2 bg-rose-50 rounded-lg text-rose-600 group-hover:bg-rose-100 transition-colors">
+                                <TrendingDown size={18} />
                             </div>
                             <div className="text-left">
-                                <h3 className="font-bold text-slate-800 text-base">Realisasi Anggaran per Kategori</h3>
-                                <p className="text-xs text-slate-400 font-medium">Klik untuk melihat detail realisasi {rkasCategoryData.length} kategori RKAS</p>
+                                <h3 className="font-bold text-slate-800 text-base">Realisasi Anggaran Kategori Pengeluaran</h3>
+                                <p className="text-xs text-slate-400 font-medium">Klik untuk melihat detail realisasi {expenseCategoryData.length} kategori pengeluaran RKAS</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
-                                {Math.round(totalPengeluaranRealized / totalPengeluaranPlanned * 100) || 0}% Total
+                            <span className="text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                                {totalPengeluaranPlanned > 0 ? Math.round(totalPengeluaranRealized / totalPengeluaranPlanned * 100) : 0}% Total
                             </span>
-                            {showRkasDetail ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                            {showRkasExpenseDetail ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
                         </div>
                     </button>
-                    {showRkasDetail && (
+                    {showRkasExpenseDetail && (
                         <div className="px-6 pb-6 border-t border-slate-50 animate-in fade-in slide-in-from-top-2 duration-300">
                             <div className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
-                                {budgetSummary.map((item, i) => {
+                                {expenseCategoryData.map((item, i) => {
                                     const pct = Math.round(item.percentage);
                                     const isOver = pct > 100;
                                     return (
                                         <div key={i} className="group py-2">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-semibold text-slate-700 truncate max-w-[200px]" title={item.category}>
+                                                <span className="text-sm font-semibold text-slate-700 truncate max-w-[220px]" title={item.category}>
                                                     {item.category}
                                                 </span>
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-bold ${isOver ? 'text-red-500' : 'text-slate-500'}`}>
+                                                    <span className={`text-xs font-bold ${isOver ? 'text-red-500' : 'text-slate-600'}`}>
                                                         {pct}%
                                                     </span>
                                                     <span className="text-[10px] font-medium text-slate-400">
@@ -333,13 +362,79 @@ const ExecutiveDashboard: React.FC = () => {
                                                             ? 'linear-gradient(90deg, #ef4444, #b91c1c)'
                                                             : pct > 85
                                                             ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                                                            : 'linear-gradient(90deg, #10b981, #059669)'
+                                                            : 'linear-gradient(90deg, #3b82f6, #1d4ed8)'
                                                     }}
                                                 />
                                             </div>
                                             <div className="flex justify-between mt-1 text-[10px] text-slate-400 font-medium">
-                                                <span>Anggaran: {formatCompact(item.planned)}</span>
-                                                {isOver && <span className="text-red-500">Over budget!</span>}
+                                                <span>Pagu Anggaran: {formatCompact(item.planned)}</span>
+                                                {isOver && <span className="text-red-500 font-bold">Over budget!</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ─── Row 6: Realisasi Anggaran Kategori Pemasukan (collapsible) ─── */}
+            {incomeCategoryData.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    <button
+                        type="button"
+                        onClick={() => setShowRkasIncomeDetail(!showRkasIncomeDetail)}
+                        className="w-full flex items-center justify-between px-6 py-5 hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+                                <TrendingUp size={18} />
+                            </div>
+                            <div className="text-left">
+                                <h3 className="font-bold text-slate-800 text-base">Realisasi Anggaran Kategori Pemasukan</h3>
+                                <p className="text-xs text-slate-400 font-medium">Klik untuk melihat detail realisasi {incomeCategoryData.length} kategori pemasukan RKAS</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                                {totalPenerimaanPlanned > 0 ? Math.round(totalPenerimaanRealized / totalPenerimaanPlanned * 100) : 0}% Total
+                            </span>
+                            {showRkasIncomeDetail ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                        </div>
+                    </button>
+                    {showRkasIncomeDetail && (
+                        <div className="px-6 pb-6 border-t border-slate-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                                {incomeCategoryData.map((item, i) => {
+                                    const pct = Math.round(item.percentage);
+                                    return (
+                                        <div key={i} className="group py-2">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-semibold text-slate-700 truncate max-w-[220px]" title={item.category}>
+                                                    {item.category}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-emerald-600">
+                                                        {pct}%
+                                                    </span>
+                                                    <span className="text-[10px] font-medium text-slate-400">
+                                                        ({formatCompact(item.realized)})
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-1000 ease-out"
+                                                    style={{
+                                                        width: `${Math.min(pct, 100)}%`,
+                                                        background: 'linear-gradient(90deg, #10b981, #059669)'
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between mt-1 text-[10px] text-slate-400 font-medium">
+                                                <span>Target Anggaran: {formatCompact(item.planned)}</span>
+                                                <span className="text-emerald-600 font-semibold">Tercapai: {formatCompact(item.realized)}</span>
                                             </div>
                                         </div>
                                     );

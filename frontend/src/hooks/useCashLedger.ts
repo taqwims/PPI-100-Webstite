@@ -95,14 +95,32 @@ export const useCashLedger = () => {
     };
 
     const handleTransactionCodeChange = (codeId: string) => {
+        if (!codeId) {
+            setFormData(prev => ({ ...prev, transaction_code_id: '' }));
+            return;
+        }
         const tc = transactionCodes.find(c => c.id === Number(codeId));
+        if (!tc) {
+            setFormData(prev => ({ ...prev, transaction_code_id: codeId }));
+            return;
+        }
+
+        // If child doesn't have a category, inherit from parent
+        let inheritedCategory = tc.category;
+        if (!inheritedCategory && tc.parent_code_id) {
+            const parent = transactionCodes.find(c => c.id === tc.parent_code_id);
+            if (parent?.category) inheritedCategory = parent.category;
+        }
+
+        const normalizedType: 'Income' | 'Expense' = (tc.type === 'Income' || tc.type === 'Penerimaan') ? 'Income' : 'Expense';
+
         setFormData(prev => ({
             ...prev,
             transaction_code_id: codeId,
-            category: tc ? tc.category : prev.category,
-            component: tc?.component ? tc.component : prev.component,
-            type: tc ? (tc.type as 'Income' | 'Expense') : prev.type,
-            item_name: (!prev.item_name || prev.item_name.trim() === '') && tc ? tc.name : prev.item_name,
+            category: inheritedCategory || prev.category,
+            component: tc.component || prev.component || '',
+            type: normalizedType,
+            item_name: (!prev.item_name || prev.item_name.trim() === '') ? tc.name : prev.item_name,
         }));
     };
 

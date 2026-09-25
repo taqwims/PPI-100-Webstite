@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShieldCheck, ShieldAlert, BadgeCheck, Search, Loader2, CheckCircle2, FileText, Calendar, DollarSign, UserCheck } from 'lucide-react';
-import axios from 'axios';
+import api from '../../services/api';
 
 // Public verification page, bypassing auth
 const VerifyInvoice: React.FC = () => {
@@ -31,7 +31,7 @@ const VerifyInvoice: React.FC = () => {
         setLoading(true);
         setSearched(true);
         try {
-            const res = await axios.get(`/api/invoice/verify?code=${encodeURIComponent(clean)}`);
+            const res = await api.get(`/invoice/verify?code=${encodeURIComponent(clean)}`, { _suppressToast: true });
             setResult(res.data);
         } catch (error) {
             console.error("Verification failed", error);

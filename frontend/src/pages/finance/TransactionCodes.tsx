@@ -4,7 +4,7 @@ import api from '../../services/api';
 import {
     Plus, Edit, Trash2, Tag, X, ChevronDown, ChevronRight,
     CreditCard, ArrowDownRight, Layers,
-    AlertCircle, Search, Filter, ChevronsUpDown
+    AlertCircle, Search, Filter, ChevronsUpDown, FolderTree, Check
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -44,6 +44,23 @@ interface PaymentType {
     is_active: boolean;
 }
 
+interface BudgetCategory {
+    id: number;
+    name: string;
+    description?: string;
+    is_active?: boolean;
+    components?: BudgetComponent[];
+}
+
+interface BudgetComponent {
+    id: number;
+    category_id: number;
+    name: string;
+    description?: string;
+    is_active?: boolean;
+    category?: BudgetCategory;
+}
+
 const formatCurrency = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 
@@ -57,6 +74,20 @@ const TransactionCodes: React.FC = () => {
     const [filterType, setFilterType] = useState<string>('ALL'); // 'ALL' | 'Income' | 'Expense'
     const [filterYearId, setFilterYearId] = useState<string>('');
     const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+
+    // Category Manager Modal state
+    const [showCategoryManagerModal, setShowCategoryManagerModal] = useState(false);
+    const [managerTab, setManagerTab] = useState<'ALL' | 'Income' | 'Expense'>('ALL');
+    const [managerSearch, setManagerSearch] = useState('');
+    const [managerNewCatName, setManagerNewCatName] = useState('');
+    const [managerNewCatType, setManagerNewCatType] = useState<'Income' | 'Expense'>('Expense');
+    const [managerNewCatDesc, setManagerNewCatDesc] = useState('');
+    const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+    const [editCategoryName, setEditCategoryName] = useState('');
+    const [editCategoryDesc, setEditCategoryDesc] = useState('');
+    const [activeAddingCompCatId, setActiveAddingCompCatId] = useState<number | null>(null);
+    const [newManagerCompName, setNewManagerCompName] = useState('');
+    const [expandedCategoryIds, setExpandedCategoryIds] = useState<Record<number, boolean>>({});
 
     // Modals state
     const [showCodeModal, setShowCodeModal] = useState(false);
@@ -83,7 +114,7 @@ const TransactionCodes: React.FC = () => {
         is_active: true
     });
 
-    // Category modal
+    // Category inline add modal
     const [showAddCategory, setShowAddCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [addingCategory, setAddingCategory] = useState(false);
@@ -118,17 +149,77 @@ const TransactionCodes: React.FC = () => {
         },
     });
 
-    const { data: budgetCategories = [] } = useQuery<{ id: number; name: string }[]>({
+    const { data: budgetCategories = [] } = useQuery<BudgetCategory[]>({
         queryKey: ['budget-categories'],
         queryFn: async () => (await api.get('/finance/budget-categories')).data || [],
     });
 
-    const categoryOptions = useMemo(() => {
+    const { data: budgetComponents = [] } = useQuery<BudgetComponent[]>({
+        queryKey: ['budget-components'],
+        queryFn: async () => (await api.get('/finance/budget-components')).data || [],
+    });
+
+    // Income categories
+    const incomeCategories = useMemo(() => {
         const set = new Set<string>();
-        budgetCategories.forEach(c => { if (c.name) set.add(c.name.trim()); });
-        codes.forEach(c => { if (c.category) set.add(c.category.trim()); });
+        codes.filter(c => c.type === 'Income' || c.type === 'Penerimaan').forEach(c => {
+            if (c.category) set.add(c.category.trim());
+        });
+        budgetCategories.forEach(c => {
+            const name = c.name?.trim();
+            if (!name) return;
+            const usedInExpense = codes.some(tc => (tc.type === 'Expense' || tc.type === 'Pengeluaran') && tc.category?.toLowerCase() === name.toLowerCase());
+            const usedInIncome = codes.some(tc => (tc.type === 'Income' || tc.type === 'Penerimaan') && tc.category?.toLowerCase() === name.toLowerCase());
+            if (usedInIncome || !usedInExpense) {
+                set.add(name);
+            }
+        });
+        if (set.size === 0) set.add('Penerimaan');
         return Array.from(set).sort((a, b) => a.localeCompare(b));
     }, [budgetCategories, codes]);
+
+    // Expense categories
+    const expenseCategories = useMemo(() => {
+        const set = new Set<string>();
+        codes.filter(c => c.type === 'Expense' || c.type === 'Pengeluaran').forEach(c => {
+            if (c.category) set.add(c.category.trim());
+        });
+        budgetCategories.forEach(c => {
+            const name = c.name?.trim();
+            if (!name) return;
+            const usedInIncome = codes.some(tc => (tc.type === 'Income' || tc.type === 'Penerimaan') && tc.category?.toLowerCase() === name.toLowerCase());
+            const usedInExpense = codes.some(tc => (tc.type === 'Expense' || tc.type === 'Pengeluaran') && tc.category?.toLowerCase() === name.toLowerCase());
+            if (usedInExpense || !usedInIncome) {
+                set.add(name);
+            }
+        });
+        if (set.size === 0) set.add('Operasional');
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [budgetCategories, codes]);
+
+    const currentTypeCategories = useMemo(() => {
+        return codeForm.type === 'Income' ? incomeCategories : expenseCategories;
+    }, [codeForm.type, incomeCategories, expenseCategories]);
+
+    const getCategoryType = (categoryName: string, desc?: string): 'Income' | 'Expense' => {
+        if (desc?.toLowerCase().includes('pendapatan') || desc?.toLowerCase().includes('income')) return 'Income';
+        if (desc?.toLowerCase().includes('pengeluaran') || desc?.toLowerCase().includes('expense')) return 'Expense';
+        const usedInIncome = codes.some(tc => (tc.type === 'Income' || tc.type === 'Penerimaan') && tc.category?.toLowerCase() === categoryName?.toLowerCase());
+        const usedInExpense = codes.some(tc => (tc.type === 'Expense' || tc.type === 'Pengeluaran') && tc.category?.toLowerCase() === categoryName?.toLowerCase());
+        if (usedInIncome && !usedInExpense) return 'Income';
+        if (usedInExpense && !usedInIncome) return 'Expense';
+        if (incomeCategories.includes(categoryName) && !expenseCategories.includes(categoryName)) return 'Income';
+        return 'Expense';
+    };
+
+    const filteredBudgetCategories = useMemo(() => {
+        return budgetCategories.filter(cat => {
+            const catType = getCategoryType(cat.name, cat.description);
+            if (managerTab !== 'ALL' && catType !== managerTab) return false;
+            if (managerSearch.trim() && !cat.name.toLowerCase().includes(managerSearch.toLowerCase())) return false;
+            return true;
+        });
+    }, [budgetCategories, managerTab, managerSearch, codes, incomeCategories, expenseCategories]);
 
     // Expand all by default when codes load
     useEffect(() => {
@@ -158,14 +249,64 @@ const TransactionCodes: React.FC = () => {
         setExpandedNodes({});
     };
 
-    // Category Creation
+    // Category Mutations
+    const createCategoryMutation = useMutation({
+        mutationFn: (data: { name: string; description?: string }) => api.post('/finance/budget-categories', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
+            toast.success('Kategori baru berhasil ditambahkan');
+        },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menambahkan kategori')
+    });
+
+    const updateCategoryMutation = useMutation({
+        mutationFn: (data: { id: number; name: string; description?: string }) => api.put(`/finance/budget-categories/${data.id}`, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
+            setEditingCategoryId(null);
+            toast.success('Kategori berhasil diperbarui');
+        },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal memperbarui kategori')
+    });
+
+    const deleteCategoryMutation = useMutation({
+        mutationFn: (id: number) => api.delete(`/finance/budget-categories/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['budget-components'] });
+            toast.success('Kategori berhasil dihapus');
+        },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus kategori')
+    });
+
+    const createComponentMutation = useMutation({
+        mutationFn: (data: { category_id: number; name: string; description?: string }) => api.post('/finance/budget-components', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['budget-components'] });
+            setActiveAddingCompCatId(null);
+            setNewManagerCompName('');
+            toast.success('Komponen baru berhasil ditambahkan');
+        },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menambahkan komponen')
+    });
+
+    const deleteComponentMutation = useMutation({
+        mutationFn: (id: number) => api.delete(`/finance/budget-components/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['budget-components'] });
+            toast.success('Komponen berhasil dihapus');
+        },
+        onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal menghapus komponen')
+    });
+
+    // Category Creation inline handler
     const handleCreateCategory = async () => {
         if (!newCategoryName.trim()) return;
         setAddingCategory(true);
         try {
             await api.post('/finance/budget-categories', {
                 name: newCategoryName.trim(),
-                description: 'Ditambahkan dari Kode Transaksi'
+                description: `Kategori ${codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}`
             });
             await queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
             setCodeForm(prev => ({ ...prev, category: newCategoryName.trim() }));
@@ -240,13 +381,22 @@ const TransactionCodes: React.FC = () => {
     });
 
     // Code Modal handlers
+    const handleCodeTypeChange = (newType: string) => {
+        const list = newType === 'Income' ? incomeCategories : expenseCategories;
+        setCodeForm(prev => ({
+            ...prev,
+            type: newType,
+            category: list.includes(prev.category) ? prev.category : (list[0] || '')
+        }));
+    };
+
     const handleOpenAddMasterCode = () => {
         setEditCodeItem(null);
         setCodeForm({
             code: '',
             name: '',
             type: 'Income',
-            category: categoryOptions[0] || 'Operasional',
+            category: incomeCategories[0] || 'Penerimaan',
             description: '',
             parent_code_id: '',
             is_active: true
@@ -422,14 +572,23 @@ const TransactionCodes: React.FC = () => {
                     {canEdit && (
                         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                             <button
+                                type="button"
+                                onClick={() => setShowCategoryManagerModal(true)}
+                                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl border border-white/20 transition backdrop-blur-sm cursor-pointer shadow-sm"
+                            >
+                                <FolderTree size={16} className="text-emerald-300" /> Kelola Kategori & Komponen
+                            </button>
+                            <button
+                                type="button"
                                 onClick={handleOpenAddMasterCode}
-                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-950/40 transition"
+                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-950/40 transition cursor-pointer"
                             >
                                 <Plus size={16} /> Tambah Kode Induk
                             </button>
                             <button
+                                type="button"
                                 onClick={() => handleOpenAddPayment()}
-                                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl border border-white/20 transition backdrop-blur-sm"
+                                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl border border-white/20 transition backdrop-blur-sm cursor-pointer"
                             >
                                 <Plus size={16} /> Tambah Jenis Bayar
                             </button>
@@ -1099,12 +1258,11 @@ const TransactionCodes: React.FC = () => {
                                         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-emerald-500"
                                         required
                                     />
-                                </div>
-                                <div>
+                                                   <div>
                                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Tipe Transaksi *</label>
                                     <select
                                         value={codeForm.type}
-                                        onChange={e => setCodeForm({ ...codeForm, type: e.target.value })}
+                                        onChange={e => handleCodeTypeChange(e.target.value)}
                                         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-emerald-500"
                                     >
                                         <option value="Income">Pendapatan / Uang Masuk</option>
@@ -1150,7 +1308,9 @@ const TransactionCodes: React.FC = () => {
                             {/* Kategori Pos */}
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Kategori Pos *</label>
+                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Kategori Pos ({codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}) *
+                                    </label>
                                     {!showAddCategory && (
                                         <button
                                             type="button"
@@ -1164,7 +1324,9 @@ const TransactionCodes: React.FC = () => {
 
                                 {showAddCategory ? (
                                     <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
-                                        <label className="text-xs text-emerald-900 font-bold">Kategori Baru</label>
+                                        <label className="text-xs text-emerald-900 font-bold">
+                                            Kategori {codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'} Baru
+                                        </label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
@@ -1192,23 +1354,41 @@ const TransactionCodes: React.FC = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <select
-                                        value={codeForm.category}
-                                        onChange={e => {
-                                            if (e.target.value === '__NEW__') setShowAddCategory(true);
-                                            else setCodeForm({ ...codeForm, category: e.target.value });
-                                        }}
-                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
-                                        required
-                                    >
-                                        <option value="">-- Pilih Kategori --</option>
-                                        {categoryOptions.map(cat => (
-                                            <option key={cat} value={cat}>{cat}</option>
-                                        ))}
-                                        <option value="__NEW__" className="text-emerald-700 font-bold">+ Tambah Kategori Baru...</option>
-                                    </select>
+                                    <div className="flex gap-2 items-center">
+                                        <select
+                                            value={codeForm.category}
+                                            onChange={e => {
+                                                if (e.target.value === '__NEW__') setShowAddCategory(true);
+                                                else setCodeForm({ ...codeForm, category: e.target.value });
+                                            }}
+                                            className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                                            required
+                                        >
+                                            <option value="">-- Pilih Kategori ({codeForm.type === 'Income' ? 'Pendapatan' : 'Pengeluaran'}) --</option>
+                                            {currentTypeCategories.map(cat => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                            ))}
+                                            <option value="__NEW__" className="text-emerald-700 font-bold">+ Tambah Kategori Baru...</option>
+                                        </select>
+                                        {codeForm.category && budgetCategories.some(c => c.name.toLowerCase() === codeForm.category.toLowerCase()) && (
+                                            <button
+                                                type="button"
+                                                title="Hapus kategori ini dari database"
+                                                onClick={() => {
+                                                    const targetCat = budgetCategories.find(c => c.name.toLowerCase() === codeForm.category.toLowerCase());
+                                                    if (targetCat && confirm(`Hapus kategori "${targetCat.name}" beserta komponen di dalamnya?`)) {
+                                                        deleteCategoryMutation.mutate(targetCat.id);
+                                                        setCodeForm(prev => ({ ...prev, category: '' }));
+                                                    }
+                                                }}
+                                                className="p-2.5 text-red-500 hover:bg-red-50 border border-red-200 rounded-xl transition cursor-pointer"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
-                            </div>
+                            </div>                    </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Deskripsi / Keterangan</label>
@@ -1390,6 +1570,360 @@ const TransactionCodes: React.FC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: KELOLA KATEGORI & KOMPONEN */}
+            {showCategoryManagerModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 my-8">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <FolderTree size={20} className="text-emerald-600" />
+                                    Kelola Kategori & Komponen Anggaran
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Struktur master kategori pos dan komponen biaya untuk RKAS & Buku Kas Umum
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowCategoryManagerModal(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                            {/* Tambah Kategori Baru Box */}
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    if (!managerNewCatName.trim()) return;
+                                    await createCategoryMutation.mutateAsync({
+                                        name: managerNewCatName.trim(),
+                                        description: managerNewCatDesc.trim() || `Kategori ${managerNewCatType === 'Income' ? 'Pendapatan' : 'Pengeluaran'}`
+                                    });
+                                    setManagerNewCatName('');
+                                    setManagerNewCatDesc('');
+                                }}
+                                className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                                        <Plus size={14} className="text-emerald-600" /> Tambah Kategori Baru
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="sm:col-span-1">
+                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Tipe Kategori</label>
+                                        <select
+                                            value={managerNewCatType}
+                                            onChange={e => setManagerNewCatType(e.target.value as 'Income' | 'Expense')}
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+                                        >
+                                            <option value="Expense">Pengeluaran / Belanja</option>
+                                            <option value="Income">Pendapatan / Uang Masuk</option>
+                                        </select>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Nama Kategori *</label>
+                                        <input
+                                            type="text"
+                                            value={managerNewCatName}
+                                            onChange={e => setManagerNewCatName(e.target.value)}
+                                            placeholder="Contoh: Operasional, Sarpras, Program Unggulan..."
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={managerNewCatDesc}
+                                        onChange={e => setManagerNewCatDesc(e.target.value)}
+                                        placeholder="Keterangan singkat (opsional)..."
+                                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={createCategoryMutation.isPending || !managerNewCatName.trim()}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center gap-1 shrink-0 cursor-pointer shadow-sm"
+                                    >
+                                        <Plus size={14} /> {createCategoryMutation.isPending ? 'Menyimpan...' : 'Simpan Kategori'}
+                                    </button>
+                                </div>
+                            </form>
+
+                            {/* Filter & Search Category */}
+                            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
+                                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                                    <button
+                                        type="button"
+                                        onClick={() => setManagerTab('ALL')}
+                                        className={clsx(
+                                            "px-3 py-1 text-xs font-bold rounded-lg transition",
+                                            managerTab === 'ALL' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                        )}
+                                    >
+                                        Semua ({budgetCategories.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setManagerTab('Income')}
+                                        className={clsx(
+                                            "px-3 py-1 text-xs font-bold rounded-lg transition",
+                                            managerTab === 'Income' ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                        )}
+                                    >
+                                        Pendapatan ({budgetCategories.filter(c => getCategoryType(c.name, c.description) === 'Income').length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setManagerTab('Expense')}
+                                        className={clsx(
+                                            "px-3 py-1 text-xs font-bold rounded-lg transition",
+                                            managerTab === 'Expense' ? "bg-red-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                        )}
+                                    >
+                                        Pengeluaran ({budgetCategories.filter(c => getCategoryType(c.name, c.description) === 'Expense').length})
+                                    </button>
+                                </div>
+                                <div className="relative min-w-[200px]">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari kategori..."
+                                        value={managerSearch}
+                                        onChange={e => setManagerSearch(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Categories List with expandable components */}
+                            <div className="space-y-3">
+                                {filteredBudgetCategories.length === 0 ? (
+                                    <div className="text-center py-10 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
+                                        Tidak ada kategori yang sesuai filter.
+                                    </div>
+                                ) : (
+                                    filteredBudgetCategories.map(cat => {
+                                        const catType = getCategoryType(cat.name, cat.description);
+                                        const comps = budgetComponents.filter(comp => comp.category_id === cat.id);
+                                        const isExpanded = expandedCategoryIds[cat.id] ?? false;
+                                        const isEditing = editingCategoryId === cat.id;
+
+                                        return (
+                                            <div key={cat.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+                                                {/* Category Header Row */}
+                                                <div className="p-3.5 bg-slate-50/70 flex items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setExpandedCategoryIds(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
+                                                            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
+                                                        >
+                                                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                                        </button>
+
+                                                        {isEditing ? (
+                                                            <div className="flex items-center gap-2 flex-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editCategoryName}
+                                                                    onChange={e => setEditCategoryName(e.target.value)}
+                                                                    className="px-2.5 py-1 text-xs font-bold border border-emerald-400 rounded-lg bg-white flex-1"
+                                                                    autoFocus
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={editCategoryDesc}
+                                                                    onChange={e => setEditCategoryDesc(e.target.value)}
+                                                                    placeholder="Deskripsi..."
+                                                                    className="px-2.5 py-1 text-xs border border-slate-300 rounded-lg bg-white flex-1"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        if (!editCategoryName.trim()) return;
+                                                                        updateCategoryMutation.mutate({
+                                                                            id: cat.id,
+                                                                            name: editCategoryName.trim(),
+                                                                            description: editCategoryDesc.trim()
+                                                                        });
+                                                                    }}
+                                                                    className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+                                                                >
+                                                                    <Check size={14} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditingCategoryId(null)}
+                                                                    className="p-1.5 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-wrap items-center gap-2 min-w-0">
+                                                                <span className="font-bold text-xs text-slate-900 truncate">{cat.name}</span>
+                                                                <span className={clsx(
+                                                                    "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                                                                    catType === 'Income' ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                                                                )}>
+                                                                    {catType === 'Income' ? 'Pendapatan' : 'Pengeluaran'}
+                                                                </span>
+                                                                <span className="px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-600 text-[10px] font-bold">
+                                                                    {comps.length} Komponen
+                                                                </span>
+                                                                {cat.description && (
+                                                                    <span className="text-[11px] text-slate-400 truncate hidden sm:inline">
+                                                                        — {cat.description}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Actions */}
+                                                    {!isEditing && (
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                title="Edit Kategori"
+                                                                onClick={() => {
+                                                                    setEditingCategoryId(cat.id);
+                                                                    setEditCategoryName(cat.name);
+                                                                    setEditCategoryDesc(cat.description || '');
+                                                                }}
+                                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                                            >
+                                                                <Edit size={14} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                title="Hapus Kategori"
+                                                                onClick={() => {
+                                                                    if (confirm(`Hapus kategori "${cat.name}" beserta ${comps.length} komponen di dalamnya?`)) {
+                                                                        deleteCategoryMutation.mutate(cat.id);
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Expanded Components Area */}
+                                                {isExpanded && (
+                                                    <div className="p-3 bg-white border-t border-slate-100 space-y-2.5">
+                                                        {/* List of Components */}
+                                                        {comps.length === 0 ? (
+                                                            <p className="text-[11px] text-slate-400 italic pl-7">Belum ada komponen pada kategori ini.</p>
+                                                        ) : (
+                                                            <div className="space-y-1.5 pl-6">
+                                                                {comps.map(comp => (
+                                                                    <div
+                                                                        key={comp.id}
+                                                                        className="flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 rounded-xl transition text-xs group"
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                                            <span className="font-semibold text-slate-800">{comp.name}</span>
+                                                                            {comp.description && (
+                                                                                <span className="text-[10px] text-slate-400">({comp.description})</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            title="Hapus Komponen"
+                                                                            onClick={() => {
+                                                                                if (confirm(`Hapus komponen "${comp.name}"?`)) {
+                                                                                    deleteComponentMutation.mutate(comp.id);
+                                                                                }
+                                                                            }}
+                                                                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                                                        >
+                                                                            <Trash2 size={13} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Add Component Form */}
+                                                        <div className="pt-2 pl-6">
+                                                            {activeAddingCompCatId === cat.id ? (
+                                                                <form
+                                                                    onSubmit={(e) => {
+                                                                        e.preventDefault();
+                                                                        if (!newManagerCompName.trim()) return;
+                                                                        createComponentMutation.mutate({
+                                                                            category_id: cat.id,
+                                                                            name: newManagerCompName.trim()
+                                                                        });
+                                                                    }}
+                                                                    className="flex gap-2"
+                                                                >
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newManagerCompName}
+                                                                        onChange={e => setNewManagerCompName(e.target.value)}
+                                                                        placeholder={`Nama komponen baru untuk ${cat.name}...`}
+                                                                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                                                                        autoFocus
+                                                                    />
+                                                                    <button
+                                                                        type="submit"
+                                                                        disabled={createComponentMutation.isPending || !newManagerCompName.trim()}
+                                                                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50"
+                                                                    >
+                                                                        {createComponentMutation.isPending ? 'Menyimpan...' : 'Tambah'}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => { setActiveAddingCompCatId(null); setNewManagerCompName(''); }}
+                                                                        className="px-2.5 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50"
+                                                                    >
+                                                                        Batal
+                                                                    </button>
+                                                                </form>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { setActiveAddingCompCatId(cat.id); setNewManagerCompName(''); }}
+                                                                    className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
+                                                                >
+                                                                    <Plus size={13} /> Tambah Komponen
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setShowCategoryManagerModal(false)}
+                                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                            >
+                                Tutup
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
