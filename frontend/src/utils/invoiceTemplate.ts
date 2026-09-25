@@ -151,23 +151,23 @@ export function drawStandardHeaderA5(
     doc.setLineWidth(0.5);
     doc.line(8, 28, pageWidth - 8, 28);
     doc.setLineWidth(0.15);
-    doc.line(8, 36, pageWidth - 8, 36);
+    doc.line(8, 29.5, pageWidth - 8, 29.5);
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(options.title.toUpperCase(), pageWidth / 2, 45, { align: 'center' });
+    doc.text(options.title.toUpperCase(), pageWidth / 2, 37, { align: 'center' });
 
-    doc.setFontSize(7);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(`No: ${options.invoiceNumber}`, pageWidth / 2, 50, { align: 'center' });
+    doc.text(`No: ${options.invoiceNumber || '-'}`, pageWidth / 2, 42, { align: 'center' });
 
     if (options.subtitle) {
-        doc.setFontSize(6);
-        doc.text(options.subtitle, pageWidth / 2, 54, { align: 'center' });
+        doc.setFontSize(6.5);
+        doc.text(options.subtitle, pageWidth / 2, 46, { align: 'center' });
     }
 
-    return options.subtitle ? 58 : 54;
+    return options.subtitle ? 51 : 47;
 }
 
 // ─── Signature Block ───
@@ -211,9 +211,6 @@ export async function drawSignatureBlock(
         ? allSigs.filter(s => selectedRoles.includes(s.role))
         : allSigs;
 
-    // If after filtering we have nothing, but we have selectedRoles, 
-    // it means the provided signatures don't contain the requested roles.
-    // Fallback to defaults for those specific roles.
     if (sigs.length === 0 && selectedRoles) {
         sigs = defaults.filter(s => selectedRoles.includes(s.role));
     }
@@ -231,9 +228,10 @@ export async function drawSignatureBlock(
         doc.setTextColor(100, 116, 139);
         doc.text(sig.role_label + ',', x, startY + 4);
 
-        // QR Code Signature (Replacing manual signature line)
+        // QR Code Signature with clickable verify URL
         try {
-            const sigQr = await QRCode.toDataURL(sig.short_code, {
+            const verifyUrl = `${window.location.origin}/verify?code=${encodeURIComponent(sig.short_code)}`;
+            const sigQr = await QRCode.toDataURL(verifyUrl, {
                 margin: 0,
                 width: 60,
                 color: { dark: '#1e293b', light: '#ffffff' }
@@ -249,13 +247,14 @@ export async function drawSignatureBlock(
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
         doc.setFontSize(7);
-        doc.text(sig.name, x, startY + 26);
+        const wrappedName = doc.splitTextToSize(sig.name || '-', colW - 4);
+        doc.text(wrappedName, x, startY + 25);
 
         // Signature code
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         doc.setFontSize(5);
-        doc.text(sig.short_code, x, startY + 30);
+        doc.text(sig.short_code, x, startY + 29);
     }
 
     return startY + 35;
@@ -277,7 +276,7 @@ export async function drawVerificationFooter(
     // QR Code
     try {
         const qrDataUrl = await QRCode.toDataURL(
-            `${window.location.origin}/verify?code=${code}`,
+            `${window.location.origin}/verify?code=${encodeURIComponent(code)}`,
             { width: 100, margin: 1, color: { dark: '#1e293b', light: '#ffffff' } }
         );
         doc.addImage(qrDataUrl, 'PNG', 14, startY, 20, 20);
@@ -287,7 +286,7 @@ export async function drawVerificationFooter(
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text('Dokumen ini ditandatangani secara digital.', 38, startY + 5);
+    doc.text('Dokumen ini ditandatangani secara digital & sah.', 38, startY + 5);
     doc.setFont('helvetica', 'bold');
     doc.text(`Kode Verifikasi: ${code}`, 38, startY + 10);
     doc.setFont('helvetica', 'normal');
@@ -320,20 +319,20 @@ export async function drawVerificationFooterCompact(
 
     try {
         const qrDataUrl = await QRCode.toDataURL(
-            `${window.location.origin}/verify?code=${code}`,
+            `${window.location.origin}/verify?code=${encodeURIComponent(code)}`,
             { width: 80, margin: 1, color: { dark: '#1e293b', light: '#ffffff' } }
         );
-        doc.addImage(qrDataUrl, 'PNG', 10, startY, 15, 15);
+        doc.addImage(qrDataUrl, 'PNG', 10, startY, 14, 14);
     } catch { }
 
     doc.setTextColor(100, 116, 139);
-    doc.setFontSize(6);
+    doc.setFontSize(6.5);
     doc.setFont('helvetica', 'normal');
-    doc.text('Ditandatangani digital.', 28, startY + 4);
+    doc.text('Ditandatangani secara digital & sah.', 28, startY + 4);
     doc.setFont('helvetica', 'bold');
     doc.text(`Verifikasi: ${code}`, 28, startY + 8);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5);
+    doc.setFontSize(5.5);
     const printedDate = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
     doc.text(`Dicetak: ${printedDate}`, 28, startY + 12);
 
@@ -350,7 +349,7 @@ export async function drawSignatureBlockCompact(
     const pageWidth = doc.internal.pageSize.getWidth();
     const labelX = 10;
 
-    if (startY + 40 > doc.internal.pageSize.getHeight()) {
+    if (startY + 35 > doc.internal.pageSize.getHeight()) {
         doc.addPage();
         startY = 20;
     }
@@ -373,9 +372,6 @@ export async function drawSignatureBlockCompact(
         ? allSigs.filter(s => selectedRoles.includes(s.role))
         : allSigs;
 
-    // If after filtering we have nothing, but we have selectedRoles,
-    // it means the provided signatures don't contain the requested roles.
-    // Fallback to defaults for those specific roles.
     if (sigs.length === 0 && selectedRoles) {
         sigs = defaults.filter(s => selectedRoles.includes(s.role));
     }
@@ -387,19 +383,20 @@ export async function drawSignatureBlockCompact(
     for (let i = 0; i < sigs.length; i++) {
         const sig = sigs[i];
         const x = labelX + i * colW;
-        doc.setFontSize(5.5);
+        doc.setFontSize(6);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         doc.text(sig.role_label + ',', x, startY + 3);
 
-        // QR Code Signature
+        // QR Code Signature with clickable verify URL
         try {
-            const sigQr = await QRCode.toDataURL(sig.short_code, {
+            const verifyUrl = `${window.location.origin}/verify?code=${encodeURIComponent(sig.short_code)}`;
+            const sigQr = await QRCode.toDataURL(verifyUrl, {
                 margin: 0,
                 width: 40,
                 color: { dark: '#1e293b', light: '#ffffff' }
             });
-            doc.addImage(sigQr, 'PNG', x, startY + 4, 10, 10);
+            doc.addImage(sigQr, 'PNG', x, startY + 4, 11, 11);
         } catch {
             doc.setDrawColor(148, 163, 184);
             doc.line(x, startY + 15, x + colW - 6, startY + 15);
@@ -408,14 +405,15 @@ export async function drawSignatureBlockCompact(
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
         doc.setFontSize(5.5);
-        doc.text(sig.name, x, startY + 17);
+        const wrappedName = doc.splitTextToSize(sig.name || '-', colW - 2);
+        doc.text(wrappedName, x, startY + 18);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         doc.setFontSize(4);
-        doc.text(sig.short_code, x, startY + 20);
+        doc.text(sig.short_code, x, startY + 21);
     }
 
-    return startY + 25;
+    return startY + 26;
 }
 
 // ─── HMAC Signature (Client-side for display) ───

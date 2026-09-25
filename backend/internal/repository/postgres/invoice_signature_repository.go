@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"ppi-100-sis/internal/domain"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -27,6 +28,8 @@ type InvoiceSignatureRepository interface {
 	UpdateVerificationCode(invoiceType, referenceID, code, docDate string) error
 	FindByVerificationCode(code string) ([]domain.InvoiceSignature, error)
 	FindByShortCode(code string) ([]domain.InvoiceSignature, error)
+	FindByInvoiceNumber(invNum string) ([]domain.InvoiceSignature, error)
+	FindByAnyCode(code string) ([]domain.InvoiceSignature, error)
 	GetInvoiceHistory(userIDStr string, roleID int, invoiceType, search, startDate, endDate string) ([]InvoiceHistoryItem, error)
 	GetConfigs() ([]domain.InvoiceNumberConfig, error)
 	GetConfigByType(invoiceType string) (*domain.InvoiceNumberConfig, error)
@@ -79,6 +82,22 @@ func (r *invoiceSignatureRepository) FindByVerificationCode(code string) ([]doma
 func (r *invoiceSignatureRepository) FindByShortCode(code string) ([]domain.InvoiceSignature, error) {
 	var sigs []domain.InvoiceSignature
 	err := r.db.Where("LOWER(short_code) = LOWER(?)", code).Find(&sigs).Error
+	return sigs, err
+}
+
+func (r *invoiceSignatureRepository) FindByInvoiceNumber(invNum string) ([]domain.InvoiceSignature, error) {
+	var sigs []domain.InvoiceSignature
+	err := r.db.Where("LOWER(invoice_number) = LOWER(?)", invNum).Find(&sigs).Error
+	return sigs, err
+}
+
+func (r *invoiceSignatureRepository) FindByAnyCode(code string) ([]domain.InvoiceSignature, error) {
+	var sigs []domain.InvoiceSignature
+	clean := strings.TrimSpace(code)
+	err := r.db.Where(
+		"LOWER(verification_code) = LOWER(?) OR LOWER(short_code) = LOWER(?) OR LOWER(invoice_number) = LOWER(?) OR LOWER(short_code) LIKE LOWER(?) OR LOWER(verification_code) LIKE LOWER(?)",
+		clean, clean, clean, "%"+clean+"%", "%"+clean+"%",
+	).Find(&sigs).Error
 	return sigs, err
 }
 

@@ -145,6 +145,32 @@ const formatDate = (dateStr: string) => {
     });
 };
 
+export const drawKeyValueRow = (
+    doc: jsPDF,
+    label: string,
+    value: string,
+    labelX: number,
+    valueX: number,
+    maxWidth: number,
+    currentY: number,
+    fontSize = 8.5
+): number => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(71, 85, 105);
+    doc.text(label, labelX, currentY);
+
+    doc.setTextColor(30, 41, 59);
+    doc.text(':', valueX - 3, currentY);
+
+    const lines = doc.splitTextToSize(value || '-', maxWidth);
+    doc.text(lines, valueX, currentY);
+
+    const lineCount = Array.isArray(lines) ? lines.length : 1;
+    const lineHeight = fontSize * 0.42;
+    return currentY + Math.max(5.2, lineCount * lineHeight + 2);
+};
+
 // ===================== PAYROLL RECEIPT =====================
 
 export const generatePayrollReceipt = async (payroll: PayrollData, selectedRoles?: string[]) => {
@@ -169,34 +195,34 @@ export const generatePayrollReceipt = async (payroll: PayrollData, selectedRoles
     });
 
     const labelX = 20;
-    const valueX = 80;
+    const valueX = 70;
+    const maxValWidth = pageWidth - valueX - 20;
     let y = bodyStart + 4;
 
     // Employee info
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setFont('helvetica', 'bold');
     doc.text('Informasi Pegawai', labelX, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('Nama', labelX, y + 10);
-    doc.text(`: ${name}`, valueX, y + 10);
-    doc.text('Jabatan', labelX, y + 17);
-    doc.text(`: ${payroll.position || '-'}`, valueX, y + 17);
-    doc.text('Tanggal Bayar', labelX, y + 24);
-    doc.text(`: ${formatDate(dateStr)}`, valueX, y + 24);
+    y += 7;
 
+    y = drawKeyValueRow(doc, 'Nama', name, labelX, valueX, maxValWidth, y, 9.5);
+    y = drawKeyValueRow(doc, 'Jabatan', payroll.position || '-', labelX, valueX, maxValWidth, y, 9.5);
+    y = drawKeyValueRow(doc, 'Tanggal Bayar', formatDate(dateStr), labelX, valueX, maxValWidth, y, 9.5);
+
+    y += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, y + 30, pageWidth - 20, y + 30);
+    doc.line(labelX, y, pageWidth - 20, y);
 
     // Salary details
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Rincian Gaji', labelX, y + 38);
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Rincian Gaji', labelX, y + 8);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
-    let detailY = y + 45;
+    let detailY = y + 15;
     doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'bold');
     doc.text('Pendapatan', labelX, detailY);
@@ -299,37 +325,31 @@ export const generateCashLedgerReceipt = async (entry: CashLedgerData, selectedR
     });
 
     const labelX = 12;
-    const valueX = 55;
-    let y = bodyStart;
+    const valueX = 45;
+    const maxValWidth = pageWidth - valueX - 12;
+    let y = bodyStart + 2;
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(9);
-    doc.text('Tanggal', labelX, y);
-    doc.text(`: ${formatDate(entry.date)}`, valueX, y);
-    doc.text('Jenis', labelX, y + 7);
-    doc.text(`: ${entry.type === 'Income' ? 'Pemasukan' : 'Pengeluaran'}`, valueX, y + 7);
-    doc.text('Kategori', labelX, y + 14);
-    doc.text(`: ${entry.category}`, valueX, y + 14);
-    doc.text('Item/Keperluan', labelX, y + 21);
-    doc.text(`: ${entry.item_name}`, valueX, y + 21);
-    doc.text('Sumber/Tujuan', labelX, y + 28);
-    doc.text(`: ${entry.source}`, valueX, y + 28);
+    y = drawKeyValueRow(doc, 'Tanggal', formatDate(entry.date), labelX, valueX, maxValWidth, y, 8.5);
+    y = drawKeyValueRow(doc, 'Jenis', entry.type === 'Income' ? 'Pemasukan' : 'Pengeluaran', labelX, valueX, maxValWidth, y, 8.5);
+    y = drawKeyValueRow(doc, 'Kategori', entry.category || '-', labelX, valueX, maxValWidth, y, 8.5);
+    y = drawKeyValueRow(doc, 'Item/Keperluan', entry.item_name || '-', labelX, valueX, maxValWidth, y, 8.5);
+    y = drawKeyValueRow(doc, 'Sumber/Tujuan', entry.source || '-', labelX, valueX, maxValWidth, y, 8.5);
 
     if (entry.notes) {
-        doc.text('Catatan', labelX, y + 35);
-        doc.text(`: ${entry.notes}`, valueX, y + 35);
+        y = drawKeyValueRow(doc, 'Catatan', entry.notes, labelX, valueX, maxValWidth, y, 8.5);
     }
 
-    const amountY = entry.notes ? y + 42 : y + 35;
+    y += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, amountY, pageWidth - 12, amountY);
+    doc.line(labelX, y, pageWidth - 12, y);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('NOMINAL', labelX, amountY + 8);
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text('NOMINAL', labelX, y + 7);
     doc.setTextColor(entry.type === 'Income' ? 5 : 220, entry.type === 'Income' ? 150 : 38, entry.type === 'Income' ? 105 : 38);
-    doc.text(formatCurrency(entry.amount), pageWidth - 12, amountY + 8, { align: 'right' });
+    doc.text(formatCurrency(entry.amount), pageWidth - 12, y + 7, { align: 'right' });
 
-    const sigY = await drawSignatureBlockCompact(doc, amountY + 16, signatures, selectedRoles);
+    const sigY = await drawSignatureBlockCompact(doc, y + 14, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Bukti_Kas_${entry.item_name.replace(/\s+/g, '_')}_${new Date(entry.date).toISOString().split('T')[0]}.pdf`);
@@ -601,59 +621,59 @@ export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?:
         ? drawStandardHeader(doc, headerParams)
         : drawStandardHeaderA5(doc, headerParams);
 
-    const labelX = format === 'A4' ? 20 : 14;
-    const valueX = format === 'A4' ? 80 : 60;
-    let y = bodyStart + 4;
+    const labelX = format === 'A4' ? 20 : 12;
+    const valueX = format === 'A4' ? 70 : 45;
+    const maxValWidth = pageWidth - valueX - labelX;
+    let y = bodyStart + 3;
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(format === 'A4' ? 11 : 10);
+    doc.setFontSize(format === 'A4' ? 11 : 9.5);
     doc.setFont('helvetica', 'bold');
     doc.text('Informasi Siswa', labelX, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(format === 'A4' ? 10 : 9);
+    y += 6;
 
     const className = bill.student?.class?.name || '-';
-    doc.text('Nama', labelX, y + 9);
-    doc.text(`: ${name}`, valueX, y + 9);
-    doc.text('Kelas', labelX, y + 16);
-    doc.text(`: ${className}`, valueX, y + 16);
+    y = drawKeyValueRow(doc, 'Nama', name, labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
+    y = drawKeyValueRow(doc, 'Kelas', className, labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
 
+    y += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, y + 22, pageWidth - labelX, y + 22);
+    doc.line(labelX, y, pageWidth - labelX, y);
+    y += 5;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(format === 'A4' ? 11 : 10);
-    doc.text('Detail Tagihan', labelX, y + 30);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(format === 'A4' ? 10 : 9);
+    doc.setFontSize(format === 'A4' ? 11 : 9.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Detail Tagihan', labelX, y);
+    y += 6;
 
-    doc.text('Jenis', labelX, y + 39);
-    doc.text(`: ${bill.bill_type || 'SPP'}`, valueX, y + 39);
-    doc.text('Keterangan', labelX, y + 46);
-    doc.text(`: ${bill.title}`, valueX, y + 46);
-    doc.text('Jatuh Tempo', labelX, y + 53);
-    doc.text(`: ${formatDate(bill.due_date)}`, valueX, y + 53);
+    y = drawKeyValueRow(doc, 'Jenis', bill.bill_type || 'SPP', labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
+    y = drawKeyValueRow(doc, 'Keterangan', bill.title, labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
+    y = drawKeyValueRow(doc, 'Jatuh Tempo', formatDate(bill.due_date), labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
 
-    doc.line(labelX, y + 59, pageWidth - labelX, y + 59);
+    y += 2;
+    doc.line(labelX, y, pageWidth - labelX, y);
+    y += 4;
 
     doc.setFillColor(240, 253, 244);
-    doc.roundedRect(labelX, y + 64, pageWidth - (labelX * 2), 22, 3, 3, 'F');
+    doc.roundedRect(labelX, y, pageWidth - (labelX * 2), 16, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(format === 'A4' ? 11 : 10);
+    doc.setFontSize(format === 'A4' ? 10.5 : 9);
     doc.setTextColor(30, 41, 59);
-    doc.text('Total Dibayar', labelX + 6, y + 74);
-    doc.setFontSize(format === 'A4' ? 14 : 12);
+    doc.text('Total Dibayar', labelX + 6, y + 10);
+    doc.setFontSize(format === 'A4' ? 13 : 11);
     doc.setTextColor(5, 150, 105);
-    doc.text(formatCurrency(bill.amount), pageWidth - (labelX + 6), y + 77, { align: 'right' });
+    doc.text(formatCurrency(bill.amount), pageWidth - (labelX + 6), y + 10.5, { align: 'right' });
 
+    y += 22;
     doc.setTextColor(5, 150, 105);
-    doc.setFontSize(format === 'A4' ? 14 : 12);
+    doc.setFontSize(format === 'A4' ? 13 : 11);
     doc.setFont('helvetica', 'bold');
-    doc.text('✓ LUNAS', pageWidth / 2, y + 100, { align: 'center' });
+    doc.text('✓ LUNAS', pageWidth / 2, y, { align: 'center' });
 
     const sigY = format === 'A4'
-        ? await drawSignatureBlock(doc, y + 108, signatures, selectedRoles)
-        : await drawSignatureBlockCompact(doc, y + 108, signatures, selectedRoles);
+        ? await drawSignatureBlock(doc, y + 6, signatures, selectedRoles)
+        : await drawSignatureBlockCompact(doc, y + 6, signatures, selectedRoles);
 
     if (format === 'A4') {
         await drawVerificationFooter(doc, sigY, verificationCode);
@@ -782,56 +802,52 @@ export const generateActivityObligationReceipt = async (data: ActivityObligation
     });
 
     const labelX = 12;
-    const valueX = 45; // Move value closer to label
-    let y = bodyStart + 3;
+    const valueX = 42;
+    const maxValWidth = pageWidth - valueX - 12;
+    let y = bodyStart + 2;
 
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(9);
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
     doc.text('Informasi Siswa', labelX, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text('Nama', labelX, y + 6);
-    doc.text(`: ${data.studentName}`, valueX, y + 6);
-    doc.text('Kelas', labelX, y + 11);
-    doc.text(`: ${data.className}`, valueX, y + 11);
+    y += 6;
 
+    y = drawKeyValueRow(doc, 'Nama', data.studentName, labelX, valueX, maxValWidth, y, 8.5);
+    y = drawKeyValueRow(doc, 'Kelas', data.className, labelX, valueX, maxValWidth, y, 8.5);
+
+    y += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(labelX, y + 15, pageWidth - 12, y + 15);
+    doc.line(labelX, y, pageWidth - 12, y);
+    y += 5;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('Detail Pembayaran', labelX, y + 21);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(9.5);
+    doc.text('Detail Pembayaran', labelX, y);
+    y += 6;
 
     if (data.activityName) {
-        doc.text('Kegiatan', labelX, y + 27);
-        doc.text(`: ${data.activityName}`, valueX, y + 27);
+        y = drawKeyValueRow(doc, 'Kegiatan', data.activityName, labelX, valueX, maxValWidth, y, 8.5);
     }
+    y = drawKeyValueRow(doc, 'Tanggal Bayar', formatDate(data.paidAt || dateStr), labelX, valueX, maxValWidth, y, 8.5);
 
-    const dateLabel = data.activityName ? y + 32 : y + 27;
-    doc.text('Tanggal Bayar', labelX, dateLabel);
-    doc.text(`: ${formatDate(data.paidAt || dateStr)}`, valueX, dateLabel);
-
-    // Amount box (Compact)
-    const boxY = dateLabel + 6;
-    doc.setFillColor(239, 246, 255); // blue-50
-    doc.roundedRect(labelX, boxY, pageWidth - 24, 14, 2, 2, 'F');
+    y += 2;
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(labelX, y, pageWidth - 24, 13, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(8.5);
     doc.setTextColor(30, 41, 59);
-    doc.text('TOTAL DIBAYAR', labelX + 4, boxY + 8);
-    doc.setFontSize(10);
-    doc.setTextColor(37, 99, 235); // blue-600
-    doc.text(formatCurrency(data.amount), pageWidth - 16, boxY + 9, { align: 'right' });
+    doc.text('TOTAL DIBAYAR', labelX + 4, y + 8);
+    doc.setFontSize(10.5);
+    doc.setTextColor(37, 99, 235);
+    doc.text(formatCurrency(data.amount), pageWidth - 16, y + 8.5, { align: 'right' });
 
+    y += 18;
     doc.setTextColor(16, 185, 129);
-    doc.setFontSize(10);
+    doc.setFontSize(10.5);
     doc.setFont('helvetica', 'bold');
-    doc.text('✓ LUNAS', pageWidth / 2, boxY + 22, { align: 'center' });
+    doc.text('✓ LUNAS', pageWidth / 2, y, { align: 'center' });
 
-    const sigY = await drawSignatureBlockCompact(doc, boxY + 28, signatures, selectedRoles || ['principal', 'treasurer']);
+    const sigY = await drawSignatureBlockCompact(doc, y + 6, signatures, selectedRoles || ['principal', 'treasurer']);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Kwitansi_${data.studentName.replace(/\s+/g, '_')}_${data.id.slice(0, 8)}.pdf`);
@@ -1045,35 +1061,30 @@ export const generateInfaqReceipt = async (entry: InfaqData, selectedRoles?: str
     });
 
     const lX = 12;
-    const vX = 55;
-    let sY = bodyStart;
+    const vX = 45;
+    const maxValWidth = pageWidth - vX - 12;
+    let sY = bodyStart + 2;
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(9);
-    doc.text('Tanggal', lX, sY);
-    doc.text(`: ${formatDate(entry.date)}`, vX, sY);
-    doc.text('Kelas', lX, sY + 7);
-    doc.text(`: ${entry.class_name}`, vX, sY + 7);
-    doc.text('Jumlah Siswa', lX, sY + 14);
-    doc.text(`: ${entry.student_count} siswa`, vX, sY + 14);
-    doc.text('Diterima Oleh', lX, sY + 21);
-    doc.text(`: ${entry.handled_by_name}`, vX, sY + 21);
+    sY = drawKeyValueRow(doc, 'Tanggal', formatDate(entry.date), lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Kelas', entry.class_name || '-', lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Jumlah Siswa', `${entry.student_count || 0} siswa`, lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Diterima Oleh', entry.handled_by_name || '-', lX, vX, maxValWidth, sY, 8.5);
 
     if (entry.notes) {
-        doc.text('Catatan', lX, sY + 28);
-        doc.text(`: ${entry.notes}`, vX, sY + 28);
+        sY = drawKeyValueRow(doc, 'Catatan', entry.notes, lX, vX, maxValWidth, sY, 8.5);
     }
 
-    const amountY = entry.notes ? sY + 35 : sY + 28;
+    sY += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(lX, amountY, pageWidth - 12, amountY);
+    doc.line(lX, sY, pageWidth - 12, sY);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('NOMINAL', lX, amountY + 8);
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text('NOMINAL', lX, sY + 7);
     doc.setTextColor(16, 185, 129);
-    doc.text(formatCurrency(entry.amount), pageWidth - 12, amountY + 8, { align: 'right' });
+    doc.text(formatCurrency(entry.amount), pageWidth - 12, sY + 7, { align: 'right' });
 
-    const sigY = await drawSignatureBlockCompact(doc, amountY + 16, signatures, selectedRoles);
+    const sigY = await drawSignatureBlockCompact(doc, sY + 14, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Bukti_Infaq_${entry.class_name.replace(/\s+/g, '_')}_${new Date(entry.date).toISOString().split('T')[0]}.pdf`);
@@ -1113,54 +1124,44 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
         invoiceNumber: invoiceNumber,
     });
 
-    const lX = 12;
-    const vX = 55;
-    let sY = bodyStart;
+    const lX = format === 'A4' ? 20 : 12;
+    const vX = format === 'A4' ? 70 : 45;
+    const maxValWidth = pageWidth - vX - lX;
+    let sY = bodyStart + 2;
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(9);
-    doc.text('Siswa', lX, sY);
-    doc.text(`: ${data.studentName}`, vX, sY);
-    doc.text('Kelas', lX, sY + 7);
-    doc.text(`: ${data.className}`, vX, sY + 7);
-    doc.text('Jenis Bayar', lX, sY + 14);
-    doc.text(`: ${data.paymentTypeName}`, vX, sY + 14);
+    sY = drawKeyValueRow(doc, 'Siswa', data.studentName, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
+    sY = drawKeyValueRow(doc, 'Kelas', data.className, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
+    sY = drawKeyValueRow(doc, 'Jenis Bayar', data.paymentTypeName, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
 
-    let currentY = sY + 21;
     if (data.billingMonth && data.billingMonth > 0) {
-        doc.text('Bulan', lX, currentY);
-        doc.text(`: ${monthNames[data.billingMonth]}`, vX, currentY);
-        currentY += 7;
+        sY = drawKeyValueRow(doc, 'Bulan', monthNames[data.billingMonth] || '-', lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     }
     if (data.installmentNumber && data.totalInstallments) {
-        doc.text('Cicilan', lX, currentY);
-        doc.text(`: ${data.installmentNumber}/${data.totalInstallments}`, vX, currentY);
-        currentY += 7;
+        sY = drawKeyValueRow(doc, 'Cicilan', `${data.installmentNumber}/${data.totalInstallments}`, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     }
-    doc.text('Tanggal', lX, currentY);
-    doc.text(`: ${formatDate(dateStr)}`, vX, currentY);
-    currentY += 7;
+    sY = drawKeyValueRow(doc, 'Tanggal', formatDate(dateStr), lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
 
-    // Amount
+    sY += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(lX, currentY, pageWidth - 12, currentY);
+    doc.line(lX, sY, pageWidth - lX, sY);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('TOTAL DIBAYAR', lX, currentY + 8);
+    doc.setFontSize(format === 'A4' ? 11 : 10);
+    doc.setTextColor(30, 41, 59);
+    doc.text('TOTAL DIBAYAR', lX, sY + 7);
     doc.setTextColor(37, 99, 235);
-    doc.setFontSize(12);
-    doc.text(formatCurrency(data.paidAmount), pageWidth - 12, currentY + 8, { align: 'right' });
+    doc.setFontSize(format === 'A4' ? 13 : 11);
+    doc.text(formatCurrency(data.paidAmount), pageWidth - lX, sY + 7, { align: 'right' });
 
-    // Status
-    currentY += 15;
+    sY += 16;
     const isLunas = data.paidAmount >= data.amount;
     doc.setTextColor(isLunas ? 16 : 245, isLunas ? 185 : 158, isLunas ? 129 : 11);
-    doc.setFontSize(12);
-    doc.text(isLunas ? '✓ LUNAS' : '◐ CICILAN', pageWidth / 2, currentY + 5, { align: 'center' });
+    doc.setFontSize(format === 'A4' ? 13 : 11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(isLunas ? '✓ LUNAS' : '◐ CICILAN', pageWidth / 2, sY, { align: 'center' });
 
     const sigY = format === 'A4'
-        ? await drawSignatureBlock(doc, currentY + 10, signatures, selectedRoles)
-        : await drawSignatureBlockCompact(doc, currentY + 10, signatures, selectedRoles);
+        ? await drawSignatureBlock(doc, sY + 6, signatures, selectedRoles)
+        : await drawSignatureBlockCompact(doc, sY + 6, signatures, selectedRoles);
 
     if (format === 'A4') {
         await drawVerificationFooter(doc, sigY, verificationCode);
@@ -1465,37 +1466,31 @@ export const generateDebtReceipt = async (payment: any, debt: any, selectedRoles
     });
 
     const lX = 12;
-    const vX = 55;
-    let sY = bodyStart;
+    const vX = 45;
+    const maxValWidth = pageWidth - vX - 12;
+    let sY = bodyStart + 2;
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(9);
-    doc.text('Tanggal', lX, sY);
-    doc.text(`: ${formatDate(payment.created_at)}`, vX, sY);
-    doc.text('Kreditur/Vendor', lX, sY + 7);
-    doc.text(`: ${debt.creditor_name}`, vX, sY + 7);
-    doc.text('Keterangan', lX, sY + 14);
-    doc.text(`: ${debt.description}`, vX, sY + 14);
-    doc.text('Sumber Dana', lX, sY + 21);
-    doc.text(`: ${payment.fund_source}`, vX, sY + 21);
-    doc.text('Dibayar Oleh', lX, sY + 28);
-    doc.text(`: ${payment.paid_by?.name || '-'}`, vX, sY + 28);
+    sY = drawKeyValueRow(doc, 'Tanggal', formatDate(payment.created_at || payment.payment_date), lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Kreditur/Vendor', debt.creditor_name || '-', lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Keterangan', debt.description || '-', lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Sumber Dana', payment.fund_source || '-', lX, vX, maxValWidth, sY, 8.5);
+    sY = drawKeyValueRow(doc, 'Dibayar Oleh', payment.paid_by?.name || '-', lX, vX, maxValWidth, sY, 8.5);
 
     if (payment.notes) {
-        doc.text('Catatan', lX, sY + 35);
-        doc.text(`: ${payment.notes}`, vX, sY + 35);
+        sY = drawKeyValueRow(doc, 'Catatan', payment.notes, lX, vX, maxValWidth, sY, 8.5);
     }
 
-    const amountY = payment.notes ? sY + 42 : sY + 35;
+    sY += 2;
     doc.setDrawColor(203, 213, 225);
-    doc.line(lX, amountY, pageWidth - 12, amountY);
+    doc.line(lX, sY, pageWidth - 12, sY);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('NOMINAL DIBAYAR', lX, amountY + 8);
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text('NOMINAL DIBAYAR', lX, sY + 7);
     doc.setTextColor(220, 38, 38);
-    doc.text(formatCurrency(payment.amount), pageWidth - 12, amountY + 8, { align: 'right' });
+    doc.text(formatCurrency(payment.amount), pageWidth - 12, sY + 7, { align: 'right' });
 
-    const sigY = await drawSignatureBlockCompact(doc, amountY + 16, signatures, selectedRoles);
+    const sigY = await drawSignatureBlockCompact(doc, sY + 14, signatures, selectedRoles);
     await drawVerificationFooterCompact(doc, sigY, verificationCode);
 
     doc.save(`Bukti_Bayar_Hutang_${debt.creditor_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);

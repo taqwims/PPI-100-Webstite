@@ -62,11 +62,30 @@ func BuildSignaturePayload(role, invoiceType, referenceID string, amount float64
 
 // VerifyStakeholderSignature verifies an existing signature for a role.
 func VerifyStakeholderSignature(role, invoiceType, referenceID string, amount float64, dateStr, signature string) bool {
+	// Try standard payload first
 	expected, err := GenerateStakeholderSignature(role, invoiceType, referenceID, amount, dateStr)
-	if err != nil {
-		return false
+	if err == nil && hmac.Equal([]byte(expected), []byte(signature)) {
+		return true
 	}
-	return hmac.Equal([]byte(expected), []byte(signature))
+
+	// Try normalized date (e.g. YYYY-MM-DD if dateStr has time suffix or vice versa)
+	cleanDate := dateStr
+	if len(cleanDate) > 10 {
+		cleanDate = cleanDate[:10]
+	}
+
+	// Try variations in invoiceType casing and clean date
+	types := []string{invoiceType, strings.ToLower(invoiceType), strings.Title(strings.ToLower(invoiceType))}
+	for _, t := range types {
+		for _, d := range []string{dateStr, cleanDate} {
+			exp, err := GenerateStakeholderSignature(role, t, referenceID, amount, d)
+			if err == nil && hmac.Equal([]byte(exp), []byte(signature)) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // ─── Multi-Stakeholder Batch Signing ───
