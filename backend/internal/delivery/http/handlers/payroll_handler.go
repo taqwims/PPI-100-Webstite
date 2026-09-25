@@ -29,15 +29,19 @@ func (h *PayrollHandler) GetPayrolls(c *gin.Context) {
 		return
 	}
 	var roleID int
-	if id, ok := roleIDVal.(int); ok {
-		roleID = id
-	} else if id, ok := roleIDVal.(float64); ok {
-		roleID = int(id)
+	switch v := roleIDVal.(type) {
+	case uint:
+		roleID = int(v)
+	case int:
+		roleID = v
+	case float64:
+		roleID = int(v)
 	}
 
 	userID := ""
-	// Jika bukan Super Admin (1) dan bukan Bendahara (9), hanya boleh lihat gajinya sendiri
-	if roleID != 1 && roleID != 9 {
+	// Role manajemen yang berhak melihat semua slip gaji: Super Admin (1), Admin (2), TU (3), Kepala Sekolah (8), Bendahara (9), Staf Keuangan (11)
+	isManagementRole := roleID == 1 || roleID == 2 || roleID == 3 || roleID == 8 || roleID == 9 || roleID == 11
+	if !isManagementRole {
 		uidVal, exists := c.Get("userID")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -52,6 +56,9 @@ func (h *PayrollHandler) GetPayrolls(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if payrolls == nil {
+		payrolls = []domain.Payroll{}
 	}
 	c.JSON(http.StatusOK, payrolls)
 }

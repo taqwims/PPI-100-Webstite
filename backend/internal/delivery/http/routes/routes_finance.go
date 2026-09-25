@@ -149,15 +149,15 @@ func RegisterFinanceRoutes(
 
 		// ── Payroll (Penggajian) ──
 		if cfg.FeaturePayroll {
-			finance.POST("/payroll", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.CreatePayroll)
+			finance.POST("/payroll", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.CreatePayroll)
 			finance.GET("/payroll", middleware.RoleMiddleware(1, 2, 3, 4, 5, 8, 9, 10, 11), payrollHandler.GetPayrolls)
-			finance.PUT("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.UpdatePayroll)
-			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.DeletePayroll)
-			finance.POST("/payroll/:id/pay", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.Pay)
+			finance.PUT("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.UpdatePayroll)
+			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.DeletePayroll)
+			finance.POST("/payroll/:id/pay", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.Pay)
 
-			finance.GET("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.GetTemplates)
-			finance.GET("/payroll/templates/:userId", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.GetTemplateByUserID)
-			finance.POST("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9), payrollHandler.UpsertTemplate)
+			finance.GET("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.GetTemplates)
+			finance.GET("/payroll/templates/:userId", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.GetTemplateByUserID)
+			finance.POST("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.UpsertTemplate)
 		}
 
 		// ── Dashboard Analytics ──

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { CashLedgerEntry, StaffUser, TransactionCode } from '../types/cashLedgerTypes';
-import { exportToCSV } from '../utils/exportUtils';
+import { exportCashLedgerToExcel } from '../utils/exportUtils';
 import { generateCashLedgerReceipt, generateCashLedgerReport } from '../utils/pdfUtils';
 
 export const useCashLedger = () => {
@@ -214,7 +214,7 @@ export const useCashLedger = () => {
         if (exportFormat === 'pdf') {
             generateCashLedgerReport(filtered, exportStartDate || 'Awal', exportEndDate || 'Akhir');
         } else {
-            exportToCSV(filtered, `Cash_Ledger_${exportStartDate || 'all'}_${exportEndDate || 'all'}`);
+            exportCashLedgerToExcel(filtered, exportStartDate, exportEndDate);
         }
         setShowExportModal(false);
     };

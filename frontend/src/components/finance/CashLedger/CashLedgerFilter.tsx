@@ -72,13 +72,19 @@ const CashLedgerFilter: React.FC<Props> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter Transaction Codes (Parent & Child Hierarchy)
-  const masterCodes = transactionCodes.filter(tc => tc.is_active && !tc.parent_code_id);
+  // Filter Transaction Codes (Parent & Child Hierarchy) based on active filterType
+  const relevantTransactionCodes = transactionCodes.filter(tc => {
+    if (!tc.is_active) return false;
+    if (filterType === 'all') return true;
+    return tc.type === filterType || tc.parent_code?.type === filterType;
+  });
+
+  const masterCodes = relevantTransactionCodes.filter(tc => !tc.parent_code_id);
   const filteredMasterCodes = masterCodes.filter(master => {
     if (!codeSearch.trim()) return true;
     const q = codeSearch.toLowerCase();
     const masterMatch = master.code.toLowerCase().includes(q) || master.name.toLowerCase().includes(q);
-    const childrenMatch = transactionCodes.some(c => c.parent_code_id === master.id && c.is_active && (c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)));
+    const childrenMatch = relevantTransactionCodes.some(c => c.parent_code_id === master.id && (c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)));
     return masterMatch || childrenMatch;
   });
 
@@ -216,7 +222,7 @@ const CashLedgerFilter: React.FC<Props> = ({
               <Filter size={13} className={filterTransactionCodeIds.length > 0 ? "text-blue-600" : "text-slate-400"} />
               <span>
                 {filterTransactionCodeIds.length === 0
-                  ? "Semua Pos / Kode Akun"
+                  ? (filterType === 'Income' ? 'Semua Pos Pemasukan' : filterType === 'Expense' ? 'Semua Pos Pengeluaran' : 'Semua Pos / Kode Akun')
                   : `${filterTransactionCodeIds.length} Pos Dipilih`}
               </span>
               <ChevronDown size={14} className="text-slate-400 ml-0.5" />
@@ -225,7 +231,9 @@ const CashLedgerFilter: React.FC<Props> = ({
             {openDropdown === 'code' && (
               <div className="absolute left-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-xs font-bold text-slate-800">Filter Pos / Kode Akun</span>
+                  <span className="text-xs font-bold text-slate-800">
+                    Filter Pos {filterType === 'Income' ? 'Pemasukan' : filterType === 'Expense' ? 'Pengeluaran' : 'Kode Akun'}
+                  </span>
                   {filterTransactionCodeIds.length > 0 && (
                     <button
                       type="button"
@@ -242,7 +250,7 @@ const CashLedgerFilter: React.FC<Props> = ({
                   <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Cari pos atau kode..."
+                    placeholder={`Cari pos ${filterType === 'Income' ? 'pemasukan' : filterType === 'Expense' ? 'pengeluaran' : 'atau kode'}...`}
                     value={codeSearch}
                     onChange={e => setCodeSearch(e.target.value)}
                     className="w-full pl-7 pr-3 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500"
@@ -251,50 +259,56 @@ const CashLedgerFilter: React.FC<Props> = ({
 
                 {/* Codes List (Hierarchical Induk & Child) */}
                 <div className="max-h-56 overflow-y-auto space-y-1 pr-1 text-xs">
-                  {filteredMasterCodes.map(master => {
-                    const children = transactionCodes.filter(c => c.parent_code_id === master.id && c.is_active);
-                    const isMasterSelected = filterTransactionCodeIds.includes(master.id);
+                  {filteredMasterCodes.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      Tidak ada pos {filterType === 'Income' ? 'pemasukan' : filterType === 'Expense' ? 'pengeluaran' : ''} yang ditemukan.
+                    </div>
+                  ) : (
+                    filteredMasterCodes.map(master => {
+                      const children = relevantTransactionCodes.filter(c => c.parent_code_id === master.id);
+                      const isMasterSelected = filterTransactionCodeIds.includes(master.id);
 
-                    return (
-                      <div key={master.id} className="space-y-0.5">
-                        {/* Induk Header / Option */}
-                        <label className={clsx(
-                          "flex items-center gap-2 px-2 py-1.5 rounded-lg font-bold cursor-pointer transition select-none",
-                          isMasterSelected ? "bg-blue-50 text-blue-900" : "text-slate-800 hover:bg-slate-100"
-                        )}>
-                          <input
-                            type="checkbox"
-                            checked={isMasterSelected}
-                            onChange={() => toggleTransactionCode(master.id)}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="truncate">{master.code} — {master.name}</span>
-                        </label>
+                      return (
+                        <div key={master.id} className="space-y-0.5">
+                          {/* Induk Header / Option */}
+                          <label className={clsx(
+                            "flex items-center gap-2 px-2 py-1.5 rounded-lg font-bold cursor-pointer transition select-none",
+                            isMasterSelected ? "bg-blue-50 text-blue-900" : "text-slate-800 hover:bg-slate-100"
+                          )}>
+                            <input
+                              type="checkbox"
+                              checked={isMasterSelected}
+                              onChange={() => toggleTransactionCode(master.id)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="truncate">{master.code} — {master.name}</span>
+                          </label>
 
-                        {/* Children List */}
-                        {children.map(child => {
-                          const isChildSelected = filterTransactionCodeIds.includes(child.id);
-                          return (
-                            <label
-                              key={child.id}
-                              className={clsx(
-                                "flex items-center gap-2 pl-6 pr-2 py-1 rounded-lg text-[11px] cursor-pointer transition select-none font-medium",
-                                isChildSelected ? "bg-blue-50/80 text-blue-800 font-semibold" : "text-slate-600 hover:bg-slate-50"
-                              )}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChildSelected}
-                                onChange={() => toggleTransactionCode(child.id)}
-                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="truncate">↳ {child.code} — {child.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                          {/* Children List */}
+                          {children.map(child => {
+                            const isChildSelected = filterTransactionCodeIds.includes(child.id);
+                            return (
+                              <label
+                                key={child.id}
+                                className={clsx(
+                                  "flex items-center gap-2 pl-6 pr-2 py-1 rounded-lg text-[11px] cursor-pointer transition select-none font-medium",
+                                  isChildSelected ? "bg-blue-50/80 text-blue-800 font-semibold" : "text-slate-600 hover:bg-slate-50"
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChildSelected}
+                                  onChange={() => toggleTransactionCode(child.id)}
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="truncate">↳ {child.code} — {child.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}

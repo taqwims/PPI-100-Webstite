@@ -89,7 +89,7 @@ const CashLedgerExportModal: React.FC<Props> = ({
                             )}
                         >
                             <Download size={16} />
-                            Excel (CSV)
+                            Excel (.xlsx)
                         </button>
                     </div>
                 </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { exportToCSV } from '../utils/exportUtils';
+import { exportDailyInfaqToExcel } from '../utils/exportUtils';
 import { generateCashLedgerReport } from '../utils/pdfUtils';
 import { useAuth } from '../context/AuthContext';
 
@@ -249,7 +249,7 @@ export const useDailyInfaq = () => {
             }));
             generateCashLedgerReport(data, exportStartDate || 'Awal', exportEndDate || 'Akhir');
         } else {
-            exportToCSV(filtered, `Infaq_Harian_${exportStartDate || 'all'}_${exportEndDate || 'all'}`);
+            exportDailyInfaqToExcel(filtered, exportStartDate, exportEndDate);
         }
         setShowExportModal(false);
     };

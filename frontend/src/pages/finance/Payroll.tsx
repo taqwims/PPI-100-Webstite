@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Plus, Download, Search, Building2, Banknote } from 'lucide-react';
-import { exportToCSV } from '../../utils/exportUtils';
+import { exportPayrollToExcel } from '../../utils/exportUtils';
 import { generatePayrollReceipt } from '../../utils/pdfUtils';
 import { toast } from 'react-hot-toast';
 import PrintOptionsModal from '../../components/ui/PrintOptionsModal';
@@ -25,7 +25,7 @@ const getMonthName = (monthNumber: number) => {
 
 const Payroll = () => {
     const { user } = useAuth();
-    const canManage = [1, 9, 11].includes(user?.role_id || 0);
+    const canManage = [1, 2, 3, 8, 9, 11].includes(user?.role_id || 0);
 
     const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
     const [users, setUsers] = useState<UserData[]>([]);
@@ -74,9 +74,10 @@ const Payroll = () => {
         setLoading(true);
         try {
             const res = await api.get(`/finance/payroll?month=${filterMonth}&year=${filterYear}`);
-            setPayrolls(res.data);
+            setPayrolls(Array.isArray(res.data) ? res.data : []);
         } catch (error) {
             console.error("Failed to fetch payrolls", error);
+            setPayrolls([]);
         } finally {
             setLoading(false);
         }
@@ -232,11 +233,11 @@ const Payroll = () => {
                             <span>Template Gaji</span>
                         </button>
                         <button
-                            onClick={() => exportToCSV(filteredPayrolls, `Data_Gaji_${filterMonth}_${filterYear}`)}
+                            onClick={() => exportPayrollToExcel(filteredPayrolls, filterMonth, filterYear)}
                             className="flex items-center space-x-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl hover:bg-slate-50 shadow-sm transition"
                         >
                             <Download size={18} />
-                            <span className="hidden sm:inline">Export</span>
+                            <span className="hidden sm:inline">Export Excel</span>
                         </button>
                         <button
                             onClick={() => { setEditingPayroll(null); setShowModal(true); }}
