@@ -155,6 +155,9 @@ func RegisterFinanceRoutes(
 			finance.DELETE("/payroll/:id", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.DeletePayroll)
 			finance.POST("/payroll/:id/pay", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.Pay)
 
+			finance.POST("/payroll/post-to-bku", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.PostToBKU)
+			finance.GET("/payroll/bku-status", middleware.RoleMiddleware(1, 2, 3, 8, 9, 11), payrollHandler.GetBKUStatus)
+
 			finance.GET("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.GetTemplates)
 			finance.GET("/payroll/templates/:userId", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.GetTemplateByUserID)
 			finance.POST("/payroll/templates", middleware.RoleMiddleware(1, 2, 3, 9, 11), payrollHandler.UpsertTemplate)

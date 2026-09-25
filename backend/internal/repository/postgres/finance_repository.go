@@ -270,6 +270,15 @@ func (r *FinanceRepository) AddCashLedgerEntry(entry *domain.CashLedger) error {
 	return r.db.Create(entry).Error
 }
 
+func (r *FinanceRepository) GetCashLedgerByItemName(itemName string) (*domain.CashLedger, error) {
+	var entry domain.CashLedger
+	err := r.db.Where("item_name = ?", itemName).First(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
 // GetBillByObligationID finds a bill linked to a StudentObligation
 func (r *FinanceRepository) GetBillByObligationID(obligationID string) (*domain.Bill, error) {
 	var bill domain.Bill

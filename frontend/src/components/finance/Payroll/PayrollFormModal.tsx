@@ -646,7 +646,7 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                                 {formData.status === 'Paid' && (
                                     <p className="text-xs text-emerald-600 mt-2 font-medium bg-emerald-50 p-2 rounded flex items-center">
                                         <CheckCircle size={14} className="mr-1" />
-                                        Menyimpan status Lunas akan otomatis mencatat pengeluaran di Buku Kas Umum (BKU).
+                                        Status Lunas menandakan gaji telah siap/dibayarkan. Pencatatan pengeluaran ke BKU dapat diposting bersamaan via tombol &quot;Posting ke BKU&quot;.
                                     </p>
                                 )}
                             </div>

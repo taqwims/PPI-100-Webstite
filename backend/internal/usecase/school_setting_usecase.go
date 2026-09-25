@@ -53,6 +53,8 @@ func (u *SchoolSettingUsecase) GetSchoolInfo() map[string]string {
 	for _, s := range settings {
 		if alias, ok := keyMap[s.Key]; ok {
 			info[alias] = s.Value
+		} else if len(s.Key) > 8 && s.Key[:8] == "landing_" {
+			info[s.Key] = s.Value
 		}
 	}
 
@@ -80,12 +82,10 @@ func (u *SchoolSettingUsecase) UpdateSettings(updates []domain.SchoolSetting, is
 		}
 
 		for _, update := range updates {
-			existing, ok := settingMap[update.Key]
-			if !ok {
-				return fmt.Errorf("setting key '%s' not found", update.Key)
-			}
-			if !existing.IsAdminEdit {
-				return fmt.Errorf("setting '%s' can only be changed by developer", update.Key)
+			if existing, ok := settingMap[update.Key]; ok {
+				if !existing.IsAdminEdit {
+					return fmt.Errorf("setting '%s' can only be changed by developer", update.Key)
+				}
 			}
 		}
 	}

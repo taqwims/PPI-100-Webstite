@@ -6,12 +6,14 @@ import {
     Building2, MapPin, Phone, Mail, Hash, Save, Camera,
     Database, Download, Trash2, RotateCcw, Clock, CheckCircle2,
     XCircle, AlertTriangle, Info, Shield, HardDrive, FileText, CreditCard,
-    Copy, Eye, EyeOff, Zap, Radio, Key, BellRing, RefreshCw, ShieldAlert
+    Copy, Eye, EyeOff, Zap, Radio, Key, BellRing, RefreshCw, ShieldAlert,
+    Image as ImageIcon, Upload
 } from 'lucide-react';
 import api from '../../services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFeatureStore } from '../../store/featureStore';
 import SchoolBankAccounts from '../finance/SchoolBankAccounts';
+import { compressImage } from '../../utils/imageCompressor';
 import toast from 'react-hot-toast';
 
 // ─── Types ───
@@ -350,6 +352,12 @@ const ProfileTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
 // ═══════════════════════════════════════════
 // ─── Tab: Landing Page ───
 // ═══════════════════════════════════════════
+const defaultSlideImages = [
+    '/images/slider_1.png',
+    '/images/slider_2.png',
+    '/images/slider_3.png'
+];
+
 const LandingPageTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     const queryClient = useQueryClient();
 
@@ -362,6 +370,7 @@ const LandingPageTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
     });
 
     const [form, setForm] = useState<Record<string, string>>({});
+    const [uploadingSlide, setUploadingSlide] = useState<number | null>(null);
 
     React.useEffect(() => {
         if (settings && Object.keys(form).length === 0) {
@@ -379,6 +388,36 @@ const LandingPageTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         setForm(prev => ({ ...prev, [key]: value }));
     };
 
+    const handleUploadSlideImage = async (slideIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingSlide(slideIndex);
+        try {
+            // Compress image client-side to ensure fast loading & prevent server overload
+            const compressed = await compressImage(file, 1920, 1080, 0.85);
+
+            const formData = new FormData();
+            formData.append('file', compressed);
+            formData.append('folder', 'landing');
+
+            const res = await api.post('/finance/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            const uploadedUrl = res.data?.url || res.data?.file_url;
+            if (uploadedUrl) {
+                updateField(`landing_slide_${slideIndex}_image`, uploadedUrl);
+                toast.success(`Gambar Slide ${slideIndex} berhasil diunggah!`);
+            }
+        } catch (err: any) {
+            console.error('Upload slide image error:', err);
+            toast.error(err.response?.data?.error || 'Gagal mengunggah gambar slide');
+        } finally {
+            setUploadingSlide(null);
+        }
+    };
+
     const saveMutation = useMutation({
         mutationFn: async () => {
             const updates = Object.entries(form).map(([key, value]) => ({ key, value }));
@@ -387,10 +426,10 @@ const LandingPageTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['school-settings'] });
             onSaved();
-            alert('Pengaturan Landing Page berhasil disimpan!');
+            toast.success('Pengaturan Landing Page berhasil disimpan!');
         },
         onError: (err: any) => {
-            alert(err.response?.data?.error || 'Gagal menyimpan');
+            toast.error(err.response?.data?.error || 'Gagal menyimpan');
         },
     });
 
@@ -398,80 +437,229 @@ const LandingPageTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         return <CardGlass className="p-8 text-center text-slate-500">Memuat pengaturan...</CardGlass>;
     }
 
+    const slideConfigs = [
+        {
+            num: 1,
+            defaultImg: defaultSlideImages[0],
+            defaultTitle: 'Generasi Qur\'ani',
+            defaultSubtitle: 'Mencetak kader ulama dan pemimpin masa depan yang berakhlak mulia, cerdas, dan berwawasan global.',
+            defaultCta: 'Daftar Sekarang',
+            defaultLink: '/ppdb'
+        },
+        {
+            num: 2,
+            defaultImg: defaultSlideImages[1],
+            defaultTitle: 'Lingkungan Islami',
+            defaultSubtitle: 'Suasana pesantren yang kondusif untuk ibadah dan belajar dengan fasilitas masjid yang megah.',
+            defaultCta: 'Lihat Profil',
+            defaultLink: '/profile'
+        },
+        {
+            num: 3,
+            defaultImg: defaultSlideImages[2],
+            defaultTitle: 'Ekstrakurikuler Unggulan',
+            defaultSubtitle: 'Mengembangkan minat dan bakat santri melalui berbagai kegiatan positif dan berprestasi.',
+            defaultCta: 'Kegiatan Kami',
+            defaultLink: '/profile'
+        }
+    ];
+
     return (
-        <CardGlass className="p-6 space-y-6">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <FileText size={20} className="text-green-600" />
-                Konten Teks Landing Page
-            </h3>
-
-            <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="space-y-5">
-                <div className="grid md:grid-cols-2 gap-5">
-                    <div className="space-y-1.5">
-                        <label className="text-sm text-slate-600 font-medium">Judul Hero (Slider)</label>
-                        <InputGlass
-                            value={form.landing_hero_title || ''}
-                            onChange={(e) => updateField('landing_hero_title', e.target.value)}
-                            placeholder="Masa Depan Cerah Dimulai dari Sini"
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-sm text-slate-600 font-medium">Sub-Judul Hero</label>
-                        <InputGlass
-                            value={form.landing_hero_subtitle || ''}
-                            onChange={(e) => updateField('landing_hero_subtitle', e.target.value)}
-                            placeholder="Mendidik generasi unggul dengan akhlak islami"
-                        />
+        <div className="space-y-8">
+            {/* Section 1: Hero Slider Images */}
+            <CardGlass className="p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-200/60 pb-4">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <ImageIcon size={20} className="text-emerald-600" />
+                            Kelola Gambar & Konten Slider Hero
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Atur gambar latar belakang, judul, subjudul, dan tombol navigasi untuk 3 slide utama di landing page. Gambar otomatis dioptimasi & dimuat secara lazy.
+                        </p>
                     </div>
                 </div>
 
-                <div className="space-y-1.5">
-                    <label className="text-sm text-slate-600 font-medium">Judul Tentang Kami</label>
-                    <InputGlass
-                        value={form.landing_about_title || ''}
-                        onChange={(e) => updateField('landing_about_title', e.target.value)}
-                        placeholder="Keunggulan Kami"
-                    />
-                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {slideConfigs.map((slide) => {
+                        const currentImg = form[`landing_slide_${slide.num}_image`] || slide.defaultImg;
+                        const currentTitle = form[`landing_slide_${slide.num}_title`] || (slide.num === 1 ? form.landing_hero_title : '') || slide.defaultTitle;
+                        const currentSubtitle = form[`landing_slide_${slide.num}_subtitle`] || (slide.num === 1 ? form.landing_hero_subtitle : '') || slide.defaultSubtitle;
+                        const currentCta = form[`landing_slide_${slide.num}_cta`] || slide.defaultCta;
+                        const currentLink = form[`landing_slide_${slide.num}_link`] || slide.defaultLink;
 
-                <div className="space-y-1.5">
-                    <label className="text-sm text-slate-600 font-medium">Deskripsi Tentang Kami</label>
-                    <textarea
-                        value={form.landing_about_desc || ''}
-                        onChange={(e) => updateField('landing_about_desc', e.target.value)}
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-green-500/50"
-                        rows={3}
-                        placeholder="Fasilitas modern dan kurikulum terintegrasi..."
-                    />
-                </div>
+                        return (
+                            <div key={slide.num} className="bg-white/70 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between space-y-4 shadow-sm hover:shadow-md transition">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                            Slide {slide.num}
+                                        </span>
+                                        {form[`landing_slide_${slide.num}_image`] && (
+                                            <button
+                                                type="button"
+                                                onClick={() => updateField(`landing_slide_${slide.num}_image`, '')}
+                                                className="text-[11px] text-slate-500 hover:text-red-600 flex items-center gap-1 transition"
+                                                title="Kembalikan ke gambar bawaan"
+                                            >
+                                                <RotateCcw size={12} /> Reset Bawaan
+                                            </button>
+                                        )}
+                                    </div>
 
-                <div className="grid md:grid-cols-2 gap-5">
+                                    {/* Image Preview Box with Lazy Loading */}
+                                    <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 group">
+                                        <img
+                                            src={currentImg}
+                                            alt={`Preview Slide ${slide.num}`}
+                                            loading="lazy"
+                                            decoding="async"
+                                            onError={(e) => { e.currentTarget.src = slide.defaultImg; }}
+                                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 flex flex-col justify-end">
+                                            <p className="text-white text-xs font-bold truncate drop-shadow">{currentTitle}</p>
+                                            <p className="text-slate-300 text-[10px] truncate drop-shadow">{currentSubtitle}</p>
+                                        </div>
+
+                                        {uploadingSlide === slide.num && (
+                                            <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center text-white text-xs font-semibold gap-2">
+                                                <RefreshCw size={16} className="animate-spin text-emerald-400" /> Mengunggah...
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Upload Button */}
+                                    <div>
+                                        <label className="cursor-pointer flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition">
+                                            <Upload size={14} />
+                                            <span>Unggah Gambar Slide {slide.num}</span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleUploadSlideImage(slide.num, e)}
+                                                className="hidden"
+                                                disabled={uploadingSlide !== null}
+                                            />
+                                        </label>
+                                    </div>
+
+                                    {/* Text Fields */}
+                                    <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                                        <div>
+                                            <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Judul Slide</label>
+                                            <input
+                                                type="text"
+                                                value={currentTitle}
+                                                onChange={(e) => {
+                                                    updateField(`landing_slide_${slide.num}_title`, e.target.value);
+                                                    if (slide.num === 1) updateField('landing_hero_title', e.target.value);
+                                                }}
+                                                placeholder={slide.defaultTitle}
+                                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Sub-Judul</label>
+                                            <textarea
+                                                rows={2}
+                                                value={currentSubtitle}
+                                                onChange={(e) => {
+                                                    updateField(`landing_slide_${slide.num}_subtitle`, e.target.value);
+                                                    if (slide.num === 1) updateField('landing_hero_subtitle', e.target.value);
+                                                }}
+                                                placeholder={slide.defaultSubtitle}
+                                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">Teks Tombol</label>
+                                                <input
+                                                    type="text"
+                                                    value={currentCta}
+                                                    onChange={(e) => updateField(`landing_slide_${slide.num}_cta`, e.target.value)}
+                                                    placeholder={slide.defaultCta}
+                                                    className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">Tautan (Link)</label>
+                                                <input
+                                                    type="text"
+                                                    value={currentLink}
+                                                    onChange={(e) => updateField(`landing_slide_${slide.num}_link`, e.target.value)}
+                                                    placeholder={slide.defaultLink}
+                                                    className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </CardGlass>
+
+            {/* Section 2: Text Content */}
+            <CardGlass className="p-6 space-y-6">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200/60 pb-3">
+                    <FileText size={20} className="text-emerald-600" />
+                    Konten Bagian Tentang Kami & Ajakan (CTA)
+                </h3>
+
+                <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="space-y-5">
                     <div className="space-y-1.5">
-                        <label className="text-sm text-slate-600 font-medium">Judul Ajakan (CTA)</label>
+                        <label className="text-sm text-slate-600 font-medium">Judul Tentang Kami</label>
                         <InputGlass
-                            value={form.landing_cta_title || ''}
-                            onChange={(e) => updateField('landing_cta_title', e.target.value)}
-                            placeholder="Siap Bergabung Bersama Kami?"
+                            value={form.landing_about_title || ''}
+                            onChange={(e) => updateField('landing_about_title', e.target.value)}
+                            placeholder="Keunggulan Kami"
                         />
                     </div>
+
                     <div className="space-y-1.5">
-                        <label className="text-sm text-slate-600 font-medium">Deskripsi Ajakan (CTA)</label>
-                        <InputGlass
-                            value={form.landing_cta_desc || ''}
-                            onChange={(e) => updateField('landing_cta_desc', e.target.value)}
-                            placeholder="Pendaftaran Santri Baru Tahun Ajaran..."
+                        <label className="text-sm text-slate-600 font-medium">Deskripsi Tentang Kami</label>
+                        <textarea
+                            value={form.landing_about_desc || ''}
+                            onChange={(e) => updateField('landing_about_desc', e.target.value)}
+                            className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                            rows={3}
+                            placeholder="Fasilitas modern dan kurikulum terintegrasi..."
                         />
                     </div>
-                </div>
 
-                <div className="pt-4 flex justify-end">
-                    <ButtonGlass type="submit" className="flex items-center gap-2" disabled={saveMutation.isPending}>
-                        <Save size={18} />
-                        {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Konten'}
-                    </ButtonGlass>
-                </div>
-            </form>
-        </CardGlass>
+                    <div className="grid md:grid-cols-2 gap-5">
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">Judul Ajakan (CTA)</label>
+                            <InputGlass
+                                value={form.landing_cta_title || ''}
+                                onChange={(e) => updateField('landing_cta_title', e.target.value)}
+                                placeholder="Siap Bergabung Bersama Kami?"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm text-slate-600 font-medium">Deskripsi Ajakan (CTA)</label>
+                            <InputGlass
+                                value={form.landing_cta_desc || ''}
+                                onChange={(e) => updateField('landing_cta_desc', e.target.value)}
+                                placeholder="Pendaftaran Santri Baru Tahun Ajaran..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                        <ButtonGlass type="submit" className="flex items-center gap-2" disabled={saveMutation.isPending}>
+                            <Save size={18} />
+                            {saveMutation.isPending ? 'Menyimpan...' : 'Simpan Semua Pengaturan Landing Page'}
+                        </ButtonGlass>
+                    </div>
+                </form>
+            </CardGlass>
+        </div>
     );
 };
 

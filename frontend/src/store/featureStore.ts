@@ -37,6 +37,21 @@ interface SchoolInfo {
     npsn: string;
     landing_hero_title?: string;
     landing_hero_subtitle?: string;
+    landing_slide_1_image?: string;
+    landing_slide_2_image?: string;
+    landing_slide_3_image?: string;
+    landing_slide_1_title?: string;
+    landing_slide_2_title?: string;
+    landing_slide_3_title?: string;
+    landing_slide_1_subtitle?: string;
+    landing_slide_2_subtitle?: string;
+    landing_slide_3_subtitle?: string;
+    landing_slide_1_cta?: string;
+    landing_slide_2_cta?: string;
+    landing_slide_3_cta?: string;
+    landing_slide_1_link?: string;
+    landing_slide_2_link?: string;
+    landing_slide_3_link?: string;
     landing_about_title?: string;
     landing_about_desc?: string;
     landing_cta_title?: string;
@@ -46,6 +61,7 @@ interface SchoolInfo {
     xendit_public_key?: string;
     allow_delete_paid_obligations?: string;
     enable_rfid_attendance?: string;
+    [key: string]: any;
 }
 
 interface FeatureState {

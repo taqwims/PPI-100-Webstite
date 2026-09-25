@@ -33,10 +33,18 @@ func (r *SchoolSettingRepository) GetByKey(key string) (*domain.SchoolSetting, e
 func (r *SchoolSettingRepository) BulkUpdate(settings []domain.SchoolSetting) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		for _, s := range settings {
-			if err := tx.Model(&domain.SchoolSetting{}).
-				Where("key = ?", s.Key).
-				Update("value", s.Value).Error; err != nil {
-				return err
+			var existing domain.SchoolSetting
+			if err := tx.Where("key = ?", s.Key).First(&existing).Error; err != nil {
+				s.IsAdminEdit = true
+				if err := tx.Create(&s).Error; err != nil {
+					return err
+				}
+			} else {
+				if err := tx.Model(&domain.SchoolSetting{}).
+					Where("key = ?", s.Key).
+					Update("value", s.Value).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil

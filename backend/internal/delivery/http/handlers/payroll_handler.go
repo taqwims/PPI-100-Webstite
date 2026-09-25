@@ -107,7 +107,50 @@ func (h *PayrollHandler) Pay(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Payroll paid successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Status gaji berhasil diubah menjadi Lunas"})
+}
+
+type PostToBKURequest struct {
+	Month      int    `json:"month"`
+	Year       int    `json:"year"`
+	FundSource string `json:"fund_source"`
+}
+
+func (h *PayrollHandler) PostToBKU(c *gin.Context) {
+	var req PostToBKURequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	entry, err := h.payrollUsecase.PostPayrollToBKU(req.Month, req.Year, req.FundSource)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Total gaji berhasil diposting ke Buku Kas Umum (BKU)",
+		"entry":   entry,
+	})
+}
+
+func (h *PayrollHandler) GetBKUStatus(c *gin.Context) {
+	monthStr := c.Query("month")
+	yearStr := c.Query("year")
+	month, _ := strconv.Atoi(monthStr)
+	year, _ := strconv.Atoi(yearStr)
+
+	posted, entry, err := h.payrollUsecase.GetBKUPostingStatus(month, year)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"posted": posted,
+		"entry":  entry,
+	})
 }
 
 func (h *PayrollHandler) GetTemplates(c *gin.Context) {
@@ -123,7 +166,6 @@ func (h *PayrollHandler) GetTemplateByUserID(c *gin.Context) {
 	userID := c.Param("userId")
 	template, err := h.payrollUsecase.GetPayrollTemplateByUserID(userID)
 	if err != nil {
-		// Return 404 if not found, instead of 500
 		c.JSON(http.StatusNotFound, gin.H{"error": "Template not found"})
 		return
 	}
