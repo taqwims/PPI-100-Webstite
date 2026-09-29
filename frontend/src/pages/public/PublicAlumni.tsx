@@ -5,6 +5,8 @@ import CardGlass from '../../components/ui/glass/CardGlass';
 import { Quote, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import { useFeatureStore } from '../../store/featureStore';
+
 interface Alumni {
     id: number;
     name: string;
@@ -15,6 +17,7 @@ interface Alumni {
 }
 
 const PublicAlumni: React.FC = () => {
+    const { school } = useFeatureStore();
     const { data: alumni, isLoading } = useQuery({
         queryKey: ['public-alumni'],
         queryFn: async () => {
@@ -22,6 +25,13 @@ const PublicAlumni: React.FC = () => {
             return response.data;
         }
     });
+
+    const pageTitle = school.alumni_page_title || 'Kisah Alumni';
+    const pageDesc = school.alumni_page_desc || 'Inspirasi dari para alumni yang telah berkiprah di berbagai bidang, membawa nilai-nilai luhur ke masyarakat luas.';
+
+    const words = pageTitle.split(' ');
+    const highlightWord = words.length > 1 ? words.pop() : '';
+    const mainTitle = words.join(' ');
 
     return (
         <div className="space-y-20 pb-24">
@@ -39,8 +49,7 @@ const PublicAlumni: React.FC = () => {
                         transition={{ duration: 0.8 }}
                         className="text-5xl lg:text-7xl font-bold mb-6"
                     >
-                        <span className="text-slate-900">Kisah</span> <br />
-                        <span className="text-gradient-primary">Alumni</span>
+                        <span className="text-slate-900">{mainTitle || pageTitle}</span> {highlightWord && <><br /><span className="text-gradient-primary">{highlightWord}</span></>}
                     </motion.h1>
                     <motion.p
                         initial={{ opacity: 0, y: 30 }}
@@ -48,7 +57,7 @@ const PublicAlumni: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Inspirasi dari para alumni yang telah berkiprah di berbagai bidang, membawa nilai-nilai pesantren ke masyarakat luas.
+                        {pageDesc}
                     </motion.p>
                 </div>
             </section>

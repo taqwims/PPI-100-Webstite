@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { User, School, Phone, CreditCard, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, School, Phone, CreditCard, Send, CheckCircle2, AlertCircle, Calendar, FileCheck, MessageCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import InputGlass from '../../components/ui/glass/InputGlass';
 import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useFeatureStore } from '../../store/featureStore';
 
 const PPDB: React.FC = () => {
+    const { school } = useFeatureStore();
     const [formData, setFormData] = useState({
         name: '',
         nisn: '',
@@ -19,6 +21,15 @@ const PPDB: React.FC = () => {
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const heroBadge = school.ppdb_hero_badge || 'Penerimaan Santri Baru';
+    const heroTitle1 = school.ppdb_hero_title_1 || 'Bergabunglah Menjadi';
+    const heroTitle2 = school.ppdb_hero_title_2 || 'Bagian Dari Kami';
+    const heroDesc = school.ppdb_hero_desc || `Isi formulir di bawah ini untuk mendaftarkan putra-putri Anda di ${school.name || 'lembaga pendidikan kami'}.`;
+
+    const scheduleInfo = school.ppdb_schedule_info || "Gelombang 1: 1 Januari - 31 Maret\nGelombang 2: 1 April - 30 Juni\nTes Seleksi & Wawancara: Setiap Hari Sabtu";
+    const requirementsInfo = school.ppdb_requirements_info || "1. Mengisi Formulir Pendaftaran Online\n2. Fotokopi Akta Kelahiran & Kartu Keluarga (KK)\n3. Pas Foto Berwarna 3x4 (2 lembar)\n4. Surat Keterangan Lulus / Ijazah dari sekolah sebelumnya";
+    const contactWA = school.ppdb_contact_wa || school.phone || '+62 812-3456-7890';
 
     // Fetch units dynamically
     const { data: units } = useQuery({
@@ -45,10 +56,16 @@ const PPDB: React.FC = () => {
         }
     };
 
+    const cleanWANumber = (num: string) => {
+        const cleaned = num.replace(/[^0-9]/g, '');
+        if (cleaned.startsWith('0')) return '62' + cleaned.substring(1);
+        return cleaned;
+    };
+
     return (
-        <div className="space-y-20 pb-24">
+        <div className="space-y-16 pb-24">
             {/* Hero Section */}
-            <section className="relative pt-20 pb-10 overflow-hidden">
+            <section className="relative pt-20 pb-6 overflow-hidden">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
                     <div className="absolute top-20 right-20 w-72 h-72 bg-purple-600/10 rounded-full blur-[100px] animate-pulse" />
                     <div className="absolute bottom-20 left-20 w-96 h-96 bg-indigo-600/10 rounded-full blur-[100px] animate-pulse delay-1000" />
@@ -61,7 +78,7 @@ const PPDB: React.FC = () => {
                         transition={{ duration: 0.6 }}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/40 border border-slate-200 backdrop-blur-md shadow-sm mb-8"
                     >
-                        <span className="text-sm font-medium text-slate-600 tracking-wide uppercase">Penerimaan Santri Baru</span>
+                        <span className="text-sm font-medium text-slate-600 tracking-wide uppercase">{heroBadge}</span>
                     </motion.div>
 
                     <motion.h1
@@ -70,8 +87,8 @@ const PPDB: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-5xl lg:text-7xl font-bold mb-6"
                     >
-                        <span className="text-slate-900">Bergabunglah Menjadi</span> <br />
-                        <span className="text-gradient-primary">Bagian Dari Kami</span>
+                        <span className="text-slate-900">{heroTitle1}</span> <br />
+                        <span className="text-gradient-primary">{heroTitle2}</span>
                     </motion.h1>
 
                     <motion.p
@@ -80,9 +97,48 @@ const PPDB: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.4 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Isi formulir di bawah ini untuk mendaftarkan putra-putri Anda di SDIT An-Nur.
+                        {heroDesc}
                     </motion.p>
                 </div>
+            </section>
+
+            {/* Information Cards (Jadwal & Syarat) */}
+            <section className="container mx-auto px-6 max-w-5xl">
+                <div className="grid md:grid-cols-2 gap-6">
+                    <CardGlass className="p-6">
+                        <div className="flex items-center gap-3 mb-4 text-emerald-600">
+                            <Calendar size={24} />
+                            <h3 className="text-lg font-bold text-slate-800">Gelombang & Jadwal Pendaftaran</h3>
+                        </div>
+                        <div className="text-sm text-slate-600 space-y-2 whitespace-pre-line leading-relaxed">
+                            {scheduleInfo}
+                        </div>
+                    </CardGlass>
+
+                    <CardGlass className="p-6">
+                        <div className="flex items-center gap-3 mb-4 text-purple-600">
+                            <FileCheck size={24} />
+                            <h3 className="text-lg font-bold text-slate-800">Persyaratan Pendaftaran</h3>
+                        </div>
+                        <div className="text-sm text-slate-600 space-y-2 whitespace-pre-line leading-relaxed">
+                            {requirementsInfo}
+                        </div>
+                    </CardGlass>
+                </div>
+
+                {contactWA && (
+                    <div className="mt-6 text-center">
+                        <a
+                            href={`https://wa.me/${cleanWANumber(contactWA)}?text=Halo%20Admin%20PPDB,%20saya%20ingin%20bertanya%20seputar%20pendaftaran.`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold hover:bg-emerald-100 transition shadow-sm"
+                        >
+                            <MessageCircle size={18} />
+                            <span>Butuh Bantuan? Chat Panitia PPDB via WhatsApp ({contactWA})</span>
+                        </a>
+                    </div>
+                )}
             </section>
 
             {/* Form Section */}
@@ -125,6 +181,11 @@ const PPDB: React.FC = () => {
                                     onSubmit={handleSubmit}
                                     className="space-y-8"
                                 >
+                                    <div className="border-b border-slate-200 pb-3">
+                                        <h3 className="text-xl font-bold text-slate-800">Formulir Pendaftaran Online</h3>
+                                        <p className="text-xs text-slate-500">Lengkapi data calon santri / peserta didik baru dengan benar</p>
+                                    </div>
+
                                     {error && (
                                         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-red-400">
                                             <AlertCircle size={20} className="shrink-0 mt-0.5" />

@@ -6,8 +6,21 @@ import { MapPin, Phone, Mail, Send, Clock } from 'lucide-react';
 import api from '../../services/api';
 import { useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { useFeatureStore } from '../../store/featureStore';
 
 const PublicContact: React.FC = () => {
+    const { school } = useFeatureStore();
+
+    const heroTitle1 = school.contact_hero_title_1 || 'Hubungi';
+    const heroTitle2 = school.contact_hero_title_2 || 'Kami';
+    const heroDesc = school.contact_hero_desc || `Kami siap membantu menjawab pertanyaan Anda seputar ${school.name || 'lembaga kami'}.`;
+
+    const address = school.address || school.school_address || 'Jl. Raya Banjarsari No. 100, Kec. Banjarsari, Kab. Ciamis, Jawa Barat 46383';
+    const phone = school.phone || school.school_phone || '+62 812-3456-7890';
+    const email = school.email || school.school_email || 'info@sekolah.sch.id';
+    const workingHours = school.contact_working_hours || 'Sabtu - Kamis: 07.00 - 16.00 WIB\nJumat: Libur';
+    const mapsEmbed = school.contact_maps_embed || 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3955.8361602579007!2d108.6082958!3d-7.4833368!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e658ff346b000e5%3A0x1474cc840c47253f!2sSDIT%20AN-NUR%20BANJARSARI!5e0!3m2!1sen!2sid!4v1776839051104!5m2!1sen!2sid';
+
     const { mutate: submitContact, isPending } = useMutation({
         mutationFn: async (data: any) => {
             return await api.post('/public/contact', data);
@@ -35,8 +48,8 @@ const PublicContact: React.FC = () => {
                         transition={{ duration: 0.8 }}
                         className="text-5xl lg:text-7xl font-bold mb-6"
                     >
-                        <span className="text-slate-900">Hubungi</span> <br />
-                        <span className="text-gradient-primary">Kami</span>
+                        <span className="text-slate-900">{heroTitle1}</span> <br />
+                        <span className="text-gradient-primary">{heroTitle2}</span>
                     </motion.h1>
                     <motion.p
                         initial={{ opacity: 0, y: 30 }}
@@ -44,7 +57,7 @@ const PublicContact: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Kami siap membantu menjawab pertanyaan Anda seputar SDIT An-Nur.
+                        {heroDesc}
                     </motion.p>
                 </div>
             </section>
@@ -70,10 +83,8 @@ const PublicContact: React.FC = () => {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-1">Alamat</h4>
-                                        <p className="text-slate-600 leading-relaxed">
-                                            Jl. Raya Banjarsari No. 100,<br />
-                                            Kec. Banjarsari, Kab. Ciamis,<br />
-                                            Jawa Barat 46383
+                                        <p className="text-slate-600 leading-relaxed whitespace-pre-line">
+                                            {address}
                                         </p>
                                     </div>
                                 </div>
@@ -84,7 +95,7 @@ const PublicContact: React.FC = () => {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-1">Telepon / WhatsApp</h4>
-                                        <p className="text-slate-600">+62 812-3456-7890</p>
+                                        <p className="text-slate-600">{phone}</p>
                                     </div>
                                 </div>
 
@@ -94,7 +105,7 @@ const PublicContact: React.FC = () => {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-1">Email</h4>
-                                        <p className="text-slate-600">info@ppi100banjarsari.sch.id</p>
+                                        <p className="text-slate-600">{email}</p>
                                     </div>
                                 </div>
 
@@ -104,26 +115,27 @@ const PublicContact: React.FC = () => {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-1">Jam Operasional</h4>
-                                        <p className="text-slate-600">Sabtu - Kamis: 07.00 - 16.00 WIB</p>
-                                        <p className="text-slate-600">Jumat: <b>Libur</b></p>
+                                        <p className="text-slate-600 whitespace-pre-line">{workingHours}</p>
                                     </div>
                                 </div>
                             </div>
                         </CardGlass>
 
-                        {/* Map Placeholder */}
-                        <div className="h-64 rounded-3xl overflow-hidden glass-panel border border-white/10 relative">
-                            <iframe
-                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3955.8361602579007!2d108.6082958!3d-7.4833368!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e658ff346b000e5%3A0x1474cc840c47253f!2sSDIT%20AN-NUR%20BANJARSARI!5e0!3m2!1sen!2sid!4v1776839051104!5m2!1sen!2sid"
-                                width="100%"
-                                height="100%"
-                                style={{ border: 0 }}
-                                allowFullScreen
-                                loading="lazy"
-                                title="Map"
-                                className="opacity-80 hover:opacity-100 transition-opacity"
-                            />
-                        </div>
+                        {/* Map */}
+                        {mapsEmbed && (
+                            <div className="h-64 rounded-3xl overflow-hidden glass-panel border border-white/10 relative">
+                                <iframe
+                                    src={mapsEmbed}
+                                    width="100%"
+                                    height="100%"
+                                    style={{ border: 0 }}
+                                    allowFullScreen
+                                    loading="lazy"
+                                    title="Map"
+                                    className="opacity-80 hover:opacity-100 transition-opacity"
+                                />
+                            </div>
+                        )}
                     </motion.div>
 
                     {/* Form */}

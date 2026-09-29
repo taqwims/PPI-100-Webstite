@@ -23,6 +23,29 @@ const Home: React.FC = () => {
     const ctaDesc = school.landing_cta_desc || "Pendaftaran Santri Baru Tahun Ajaran 2025/2026 telah dibuka. Segera daftarkan putra-putri Anda.";
     const aboutDesc = school.landing_about_desc || "Fasilitas modern dan kurikulum terintegrasi untuk mendukung perkembangan santri secara holistik.";
 
+    const features = [
+        {
+            icon: BookOpen,
+            title: school.landing_feature_1_title || "Kurikulum Terpadu",
+            desc: school.landing_feature_1_desc || "Memadukan kurikulum nasional (Kemendikbud) dan kepesantrenan untuk keseimbangan ilmu dunia dan akhirat."
+        },
+        {
+            icon: Users,
+            title: school.landing_feature_2_title || "Pembinaan Karakter",
+            desc: school.landing_feature_2_desc || "Program pembinaan akhlak, adab, dan kepemimpinan yang intensif 24 jam dalam lingkungan asrama."
+        },
+        {
+            icon: Calendar,
+            title: school.landing_feature_3_title || "Ekstrakurikuler",
+            desc: school.landing_feature_3_desc || "Beragam kegiatan untuk mengembangkan minat dan bakat santri, mulai dari olahraga, seni, hingga teknologi."
+        }
+    ];
+
+    const ctaBtn1Text = school.landing_cta_btn1_text || "Daftar Sekarang";
+    const ctaBtn1Link = school.landing_cta_btn1_link || "/ppdb";
+    const ctaBtn2Text = school.landing_cta_btn2_text || "Hubungi Kami";
+    const ctaBtn2Link = school.landing_cta_btn2_link || "/contact";
+
     return (
         <div className="space-y-0 pb-24">
             {/* Hero Section with Slider */}
@@ -42,11 +65,7 @@ const Home: React.FC = () => {
                 </motion.div>
 
                 <div className="grid md:grid-cols-3 gap-8">
-                    {[
-                        { icon: BookOpen, title: "Kurikulum Terpadu", desc: "Memadukan kurikulum nasional (Kemendikbud) dan kepesantrenan untuk keseimbangan ilmu dunia dan akhirat." },
-                        { icon: Users, title: "Pembinaan Karakter", desc: "Program pembinaan akhlak, adab, dan kepemimpinan yang intensif 24 jam dalam lingkungan asrama." },
-                        { icon: Calendar, title: "Ekstrakurikuler", desc: "Beragam kegiatan untuk mengembangkan minat dan bakat santri, mulai dari olahraga, seni, hingga teknologi." }
-                    ].map((feature, idx) => (
+                    {features.map((feature, idx) => (
                         <motion.div
                             key={idx}
                             initial={{ opacity: 0, y: 50 }}
@@ -85,14 +104,14 @@ const Home: React.FC = () => {
                         <p className="text-xl text-slate-600">{ctaDesc}</p>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-                            <Link to="/ppdb">
+                            <Link to={ctaBtn1Link}>
                                 <button className="glass-button-primary w-full sm:w-auto text-lg px-10 py-4">
-                                    Daftar Sekarang
+                                    {ctaBtn1Text}
                                 </button>
                             </Link>
-                            <Link to="/contact">
+                            <Link to={ctaBtn2Link}>
                                 <button className="glass-button w-full sm:w-auto text-lg px-10 py-4">
-                                    Hubungi Kami
+                                    {ctaBtn2Text}
                                 </button>
                             </Link>
                         </div>

@@ -59,9 +59,6 @@ import ParentChildBK from './pages/parent/ParentChildBK';
 import AdminNotificationManagement from './pages/admin/AdminNotificationManagement';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import AdminPPDB from './pages/admin/AdminPPDB';
-import AdminAlumni from './pages/admin/AdminAlumni';
-import AdminPublicTeachers from './pages/admin/AdminPublicTeachers';
-import AdminDownloads from './pages/admin/AdminDownloads';
 import AdminPublicContent from './pages/admin/AdminPublicContent';
 import BulkImport from './pages/admin/BulkImport';
 import Assets from './pages/admin/Assets';
@@ -133,14 +130,15 @@ function App() {
                                     <Route path="notifications" element={<Notifications />} />
                                     <Route path="ppdb" element={<AdminPPDB />} />
                                     <Route path="public-content" element={<AdminPublicContent />} />
+                                    <Route path="admin/public-content" element={<AdminPublicContent />} />
                                     <Route path="admin/notifications" element={<AdminNotificationManagement />} />
                                     <Route path="admin/contacts" element={<AdminContactMessages />} />
                                     <Route path="admin/finance" element={<Finance />} />
                                     <Route path="admin/elearning" element={<Elearning />} />
                                     <Route path="admin/ppdb" element={<AdminPPDB />} />
-                                    <Route path="admin/alumni" element={<AdminAlumni />} />
-                                    <Route path="admin/teachers" element={<AdminPublicTeachers />} />
-                                    <Route path="admin/downloads" element={<AdminDownloads />} />
+                                    <Route path="admin/alumni" element={<AdminPublicContent />} />
+                                    <Route path="admin/teachers" element={<AdminPublicContent />} />
+                                    <Route path="admin/downloads" element={<AdminPublicContent />} />
                                     <Route path="admin/bk" element={<BK />} />
                                     <Route path="admin/bulk-import" element={
                                         <RoleRoute allowedRoles={[1, 2, 3]}>

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"strings"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 )
@@ -50,11 +51,27 @@ func (u *SchoolSettingUsecase) GetSchoolInfo() map[string]string {
 		"enable_rfid_attendance": "enable_rfid_attendance",
 	}
 
+	sensitiveKeywords := []string{"secret", "server_key", "token", "password", "device_api_key"}
+
 	for _, s := range settings {
+		// Check if setting is sensitive
+		isSensitive := false
+		for _, kw := range sensitiveKeywords {
+			if strings.Contains(strings.ToLower(s.Key), kw) {
+				// Don't hide public keys
+				if !strings.Contains(strings.ToLower(s.Key), "public_key") && !strings.Contains(strings.ToLower(s.Key), "client_key") {
+					isSensitive = true
+					break
+				}
+			}
+		}
+
+		if !isSensitive {
+			info[s.Key] = s.Value
+		}
+
 		if alias, ok := keyMap[s.Key]; ok {
 			info[alias] = s.Value
-		} else if len(s.Key) > 8 && s.Key[:8] == "landing_" {
-			info[s.Key] = s.Value
 		}
 	}
 

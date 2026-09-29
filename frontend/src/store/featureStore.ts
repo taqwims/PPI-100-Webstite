@@ -35,6 +35,8 @@ interface SchoolInfo {
     phone: string;
     email: string;
     npsn: string;
+
+    // Landing Page
     landing_hero_title?: string;
     landing_hero_subtitle?: string;
     landing_slide_1_image?: string;
@@ -54,8 +56,69 @@ interface SchoolInfo {
     landing_slide_3_link?: string;
     landing_about_title?: string;
     landing_about_desc?: string;
+    landing_feature_1_title?: string;
+    landing_feature_1_desc?: string;
+    landing_feature_2_title?: string;
+    landing_feature_2_desc?: string;
+    landing_feature_3_title?: string;
+    landing_feature_3_desc?: string;
     landing_cta_title?: string;
     landing_cta_desc?: string;
+    landing_cta_btn1_text?: string;
+    landing_cta_btn1_link?: string;
+    landing_cta_btn2_text?: string;
+    landing_cta_btn2_link?: string;
+
+    // Profile Page
+    profile_hero_badge?: string;
+    profile_hero_title_1?: string;
+    profile_hero_title_2?: string;
+    profile_hero_desc?: string;
+    profile_visi_title?: string;
+    profile_visi_text?: string;
+    profile_misi_title?: string;
+    profile_misi_points?: string;
+    profile_sejarah_badge?: string;
+    profile_sejarah_title?: string;
+    profile_sejarah_p1?: string;
+    profile_sejarah_p2?: string;
+    profile_stat_1_val?: string;
+    profile_stat_1_label?: string;
+    profile_stat_2_val?: string;
+    profile_stat_2_label?: string;
+    profile_stat_3_val?: string;
+    profile_stat_3_label?: string;
+    profile_stat_4_val?: string;
+    profile_stat_4_label?: string;
+
+    // PPDB Page
+    ppdb_hero_badge?: string;
+    ppdb_hero_title_1?: string;
+    ppdb_hero_title_2?: string;
+    ppdb_hero_desc?: string;
+    ppdb_schedule_info?: string;
+    ppdb_requirements_info?: string;
+    ppdb_contact_wa?: string;
+
+    // Contact, Footer & Social Media
+    contact_hero_title_1?: string;
+    contact_hero_title_2?: string;
+    contact_hero_desc?: string;
+    contact_working_hours?: string;
+    contact_maps_embed?: string;
+    teachers_page_title?: string;
+    teachers_page_desc?: string;
+    downloads_page_title?: string;
+    downloads_page_desc?: string;
+    alumni_page_title?: string;
+    alumni_page_desc?: string;
+    social_instagram?: string;
+    social_facebook?: string;
+    social_youtube?: string;
+    social_tiktok?: string;
+    social_whatsapp?: string;
+    footer_copyright?: string;
+
     active_payment_gateway?: string;
     midtrans_client_key?: string;
     xendit_public_key?: string;

@@ -6,6 +6,8 @@ import ButtonGlass from '../../components/ui/glass/ButtonGlass';
 import { Download, FileText, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import { useFeatureStore } from '../../store/featureStore';
+
 interface DownloadItem {
     id: number;
     title: string;
@@ -15,6 +17,7 @@ interface DownloadItem {
 }
 
 const PublicDownloads: React.FC = () => {
+    const { school } = useFeatureStore();
     const { data: downloads, isLoading } = useQuery({
         queryKey: ['public-downloads'],
         queryFn: async () => {
@@ -22,6 +25,13 @@ const PublicDownloads: React.FC = () => {
             return response.data;
         }
     });
+
+    const pageTitle = school.downloads_page_title || 'Pusat Unduhan';
+    const pageDesc = school.downloads_page_desc || `Akses berbagai dokumen penting, brosur, dan kalender akademik ${school.name || 'sekolah'}.`;
+
+    const words = pageTitle.split(' ');
+    const highlightWord = words.length > 1 ? words.pop() : '';
+    const mainTitle = words.join(' ');
 
     const getIcon = (category: string) => {
         switch (category.toLowerCase()) {
@@ -46,8 +56,7 @@ const PublicDownloads: React.FC = () => {
                         transition={{ duration: 0.8 }}
                         className="text-5xl lg:text-7xl font-bold mb-6"
                     >
-                        <span className="text-slate-900">Pusat</span> <br />
-                        <span className="text-gradient-primary">Unduhan</span>
+                        <span className="text-slate-900">{mainTitle || pageTitle}</span> {highlightWord && <><br /><span className="text-gradient-primary">{highlightWord}</span></>}
                     </motion.h1>
                     <motion.p
                         initial={{ opacity: 0, y: 30 }}
@@ -55,7 +64,7 @@ const PublicDownloads: React.FC = () => {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
                     >
-                        Akses berbagai dokumen penting, brosur, dan kalender akademik SDIT An-Nur Banjarsari.
+                        {pageDesc}
                     </motion.p>
                 </div>
             </section>

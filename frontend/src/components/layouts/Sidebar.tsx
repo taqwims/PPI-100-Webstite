@@ -4,7 +4,7 @@ import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
     Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers,
-    Radio
+    Radio, Globe
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -72,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const adminContent: MenuGroup = {
             title: 'Konten & Komunikasi',
             items: [
+                { icon: Globe, label: 'Konten Publik (Web)', path: '/dashboard/public-content' },
                 { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
                 { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
             ]
@@ -224,6 +225,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const transactionalTellerKonten: MenuGroup = {
             title: 'Konten & Komunikasi',
             items: [
+                { icon: Globe, label: 'Konten Publik (Web)', path: '/dashboard/public-content' },
                 { icon: Bell, label: 'Notifikasi', path: '/dashboard/notifications' },
                 { icon: Mail, label: 'Pesan Masuk', path: '/dashboard/admin/contacts' },
             ]

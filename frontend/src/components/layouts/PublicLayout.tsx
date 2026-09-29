@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import NavbarGlass from '../ui/glass/NavbarGlass';
 import PWAPrompt from '../ui/PWAPrompt';
 
+import { useFeatureStore } from '../../store/featureStore';
+
 interface PublicLayoutProps {
     children: React.ReactNode;
 }
@@ -10,6 +12,19 @@ interface PublicLayoutProps {
 const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
     const location = useLocation();
     const isHome = location.pathname === '/';
+    const { school } = useFeatureStore();
+
+    const currentYear = new Date().getFullYear();
+    const defaultCopyright = `© ${currentYear} ${school.name || 'SDIT An-Nur Banjarsari'}. All rights reserved.`;
+    const copyrightText = school.footer_copyright || defaultCopyright;
+
+    const socialLinks = [
+        { name: 'Instagram', url: school.social_instagram },
+        { name: 'Facebook', url: school.social_facebook },
+        { name: 'YouTube', url: school.social_youtube },
+        { name: 'TikTok', url: school.social_tiktok },
+        { name: 'WhatsApp', url: school.social_whatsapp ? `https://wa.me/${school.social_whatsapp.replace(/[^0-9]/g, '')}` : '' },
+    ].filter(s => !!s.url);
 
     return (
         <div className="min-h-screen relative">
@@ -29,13 +44,23 @@ const PublicLayout: React.FC<PublicLayoutProps> = ({ children }) => {
                 <div className="container mx-auto px-6 py-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="text-slate-500 text-sm">
-                            © 2026 SDIT An-Nur Banjar­sari. All rights reserved.
+                            {copyrightText}
                         </div>
-                        <div className="flex gap-6">
-                            <a href="https://www.instagram.com/ppi100banjarsari_?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank" className="text-slate-400 hover:text-green-600 transition-colors">Instagram</a>
-                            <a href="https://www.facebook.com/ppi100banjarsari" target="_blank" className="text-slate-400 hover:text-green-600 transition-colors">Facebook</a>
-                            <a href="https://www.youtube.com/@ppi100banjarsari" target="_blank" className="text-slate-400 hover:text-green-600 transition-colors">YouTube</a>
-                        </div>
+                        {socialLinks.length > 0 && (
+                            <div className="flex flex-wrap gap-6">
+                                {socialLinks.map((s, idx) => (
+                                    <a
+                                        key={idx}
+                                        href={s.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-slate-400 hover:text-green-600 transition-colors text-sm font-medium"
+                                    >
+                                        {s.name}
+                                    </a>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </footer>
