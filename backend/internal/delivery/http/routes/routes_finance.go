@@ -95,6 +95,7 @@ func RegisterFinanceRoutes(
 			finance.DELETE("/student-obligations/bulk", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.BulkDelete)
 			finance.DELETE("/student-obligations/:id", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.Delete)
 			finance.POST("/student-obligations/:id/pay", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.RecordPayment)
+			finance.POST("/student-obligations/:id/reset-payment", middleware.RoleMiddleware(1, 9, 11), studentObligationHandler.ResetPayment)
 		}
 
 		// ── Savings (Tabungan Siswa) ──

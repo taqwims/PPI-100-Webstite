@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, CheckCircle, Edit2, Trash2, Calendar } from 'lucide-react';
+import { FileText, CheckCircle, Edit2, Trash2, Calendar, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 import { GroupedStudentAmount, Obligation, AcademicYear } from './types';
 
@@ -28,12 +28,13 @@ interface Props {
     setEditAmount: (amount: string) => void;
     handleDelete: (id: string, e?: React.MouseEvent) => void;
     handleBulkDeleteGroup: (ids: string[], typeName: string, e?: React.MouseEvent) => void;
+    handleResetPayment: (id: string, e?: React.MouseEvent) => void;
     handlePrintReceipt: (params: any) => void;
 }
 
 export const StudentObligationsExpanded: React.FC<Props> = ({
     group, academicYears, filterYearId, canManage,
-    setPayingOb, setPayAmount, setEditingOb, setEditAmount, handleDelete, handleBulkDeleteGroup, handlePrintReceipt
+    setPayingOb, setPayAmount, setEditingOb, setEditAmount, handleDelete, handleBulkDeleteGroup, handleResetPayment, handlePrintReceipt
 }) => {
     const byType: Record<string, Obligation[]> = {};
     group.obligations.forEach(ob => {
@@ -128,18 +129,27 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase leading-none">{monthName.slice(0, 3)}</p>
                                                     <div className="mt-1">
                                                         <p className={clsx('text-[10px] font-bold', isPaid ? 'text-emerald-600' : isPartial ? 'text-amber-600' : 'text-red-600')}>
-                                                            {isPaid ? 'LUNAS' : isPartial ? `${Math.round((ob.paid_amount / ob.amount) * 100)}%` : 'BELUM'}
+                                                             {isPaid ? 'LUNAS' : isPartial ? `${Math.round((ob.paid_amount / ob.amount) * 100)}%` : 'BELUM'}
                                                         </p>
                                                         <p className="text-[9px] text-slate-400 mt-0.5">{formatCurrency(ob.amount / 1000)}k</p>
                                                     </div>
 
                                                     {canManage && (
-                                                        <div className="flex items-center justify-center gap-1 mt-1.5 pt-1 border-t border-black/5">
+                                                        <div className="flex items-center justify-center gap-1.5 mt-1.5 pt-1 border-t border-black/5">
                                                             {!isPaid && (
                                                                 <>
                                                                     <button onClick={(e) => { e.stopPropagation(); setPayingOb(ob); setPayAmount(String(ob.amount - ob.paid_amount)); }} className="text-[10px] hover:scale-110 transition" title="Bayar">💵</button>
                                                                     <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[10px] hover:scale-110 transition" title="Ubah Nominal">✏️</button>
                                                                 </>
+                                                            )}
+                                                            {(isPaid || isPartial) && (
+                                                                <button 
+                                                                    onClick={(e) => handleResetPayment(ob.id, e)} 
+                                                                    className="text-amber-600 hover:text-amber-800 hover:scale-110 transition p-0.5" 
+                                                                    title="Batalkan Pembayaran / Kembalikan ke Tagihan"
+                                                                >
+                                                                    <RotateCcw size={11} />
+                                                                </button>
                                                             )}
                                                             <button onClick={(e) => handleDelete(ob.id, e)} className="text-[10px] hover:scale-110 transition" title="Hapus">🗑️</button>
                                                         </div>
@@ -178,6 +188,15 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                             <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="bg-blue-100 text-blue-600 px-2 py-1.5 rounded-lg hover:bg-blue-200 transition" title="Edit Nominal"><Edit2 size={14} /></button>
                                                         </>
                                                     )}
+                                                    {(isPaid || isPartial) && (
+                                                        <button 
+                                                            onClick={(e) => handleResetPayment(ob.id, e)} 
+                                                            className="flex-1 flex items-center justify-center gap-1 text-xs bg-amber-100 text-amber-800 py-1.5 rounded-lg hover:bg-amber-200 font-medium transition" 
+                                                            title="Batalkan Pembayaran / Kembalikan ke Tagihan"
+                                                        >
+                                                            <RotateCcw size={12} /> Batal Bayar
+                                                        </button>
+                                                    )}
                                                     <button onClick={(e) => handleDelete(ob.id, e)} className="bg-red-100 text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-200 transition" title="Hapus"><Trash2 size={14} /></button>
                                                 </div>
                                             )}
@@ -213,6 +232,15 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                                 <button onClick={(e) => { e.stopPropagation(); setEditingOb(ob); setEditAmount(String(ob.amount)); }} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-1 rounded hover:bg-blue-200" title="Edit Nominal"><Edit2 size={10} /></button>
                                                             </>
                                                         )}
+                                                        {(isPaid || isPartial) && (
+                                                            <button 
+                                                                onClick={(e) => handleResetPayment(ob.id, e)} 
+                                                                className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-1 rounded hover:bg-amber-200 flex items-center gap-0.5" 
+                                                                title="Batalkan Pembayaran / Kembalikan ke Tagihan"
+                                                            >
+                                                                <RotateCcw size={10} /> Batal
+                                                            </button>
+                                                        )}
                                                         <button onClick={(e) => handleDelete(ob.id, e)} className="text-[10px] bg-red-100 text-red-700 px-1.5 py-1 rounded hover:bg-red-200" title="Hapus"><Trash2 size={10} /></button>
                                                     </div>
                                                 )}
@@ -240,6 +268,15 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                             {(ob.status === 'Paid' || ob.status === 'Partial') && (
                                                 <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: ob.paid_amount }); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Cetak Kuitansi">
                                                     <FileText size={16} />
+                                                </button>
+                                            )}
+                                            {(ob.status === 'Paid' || ob.status === 'Partial') && canManage && (
+                                                <button 
+                                                    onClick={(e) => handleResetPayment(ob.id, e)} 
+                                                    className="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition" 
+                                                    title="Batalkan Pembayaran / Kembalikan ke Tagihan"
+                                                >
+                                                    <RotateCcw size={16} />
                                                 </button>
                                             )}
                                             {canManage && ob.status !== 'Paid' && (

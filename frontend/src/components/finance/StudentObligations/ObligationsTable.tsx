@@ -18,6 +18,7 @@ interface Props {
     setEditAmount: (amount: string) => void;
     handleDelete: (id: string, e?: React.MouseEvent) => void;
     handleBulkDeleteGroup: (ids: string[], typeName: string, e?: React.MouseEvent) => void;
+    handleResetPayment: (id: string, e?: React.MouseEvent) => void;
     handlePrintReceipt: (params: any) => void;
 }
 
@@ -119,6 +120,7 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                                                 setEditAmount={props.setEditAmount}
                                                 handleDelete={props.handleDelete}
                                                 handleBulkDeleteGroup={props.handleBulkDeleteGroup}
+                                                handleResetPayment={props.handleResetPayment}
                                                 handlePrintReceipt={props.handlePrintReceipt}
                                             />
                                         </td>

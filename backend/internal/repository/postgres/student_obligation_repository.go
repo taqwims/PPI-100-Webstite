@@ -125,6 +125,13 @@ func (r *StudentObligationRepository) RecordPayment(id uuid.UUID, amount float64
 	})
 }
 
+func (r *StudentObligationRepository) ResetPayment(id uuid.UUID) error {
+	return r.db.Model(&domain.StudentObligation{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"paid_amount": 0,
+		"status":      "Unpaid",
+	}).Error
+}
+
 // GetStudentsByClassID fetches all students in a class (helper)
 func (r *StudentObligationRepository) GetStudentsByClassID(classID uint) ([]domain.Student, error) {
 	var students []domain.Student

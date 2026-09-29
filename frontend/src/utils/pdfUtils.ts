@@ -595,6 +595,12 @@ interface BillReceiptData {
         class?: { name: string };
     };
     paid_at?: string;
+    payment_method?: string;
+    payments?: {
+        payment_method?: string;
+        status?: string;
+        amount?: number;
+    }[];
 }
 
 export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?: string[], format: 'A4' | 'A5' = 'A5') => {
@@ -647,8 +653,14 @@ export const generateBillReceipt = async (bill: BillReceiptData, selectedRoles?:
     doc.text('Detail Tagihan', labelX, y);
     y += 6;
 
+    const successPayments = (bill.payments || []).filter(p => p.status === 'Success');
+    const paymentMethod = bill.payment_method || 
+        (successPayments.length > 0 ? Array.from(new Set(successPayments.map(p => p.payment_method).filter(Boolean))).join(', ') : '') ||
+        'Tunai (Cash)';
+
     y = drawKeyValueRow(doc, 'Jenis', bill.bill_type || 'SPP', labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
     y = drawKeyValueRow(doc, 'Keterangan', bill.title, labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
+    y = drawKeyValueRow(doc, 'Metode Bayar', paymentMethod, labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
     y = drawKeyValueRow(doc, 'Jatuh Tempo', formatDate(bill.due_date), labelX, valueX, maxValWidth, y, format === 'A4' ? 9.5 : 8.5);
 
     y += 2;
@@ -780,6 +792,7 @@ interface ActivityObligationReceiptData {
     activityName?: string;
     amount: number;
     paidAt?: string;
+    paymentMethod?: string;
 }
 
 export const generateActivityObligationReceipt = async (data: ActivityObligationReceiptData, selectedRoles?: string[]) => {
@@ -828,6 +841,7 @@ export const generateActivityObligationReceipt = async (data: ActivityObligation
     if (data.activityName) {
         y = drawKeyValueRow(doc, 'Kegiatan', data.activityName, labelX, valueX, maxValWidth, y, 8.5);
     }
+    y = drawKeyValueRow(doc, 'Metode Bayar', data.paymentMethod || 'Tunai (Cash)', labelX, valueX, maxValWidth, y, 8.5);
     y = drawKeyValueRow(doc, 'Tanggal Bayar', formatDate(data.paidAt || dateStr), labelX, valueX, maxValWidth, y, 8.5);
 
     y += 2;
@@ -1102,6 +1116,7 @@ interface ObligationReceiptData {
     billingMonth?: number;
     installmentNumber?: number;
     totalInstallments?: number;
+    paymentMethod?: string;
 }
 
 export const generateObligationReceipt = async (data: ObligationReceiptData, selectedRoles?: string[], format: 'A4' | 'A5' = 'A5') => {
@@ -1132,6 +1147,7 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
     sY = drawKeyValueRow(doc, 'Siswa', data.studentName, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     sY = drawKeyValueRow(doc, 'Kelas', data.className, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     sY = drawKeyValueRow(doc, 'Jenis Bayar', data.paymentTypeName, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
+    sY = drawKeyValueRow(doc, 'Metode Bayar', data.paymentMethod || 'Tunai (Cash)', lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
 
     if (data.billingMonth && data.billingMonth > 0) {
         sY = drawKeyValueRow(doc, 'Bulan', monthNames[data.billingMonth] || '-', lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);

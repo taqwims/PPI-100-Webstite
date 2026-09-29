@@ -173,6 +173,26 @@ const StudentObligations = () => {
         }
     };
 
+    const handleResetPayment = async (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const targetOb = obligations.find(o => o.id === id);
+        if (!targetOb) return;
+
+        const confirmMsg = `⚠️ BATALKAN PEMBAYARAN:\n\nApakah Anda yakin ingin membatalkan status pembayaran untuk ${targetOb.student?.user?.name || 'siswa ini'} sebesar ${formatCurrency(targetOb.paid_amount)}?\n\nTindakan ini akan:\n1. Mengembalikan status tanggungan & tagihan menjadi Belum Bayar (Unpaid)\n2. Menghapus riwayat transaksi pembayaran terkait\n3. Menghapus pencatatan pemasukan di Buku Kas Umum (BKU)\n4. Mengurangi/membatalkan realisasi anggaran RKAS terkait\n\nLanjutkan pembatalan pembayaran?`;
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await api.post(`/finance/student-obligations/${id}/reset-payment`);
+            toast.success('Pembayaran berhasil dibatalkan. Tanggungan kembali aktif menjadi tagihan.');
+            fetchData();
+            invalidateBudgets();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.response?.data?.error || 'Gagal membatalkan pembayaran');
+        }
+    };
+
     const handlePrintReceipt = (params: any) => {
         setPrintParams(params);
         setIsPrintModalOpen(true);
@@ -304,6 +324,7 @@ const StudentObligations = () => {
                     setEditAmount={setEditAmount}
                     handleDelete={handleDelete}
                     handleBulkDeleteGroup={handleBulkDeleteGroup}
+                    handleResetPayment={handleResetPayment}
                     handlePrintReceipt={handlePrintReceipt}
                 />
             </div>

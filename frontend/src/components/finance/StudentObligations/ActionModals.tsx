@@ -23,12 +23,15 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
     editingOb, setEditingOb, editAmount, setEditAmount,
     onSuccess
 }) => {
+    const [payMethod, setPayMethod] = React.useState('Tunai (Cash)');
+
     const handlePay = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!payingOb) return;
         try {
             await api.post(`/finance/student-obligations/${payingOb.id}/pay`, {
-                amount: parseFloat(payAmount)
+                amount: parseFloat(payAmount),
+                payment_method: payMethod
             });
             toast.success('Pembayaran berhasil dicatat');
             setPayingOb(null);
@@ -36,6 +39,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
             onSuccess();
         } catch (err: any) {
             console.error(err);
+            toast.error(err.response?.data?.error || 'Gagal mencatat pembayaran');
         }
     };
 
@@ -51,6 +55,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
             onSuccess();
         } catch (err: any) {
             console.error(err);
+            toast.error(err.response?.data?.error || 'Gagal mengubah tanggungan');
         }
     };
 
@@ -68,6 +73,19 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                             <div className="bg-slate-50 p-3 rounded-xl">
                                 <p className="text-sm text-slate-700 font-medium">{payingOb.student?.user?.name}</p>
                                 <p className="text-xs text-slate-500">{payingOb.payment_type?.name} — Sisa: {formatCurrency(payingOb.amount - payingOb.paid_amount)}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Metode Pembayaran</label>
+                                <select 
+                                    value={payMethod} 
+                                    onChange={e => setPayMethod(e.target.value)} 
+                                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-medium bg-white"
+                                >
+                                    <option value="Tunai (Cash)">Tunai (Cash)</option>
+                                    <option value="Transfer Bank">Transfer Bank</option>
+                                    <option value="Xendit">Xendit / Virtual Account</option>
+                                    <option value="Midtrans">Midtrans</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Jumlah Bayar (Rp)</label>

@@ -183,7 +183,8 @@ func (h *StudentObligationHandler) Delete(c *gin.Context) {
 }
 
 type RecordPaymentRequest struct {
-	Amount float64 `json:"amount" binding:"required"`
+	Amount        float64 `json:"amount" binding:"required"`
+	PaymentMethod string  `json:"payment_method"`
 }
 
 func (h *StudentObligationHandler) RecordPayment(c *gin.Context) {
@@ -200,12 +201,28 @@ func (h *StudentObligationHandler) RecordPayment(c *gin.Context) {
 		return
 	}
 
-	if err := h.usecase.RecordPayment(id, req.Amount); err != nil {
+	if err := h.usecase.RecordPayment(id, req.Amount, req.PaymentMethod); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Pembayaran berhasil dicatat"})
+}
+
+func (h *StudentObligationHandler) ResetPayment(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	if err := h.usecase.ResetPayment(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Pembayaran berhasil dibatalkan, tanggungan kembali aktif"})
 }
 
 func (h *StudentObligationHandler) BulkDelete(c *gin.Context) {
