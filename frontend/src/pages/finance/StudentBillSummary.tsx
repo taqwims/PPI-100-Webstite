@@ -151,6 +151,12 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
         },
     });
 
+    const getEffectivePaid = (o: Obligation) => {
+        const amount = o.amount || 0;
+        if (o.status === 'Paid') return amount;
+        return Math.min(Math.max(o.paid_amount || 0, 0), amount);
+    };
+
     // Group obligations by student
     const studentMap = useMemo(() => {
         const map: Record<string, { student: Student; obligations: Obligation[]; totalDebt: number; totalPaid: number }> = {};
@@ -172,15 +178,25 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                     total_installments: undefined,
                     created_at: o.created_at || '',
                 } as Obligation));
-            const allObs = [...obs, ...actObs];
-            const totalDebt = allObs.reduce((acc, o) => acc + (o.amount - o.paid_amount), 0);
+            const allObs = [...obs, ...actObs].map(o => {
+                const paid = getEffectivePaid(o);
+                const amount = o.amount || 0;
+                const isPaid = paid >= amount && amount > 0 || o.status === 'Paid';
+                const isPartial = !isPaid && (paid > 0 || o.status === 'Partial');
+                return {
+                    ...o,
+                    paid_amount: paid,
+                    status: isPaid ? 'Paid' : (isPartial ? 'Partial' : 'Unpaid')
+                };
+            });
+            const totalDebt = allObs.reduce((acc, o) => acc + Math.max(0, o.amount - o.paid_amount), 0);
             const totalPaid = allObs.reduce((acc, o) => acc + o.paid_amount, 0);
             if (allObs.length > 0) {
                 map[s.id] = { student: s, obligations: allObs, totalDebt, totalPaid };
             }
         });
         return map;
-    }, [students, allObligations]);
+    }, [students, allObligations, activityObligations]);
 
     const filteredStudents = useMemo(() => {
         const entries = Object.values(studentMap);

@@ -222,10 +222,22 @@ const StudentObligations = () => {
         );
     });
 
+    const getEffectivePaid = (ob: Obligation) => {
+        const amount = ob.amount || 0;
+        if (ob.status === 'Paid') return amount;
+        return Math.min(Math.max(ob.paid_amount || 0, 0), amount);
+    };
+
     const groupedStudents = useMemo(() => {
         const groups: Record<string, GroupedStudentAmount> = {};
         filtered.forEach(ob => {
             const sid = ob.student_id;
+            const paid = getEffectivePaid(ob);
+            const amount = ob.amount || 0;
+            const isPaid = paid >= amount && amount > 0 || ob.status === 'Paid';
+            const isPartial = !isPaid && (paid > 0 || ob.status === 'Partial');
+            const normalizedStatus = isPaid ? 'Paid' : (isPartial ? 'Partial' : 'Unpaid');
+
             if (!groups[sid]) {
                 groups[sid] = {
                     student_id: sid,
@@ -238,16 +250,20 @@ const StudentObligations = () => {
                     obligations: []
                 };
             }
-            groups[sid].total_amount += ob.amount;
-            groups[sid].total_paid += ob.paid_amount;
-            groups[sid].obligations.push(ob);
+            groups[sid].total_amount += amount;
+            groups[sid].total_paid += paid;
+            groups[sid].obligations.push({
+                ...ob,
+                paid_amount: paid,
+                status: normalizedStatus
+            });
         });
         return Object.values(groups).sort((a, b) => a.student_name.localeCompare(b.student_name));
     }, [filtered]);
 
-    const totalAmount = obligations.reduce((s, o) => s + o.amount, 0);
-    const totalPaid = obligations.reduce((s, o) => s + o.paid_amount, 0);
-    const totalUnpaid = totalAmount - totalPaid;
+    const totalAmount = useMemo(() => filtered.reduce((s, o) => s + (o.amount || 0), 0), [filtered]);
+    const totalPaid = useMemo(() => filtered.reduce((s, o) => s + getEffectivePaid(o), 0), [filtered]);
+    const totalUnpaid = Math.max(0, totalAmount - totalPaid);
 
     return (
         <div className="space-y-6">

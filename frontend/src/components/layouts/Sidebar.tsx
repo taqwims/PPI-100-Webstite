@@ -200,8 +200,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         // ── Teller ──
         const tellerTabungan: MenuGroup = {
-            title: 'Tabungan',
-            items: [{ icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' }]
+            title: 'Tabungan & User',
+            items: [
+                { icon: Wallet, label: 'Kelola Tabungan', path: '/dashboard/finance/savings' },
+                { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
+            ]
         };
 
 
@@ -231,8 +234,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             ]
         };
         const transactionalTellerPengaturan: MenuGroup = {
-            title: 'Pengaturan Keuangan',
+            title: 'Pengaturan & Master Data',
             items: [
+                { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
                 { icon: Tag, label: 'Kode Transaksi & Pos Bayar', path: '/dashboard/finance/transaction-codes', feature: 'student_obligations' },
                 { icon: Heart, label: 'Jenis Infaq', path: '/dashboard/finance/infaq-types', feature: 'infaq' },
                 { icon: MessageCircle, label: 'Pengaturan Notifikasi', path: '/dashboard/finance/notification-settings', feature: 'wa_gateway' },

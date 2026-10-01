@@ -29,6 +29,8 @@ const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 
 const currentYear = new Date().getFullYear();
+const currentMonth = new Date().getMonth() + 1;
+const MONTH_NAMES = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 interface SavingsRecapProps {
     classList: ClassData[];
@@ -37,6 +39,7 @@ interface SavingsRecapProps {
 const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
     const [periodType, setPeriodType] = useState<'daily' | 'monthly' | 'range' | 'semester' | 'yearly'>('monthly');
     const [year, setYear] = useState<number>(currentYear);
+    const [month, setMonth] = useState<number>(currentMonth);
     const [semester, setSemester] = useState<1 | 2>(1);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -53,7 +56,10 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
 
             if (periodType === 'daily') {
                 if (startDate) params.set('start_date', startDate);
-            } else if (periodType === 'monthly' || periodType === 'yearly') {
+            } else if (periodType === 'monthly') {
+                params.set('year', String(year));
+                if (month > 0) params.set('month', String(month));
+            } else if (periodType === 'yearly') {
                 params.set('year', String(year));
             } else if (periodType === 'semester') {
                 params.set('year', String(year));
@@ -72,7 +78,7 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
         } finally {
             setLoading(false);
         }
-    }, [periodType, year, semester, startDate, endDate, classFilter]);
+    }, [periodType, year, month, semester, startDate, endDate, classFilter]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -81,7 +87,7 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
 
     const periodLabel = () => {
         if (periodType === 'daily') return `Harian — ${startDate}`;
-        if (periodType === 'monthly') return `Bulanan — Tahun ${year}`;
+        if (periodType === 'monthly') return `Bulanan — ${month > 0 ? MONTH_NAMES[month] : 'Semua Bulan'} ${year}`;
         if (periodType === 'yearly') return `Tahunan — ${year}`;
         if (periodType === 'semester') return `Semester ${semester} — Tahun ${year}`;
         if (periodType === 'range') return `${startDate} s/d ${endDate}`;
@@ -225,6 +231,23 @@ const SavingsRecap: React.FC<SavingsRecapProps> = ({ classList }) => {
                                     max={currentYear + 1}
                                     className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm w-28 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                 />
+                            </div>
+                        )}
+
+                        {/* Month selector for Monthly period */}
+                        {periodType === 'monthly' && (
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Bulan</label>
+                                <select
+                                    value={month}
+                                    onChange={e => setMonth(Number(e.target.value))}
+                                    className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                >
+                                    <option value={0}>Semua Bulan (1 Tahun)</option>
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                        <option key={m} value={m}>{MONTH_NAMES[m]}</option>
+                                    ))}
+                                </select>
                             </div>
                         )}
 

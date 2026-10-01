@@ -460,6 +460,7 @@ type SavingsRecapParams struct {
 	StartDate  time.Time
 	EndDate    time.Time
 	Year       int
+	Month      int // 1..12 (0 = semua bulan)
 	Semester   int // 1 atau 2
 	ClassID    *uint
 }

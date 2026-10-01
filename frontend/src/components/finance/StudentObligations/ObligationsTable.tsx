@@ -68,7 +68,10 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                         </td></tr>
                     ) : groupedStudents.map((group, idx) => {
                         const isExpanded = expandedRows[group.student_id];
-                        const globalStatus = group.total_paid >= group.total_amount ? 'Paid' : (group.total_paid > 0 ? 'Partial' : 'Unpaid');
+                        const isPaidAll = group.total_amount > 0 && group.total_paid >= group.total_amount;
+                        const isPartialAll = group.total_paid > 0 && !isPaidAll;
+                        const globalStatus = isPaidAll ? 'Paid' : (isPartialAll ? 'Partial' : 'Unpaid');
+                        const remainingAmount = Math.max(0, group.total_amount - group.total_paid);
                         return (
                             <React.Fragment key={group.student_id}>
                                 <tr 
@@ -101,7 +104,7 @@ export const ObligationsTable: React.FC<Props> = (props) => {
                                     <td className="px-4 py-4 text-right text-emerald-600 font-bold text-sm">{formatCurrency(group.total_paid)}</td>
                                     <td className="px-4 py-4 text-right">
                                         <div className="flex flex-col items-end gap-1">
-                                            <span className="text-red-600 font-bold text-sm">{formatCurrency(group.total_amount - group.total_paid)}</span>
+                                            <span className="text-red-600 font-bold text-sm">{formatCurrency(remainingAmount)}</span>
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor(globalStatus)}`}>{statusLabel(globalStatus)}</span>
                                         </div>
                                     </td>

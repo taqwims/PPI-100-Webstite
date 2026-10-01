@@ -675,6 +675,13 @@ func (h *FinanceExtendedHandler) GetSavingsRecap(c *gin.Context) {
 		params.Year = year
 	}
 
+	if monthStr := c.Query("month"); monthStr != "" {
+		month, err := strconv.Atoi(monthStr)
+		if err == nil {
+			params.Month = month
+		}
+	}
+
 	if semesterStr := c.Query("semester"); semesterStr != "" {
 		semester, err := strconv.Atoi(semesterStr)
 		if err != nil {

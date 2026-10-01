@@ -393,11 +393,41 @@ func (u *StudentObligationUsecase) AssignToStudents(studentIDs []uuid.UUID, paym
 }
 
 func (u *StudentObligationUsecase) GetAll(academicYearID uint, classID uint) ([]domain.StudentObligation, error) {
-	return u.repo.GetAll(academicYearID, classID)
+	obs, err := u.repo.GetAll(academicYearID, classID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range obs {
+		if obs[i].Status == "Paid" && obs[i].PaidAmount < obs[i].Amount {
+			obs[i].PaidAmount = obs[i].Amount
+		} else if obs[i].PaidAmount >= obs[i].Amount && obs[i].Amount > 0 {
+			obs[i].Status = "Paid"
+		} else if obs[i].PaidAmount > 0 && obs[i].Status == "Unpaid" {
+			obs[i].Status = "Partial"
+		}
+	}
+
+	return obs, nil
 }
 
 func (u *StudentObligationUsecase) GetByStudentID(studentID uuid.UUID, academicYearID uint) ([]domain.StudentObligation, error) {
-	return u.repo.GetByStudentID(studentID, academicYearID)
+	obs, err := u.repo.GetByStudentID(studentID, academicYearID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range obs {
+		if obs[i].Status == "Paid" && obs[i].PaidAmount < obs[i].Amount {
+			obs[i].PaidAmount = obs[i].Amount
+		} else if obs[i].PaidAmount >= obs[i].Amount && obs[i].Amount > 0 {
+			obs[i].Status = "Paid"
+		} else if obs[i].PaidAmount > 0 && obs[i].Status == "Unpaid" {
+			obs[i].Status = "Partial"
+		}
+	}
+
+	return obs, nil
 }
 
 func (u *StudentObligationUsecase) GetByID(id uuid.UUID) (*domain.StudentObligation, error) {
@@ -405,7 +435,38 @@ func (u *StudentObligationUsecase) GetByID(id uuid.UUID) (*domain.StudentObligat
 }
 
 func (u *StudentObligationUsecase) Update(ob *domain.StudentObligation) error {
-	return u.repo.Update(ob)
+	existing, err := u.repo.GetByID(ob.ID)
+	if err != nil {
+		return err
+	}
+
+	if ob.Amount > 0 {
+		existing.Amount = ob.Amount
+		if existing.PaidAmount >= existing.Amount {
+			existing.Status = "Paid"
+		} else if existing.PaidAmount > 0 {
+			existing.Status = "Partial"
+		} else {
+			existing.Status = "Unpaid"
+		}
+	}
+	if ob.DueDate != nil {
+		existing.DueDate = ob.DueDate
+	}
+	if ob.Status != "" {
+		existing.Status = ob.Status
+	}
+
+	// Also sync linked Bill amount if bill is unpaid
+	if u.financeRepo != nil {
+		bill, err := u.financeRepo.GetBillByObligationID(ob.ID.String())
+		if err == nil && bill != nil && bill.Status != "Paid" {
+			bill.Amount = existing.Amount
+			_ = u.financeRepo.UpdateBill(bill)
+		}
+	}
+
+	return u.repo.Update(existing)
 }
 
 func (u *StudentObligationUsecase) isForceDeletePaidAllowed() bool {

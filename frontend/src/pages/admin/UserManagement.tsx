@@ -242,7 +242,8 @@ const UserManagement: React.FC = () => {
     // Filter & sort
     const filteredUsers = users
         .filter((u: User) => {
-            if (user?.role_id !== 1 && u.unit_id !== user?.unit_id) return false;
+            const isGlobalAdmin = [1, 9, 10, 11].includes(user?.role_id || 0);
+            if (!isGlobalAdmin && user?.unit_id && u.unit_id !== user?.unit_id) return false;
             if (activeTab !== 0 && u.role_id !== activeTab) return false;
 
             // Class filter (only for students or in "Semua" tab)
@@ -660,7 +661,7 @@ const UserManagement: React.FC = () => {
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Unit</label>
                                     <div className="relative">
                                         <School className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        {user?.role_id === 1 ? (
+                                        {[1, 9, 10, 11].includes(user?.role_id || 0) ? (
                                             <select value={formData.unit_id} onChange={e => setFormData({ ...formData, unit_id: Number(e.target.value) })}
                                                 className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm appearance-none">
                                                 {activeUnits.map(u => (

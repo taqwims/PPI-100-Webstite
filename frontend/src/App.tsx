@@ -113,7 +113,12 @@ function App() {
                                     <Route path="academic" element={<Academic />} />
                                     <Route path="admin/academic" element={<Academic />} />
                                     <Route path="users" element={
-                                        <RoleRoute allowedRoles={[1, 2, 3]}>
+                                        <RoleRoute allowedRoles={[1, 2, 3, 9, 10, 11]}>
+                                            <UserManagement />
+                                        </RoleRoute>
+                                    } />
+                                    <Route path="admin/users" element={
+                                        <RoleRoute allowedRoles={[1, 2, 3, 9, 10, 11]}>
                                             <UserManagement />
                                         </RoleRoute>
                                     } />

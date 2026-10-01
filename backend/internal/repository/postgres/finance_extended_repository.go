@@ -1000,9 +1000,17 @@ func (r *financeExtendedRepository) GetSavingsRecap(params domain.SavingsRecapPa
 		endDate = time.Date(params.StartDate.Year(), params.StartDate.Month(), params.StartDate.Day(), 23, 59, 59, 0, time.UTC)
 		periodLabel = fmt.Sprintf("Harian: %02d %s %d", startDate.Day(), monthNames[int(startDate.Month())], startDate.Year())
 	case "monthly":
-		startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
-		endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)
-		periodLabel = fmt.Sprintf("Tahun %d (Per Bulan)", params.Year)
+		if params.Month >= 1 && params.Month <= 12 {
+			firstDay := time.Date(params.Year, time.Month(params.Month), 1, 0, 0, 0, 0, time.UTC)
+			lastDay := firstDay.AddDate(0, 1, -1)
+			startDate = firstDay
+			endDate = time.Date(lastDay.Year(), lastDay.Month(), lastDay.Day(), 23, 59, 59, 0, time.UTC)
+			periodLabel = fmt.Sprintf("Bulan %s %d", monthNames[params.Month], params.Year)
+		} else {
+			startDate = time.Date(params.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
+			endDate = time.Date(params.Year, time.December, 31, 23, 59, 59, 0, time.UTC)
+			periodLabel = fmt.Sprintf("Tahun %d (Semua Bulan)", params.Year)
+		}
 	case "range":
 		startDate = params.StartDate
 		endDate = params.EndDate

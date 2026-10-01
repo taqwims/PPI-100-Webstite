@@ -33,23 +33,23 @@ func RegisterAdminRoutes(
 	{
 		users.GET("", middleware.RoleMiddleware(1, 2, 3, 4, 5, 8, 9, 10, 11), userHandler.GetAllUsers)
 		users.GET("/", middleware.RoleMiddleware(1, 2, 3, 4, 5, 8, 9, 10, 11), userHandler.GetAllUsers)
-		users.POST("", middleware.RoleMiddleware(1, 2, 3), userHandler.CreateUser)
-		users.POST("/", middleware.RoleMiddleware(1, 2, 3), userHandler.CreateUser)
-		users.POST("/bulk", middleware.RoleMiddleware(1, 2, 3), userHandler.BulkCreateUsers)
-		users.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.UpdateUser)
-		users.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3), userHandler.DeleteUser)
+		users.POST("", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), userHandler.CreateUser)
+		users.POST("/", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), userHandler.CreateUser)
+		users.POST("/bulk", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), userHandler.BulkCreateUsers)
+		users.PUT("/:id", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), userHandler.UpdateUser)
+		users.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), userHandler.DeleteUser)
 	}
 
 	// ── Parents ──
 	parents := rg.Group("/parents")
 	{
-		parents.GET("/", middleware.RoleMiddleware(1, 2, 3, 9), parentHandler.GetAllParents)
-		parents.GET("/:id", middleware.RoleMiddleware(1, 2, 3, 9), parentHandler.GetParentByID)
-		parents.POST("/", middleware.RoleMiddleware(1, 2, 3), parentHandler.CreateParent)
-		parents.PUT("/:id", middleware.RoleMiddleware(1, 2, 3), parentHandler.UpdateParent)
-		parents.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3), parentHandler.DeleteParent)
-		parents.POST("/:id/assign", middleware.RoleMiddleware(1, 2, 3), parentHandler.AssignChild)
-		parents.DELETE("/:id/remove/:student_id", middleware.RoleMiddleware(1, 2, 3), parentHandler.RemoveChild)
+		parents.GET("/", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.GetAllParents)
+		parents.GET("/:id", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.GetParentByID)
+		parents.POST("/", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.CreateParent)
+		parents.PUT("/:id", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.UpdateParent)
+		parents.DELETE("/:id", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.DeleteParent)
+		parents.POST("/:id/assign", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.AssignChild)
+		parents.DELETE("/:id/remove/:student_id", middleware.RoleMiddleware(1, 2, 3, 9, 10, 11), parentHandler.RemoveChild)
 	}
 
 	// ── Notifications ──
