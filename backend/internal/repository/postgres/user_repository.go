@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"ppi-100-sis/internal/domain"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -83,5 +84,36 @@ func (r *UserRepository) Delete(id string) error {
 func (r *UserRepository) GetUsersByRole(roleID uint) ([]domain.User, error) {
 	var users []domain.User
 	err := r.db.Where("role_id = ?", roleID).Find(&users).Error
+	return users, err
+}
+
+func (r *UserRepository) UpdateFaceBiometric(userID string, embedding string, photoURL string, registeredAt *time.Time) error {
+	updates := map[string]interface{}{
+		"face_embedding":     embedding,
+		"face_registered_at": registeredAt,
+	}
+	if photoURL != "" {
+		updates["face_photo_url"] = photoURL
+	}
+	return r.db.Model(&domain.User{}).Where("id = ?", userID).Updates(updates).Error
+}
+
+func (r *UserRepository) RemoveFaceBiometric(userID string) error {
+	return r.db.Model(&domain.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"face_embedding":     "",
+		"face_registered_at": nil,
+	}).Error
+}
+
+func (r *UserRepository) GetUsersWithFaceBiometric(unitID uint) ([]domain.User, error) {
+	var users []domain.User
+	query := r.db.Where("face_embedding IS NOT NULL AND face_embedding != ''").
+		Preload("Teacher").
+		Preload("Student").
+		Preload("Student.Class")
+	if unitID > 0 {
+		query = query.Where("unit_id = ?", unitID)
+	}
+	err := query.Find(&users).Error
 	return users, err
 }

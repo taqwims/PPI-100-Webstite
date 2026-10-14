@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Search, Menu, Check, Info, AlertTriangle, FileText, CreditCard, Settings, LogOut } from 'lucide-react';
+import { Bell, Search, Menu, Check, Info, AlertTriangle, FileText, CreditCard, Settings, LogOut, Calendar } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -87,6 +87,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 return <AlertTriangle className="text-rose-500" size={16} />;
             case 'task':
                 return <FileText className="text-blue-500" size={16} />;
+            case 'leaverequest':
+            case 'leaveapproval':
+                return <Calendar className="text-emerald-600" size={16} />;
             default:
                 return <Info className="text-slate-400" size={16} />;
         }
@@ -170,6 +173,17 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                                                 onClick={() => {
                                                     if (!notif.is_read) {
                                                         markAsReadMutation.mutate(notif.id);
+                                                    }
+                                                    setIsDropdownOpen(false);
+                                                    const t = notif.type?.toLowerCase();
+                                                    if (t === 'leaverequest') {
+                                                        navigate('/dashboard/homeroom/leave-approvals');
+                                                    } else if (t === 'leaveapproval') {
+                                                        if (user?.role_id === 7) {
+                                                            navigate('/dashboard/parent/leave-requests');
+                                                        } else {
+                                                            navigate('/dashboard/student/leave-requests');
+                                                        }
                                                     }
                                                 }}
                                             >

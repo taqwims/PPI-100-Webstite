@@ -606,6 +606,8 @@ const Payroll: React.FC = () => {
                 users={users}
                 templates={templates}
                 onSubmit={handleSavePayroll}
+                month={filterMonth}
+                year={filterYear}
             />
             <PayrollTemplateModal
                 isOpen={showTemplateModal}

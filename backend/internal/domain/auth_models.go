@@ -21,6 +21,9 @@ type User struct {
 	BankName          string    `json:"bank_name"`
 	BankAccountNumber string    `json:"bank_account_number"`
 	BankAccountHolder string    `json:"bank_account_holder"`
+	FaceEmbedding     string    `gorm:"type:text" json:"face_embedding,omitempty"`
+	FacePhotoURL      string    `json:"face_photo_url,omitempty"`
+	FaceRegisteredAt  *time.Time `json:"face_registered_at,omitempty"`
 	Teacher           *Teacher  `gorm:"foreignKey:UserID" json:"teacher,omitempty"`
 	Parent            *Parent   `gorm:"foreignKey:UserID" json:"parent,omitempty"`
 	Student           *Student  `gorm:"foreignKey:UserID" json:"student,omitempty"`

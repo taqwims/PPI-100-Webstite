@@ -4,7 +4,7 @@ import CardGlass from '../components/ui/glass/CardGlass';
 import { 
     Users, BookOpen, DollarSign, Clock, AlertCircle, FileText, 
     CreditCard, Activity, Inbox, Wallet, ShieldCheck, TrendingDown,
-    LayoutDashboard
+    LayoutDashboard, Calendar
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -202,11 +202,21 @@ const TeacherDashboard = () => {
                             <Users className="text-green-600" size={20} />
                             Wali Kelas
                         </h3>
-                        <div className="text-center py-8 text-slate-600">
-                            <p>Kelola data siswa kelas Anda.</p>
-                            <Link to="/dashboard/homeroom" className="text-blue-600 hover:underline mt-2 inline-block">
-                                Buka Kelas Wali
-                            </Link>
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-600">Kelola kelas perwalian & persetujuan izin sakit/keperluan siswa.</p>
+                            <div className="flex flex-col gap-2 pt-1">
+                                <Link to="/dashboard/homeroom" className="p-2.5 bg-white/50 hover:bg-white/80 rounded-xl text-sm font-medium text-slate-700 flex items-center justify-between border border-white/40 shadow-sm transition">
+                                    <span>Buka Kelas Perwalian</span>
+                                    <span className="text-xs text-blue-600 font-semibold">Buka →</span>
+                                </Link>
+                                <Link to="/dashboard/homeroom/leave-approvals" className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-xl text-sm font-medium text-emerald-800 flex items-center justify-between border border-emerald-500/20 shadow-sm transition">
+                                    <span className="flex items-center gap-2">
+                                        <Calendar size={16} className="text-emerald-600" />
+                                        Persetujuan Izin Siswa
+                                    </span>
+                                    <span className="text-xs text-emerald-700 font-bold">Approval →</span>
+                                </Link>
+                            </div>
                         </div>
                     </CardGlass>
                 )}
@@ -329,6 +339,19 @@ const StudentDashboard = () => {
                         </Link>
                     </div>
                 </CardGlass>
+
+                <CardGlass className="p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Calendar className="text-emerald-600" size={20} />
+                        Izin / Sakit
+                    </h3>
+                    <div className="text-center py-4">
+                        <p className="text-slate-600 text-sm mb-4">Berhalangan hadir atau butuh izin tidak masuk sekolah?</p>
+                        <Link to="/dashboard/student/leave-requests" className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-xl shadow-sm inline-flex items-center justify-center gap-2 transition">
+                            <Calendar size={14} /> Ajukan Izin / Sakit
+                        </Link>
+                    </div>
+                </CardGlass>
             </div>
         </div>
     );
@@ -368,14 +391,18 @@ const ParentDashboard = () => {
                             <h3 className="text-xl font-bold text-slate-900 mb-1">{child.user?.name}</h3>
                             <p className="text-sm text-slate-500 mb-4">{child.class?.name || 'Belum ada kelas'} • NISN: {child.nisn}</p>
                             
-                            <div className="grid grid-cols-2 gap-3 mt-6">
-                                <Link to="/dashboard/children" className="p-3 bg-blue-50/50 hover:bg-blue-50 rounded-xl text-center border border-blue-100 transition">
-                                    <BookOpen className="mx-auto mb-1 text-blue-600" size={20} />
-                                    <span className="text-xs font-medium text-slate-700">Akademik</span>
+                            <div className="grid grid-cols-3 gap-2 mt-6">
+                                <Link to="/dashboard/children" className="p-2.5 bg-blue-50/50 hover:bg-blue-50 rounded-xl text-center border border-blue-100 transition">
+                                    <BookOpen className="mx-auto mb-1 text-blue-600" size={18} />
+                                    <span className="text-[11px] font-medium text-slate-700 block">Akademik</span>
                                 </Link>
-                                <Link to={`/dashboard/parent/children/${child.id}/bills`} className="p-3 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl text-center border border-emerald-100 transition">
-                                    <DollarSign className="mx-auto mb-1 text-emerald-600" size={20} />
-                                    <span className="text-xs font-medium text-slate-700">Keuangan</span>
+                                <Link to={`/dashboard/parent/children/${child.id}/bills`} className="p-2.5 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl text-center border border-emerald-100 transition">
+                                    <DollarSign className="mx-auto mb-1 text-emerald-600" size={18} />
+                                    <span className="text-[11px] font-medium text-slate-700 block">Keuangan</span>
+                                </Link>
+                                <Link to="/dashboard/parent/leave-requests" className="p-2.5 bg-teal-50/60 hover:bg-teal-50 rounded-xl text-center border border-teal-100 transition">
+                                    <Calendar className="mx-auto mb-1 text-teal-600" size={18} />
+                                    <span className="text-[11px] font-medium text-slate-700 block">Izin / Sakit</span>
                                 </Link>
                             </div>
                         </CardGlass>

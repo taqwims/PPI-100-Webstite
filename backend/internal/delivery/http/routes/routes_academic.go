@@ -13,6 +13,7 @@ func RegisterAcademicRoutes(
 	studentHandler *handlers.StudentHandler,
 	bkHandler *handlers.BKHandler,
 	elearningHandler *handlers.ElearningHandler,
+	studentLeaveHandler *handlers.StudentLeaveHandler,
 	featureBK bool,
 	featureElearning bool,
 ) {
@@ -56,6 +57,7 @@ func RegisterAcademicRoutes(
 		students.POST("/attendance", studentHandler.RecordAttendance)
 		students.POST("/attendance/rfid-tap", studentHandler.RecordRFIDAttendance)
 		students.GET("/attendance/daily", studentHandler.GetDailyAttendance)
+		students.GET("/attendance/export", studentHandler.GetAttendanceExport)
 		students.GET("/attendance/live-recent", studentHandler.GetRecentDailyAttendance)
 		students.GET("/attendance/today-summary", studentHandler.GetTodaySummary)
 		students.GET("/attendance/:schedule_id", studentHandler.GetScheduleAttendance)
@@ -96,5 +98,16 @@ func RegisterAcademicRoutes(
 			elearning.POST("/submissions", elearningHandler.SubmitTask)
 			elearning.GET("/submissions", elearningHandler.GetStudentSubmissions)
 		}
+	}
+
+	// ── Portal Pengajuan Izin Siswa & Approval Wali Kelas ──
+	leaveRequests := rg.Group("/academic/leave-requests")
+	{
+		leaveRequests.POST("", studentLeaveHandler.CreateLeaveRequest)
+		leaveRequests.POST("/", studentLeaveHandler.CreateLeaveRequest)
+		leaveRequests.GET("/my", studentLeaveHandler.GetMyStudentLeaveRequests)
+		leaveRequests.GET("/children", studentLeaveHandler.GetChildrenLeaveRequests)
+		leaveRequests.GET("/homeroom", studentLeaveHandler.GetHomeroomLeaveRequests)
+		leaveRequests.PUT("/:id/approval", studentLeaveHandler.ApproveLeaveRequest)
 	}
 }

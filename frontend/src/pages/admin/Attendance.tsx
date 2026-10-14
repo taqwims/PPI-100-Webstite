@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import {
     CheckCircle, XCircle, Calendar, Users, Clock, AlertCircle, Coffee,
-    Radio, Search, RefreshCw
+    Radio, Search, RefreshCw, Camera, UserPlus, FileSpreadsheet
 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
@@ -12,6 +13,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../hooks/useUnits';
 import { useFeatureStore } from '../../store/featureStore';
 import AttendanceRFID from './AttendanceRFID';
+import { FaceEnrollmentModal } from '../../components/admin/FaceEnrollmentModal';
+import AttendanceExportPanel from './AttendanceExportPanel';
 
 interface Student {
     id: string;
@@ -72,10 +75,20 @@ const AttendancePage: React.FC = () => {
     const { user } = useAuth();
     const { defaultUnitId } = useUnits();
     const unitID = user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId;
+    const [searchParams] = useSearchParams();
     const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
-    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule'>(isRFIDEnabled ? 'scanner' : 'daily');
+    const initialTab = searchParams.get('tab') === 'export' ? 'export' : (isRFIDEnabled ? 'scanner' : 'daily');
+    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule' | 'export'>(initialTab);
+    const [showFaceEnrollModal, setShowFaceEnrollModal] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'export') {
+            setActiveTab('export');
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
         if (!isRFIDEnabled && activeTab === 'scanner') {
             setActiveTab('daily');
         }
@@ -222,6 +235,33 @@ const AttendancePage: React.FC = () => {
                     >
                         <Clock size={16} /> Presensi Per Mapel
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('export')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                            activeTab === 'export'
+                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <FileSpreadsheet size={16} /> Export & Rekap
+                    </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowFaceEnrollModal(true)}
+                        className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-all shadow-sm active:scale-95"
+                    >
+                        <UserPlus size={16} className="text-emerald-600" /> Daftarkan Wajah
+                    </button>
+                    <Link
+                        to="/dashboard/attendance/face"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-teal-500 transition-all hover:scale-105 active:scale-95"
+                    >
+                        <Camera size={16} /> Scanner Wajah
+                    </Link>
                 </div>
             </div>
 
@@ -482,6 +522,17 @@ const AttendancePage: React.FC = () => {
                     )}
                 </div>
             )}
+
+            {/* TAB 4: Export & Rekap Laporan */}
+            {activeTab === 'export' && (
+                <AttendanceExportPanel onBack={() => setActiveTab('daily')} />
+            )}
+
+            {/* Modal Pendaftaran Wajah */}
+            <FaceEnrollmentModal
+                isOpen={showFaceEnrollModal}
+                onClose={() => setShowFaceEnrollModal(false)}
+            />
         </div>
     );
 };

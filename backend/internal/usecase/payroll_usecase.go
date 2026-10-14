@@ -3,17 +3,19 @@ package usecase
 import (
 	"errors"
 	"fmt"
+	"math"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 	"time"
 )
 
 type PayrollUsecase struct {
-	payrollRepo *postgres.PayrollRepository
-	userRepo    *postgres.UserRepository
-	financeRepo *postgres.FinanceRepository
-	budgetRepo  *postgres.BudgetRepository
-	tcRepo      *postgres.TransactionCodeRepository
+	payrollRepo         *postgres.PayrollRepository
+	userRepo            *postgres.UserRepository
+	financeRepo         *postgres.FinanceRepository
+	budgetRepo          *postgres.BudgetRepository
+	tcRepo              *postgres.TransactionCodeRepository
+	staffAttendanceRepo *postgres.StaffAttendanceRepository
 }
 
 func NewPayrollUsecase(
@@ -249,4 +251,27 @@ func (u *PayrollUsecase) GetPayrollTemplateByUserID(userID string) (*domain.Payr
 
 func (u *PayrollUsecase) UpsertPayrollTemplate(template *domain.PayrollTemplate) error {
 	return u.payrollRepo.UpsertPayrollTemplate(template)
+}
+
+func (u *PayrollUsecase) SetStaffAttendanceRepo(r *postgres.StaffAttendanceRepository) {
+	u.staffAttendanceRepo = r
+}
+
+func (u *PayrollUsecase) GetLatenessPenaltySuggestion(userID string, month, year int, hourlyRate float64) (totalLateMinutes int64, suggestedPenalty float64, err error) {
+	if u.staffAttendanceRepo == nil {
+		return 0, 0, nil
+	}
+	_, _, totalMins, totalPenFromDB, err := u.staffAttendanceRepo.GetMonthlySummary(userID, month, year)
+	if err != nil {
+		return 0, 0, err
+	}
+	if hourlyRate <= 0 {
+		hourlyRate = 30000
+	}
+	// Formula: menit : 60 x harga
+	calc := math.Round((float64(totalMins) / 60.0) * hourlyRate)
+	if totalPenFromDB > 0 && calc == 0 {
+		calc = totalPenFromDB
+	}
+	return totalMins, calc, nil
 }

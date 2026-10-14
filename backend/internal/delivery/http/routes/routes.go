@@ -190,16 +190,48 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	backupUsecase := usecase.NewBackupUsecase(backupRepo)
 	backupHandler := handlers.NewBackupHandler(backupUsecase, cfg)
 
+	// Face Biometrics & Staff Attendance
+	staffAttendanceRepo := postgres.NewStaffAttendanceRepository(db)
+	staffAttendanceUsecase := usecase.NewStaffAttendanceUsecase(staffAttendanceRepo, userRepo, schoolSettingRepo)
+	faceBiometricUsecase := usecase.NewFaceBiometricUsecase(userRepo, studentRepo, attendanceRepo, staffAttendanceRepo, schoolSettingRepo, notificationUsecase)
+	faceAttendanceHandler := handlers.NewFaceAttendanceHandler(faceBiometricUsecase, staffAttendanceUsecase)
+	payrollUsecase.SetStaffAttendanceRepo(staffAttendanceRepo)
+
+	// Student Leave Requests (Portal Izin Siswa & Approval Wali Kelas)
+	studentLeaveRepo := postgres.NewStudentLeaveRepository(db)
+	studentLeaveUsecase := usecase.NewStudentLeaveUsecase(studentLeaveRepo, studentRepo, userRepo, notificationRepo, db)
+	studentLeaveHandler := handlers.NewStudentLeaveHandler(studentLeaveUsecase, db)
+
 	// Public Routes
 	apiGroup := r.Group("/api")
 	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, mayarHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase, studentHandler)
+
+	// Public Face Attendance Routes (untuk Kiosk Gerbang / Tablet tanpa session timeout)
+	apiGroup.POST("/attendance/face-scan", faceAttendanceHandler.MatchAndRecordAttendance)
+	apiGroup.GET("/attendance/face-descriptors", faceAttendanceHandler.GetRegisteredFaces)
+	apiGroup.GET("/staff-attendance/live-recent", faceAttendanceHandler.GetStaffRecentDaily)
+	apiGroup.GET("/staff-attendance/today-summary", faceAttendanceHandler.GetStaffDailySummary)
 
 	// Protected Routes (requires authentication)
 	protectedGroup := apiGroup.Group("/")
 	protectedGroup.Use(middleware.AuthMiddleware(cfg))
 
+	// Protected Face Attendance routes (Admin / Registration / Management)
+	attendanceGroup := protectedGroup.Group("/attendance")
+	{
+		attendanceGroup.POST("/face-register", faceAttendanceHandler.RegisterFace)
+		attendanceGroup.DELETE("/face/:user_id", faceAttendanceHandler.RemoveFace)
+	}
+
+	staffAttendanceGroup := protectedGroup.Group("/staff-attendance")
+	{
+		staffAttendanceGroup.GET("/daily", faceAttendanceHandler.GetStaffDailyAttendance)
+		staffAttendanceGroup.GET("/export", faceAttendanceHandler.GetStaffAttendanceExport)
+		staffAttendanceGroup.GET("/monthly-summary", faceAttendanceHandler.GetStaffMonthlySummary)
+	}
+
 	// Register modular mapped routes
-	RegisterAcademicRoutes(protectedGroup, academicHandler, teacherHandler, studentHandler, bkHandler, elearningHandler, cfg.FeatureBK, cfg.FeatureElearning)
+	RegisterAcademicRoutes(protectedGroup, academicHandler, teacherHandler, studentHandler, bkHandler, elearningHandler, studentLeaveHandler, cfg.FeatureBK, cfg.FeatureElearning)
 	
 	RegisterAdminRoutes(protectedGroup, cfg, userHandler, profileHandler, notificationHandler, assetHandler, assetCategoryHandler, schoolSettingHandler, backupHandler, publicHandler, ppdbPaymentHandler, parentHandler)
 

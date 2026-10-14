@@ -4,7 +4,7 @@ import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
     Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers,
-    Radio, Globe
+    Radio, Globe, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -61,6 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
                 { icon: Users, label: isEnabled('rfid_attendance') ? 'Data Siswa & RFID' : 'Data Siswa', path: '/dashboard/students' },
                 { icon: Radio, label: 'Presensi RFID & NFC', path: '/dashboard/attendance', feature: 'rfid_attendance' },
+                { icon: FileSpreadsheet, label: 'Export Presensi', path: '/dashboard/attendance/export' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
                 { icon: GraduationCap, label: 'Kenaikan Kelas', path: '/dashboard/admin/promotions' },
@@ -149,7 +150,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const homeroomGroup: MenuGroup = {
             title: 'Wali Kelas',
             items: [
-                { icon: Users, label: 'Kelas Saya', path: '/dashboard/homeroom' }
+                { icon: Users, label: 'Kelas Saya', path: '/dashboard/homeroom' },
+                { icon: ShieldCheck, label: 'Persetujuan Izin Siswa', path: '/dashboard/homeroom/leave-approvals' }
             ]
         };
 
@@ -157,6 +159,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         const studentGroup: MenuGroup = {
             title: 'Akademik & Keuangan',
             items: [
+                { icon: Calendar, label: 'Izin & Presensi', path: '/dashboard/student/leave-requests' },
                 { icon: Calendar, label: 'Jadwal Pelajaran', path: '/dashboard/student/schedule' },
                 { icon: GraduationCap, label: 'Nilai Akademik', path: '/dashboard/student/grades' },
                 { icon: BookOpen, label: 'E-Learning', path: '/dashboard/student/elearning', feature: 'elearning' },
@@ -172,6 +175,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             title: 'Anak Saya',
             items: [
                 { icon: Users, label: 'Data Anak', path: '/dashboard/children' },
+                { icon: Calendar, label: 'Pengajuan Izin Anak', path: '/dashboard/parent/leave-requests' },
                 { icon: CreditCard, label: 'Tagihan', path: '/dashboard/bills', feature: 'billing' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: Wallet, label: 'Tabungan Anak', path: '/dashboard/parent/savings', feature: 'savings' },

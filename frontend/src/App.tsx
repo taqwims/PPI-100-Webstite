@@ -11,6 +11,8 @@ import Settings from './pages/Settings';
 import Finance from './pages/admin/Finance';
 import Attendance from './pages/admin/Attendance';
 import AttendanceRFID from './pages/admin/AttendanceRFID';
+import AttendanceFaceScanner from './pages/admin/AttendanceFaceScanner';
+import AttendanceExportPanel from './pages/admin/AttendanceExportPanel';
 import BK from './pages/admin/BK';
 import Elearning from './pages/admin/Elearning';
 import Notifications from './pages/admin/Notifications';
@@ -51,11 +53,14 @@ import StudentBK from './pages/student/StudentBK';
 import StudentSchedule from './pages/student/StudentSchedule';
 import StudentElearning from './pages/student/StudentElearning';
 import StudentGrades from './pages/student/StudentGrades';
+import StudentLeaveRequests from './pages/student/StudentLeaveRequests';
 import ParentChildren from './pages/parent/ParentChildren';
 import ParentChildAttendance from './pages/parent/ParentChildAttendance';
 import ParentChildGrades from './pages/parent/ParentChildGrades';
 import ParentChildBills from './pages/parent/ParentChildBills';
 import ParentChildBK from './pages/parent/ParentChildBK';
+import ParentLeaveRequests from './pages/parent/ParentLeaveRequests';
+import HomeroomLeaveApprovals from './pages/teacher/HomeroomLeaveApprovals';
 import AdminNotificationManagement from './pages/admin/AdminNotificationManagement';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import AdminPPDB from './pages/admin/AdminPPDB';
@@ -129,6 +134,8 @@ function App() {
                                     <Route path="admin/promotions" element={<GradePromotion />} />
                                     <Route path="attendance" element={<Attendance />} />
                                     <Route path="attendance/rfid" element={<AttendanceRFID />} />
+                                    <Route path="attendance/face" element={<AttendanceFaceScanner />} />
+                                    <Route path="attendance/export" element={<AttendanceExportPanel />} />
                                     <Route path="finance" element={<Finance />} />
                                     <Route path="bk" element={<BK />} />
                                     <Route path="elearning" element={<Elearning />} />
@@ -258,13 +265,17 @@ function App() {
                                     <Route path="attendance/:scheduleId" element={<TeacherAttendance />} />
                                     <Route path="homeroom" element={<HomeroomClass />} />
                                     <Route path="homeroom/report-card/:studentId" element={<HomeroomReportCards />} />
+                                    <Route path="homeroom/leave-approvals" element={<HomeroomLeaveApprovals />} />
                                     <Route path="student/schedule" element={<StudentSchedule />} />
                                     <Route path="student/elearning" element={<StudentElearning />} />
                                     <Route path="student/grades" element={<StudentGrades />} />
+                                    <Route path="student/leave-requests" element={<StudentLeaveRequests />} />
+                                    <Route path="student/attendance" element={<StudentLeaveRequests />} />
                                     <Route path="teacher/bk-report" element={<TeacherBKReport />} />
                                     <Route path="student/bk" element={<StudentBK />} />
                                     <Route path="bills" element={<StudentBills />} />
                                     <Route path="children" element={<ParentChildren />} />
+                                    <Route path="parent/leave-requests" element={<ParentLeaveRequests />} />
                                     <Route path="parent/children/:studentId/attendance" element={<ParentChildAttendance />} />
                                     <Route path="parent/children/:studentId/grades" element={<ParentChildGrades />} />
                                     <Route path="parent/children/:studentId/bills" element={<ParentChildBills />} />

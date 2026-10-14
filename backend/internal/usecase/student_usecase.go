@@ -389,6 +389,18 @@ func (u *StudentUsecase) GetDailyAttendance(unitID uint, dateStr string, classID
 	return u.attendanceRepo.GetDailyAttendance(unitID, date, classID)
 }
 
+func (u *StudentUsecase) GetAttendanceExport(unitID uint, startDateStr, endDateStr string, classID *uint, studentID *string, status *string) ([]domain.Attendance, error) {
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		startDate = time.Now().AddDate(0, 0, -30)
+	}
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		endDate = time.Now()
+	}
+	return u.attendanceRepo.GetAttendanceExport(unitID, startDate, endDate, classID, studentID, status)
+}
+
 func (u *StudentUsecase) GetRecentDailyAttendance(unitID uint, limit int) ([]domain.Attendance, error) {
 	return u.attendanceRepo.GetRecentDaily(unitID, limit)
 }

@@ -79,6 +79,39 @@ func (r *AttendanceRepository) GetDailyAttendance(unitID uint, date time.Time, c
 	return attendances, err
 }
 
+func (r *AttendanceRepository) GetAttendanceExport(unitID uint, startDate, endDate time.Time, classID *uint, studentID *string, status *string) ([]domain.Attendance, error) {
+	var attendances []domain.Attendance
+	startOfDay := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	endOfDay := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 999999999, endDate.Location())
+
+	query := r.db.Joins("JOIN students ON students.id = attendances.student_id").
+		Where("attendances.timestamp >= ? AND attendances.timestamp <= ?", startOfDay, endOfDay)
+
+	if unitID > 0 {
+		query = query.Where("students.unit_id = ?", unitID)
+	}
+
+	if classID != nil && *classID > 0 {
+		query = query.Where("students.class_id = ?", *classID)
+	}
+
+	if studentID != nil && *studentID != "" {
+		query = query.Where("attendances.student_id = ?", *studentID)
+	}
+
+	if status != nil && *status != "" && *status != "all" {
+		query = query.Where("attendances.status = ?", *status)
+	}
+
+	err := query.Preload("Student.User").
+		Preload("Student.Class").
+		Preload("Schedule.Subject").
+		Order("attendances.timestamp ASC").
+		Find(&attendances).Error
+
+	return attendances, err
+}
+
 func (r *AttendanceRepository) GetRecentDaily(unitID uint, limit int) ([]domain.Attendance, error) {
 	if limit <= 0 {
 		limit = 15

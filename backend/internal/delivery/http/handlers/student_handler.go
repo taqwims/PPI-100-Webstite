@@ -315,6 +315,40 @@ func (h *StudentHandler) GetDailyAttendance(c *gin.Context) {
 	c.JSON(http.StatusOK, attendances)
 }
 
+func (h *StudentHandler) GetAttendanceExport(c *gin.Context) {
+	unitID, _ := strconv.Atoi(c.Query("unit_id"))
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	classIDStr := c.Query("class_id")
+	studentID := c.Query("student_id")
+	status := c.Query("status")
+
+	var classID *uint
+	if classIDStr != "" {
+		if parsed, err := strconv.Atoi(classIDStr); err == nil && parsed > 0 {
+			uParsed := uint(parsed)
+			classID = &uParsed
+		}
+	}
+
+	var pStudentID *string
+	if studentID != "" {
+		pStudentID = &studentID
+	}
+
+	var pStatus *string
+	if status != "" {
+		pStatus = &status
+	}
+
+	attendances, err := h.studentUsecase.GetAttendanceExport(uint(unitID), startDate, endDate, classID, pStudentID, pStatus)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, attendances)
+}
+
 func (h *StudentHandler) GetRecentDailyAttendance(c *gin.Context) {
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
 	limit, _ := strconv.Atoi(c.Query("limit"))

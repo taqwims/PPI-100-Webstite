@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Banknote, CheckCircle, Plus, Trash2, Clock, Calculator, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Banknote, CheckCircle, Plus, Trash2, Clock, Calculator, Sparkles, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import clsx from 'clsx';
+import api from '../../../services/api';
+import toast from 'react-hot-toast';
 import { PayrollRecord, UserData, PayrollTemplate, PayrollCustomItem } from './types';
 
 const formatCurrency = (amount: number) => {
@@ -18,6 +20,8 @@ interface PayrollFormModalProps {
     users: UserData[];
     templates: PayrollTemplate[];
     onSubmit: (data: any) => Promise<void>;
+    month?: number;
+    year?: number;
 }
 
 export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
@@ -26,7 +30,9 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
     editingPayroll,
     users,
     templates,
-    onSubmit
+    onSubmit,
+    month,
+    year
 }) => {
     const initialFormState = {
         user_id: '',
@@ -57,6 +63,11 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
     const [lateMinutes, setLateMinutes] = useState<number | ''>('');
     const [lateHourlyRate, setLateHourlyRate] = useState<number | ''>('');
     const [showLateCalc, setShowLateCalc] = useState(false);
+    const [attendanceBadge, setAttendanceBadge] = useState<{
+        lateCount: number;
+        totalMinutes: number;
+        penalty: number;
+    } | null>(null);
 
     // Transport Allowance Calculator State: kehadiran (hari) * harga/tarif
     const [transportDays, setTransportDays] = useState<number | ''>('');
@@ -142,6 +153,7 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                 setTransportDailyRate('');
                 setShowTransportCalc(false);
                 setAutoInfaq(true);
+                setAttendanceBadge(null);
             }
         }
     }, [isOpen, editingPayroll]);
@@ -192,6 +204,37 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                 setCustomIncomeItems(cIncomes);
                 setCustomDeductionItems(userTemplate?.custom_deduction_items || []);
                 setAutoInfaq(true);
+
+                // Auto-fetch staff attendance monthly late summary from Face Biometric records
+                const activeMonth = month || (new Date().getMonth() + 1);
+                const activeYear = year || new Date().getFullYear();
+                api.get('/staff-attendance/monthly-summary', {
+                    params: {
+                        user_id: value,
+                        month: activeMonth,
+                        year: activeYear
+                    }
+                }).then(res => {
+                    const sum = res.data?.data;
+                    if (sum && sum.total_late_minutes > 0) {
+                        setLateMinutes(sum.total_late_minutes);
+                        setLateHourlyRate(sum.hourly_rate);
+                        setFormData(prev => ({
+                            ...prev,
+                            lateness_penalty: sum.calculated_lateness_penalty
+                        }));
+                        setAttendanceBadge({
+                            lateCount: sum.late_count,
+                            totalMinutes: sum.total_late_minutes,
+                            penalty: sum.calculated_lateness_penalty
+                        });
+                        toast.success(`Terdeteksi ${sum.late_count}x terlambat (${sum.total_late_minutes} menit) dari Presensi Wajah!`, { icon: '⏰' });
+                    } else {
+                        setAttendanceBadge(null);
+                    }
+                }).catch(() => {
+                    setAttendanceBadge(null);
+                });
             }
         }
     };
@@ -503,6 +546,16 @@ export const PayrollFormModal: React.FC<PayrollFormModalProps> = ({
                                                 className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-200 text-right text-sm focus:ring-2 focus:ring-red-400 transition-all font-semibold text-red-600"
                                             />
                                         </div>
+
+                                        {/* Auto-detected Face Attendance Badge */}
+                                        {attendanceBadge && (
+                                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">
+                                                <Zap size={13} className="text-amber-600 shrink-0" />
+                                                <span>
+                                                    Terdeteksi Presensi Wajah: <strong>{attendanceBadge.lateCount}x terlambat ({attendanceBadge.totalMinutes} mnt)</strong>. Potongan: <strong>{formatCurrency(attendanceBadge.penalty)}</strong>
+                                                </span>
+                                            </div>
+                                        )}
 
                                         {/* Toggle Mini Calculator */}
                                         <div className="pt-1">

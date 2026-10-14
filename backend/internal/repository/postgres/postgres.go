@@ -41,6 +41,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.Subject{},
 		&domain.Schedule{},
 		&domain.Attendance{},
+		&domain.StaffAttendance{},
+		&domain.StudentLeaveRequest{},
 		&domain.Violation{},
 		&domain.StudentViolation{},
 		&domain.BKCall{},
