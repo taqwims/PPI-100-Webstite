@@ -72,7 +72,9 @@ func RegisterPublicRoutes(
 	api.POST("/invoice/verify", invoiceSignatureHandler.VerifyInvoice)
 
 	// Public IoT Device RFID Tap
-	api.POST("/attendance/rfid-tap", studentHandler.RecordRFIDAttendance)
+	if cfg.FeatureRFIDAttendance {
+		api.POST("/attendance/rfid-tap", studentHandler.RecordRFIDAttendance)
+	}
 
 	auth := api.Group("/auth")
 	{

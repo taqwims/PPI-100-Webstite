@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-
 import PWAPrompt from '../ui/PWAPrompt';
+import { stopAllCameraStreams } from '../../utils/cameraGuard';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -10,6 +11,14 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const location = useLocation();
+
+    // Pastikan semua kamera hardware dimatikan jika berpindah ke page yang bukan scanner wajah
+    useEffect(() => {
+        if (!location.pathname.includes('/attendance/face')) {
+            stopAllCameraStreams();
+        }
+    }, [location.pathname]);
 
     return (
         <div className="min-h-screen flex relative">

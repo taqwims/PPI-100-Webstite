@@ -11,6 +11,7 @@ import {
     extractEmbeddingFromImageUrl,
     extractEmbeddingFromFile
 } from '../../utils/faceBiometric';
+import { registerCameraStream, stopMediaStream } from '../../utils/cameraGuard';
 
 interface UserItem {
     id: string;
@@ -47,10 +48,12 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
     const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'teacher'>('all');
     const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
 
-    // Camera State
+    // Camera State & Cancellation Refs
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const isMountedRef = useRef(true);
+    const requestTokenRef = useRef(0);
     const [cameraActive, setCameraActive] = useState(false);
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
     const [capturedEmbedding, setCapturedEmbedding] = useState<number[] | null>(null);
@@ -58,24 +61,52 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
     const [isBulkSyncing, setIsBulkSyncing] = useState(false);
     const [isTabVisible, setIsTabVisible] = useState<boolean>(() => typeof document !== 'undefined' ? !document.hidden : true);
 
+    // ─── Stop Camera Tracks Completely ───
+    const stopCamera = () => {
+        // Invalidate any in-flight startCamera
+        requestTokenRef.current++;
+
+        if (streamRef.current) {
+            stopMediaStream(streamRef.current);
+            streamRef.current = null;
+        }
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stopMediaStream(stream);
+            videoRef.current.srcObject = null;
+        }
+        setCameraActive(false);
+    };
+
     // ─── Listen to Tab Visibility (pindah tab browser) ───
     useEffect(() => {
+        isMountedRef.current = true;
+
         const handleVisibilityChange = () => {
-            setIsTabVisible(!document.hidden);
+            const visible = !document.hidden;
+            setIsTabVisible(visible);
+            if (!visible) {
+                stopCamera();
+            }
         };
+
         const handleFocus = () => setIsTabVisible(true);
-        const handleBlur = () => {
-            if (document.hidden) setIsTabVisible(false);
+        const handlePageLeave = () => {
+            stopCamera();
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('focus', handleFocus);
-        window.addEventListener('blur', handleBlur);
+        window.addEventListener('pagehide', handlePageLeave);
+        window.addEventListener('beforeunload', handlePageLeave);
 
         return () => {
+            isMountedRef.current = false;
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('pagehide', handlePageLeave);
+            window.removeEventListener('beforeunload', handlePageLeave);
+            stopCamera();
         };
     }, []);
 
@@ -104,46 +135,37 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
         }
     };
 
-    // Camera handling
-    const stopCamera = () => {
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(t => {
-                try {
-                    t.stop();
-                } catch (e) {
-                    console.warn('Error stopping modal stream track:', e);
-                }
-            });
-            streamRef.current = null;
-        }
-        if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(t => {
-                try {
-                    t.stop();
-                } catch (e) {
-                    console.warn('Error stopping modal video srcObject track:', e);
-                }
-            });
-            videoRef.current.srcObject = null;
-        }
-        setCameraActive(false);
-    };
-
     const startCamera = async () => {
         stopCamera();
+        const token = ++requestTokenRef.current;
+
         try {
+            const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+                video: {
+                    facingMode: 'user',
+                    width: isMobile ? { ideal: 480 } : { ideal: 640 },
+                    height: isMobile ? { ideal: 640 } : { ideal: 480 }
+                }
             });
+
+            // Pastikan jika modal tertutup atau tab tidak aktif saat kamera siap, langsung matikan stream
+            if (!isMountedRef.current || token !== requestTokenRef.current || !isOpen || !selectedUser || capturedImage || document.hidden) {
+                stopMediaStream(stream);
+                return;
+            }
+
+            registerCameraStream(stream);
             streamRef.current = stream;
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
                 setCameraActive(true);
             }
         } catch (err) {
-            console.error('Gagal membuka kamera:', err);
-            toast.error('Kamera tidak dapat diakses. Pastikan izin kamera aktif.');
+            if (token === requestTokenRef.current) {
+                console.error('Gagal membuka kamera:', err);
+                toast.error('Kamera tidak dapat diakses. Pastikan izin kamera aktif.');
+            }
         }
     };
 
@@ -565,8 +587,8 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
                                     </div>
                                 )}
 
-                                {/* Camera Viewport */}
-                                <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3] flex items-center justify-center border border-slate-300 shadow-inner">
+                                {/* Camera Viewport: Portrait on mobile, Horizontal on desktop */}
+                                <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] sm:aspect-[4/3] flex items-center justify-center border border-slate-300 shadow-inner">
                                     {/* Video Stream */}
                                     <video
                                         ref={videoRef}

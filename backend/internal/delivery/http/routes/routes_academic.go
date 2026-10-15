@@ -16,6 +16,7 @@ func RegisterAcademicRoutes(
 	studentLeaveHandler *handlers.StudentLeaveHandler,
 	featureBK bool,
 	featureElearning bool,
+	featureRFID bool,
 ) {
 	// Fallback alias
 	rg.GET("/classes", academicHandler.GetAllClasses)
@@ -51,11 +52,15 @@ func RegisterAcademicRoutes(
 		students.POST("/", studentHandler.CreateStudent)
 		students.PUT("/:id", studentHandler.UpdateStudent)
 		students.DELETE("/:id", studentHandler.DeleteStudent)
-		students.POST("/:id/rfid", studentHandler.AssignRFID)
+		if featureRFID {
+			students.POST("/:id/rfid", studentHandler.AssignRFID)
+		}
 		students.POST("/bulk-promote", studentHandler.HandleBulkPromote)
 		students.GET("/children", studentHandler.GetChildren)
 		students.POST("/attendance", studentHandler.RecordAttendance)
-		students.POST("/attendance/rfid-tap", studentHandler.RecordRFIDAttendance)
+		if featureRFID {
+			students.POST("/attendance/rfid-tap", studentHandler.RecordRFIDAttendance)
+		}
 		students.GET("/attendance/daily", studentHandler.GetDailyAttendance)
 		students.GET("/attendance/export", studentHandler.GetAttendanceExport)
 		students.GET("/attendance/live-recent", studentHandler.GetRecentDailyAttendance)

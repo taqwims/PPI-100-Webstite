@@ -207,20 +207,24 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, mayarHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase, studentHandler)
 
 	// Public Face Attendance Routes (untuk Kiosk Gerbang / Tablet tanpa session timeout)
-	apiGroup.POST("/attendance/face-scan", faceAttendanceHandler.MatchAndRecordAttendance)
-	apiGroup.GET("/attendance/face-descriptors", faceAttendanceHandler.GetRegisteredFaces)
-	apiGroup.GET("/staff-attendance/live-recent", faceAttendanceHandler.GetStaffRecentDaily)
-	apiGroup.GET("/staff-attendance/today-summary", faceAttendanceHandler.GetStaffDailySummary)
+	if cfg.FeatureFaceAttendance {
+		apiGroup.POST("/attendance/face-scan", faceAttendanceHandler.MatchAndRecordAttendance)
+		apiGroup.GET("/attendance/face-descriptors", faceAttendanceHandler.GetRegisteredFaces)
+		apiGroup.GET("/staff-attendance/live-recent", faceAttendanceHandler.GetStaffRecentDaily)
+		apiGroup.GET("/staff-attendance/today-summary", faceAttendanceHandler.GetStaffDailySummary)
+	}
 
 	// Protected Routes (requires authentication)
 	protectedGroup := apiGroup.Group("/")
 	protectedGroup.Use(middleware.AuthMiddleware(cfg))
 
 	// Protected Face Attendance routes (Admin / Registration / Management)
-	attendanceGroup := protectedGroup.Group("/attendance")
-	{
-		attendanceGroup.POST("/face-register", faceAttendanceHandler.RegisterFace)
-		attendanceGroup.DELETE("/face/:user_id", faceAttendanceHandler.RemoveFace)
+	if cfg.FeatureFaceAttendance {
+		attendanceGroup := protectedGroup.Group("/attendance")
+		{
+			attendanceGroup.POST("/face-register", faceAttendanceHandler.RegisterFace)
+			attendanceGroup.DELETE("/face/:user_id", faceAttendanceHandler.RemoveFace)
+		}
 	}
 
 	staffAttendanceGroup := protectedGroup.Group("/staff-attendance")
@@ -231,7 +235,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	}
 
 	// Register modular mapped routes
-	RegisterAcademicRoutes(protectedGroup, academicHandler, teacherHandler, studentHandler, bkHandler, elearningHandler, studentLeaveHandler, cfg.FeatureBK, cfg.FeatureElearning)
+	RegisterAcademicRoutes(protectedGroup, academicHandler, teacherHandler, studentHandler, bkHandler, elearningHandler, studentLeaveHandler, cfg.FeatureBK, cfg.FeatureElearning, cfg.FeatureRFIDAttendance)
 	
 	RegisterAdminRoutes(protectedGroup, cfg, userHandler, profileHandler, notificationHandler, assetHandler, assetCategoryHandler, schoolSettingHandler, backupHandler, publicHandler, ppdbPaymentHandler, parentHandler)
 

@@ -7,8 +7,10 @@ import {
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import { useFeatureStore } from '../../store/featureStore';
 import { FaceEnrollmentModal } from '../../components/admin/FaceEnrollmentModal';
 import { extractFaceEmbedding } from '../../utils/faceBiometric';
+import { registerCameraStream, stopMediaStream, stopAllCameraStreams } from '../../utils/cameraGuard';
 
 // ─── Web Audio API Sound Synthesizer ───
 class BiometricAudio {
@@ -114,6 +116,8 @@ interface ScanResult {
 }
 
 const AttendanceFaceScanner: React.FC = () => {
+    const isFaceEnabled = useFeatureStore((s) => s.isFaceEnabled());
+
     // ─── Sound System ───
     const soundRef = useRef<BiometricAudio>(new BiometricAudio());
     const [soundOn, setSoundOn] = useState(true);
@@ -125,16 +129,50 @@ const AttendanceFaceScanner: React.FC = () => {
     const [hourlyRate, setHourlyRate] = useState(30000); // Rp 30.000 / jam
     const [cutoffTime] = useState('07:00'); // Batas jam masuk
 
-    // ─── Camera Stream State ───
+    // Early return if Face Attendance is disabled
+    if (!isFaceEnabled) {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
+                <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-4">
+                    <Camera size={32} />
+                </div>
+                <h2 className="text-xl font-bold mb-2">Fitur Presensi Wajah Dinonaktifkan</h2>
+                <p className="text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
+                    Fitur pengenalan wajah (Face Attendance) sedang dinonaktifkan pada konfigurasi sistem (FEATURE_FACE_ATTENDANCE=false). Silakan aktifkan di pengaturan lingkungan atau hubungi administrator.
+                </p>
+                <Link
+                    to="/dashboard/attendance"
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold transition"
+                >
+                    Kembali ke Halaman Presensi
+                </Link>
+            </div>
+        );
+    }
+
+    // ─── Camera Stream State & Cancellation Refs ───
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const isMountedRef = useRef(true);
+    const requestTokenRef = useRef(0);
     const [hasCamera, setHasCamera] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const [isLiveScanning, setIsLiveScanning] = useState(false);
     const [isTabVisible, setIsTabVisible] = useState<boolean>(() => typeof document !== 'undefined' ? !document.hidden : true);
+    const [currentTime, setCurrentTime] = useState<string>(() =>
+        new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB'
+    );
+
+    // Live Clock Effect
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     // ─── Biometric Scan State ───
     const [activeResult, setActiveResult] = useState<ScanResult | null>(null);
@@ -184,73 +222,92 @@ const AttendanceFaceScanner: React.FC = () => {
         }
     ]);
 
-    // ─── Listen to Tab Visibility (pindah tab browser) ───
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            setIsTabVisible(!document.hidden);
-        };
-
-        const handleFocus = () => setIsTabVisible(true);
-        const handleBlur = () => {
-            if (document.hidden) {
-                setIsTabVisible(false);
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('focus', handleFocus);
-        window.addEventListener('blur', handleBlur);
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('blur', handleBlur);
-        };
-    }, []);
-
     // ─── Stop Camera Tracks Completely ───
     const stopCamera = () => {
+        // Invalidate any in-flight startCamera asynchronous promise
+        requestTokenRef.current++;
+
         if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => {
-                try {
-                    track.stop();
-                } catch (e) {
-                    console.warn('Error stopping track:', e);
-                }
-            });
+            stopMediaStream(streamRef.current);
             streamRef.current = null;
         }
         if (videoRef.current && videoRef.current.srcObject) {
             const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(t => {
-                try {
-                    t.stop();
-                } catch (e) {
-                    console.warn('Error stopping video srcObject track:', e);
-                }
-            });
+            stopMediaStream(stream);
             videoRef.current.srcObject = null;
         }
+        stopAllCameraStreams();
         setHasCamera(false);
     };
 
-    // ─── Start Camera Function ───
+    // ─── Listen to Tab Visibility (pindah tab browser / minimize) ───
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        const handleVisibilityChange = () => {
+            const visible = !document.hidden;
+            setIsTabVisible(visible);
+            if (!visible) {
+                // Langsung matikan kamera secara sinkron saat berpindah tab browser
+                stopCamera();
+            }
+        };
+
+        const handleFocus = () => {
+            setIsTabVisible(true);
+        };
+
+        const handlePageLeave = () => {
+            stopCamera();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+        window.addEventListener('pagehide', handlePageLeave);
+        window.addEventListener('beforeunload', handlePageLeave);
+
+        return () => {
+            isMountedRef.current = false;
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('pagehide', handlePageLeave);
+            window.removeEventListener('beforeunload', handlePageLeave);
+            stopCamera();
+        };
+    }, []);
+
+    // ─── Start Camera Function with Race-Condition Prevention ───
     const startCamera = async () => {
         // Stop any existing stream first
         stopCamera();
+        const token = ++requestTokenRef.current;
 
         try {
             const devs = await navigator.mediaDevices.enumerateDevices();
             const videoDevs = devs.filter(d => d.kind === 'videoinput');
+            if (token !== requestTokenRef.current || !isMountedRef.current) return;
             setDevices(videoDevs);
 
+            const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
             const constraints: MediaStreamConstraints = {
                 video: selectedDeviceId
-                    ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-                    : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+                    ? { deviceId: { exact: selectedDeviceId } }
+                    : {
+                        facingMode: 'user',
+                        width: isMobile ? { ideal: 720 } : { ideal: 1280 },
+                        height: isMobile ? { ideal: 1280 } : { ideal: 720 }
+                    }
             };
 
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Periksa jika saat menunggu kamera dibuka komponen unmount, tab berpindah, atau scanner dimatikan
+            if (!isMountedRef.current || token !== requestTokenRef.current || document.hidden || !isScanning || showEnrollModal) {
+                stopMediaStream(stream);
+                return;
+            }
+
+            registerCameraStream(stream);
             streamRef.current = stream;
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
@@ -258,9 +315,11 @@ const AttendanceFaceScanner: React.FC = () => {
                 setCameraError(null);
             }
         } catch (err: any) {
-            console.warn('Camera stream error:', err);
-            setCameraError(err.message || 'Kamera tidak dapat diakses');
-            setHasCamera(false);
+            if (token === requestTokenRef.current) {
+                console.warn('Camera stream error:', err);
+                setCameraError(err.message || 'Kamera tidak dapat diakses');
+                setHasCamera(false);
+            }
         }
     };
 
@@ -517,58 +576,110 @@ const AttendanceFaceScanner: React.FC = () => {
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-12">
             {/* ─── Top Header Bar ─── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/70 backdrop-blur-xl border border-white/60 p-5 rounded-3xl shadow-sm">
-                <div>
-                    <div className="flex items-center gap-2">
-                        {!isTabVisible ? (
-                            <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                Kamera Dijeda (Tab Lain)
+            <div className="bg-white/80 backdrop-blur-xl border border-white/60 p-4 sm:p-5 rounded-3xl shadow-sm space-y-4">
+                {/* Top Row: Title, Live Status, Cutoff Info & Quick Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {!isTabVisible ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold flex items-center gap-1.5 shadow-xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    Dijeda (Tab Lain)
+                                </span>
+                            ) : showEnrollModal ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-semibold flex items-center gap-1.5 shadow-xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                    Modal Terbuka
+                                </span>
+                            ) : isScanning && hasCamera ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold flex items-center gap-1.5 shadow-xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Kamera Siap
+                                </span>
+                            ) : (
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1.5 shadow-xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                    Nonaktif
+                                </span>
+                            )}
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                <Clock size={11} className="text-amber-500" />
+                                Batas Masuk: <strong className="text-slate-700 font-semibold">{cutoffTime} WIB</strong>
                             </span>
-                        ) : showEnrollModal ? (
-                            <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
-                                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                                Kamera di Modal Pendaftaran
-                            </span>
-                        ) : isScanning && hasCamera ? (
-                            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                Kamera Siap & Aktif
-                            </span>
-                        ) : (
-                            <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
-                                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                                Kamera Nonaktif
-                            </span>
-                        )}
-                        <span className="text-xs text-slate-500 hidden sm:inline">Presensi Masuk & Pulang Sekolah</span>
+                        </div>
+                        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1 flex items-center gap-2">
+                            Presensi Wajah
+                            <span className="text-emerald-600 text-sm sm:text-lg font-medium">(Siswa & Guru)</span>
+                        </h1>
                     </div>
-                    <h1 className="text-2xl font-extrabold text-slate-800 mt-1 flex items-center gap-2">
-                        Presensi Wajah
-                        <span className="text-emerald-600 text-lg font-medium">(Siswa & Guru)</span>
-                    </h1>
+
+                    {/* Quick Utility Actions */}
+                    <div className="flex items-center flex-wrap gap-2">
+                        {/* Toggle Kamera Manual */}
+                        <button
+                            onClick={() => setIsScanning(prev => !prev)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                                isScanning
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                            }`}
+                            title={isScanning ? 'Klik untuk mematikan kamera' : 'Klik untuk menyalakan kamera'}
+                        >
+                            <Camera size={14} className={isScanning ? 'text-emerald-600' : 'text-slate-400'} />
+                            <span>{isScanning ? 'Kamera ON' : 'Kamera OFF'}</span>
+                        </button>
+
+                        {/* Sound Toggle */}
+                        <button
+                            onClick={() => {
+                                const next = !soundOn;
+                                setSoundOn(next);
+                                soundRef.current.soundEnabled = next;
+                            }}
+                            className={`p-2 rounded-xl border transition-all ${
+                                soundOn
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                            }`}
+                            title={soundOn ? 'Suara Aktif' : 'Mute'}
+                        >
+                            {soundOn ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                        </button>
+
+                        {/* Fullscreen Button */}
+                        <button
+                            onClick={toggleFullscreen}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all hidden sm:inline-flex"
+                            title="Mode Kiosk / Layar Penuh"
+                        >
+                            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                        </button>
+
+                        {/* Face Enrollment Button */}
+                        <button
+                            onClick={() => setShowEnrollModal(true)}
+                            className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
+                        >
+                            <UserPlus size={14} /> <span>Daftarkan Wajah</span>
+                        </button>
+
+                        {/* Back to Attendance */}
+                        <Link
+                            to="/dashboard/attendance"
+                            className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm"
+                        >
+                            Tabel Rekap
+                        </Link>
+                    </div>
                 </div>
 
-                <div className="flex items-center flex-wrap gap-2">
-                    {/* Toggle Kamera Manual */}
-                    <button
-                        onClick={() => setIsScanning(prev => !prev)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-                            isScanning
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
-                        }`}
-                        title={isScanning ? 'Klik untuk mematikan kamera' : 'Klik untuk menyalakan kamera'}
-                    >
-                        <Camera size={14} className={isScanning ? 'text-emerald-600' : 'text-slate-400'} />
-                        {isScanning ? 'Kamera ON' : 'Kamera OFF'}
-                    </button>
-
-                    {/* Mode Selector */}
-                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                {/* Bottom Row: Mode Selector + Camera Device Selector */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    {/* Mode Selector Segmented Tabs */}
+                    <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-center">
                         <button
                             onClick={() => setTargetMode('all')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                            className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${
                                 targetMode === 'all'
                                     ? 'bg-white text-emerald-700 shadow-sm'
                                     : 'text-slate-600 hover:text-slate-900'
@@ -578,23 +689,23 @@ const AttendanceFaceScanner: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setTargetMode('student')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 ${
+                            className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                                 targetMode === 'student'
                                     ? 'bg-white text-emerald-700 shadow-sm'
                                     : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                            <GraduationCap size={13} /> Siswa
+                            <GraduationCap size={13} /> <span>Siswa</span>
                         </button>
                         <button
                             onClick={() => setTargetMode('teacher')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 ${
+                            className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                                 targetMode === 'teacher'
                                     ? 'bg-white text-emerald-700 shadow-sm'
                                     : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                            <Briefcase size={13} /> Guru & Staf
+                            <Briefcase size={13} /> <span>Guru & Staf</span>
                         </button>
                     </div>
 
@@ -604,7 +715,7 @@ const AttendanceFaceScanner: React.FC = () => {
                             value={selectedDeviceId}
                             onChange={(e) => setSelectedDeviceId(e.target.value)}
                             aria-label="Pilih Perangkat Kamera"
-                            className="text-xs bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                            className="text-xs bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
                         >
                             {devices.map((d, i) => (
                                 <option key={d.deviceId || i} value={d.deviceId}>
@@ -613,48 +724,6 @@ const AttendanceFaceScanner: React.FC = () => {
                             ))}
                         </select>
                     )}
-
-                    {/* Sound Toggle */}
-                    <button
-                        onClick={() => {
-                            const next = !soundOn;
-                            setSoundOn(next);
-                            soundRef.current.soundEnabled = next;
-                        }}
-                        className={`p-2.5 rounded-xl border transition-all ${
-                            soundOn
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        title={soundOn ? 'Suara Aktif' : 'Mute'}
-                    >
-                        {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                    </button>
-
-                    {/* Fullscreen Button */}
-                    <button
-                        onClick={toggleFullscreen}
-                        className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all"
-                        title="Mode Kiosk / Layar Penuh"
-                    >
-                        {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                    </button>
-
-                    {/* Face Enrollment Button */}
-                    <button
-                        onClick={() => setShowEnrollModal(true)}
-                        className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
-                    >
-                        <UserPlus size={14} /> Daftarkan Wajah
-                    </button>
-
-                    {/* Back to Attendance */}
-                    <Link
-                        to="/dashboard/attendance"
-                        className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm"
-                    >
-                        Tabel Rekap
-                    </Link>
                 </div>
             </div>
 
@@ -662,7 +731,8 @@ const AttendanceFaceScanner: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* ─── Left Column: Camera Viewfinder (7 Cols) ─── */}
                 <div className="lg:col-span-7 space-y-4">
-                    <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl aspect-[4/3] sm:aspect-[16/10] flex items-center justify-center group">
+                    {/* Viewfinder: Portrait aspect-[3/4] on mobile, Horizontal aspect-[16/10] on desktop */}
+                    <div className="relative rounded-3xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl aspect-[3/4] sm:aspect-[16/10] flex items-center justify-center group">
                         {/* Live Video Feed */}
                         <video
                             ref={videoRef}
@@ -727,55 +797,58 @@ const AttendanceFaceScanner: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ─── Clean Camera Overlay (No AI HUD) ─── */}
-                        <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-5">
-                            {/* Top Clean Info */}
-                            <div className="flex items-center justify-between text-xs text-white/90 bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                                    <span className="font-medium">Kamera Presensi Aktif</span>
+                        {/* ─── Modern Minimalist Camera HUD Overlay ─── */}
+                        <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 sm:p-5">
+                            {/* Top Corner Badges: Clean pills at left & right corners, open in the center */}
+                            <div className="flex items-center justify-between w-full">
+                                {/* Left: Minimalist Live Status */}
+                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-[11px] font-bold text-emerald-300 uppercase tracking-wider shadow-sm">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span>LIVE CAM</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-slate-300">
-                                    <span>Batas Masuk:</span>
-                                    <span className="text-amber-300 font-semibold">{cutoffTime} WIB</span>
+
+                                {/* Right: Real-time Clock Badge */}
+                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-[11px] font-mono text-slate-200 shadow-sm">
+                                    <Clock size={11} className="text-amber-400" />
+                                    <span>{currentTime}</span>
                                 </div>
                             </div>
 
-                            {/* Centered Facial Bounding Frame (Clean Oval) */}
-                            <div className="relative mx-auto w-56 h-72 sm:w-64 sm:h-80 flex items-center justify-center">
-                                <div className={`w-full h-full rounded-[64px] sm:rounded-[80px] border-2 transition-all duration-300 ${
+                            {/* Centered Facial Bounding Frame (Clean Oval adapted to mobile portrait & desktop landscape) */}
+                            <div className="relative mx-auto w-48 h-64 sm:w-60 sm:h-76 flex items-center justify-center my-auto">
+                                <div className={`w-full h-full rounded-[68px] sm:rounded-[80px] border-2 transition-all duration-300 ${
                                     livenessStage === 'matched'
-                                        ? 'border-emerald-400 bg-emerald-500/10'
+                                        ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_25px_rgba(52,211,153,0.3)]'
                                         : livenessStage === 'verifying'
-                                        ? 'border-amber-400 bg-amber-500/5'
-                                        : 'border-white/60 bg-transparent'
+                                        ? 'border-amber-400 bg-amber-500/10 shadow-[0_0_25px_rgba(251,191,36,0.3)]'
+                                        : 'border-white/50 bg-transparent'
                                 }`}>
                                     {/* Soft corner guides */}
-                                    <div className="absolute top-5 left-5 w-4 h-4 border-t-2 border-l-2 border-white/50 rounded-tl-lg" />
-                                    <div className="absolute top-5 right-5 w-4 h-4 border-t-2 border-r-2 border-white/50 rounded-tr-lg" />
-                                    <div className="absolute bottom-5 left-5 w-4 h-4 border-b-2 border-l-2 border-white/50 rounded-bl-lg" />
-                                    <div className="absolute bottom-5 right-5 w-4 h-4 border-b-2 border-r-2 border-white/50 rounded-br-lg" />
+                                    <div className="absolute top-4 left-4 w-3.5 h-3.5 border-t-2 border-l-2 border-white/60 rounded-tl-md" />
+                                    <div className="absolute top-4 right-4 w-3.5 h-3.5 border-t-2 border-r-2 border-white/60 rounded-tr-md" />
+                                    <div className="absolute bottom-4 left-4 w-3.5 h-3.5 border-b-2 border-l-2 border-white/60 rounded-bl-md" />
+                                    <div className="absolute bottom-4 right-4 w-3.5 h-3.5 border-b-2 border-r-2 border-white/60 rounded-br-md" />
                                 </div>
                             </div>
 
-                            {/* Friendly Interactive Guidance Banner */}
+                            {/* Floating Guidance Banner at Bottom */}
                             <div className="flex justify-center pb-1">
                                 {livenessStage === 'detecting' && (
-                                    <div className="bg-black/65 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/15 text-white text-xs sm:text-sm font-medium flex items-center gap-2 shadow-lg">
-                                        <Camera size={16} className="text-emerald-400 shrink-0" />
-                                        <span>Posisikan wajah Anda di dalam lingkaran panduan</span>
+                                    <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/15 text-white text-[11px] sm:text-xs font-medium flex items-center gap-1.5 shadow-md">
+                                        <Smile size={14} className="text-emerald-400 shrink-0" />
+                                        <span>Arahkan wajah ke dalam bingkai oval</span>
                                     </div>
                                 )}
                                 {livenessStage === 'verifying' && (
-                                    <div className="bg-black/75 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-amber-400/50 text-amber-200 text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xl animate-pulse">
-                                        <Smile size={18} className="text-amber-400 shrink-0" />
-                                        <span>Silakan kedipkan mata atau tersenyum 😉</span>
+                                    <div className="bg-black/75 backdrop-blur-md px-4 py-2 rounded-full border border-amber-400/40 text-amber-200 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 shadow-lg animate-pulse">
+                                        <Smile size={14} className="text-amber-400 shrink-0" />
+                                        <span>Kedipkan mata atau tersenyum 😉</span>
                                     </div>
                                 )}
                                 {livenessStage === 'matched' && (
-                                    <div className="bg-emerald-950/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-emerald-400/50 text-emerald-200 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-xl">
-                                        <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-                                        <span>Wajah terverifikasi, memproses absensi...</span>
+                                    <div className="bg-emerald-950/85 backdrop-blur-md px-4 py-2 rounded-full border border-emerald-400/40 text-emerald-200 text-[11px] sm:text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                                        <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                                        <span>Wajah Terverifikasi</span>
                                     </div>
                                 )}
                             </div>

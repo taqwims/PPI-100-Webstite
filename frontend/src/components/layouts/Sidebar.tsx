@@ -4,7 +4,7 @@ import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
     Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers,
-    Radio, Globe, FileSpreadsheet
+    Radio, Globe, FileSpreadsheet, Camera
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -54,13 +54,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             items: [{ icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' }]
         };
 
+        const isRFID = isEnabled('rfid_attendance');
+        const isFace = isEnabled('face_attendance');
+
+        const attendanceMenuItems: MenuItem[] = [];
+        if (isRFID && isFace) {
+            attendanceMenuItems.push({ icon: Radio, label: 'Presensi RFID & Wajah', path: '/dashboard/attendance' });
+            attendanceMenuItems.push({ icon: Camera, label: 'Scanner Wajah', path: '/dashboard/attendance/face' });
+        } else if (isRFID) {
+            attendanceMenuItems.push({ icon: Radio, label: 'Presensi RFID & NFC', path: '/dashboard/attendance' });
+        } else if (isFace) {
+            attendanceMenuItems.push({ icon: Camera, label: 'Presensi Wajah', path: '/dashboard/attendance' });
+            attendanceMenuItems.push({ icon: Camera, label: 'Scanner Wajah', path: '/dashboard/attendance/face' });
+        } else {
+            attendanceMenuItems.push({ icon: Calendar, label: 'Presensi Siswa', path: '/dashboard/attendance' });
+        }
+
         // ── Admin groups ──
         const adminManagement: MenuGroup = {
             title: 'Manajemen',
             items: [
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
-                { icon: Users, label: isEnabled('rfid_attendance') ? 'Data Siswa & RFID' : 'Data Siswa', path: '/dashboard/students' },
-                { icon: Radio, label: 'Presensi RFID & NFC', path: '/dashboard/attendance', feature: 'rfid_attendance' },
+                { icon: Users, label: isRFID ? 'Data Siswa & RFID' : 'Data Siswa', path: '/dashboard/students' },
+                ...attendanceMenuItems,
                 { icon: FileSpreadsheet, label: 'Export Presensi', path: '/dashboard/attendance/export' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
