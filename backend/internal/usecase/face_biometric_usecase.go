@@ -135,6 +135,7 @@ type MatchScanRequest struct {
 	Descriptor []float64 `json:"descriptor"`
 	DeviceID   string    `json:"device_id"`
 	UnitID     uint      `json:"unit_id"`
+	ScanType   string    `json:"scan_type"` // "auto", "checkin", "checkout"
 	Notes      string    `json:"notes"`
 }
 
@@ -145,6 +146,7 @@ type MatchScanResponse struct {
 	Identifier    string  `json:"identifier"`
 	Subtext       string  `json:"subtext"`
 	Status        string  `json:"status"` // Present / Late
+	Type          string  `json:"type"`   // CheckIn / CheckOut
 	Timestamp     string  `json:"timestamp"`
 	LateMinutes   int     `json:"late_minutes"`
 	HourlyRate    float64 `json:"hourly_rate"`
@@ -240,12 +242,19 @@ func (u *FaceBiometricUsecase) MatchAndRecord(req MatchScanRequest) (*MatchScanR
 	// ─── Skenario Siswa ───
 	if matchedUser.Student != nil {
 		student := matchedUser.Student
-
-		// Cooldown check (5 menit untuk mencegah double-tap)
 		todayAtts, _ := u.attendanceRepo.GetTodayStudentAttendance(student.ID.String(), now)
+
+		// Cooldown check (dinamis dari pengaturan sekolah attendance_cooldown_minutes, default 3 menit)
+		cooldownMinsStr := u.getSetting("attendance_cooldown_minutes", "3")
+		cooldownMins, _ := strconv.Atoi(cooldownMinsStr)
+		if cooldownMins <= 0 {
+			cooldownMins = 3
+		}
+		cooldownDuration := time.Duration(cooldownMins) * time.Minute
+
 		if len(todayAtts) > 0 {
 			lastAtt := todayAtts[len(todayAtts)-1]
-			if now.Sub(lastAtt.Timestamp) < 5*time.Minute {
+			if now.Sub(lastAtt.Timestamp) < cooldownDuration {
 				return &MatchScanResponse{
 					UserID:      matchedUser.ID.String(),
 					Name:        matchedUser.Name,
@@ -253,33 +262,117 @@ func (u *FaceBiometricUsecase) MatchAndRecord(req MatchScanRequest) (*MatchScanR
 					Identifier:  "NISN " + student.NISN,
 					Subtext:     "Kelas " + student.Class.Name,
 					Status:      lastAtt.Status,
+					Type:        lastAtt.Type,
 					Timestamp:   lastAtt.Timestamp.Format("15:04") + " WIB",
 					LateMinutes: 0,
 					Confidence:  confidence,
-					Message:     "Sudah melakukan presensi beberapa saat yang lalu",
+					Message:     fmt.Sprintf("Siswa baru saja presensi %s pada %s WIB. Mohon tunggu %d menit.", lastAtt.Type, lastAtt.Timestamp.Format("15:04:05"), cooldownMins),
 				}, nil
 			}
 		}
 
-		// Batas jam masuk siswa (default 07:00)
-		cutoffStr := u.getSetting("student_check_in_time", "07:00")
-		status := "Present"
-		lateMins := 0
+		var hasCheckIn, hasCheckOut bool
+		for _, rec := range todayAtts {
+			if rec.Type == "CheckIn" {
+				hasCheckIn = true
+			} else if rec.Type == "CheckOut" {
+				hasCheckOut = true
+			}
+		}
 
+		// Batas jam masuk (dinamis dari attendance_late_threshold atau student_check_in_time)
+		cutoffStr := u.getSetting("student_check_in_time", u.getSetting("attendance_late_threshold", "07:00"))
 		cutoffTime := parseTimeToday(cutoffStr, now)
-		if now.After(cutoffTime) {
-			status = "Late"
-			lateMins = int(now.Sub(cutoffTime).Minutes())
+
+		var targetType string
+		var targetStatus string
+		var lateMins int
+		var message string
+
+		switch strings.ToLower(req.ScanType) {
+		case "checkin", "masuk":
+			if hasCheckIn {
+				return &MatchScanResponse{
+					UserID:     matchedUser.ID.String(),
+					Name:       matchedUser.Name,
+					Role:       "Siswa",
+					Identifier: "NISN " + student.NISN,
+					Subtext:    "Kelas " + student.Class.Name,
+					Status:     "Present",
+					Type:       "CheckIn",
+					Timestamp:  timestampStr,
+					Confidence: confidence,
+					Message:    "Siswa sudah melakukan presensi masuk hari ini",
+				}, nil
+			}
+			targetType = "CheckIn"
+			if now.After(cutoffTime) {
+				targetStatus = "Late"
+				lateMins = int(now.Sub(cutoffTime).Minutes())
+				message = fmt.Sprintf("Presensi Masuk Siswa Tercatat (Terlambat %d Menit)", lateMins)
+			} else {
+				targetStatus = "Present"
+				message = "Presensi Masuk Siswa Berhasil (Tepat Waktu)"
+			}
+
+		case "checkout", "pulang":
+			if hasCheckOut {
+				return &MatchScanResponse{
+					UserID:     matchedUser.ID.String(),
+					Name:       matchedUser.Name,
+					Role:       "Siswa",
+					Identifier: "NISN " + student.NISN,
+					Subtext:    "Kelas " + student.Class.Name,
+					Status:     "Present",
+					Type:       "CheckOut",
+					Timestamp:  timestampStr,
+					Confidence: confidence,
+					Message:    "Siswa sudah melakukan presensi pulang hari ini",
+				}, nil
+			}
+			targetType = "CheckOut"
+			targetStatus = "Present"
+			message = "Presensi Pulang Siswa Berhasil. Hati-hati di jalan!"
+
+		default: // "auto"
+			if !hasCheckIn {
+				targetType = "CheckIn"
+				if now.After(cutoffTime) {
+					targetStatus = "Late"
+					lateMins = int(now.Sub(cutoffTime).Minutes())
+					message = fmt.Sprintf("Presensi Masuk Siswa Tercatat (Terlambat %d Menit)", lateMins)
+				} else {
+					targetStatus = "Present"
+					message = "Presensi Masuk Siswa Berhasil (Tepat Waktu)"
+				}
+			} else if !hasCheckOut {
+				targetType = "CheckOut"
+				targetStatus = "Present"
+				message = "Presensi Pulang Siswa Berhasil. Hati-hati di jalan!"
+			} else {
+				return &MatchScanResponse{
+					UserID:     matchedUser.ID.String(),
+					Name:       matchedUser.Name,
+					Role:       "Siswa",
+					Identifier: "NISN " + student.NISN,
+					Subtext:    "Kelas " + student.Class.Name,
+					Status:     "Present",
+					Type:       "CheckOut",
+					Timestamp:  timestampStr,
+					Confidence: confidence,
+					Message:    "Siswa sudah menyelesaikan presensi masuk dan pulang hari ini",
+				}, nil
+			}
 		}
 
 		attRecord := domain.Attendance{
 			StudentID: student.ID,
 			Timestamp: now,
 			Method:    "Face",
-			Status:    status,
-			Type:      "CheckIn",
+			Status:    targetStatus,
+			Type:      targetType,
 			DeviceID:  req.DeviceID,
-			Notes:     fmt.Sprintf("Face Biometric (Confidence: %.1f%%)", confidence),
+			Notes:     fmt.Sprintf("Face Biometric %s (Confidence: %.1f%%)", targetType, confidence),
 		}
 		_ = u.attendanceRepo.Create(&attRecord)
 
@@ -289,71 +382,197 @@ func (u *FaceBiometricUsecase) MatchAndRecord(req MatchScanRequest) (*MatchScanR
 			Role:        "Siswa",
 			Identifier:  "NISN " + student.NISN,
 			Subtext:     "Kelas " + student.Class.Name,
-			Status:      status,
+			Status:      targetStatus,
+			Type:        targetType,
 			Timestamp:   timestampStr,
 			LateMinutes: lateMins,
 			Confidence:  confidence,
-			Message:     "Presensi Siswa Berhasil",
+			Message:     message,
 		}, nil
 	}
 
 	// ─── Skenario Guru & Tenaga Kependidikan ───
-	cutoffStr := u.getSetting("teacher_check_in_time", "07:00")
+	cutoffStr := u.getSetting("teacher_check_in_time", u.getSetting("attendance_late_threshold", "07:00"))
 	hourlyRateStr := u.getSetting("teacher_late_hourly_rate", "30000")
 	hourlyRate, _ := strconv.ParseFloat(hourlyRateStr, 64)
 	if hourlyRate <= 0 {
 		hourlyRate = 30000
 	}
 
-	status := "Present"
-	lateMins := 0
-	penalty := 0.0
-
 	cutoffTime := parseTimeToday(cutoffStr, now)
-	if now.After(cutoffTime) {
-		status = "Late"
-		lateMins = int(now.Sub(cutoffTime).Minutes())
-		// Rumus: (menit : 60 x harga)
-		penalty = math.Round((float64(lateMins) / 60.0) * hourlyRate)
-	}
-
-	// Cek apakah sudah absen hari ini
 	existingStaffAtt, _ := u.staffAttendanceRepo.GetTodayByUser(matchedUser.ID.String(), now)
-	if existingStaffAtt != nil {
-		return &MatchScanResponse{
-			UserID:        matchedUser.ID.String(),
-			Name:          matchedUser.Name,
-			Role:          "Guru",
-			Identifier:    getStaffNIP(matchedUser),
-			Subtext:       "Guru / Staf",
-			Status:        existingStaffAtt.Status,
-			Timestamp:     existingStaffAtt.CheckInTime.Format("15:04") + " WIB",
-			LateMinutes:   existingStaffAtt.LateMinutes,
-			HourlyRate:    existingStaffAtt.HourlyRate,
-			PenaltyAmount: existingStaffAtt.PenaltyAmount,
-			Confidence:    confidence,
-			Message:       "Presensi hari ini sudah tercatat sebelumnya",
-		}, nil
-	}
 
-	staffAtt := domain.StaffAttendance{
-		UserID:        matchedUser.ID,
-		UnitID:        matchedUser.UnitID,
-		Date:          now,
-		CheckInTime:   now,
-		Method:        "Face",
-		Status:        status,
-		LateMinutes:   lateMins,
-		HourlyRate:    hourlyRate,
-		PenaltyAmount: penalty,
-		DeviceID:      req.DeviceID,
-		Notes:         fmt.Sprintf("Face Biometric (Confidence: %.1f%%)", confidence),
-	}
-	_ = u.staffAttendanceRepo.Create(&staffAtt)
+	var targetType string
+	var status string
+	var lateMins int
+	var penalty float64
+	var msg string
 
-	msg := "Presensi Guru Berhasil (Tepat Waktu)"
-	if status == "Late" {
-		msg = fmt.Sprintf("Presensi Tercatat (Terlambat %d Menit, Potongan Rp %.0f)", lateMins, penalty)
+	switch strings.ToLower(req.ScanType) {
+	case "checkin", "masuk":
+		if existingStaffAtt != nil {
+			return &MatchScanResponse{
+				UserID:        matchedUser.ID.String(),
+				Name:          matchedUser.Name,
+				Role:          "Guru",
+				Identifier:    getStaffNIP(matchedUser),
+				Subtext:       "Guru / Staf",
+				Status:        existingStaffAtt.Status,
+				Type:          "CheckIn",
+				Timestamp:     existingStaffAtt.CheckInTime.Format("15:04") + " WIB",
+				LateMinutes:   existingStaffAtt.LateMinutes,
+				HourlyRate:    existingStaffAtt.HourlyRate,
+				PenaltyAmount: existingStaffAtt.PenaltyAmount,
+				Confidence:    confidence,
+				Message:       "Presensi masuk guru sudah tercatat sebelumnya",
+			}, nil
+		}
+
+		status = "Present"
+		if now.After(cutoffTime) {
+			status = "Late"
+			lateMins = int(now.Sub(cutoffTime).Minutes())
+			penalty = math.Round((float64(lateMins) / 60.0) * hourlyRate)
+		}
+		targetType = "CheckIn"
+		msg = "Presensi Masuk Guru Berhasil (Tepat Waktu)"
+		if status == "Late" {
+			msg = fmt.Sprintf("Presensi Masuk Tercatat (Terlambat %d Menit, Potongan Rp %.0f)", lateMins, penalty)
+		}
+
+		staffAtt := domain.StaffAttendance{
+			UserID:        matchedUser.ID,
+			UnitID:        matchedUser.UnitID,
+			Date:          now,
+			CheckInTime:   now,
+			Method:        "Face",
+			Status:        status,
+			LateMinutes:   lateMins,
+			HourlyRate:    hourlyRate,
+			PenaltyAmount: penalty,
+			DeviceID:      req.DeviceID,
+			Notes:         fmt.Sprintf("Face Biometric CheckIn (Confidence: %.1f%%)", confidence),
+		}
+		_ = u.staffAttendanceRepo.Create(&staffAtt)
+
+	case "checkout", "pulang":
+		if existingStaffAtt == nil {
+			status = "Present"
+			targetType = "CheckOut"
+			staffAtt := domain.StaffAttendance{
+				UserID:        matchedUser.ID,
+				UnitID:        matchedUser.UnitID,
+				Date:          now,
+				CheckInTime:   now,
+				CheckOutTime:  &now,
+				Method:        "Face",
+				Status:        status,
+				HourlyRate:    hourlyRate,
+				DeviceID:      req.DeviceID,
+				Notes:         fmt.Sprintf("Face Biometric CheckOut langsung (Confidence: %.1f%%)", confidence),
+			}
+			_ = u.staffAttendanceRepo.Create(&staffAtt)
+			msg = "Presensi Pulang Guru Berhasil. Selamat beristirahat!"
+		} else if existingStaffAtt.CheckOutTime != nil {
+			return &MatchScanResponse{
+				UserID:        matchedUser.ID.String(),
+				Name:          matchedUser.Name,
+				Role:          "Guru",
+				Identifier:    getStaffNIP(matchedUser),
+				Subtext:       "Guru / Staf",
+				Status:        existingStaffAtt.Status,
+				Type:          "CheckOut",
+				Timestamp:     existingStaffAtt.CheckOutTime.Format("15:04") + " WIB",
+				Confidence:    confidence,
+				Message:       "Presensi pulang guru sudah tercatat sebelumnya",
+			}, nil
+		} else {
+			existingStaffAtt.CheckOutTime = &now
+			_ = u.staffAttendanceRepo.Update(existingStaffAtt)
+			targetType = "CheckOut"
+			status = existingStaffAtt.Status
+			lateMins = existingStaffAtt.LateMinutes
+			penalty = existingStaffAtt.PenaltyAmount
+			msg = "Presensi Pulang Guru Berhasil. Selamat beristirahat!"
+		}
+
+	default: // "auto"
+		if existingStaffAtt == nil {
+			// Belum pernah presensi hari ini -> Presensi Masuk
+			status = "Present"
+			if now.After(cutoffTime) {
+				status = "Late"
+				lateMins = int(now.Sub(cutoffTime).Minutes())
+				penalty = math.Round((float64(lateMins) / 60.0) * hourlyRate)
+			}
+			targetType = "CheckIn"
+			msg = "Presensi Masuk Guru Berhasil (Tepat Waktu)"
+			if status == "Late" {
+				msg = fmt.Sprintf("Presensi Masuk Tercatat (Terlambat %d Menit, Potongan Rp %.0f)", lateMins, penalty)
+			}
+
+			staffAtt := domain.StaffAttendance{
+				UserID:        matchedUser.ID,
+				UnitID:        matchedUser.UnitID,
+				Date:          now,
+				CheckInTime:   now,
+				Method:        "Face",
+				Status:        status,
+				LateMinutes:   lateMins,
+				HourlyRate:    hourlyRate,
+				PenaltyAmount: penalty,
+				DeviceID:      req.DeviceID,
+				Notes:         fmt.Sprintf("Face Biometric CheckIn (Confidence: %.1f%%)", confidence),
+			}
+			_ = u.staffAttendanceRepo.Create(&staffAtt)
+		} else if existingStaffAtt.CheckOutTime == nil {
+			// Sudah masuk tapi belum pulang -> Presensi Pulang
+			cooldownMinsStr := u.getSetting("attendance_cooldown_minutes", "3")
+			cooldownMins, _ := strconv.Atoi(cooldownMinsStr)
+			if cooldownMins <= 0 {
+				cooldownMins = 3
+			}
+			cooldownDuration := time.Duration(cooldownMins) * time.Minute
+
+			if now.Sub(existingStaffAtt.CheckInTime) < cooldownDuration {
+				return &MatchScanResponse{
+					UserID:        matchedUser.ID.String(),
+					Name:          matchedUser.Name,
+					Role:          "Guru",
+					Identifier:    getStaffNIP(matchedUser),
+					Subtext:       "Guru / Staf",
+					Status:        existingStaffAtt.Status,
+					Type:          "CheckIn",
+					Timestamp:     existingStaffAtt.CheckInTime.Format("15:04") + " WIB",
+					LateMinutes:   existingStaffAtt.LateMinutes,
+					HourlyRate:    existingStaffAtt.HourlyRate,
+					PenaltyAmount: existingStaffAtt.PenaltyAmount,
+					Confidence:    confidence,
+					Message:       fmt.Sprintf("Guru baru saja presensi masuk pada %s WIB. Mohon tunggu %d menit sebelum presensi pulang.", existingStaffAtt.CheckInTime.Format("15:04:05"), cooldownMins),
+				}, nil
+			}
+
+			existingStaffAtt.CheckOutTime = &now
+			_ = u.staffAttendanceRepo.Update(existingStaffAtt)
+			targetType = "CheckOut"
+			status = existingStaffAtt.Status
+			lateMins = existingStaffAtt.LateMinutes
+			penalty = existingStaffAtt.PenaltyAmount
+			msg = "Presensi Pulang Guru Berhasil. Selamat beristirahat!"
+		} else {
+			return &MatchScanResponse{
+				UserID:        matchedUser.ID.String(),
+				Name:          matchedUser.Name,
+				Role:          "Guru",
+				Identifier:    getStaffNIP(matchedUser),
+				Subtext:       "Guru / Staf",
+				Status:        existingStaffAtt.Status,
+				Type:          "CheckOut",
+				Timestamp:     existingStaffAtt.CheckOutTime.Format("15:04") + " WIB",
+				Confidence:    confidence,
+				Message:       "Presensi masuk dan pulang hari ini sudah tercatat lengkap",
+			}, nil
+		}
 	}
 
 	return &MatchScanResponse{
@@ -363,6 +582,7 @@ func (u *FaceBiometricUsecase) MatchAndRecord(req MatchScanRequest) (*MatchScanR
 		Identifier:    getStaffNIP(matchedUser),
 		Subtext:       "Guru / Staf",
 		Status:        status,
+		Type:          targetType,
 		Timestamp:     timestampStr,
 		LateMinutes:   lateMins,
 		HourlyRate:    hourlyRate,

@@ -265,6 +265,16 @@ const AttendancePage: React.FC = () => {
 
                 {isFaceEnabled && (
                     <div className="flex items-center gap-2">
+                        {user?.role_id === 1 && (
+                            <Link
+                                to="/dashboard/settings?tab=rfid_attendance"
+                                className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-all shadow-sm active:scale-95"
+                                title="Atur Jam Masuk, Batas Terlambat, dan Jam Pulang Sekolah"
+                            >
+                                <Clock size={16} className="text-purple-600" />
+                                <span className="hidden sm:inline">Pengaturan Jam</span>
+                            </Link>
+                        )}
                         <button
                             type="button"
                             onClick={() => setShowFaceEnrollModal(true)}

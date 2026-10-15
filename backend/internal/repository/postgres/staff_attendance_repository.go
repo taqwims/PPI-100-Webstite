@@ -19,6 +19,10 @@ func (r *StaffAttendanceRepository) Create(att *domain.StaffAttendance) error {
 	return r.db.Create(att).Error
 }
 
+func (r *StaffAttendanceRepository) Update(att *domain.StaffAttendance) error {
+	return r.db.Save(att).Error
+}
+
 func (r *StaffAttendanceRepository) GetTodayByUser(userID string, date time.Time) (*domain.StaffAttendance, error) {
 	var att domain.StaffAttendance
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())

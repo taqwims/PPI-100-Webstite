@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Camera, Maximize2, Minimize2, Volume2, VolumeX,
-    CheckCircle2, Clock, UserCheck, Coins, RefreshCw,
-    GraduationCap, Briefcase, Info, Zap, UserPlus, Smile
+    CheckCircle2, Clock, Coins, RefreshCw,
+    GraduationCap, Briefcase, Info, Zap, UserPlus, Smile, LogOut, Settings
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useFeatureStore } from '../../store/featureStore';
@@ -59,6 +60,36 @@ class BiometricAudio {
         osc2.stop(now + 0.35);
     }
 
+    playCheckOut() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Melodious descending chime: G5 (783.99Hz) -> E5 (659.25Hz) -> C5 (523.25Hz)
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(783.99, now);
+        osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
+        osc1.frequency.exponentialRampToValueAtTime(523.25, now + 0.22);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(523.25, now);
+
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.4);
+        osc2.stop(now + 0.4);
+    }
+
     playLateWarning() {
         const ctx = this.getContext();
         if (!ctx) return;
@@ -108,6 +139,7 @@ interface ScanResult {
     subtext: string; // Kelas atau Jabatan
     timestamp: string;
     status: 'Present' | 'Late';
+    type?: 'CheckIn' | 'CheckOut';
     lateMinutes: number;
     hourlyRate: number;
     penaltyAmount: number;
@@ -122,12 +154,37 @@ const AttendanceFaceScanner: React.FC = () => {
     const soundRef = useRef<BiometricAudio>(new BiometricAudio());
     const [soundOn, setSoundOn] = useState(true);
 
+    // ─── Fetch School Settings (Jam Masuk, Pulang, dan Tarif Denda) ───
+    const { data: schoolSettings } = useQuery({
+        queryKey: ['school-settings'],
+        queryFn: async () => (await api.get('/admin/settings')).data,
+    });
+
+    const cutoffTime = useMemo(() => {
+        const found = schoolSettings?.find((s: any) => s.key === 'attendance_late_threshold' || s.key === 'student_check_in_time');
+        return found?.value || '07:00';
+    }, [schoolSettings]);
+
+    const exitTime = useMemo(() => {
+        const found = schoolSettings?.find((s: any) => s.key === 'attendance_exit_start');
+        return found?.value || '14:00';
+    }, [schoolSettings]);
+
     // ─── Mode & Settings ───
+    const [scanMode, setScanMode] = useState<'Auto' | 'CheckIn' | 'CheckOut'>('Auto');
     const [targetMode, setTargetMode] = useState<'all' | 'student' | 'teacher'>('all');
     const [isScanning, setIsScanning] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [hourlyRate, setHourlyRate] = useState(30000); // Rp 30.000 / jam
-    const [cutoffTime] = useState('07:00'); // Batas jam masuk
+
+    useEffect(() => {
+        if (schoolSettings) {
+            const rate = schoolSettings.find((s: any) => s.key === 'teacher_late_hourly_rate');
+            if (rate && rate.value) {
+                setHourlyRate(Number(rate.value) || 30000);
+            }
+        }
+    }, [schoolSettings]);
 
     // Early return if Face Attendance is disabled
     if (!isFaceEnabled) {
@@ -364,6 +421,7 @@ const AttendanceFaceScanner: React.FC = () => {
                         subtext: 'Guru / Tenaga Pendidik',
                         timestamp: dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
                         status: s.status === 'Late' ? 'Late' : 'Present',
+                        type: s.check_out_time ? 'CheckOut' : 'CheckIn',
                         lateMinutes: s.late_minutes || 0,
                         hourlyRate: s.hourly_rate || 30000,
                         penaltyAmount: s.penalty_amount || 0,
@@ -384,6 +442,7 @@ const AttendanceFaceScanner: React.FC = () => {
                         subtext: st.student?.class?.name ? `Kelas ${st.student.class.name}` : 'Siswa Aktif',
                         timestamp: dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
                         status: st.status === 'Late' ? 'Late' : 'Present',
+                        type: (st.type === 'CheckOut' ? 'CheckOut' : 'CheckIn') as 'CheckIn' | 'CheckOut',
                         lateMinutes: 0,
                         hourlyRate: 0,
                         penaltyAmount: 0,
@@ -420,82 +479,6 @@ const AttendanceFaceScanner: React.FC = () => {
         }
     };
 
-    // ─── Simulate / Trigger Scan Event ───
-    const triggerScan = (scenario: 'student_ontime' | 'teacher_late' | 'teacher_ontime') => {
-        soundRef.current.playScanBeep();
-        setLivenessStage('verifying');
-
-        setTimeout(() => {
-            let mock: ScanResult;
-            const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-
-            if (scenario === 'teacher_late') {
-                const lateMins = 35; // 35 menit terlambat
-                const penalty = Math.round((lateMins / 60) * hourlyRate); // (35/60)*30000 = Rp 17.500
-                mock = {
-                    id: Date.now().toString(),
-                    name: 'Ustadzah Siti Aminah, S.Pd',
-                    role: 'Guru',
-                    identifier: 'NIP 1991081504',
-                    subtext: 'Guru Bahasa Arab & Wali Kelas 5',
-                    timestamp: nowTime,
-                    status: 'Late',
-                    lateMinutes: lateMins,
-                    hourlyRate: hourlyRate,
-                    penaltyAmount: penalty,
-                    confidence: 99.6
-                };
-                soundRef.current.playLateWarning();
-                toast.error(`Presensi Tercatat (Terlambat ${lateMins} Menit)`, {
-                    duration: 4000,
-                    icon: '⏰'
-                });
-            } else if (scenario === 'teacher_ontime') {
-                mock = {
-                    id: Date.now().toString(),
-                    name: 'Ustadz Ridwan Hakim, M.Pd',
-                    role: 'Guru',
-                    identifier: 'NIP 1988020402',
-                    subtext: 'Kepala Bagian Kurikulum',
-                    timestamp: nowTime,
-                    status: 'Present',
-                    lateMinutes: 0,
-                    hourlyRate: hourlyRate,
-                    penaltyAmount: 0,
-                    confidence: 99.2
-                };
-                soundRef.current.playSuccess();
-                toast.success('Presensi Guru Berhasil (Tepat Waktu)');
-            } else {
-                mock = {
-                    id: Date.now().toString(),
-                    name: 'Rayhan Putra Pratama',
-                    role: 'Siswa',
-                    identifier: 'NISN 00931289',
-                    subtext: 'Kelas 6A - Utsman bin Affan',
-                    timestamp: nowTime,
-                    status: 'Present',
-                    lateMinutes: 0,
-                    hourlyRate: hourlyRate,
-                    penaltyAmount: 0,
-                    confidence: 99.5
-                };
-                soundRef.current.playSuccess();
-                toast.success('Presensi Siswa Berhasil');
-            }
-
-            setLivenessStage('matched');
-            setActiveResult(mock);
-            setRecentScans(prev => [mock, ...prev.slice(0, 19)]);
-
-            // Reset after 4 seconds
-            setTimeout(() => {
-                setActiveResult(null);
-                setLivenessStage('detecting');
-            }, 4000);
-        }, 1300);
-    };
-
     // ─── Live Camera Scan Real Backend Match ───
     const handleLiveScan = async () => {
         if (!videoRef.current || !canvasRef.current) {
@@ -516,11 +499,13 @@ const AttendanceFaceScanner: React.FC = () => {
 
                 const res = await api.post('/attendance/face-scan', {
                     descriptor: embedding,
+                    scan_type: scanMode.toLowerCase(),
                     device_id: selectedDeviceId || 'kiosk-camera'
                 });
 
                 if (res.data?.data) {
                     const match = res.data.data;
+                    const isCheckOut = match.type === 'CheckOut';
                     const resultItem: ScanResult = {
                         id: match.user_id || Date.now().toString(),
                         name: match.name,
@@ -529,6 +514,7 @@ const AttendanceFaceScanner: React.FC = () => {
                         subtext: match.subtext || '-',
                         timestamp: match.timestamp || (new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'),
                         status: match.status === 'Late' ? 'Late' : 'Present',
+                        type: isCheckOut ? 'CheckOut' : 'CheckIn',
                         lateMinutes: match.late_minutes || 0,
                         hourlyRate: match.hourly_rate || hourlyRate,
                         penaltyAmount: match.penalty_amount || 0,
@@ -541,10 +527,15 @@ const AttendanceFaceScanner: React.FC = () => {
 
                     if (resultItem.status === 'Late') {
                         soundRef.current.playLateWarning();
-                        toast.error(`Presensi Tercatat (Terlambat ${resultItem.lateMinutes} Menit)`);
+                        toast.error(match.message || `Presensi Tercatat (Terlambat ${resultItem.lateMinutes} Menit)`);
+                    } else if (isCheckOut) {
+                        soundRef.current.playCheckOut();
+                        toast.success(match.message || `Presensi Pulang ${resultItem.name} Berhasil. Hati-hati di jalan!`, {
+                            icon: '👋'
+                        });
                     } else {
                         soundRef.current.playSuccess();
-                        toast.success(`Presensi ${resultItem.name} Berhasil`);
+                        toast.success(match.message || `Presensi Masuk ${resultItem.name} Berhasil`);
                     }
 
                     setTimeout(() => {
@@ -602,9 +593,11 @@ const AttendanceFaceScanner: React.FC = () => {
                                     Nonaktif
                                 </span>
                             )}
-                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
                                 <Clock size={11} className="text-amber-500" />
-                                Batas Masuk: <strong className="text-slate-700 font-semibold">{cutoffTime} WIB</strong>
+                                <span>Batas Masuk: <strong className="text-slate-700 font-semibold">{cutoffTime} WIB</strong></span>
+                                <span>•</span>
+                                <span>Mulai Pulang: <strong className="text-purple-700 font-semibold">{exitTime} WIB</strong></span>
                             </span>
                         </div>
                         <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1 flex items-center gap-2">
@@ -663,6 +656,16 @@ const AttendanceFaceScanner: React.FC = () => {
                             <UserPlus size={14} /> <span>Daftarkan Wajah</span>
                         </button>
 
+                        {/* Settings Button */}
+                        <Link
+                            to="/dashboard/settings?tab=rfid_attendance"
+                            className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                            title="Pengaturan Jam Masuk & Pulang Sekolah"
+                        >
+                            <Settings size={14} className="text-slate-500" />
+                            <span>Pengaturan Jam</span>
+                        </Link>
+
                         {/* Back to Attendance */}
                         <Link
                             to="/dashboard/attendance"
@@ -673,57 +676,97 @@ const AttendanceFaceScanner: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Bottom Row: Mode Selector + Camera Device Selector */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                    {/* Mode Selector Segmented Tabs */}
-                    <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-center">
-                        <button
-                            onClick={() => setTargetMode('all')}
-                            className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${
-                                targetMode === 'all'
-                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                        >
-                            Semua
-                        </button>
-                        <button
-                            onClick={() => setTargetMode('student')}
-                            className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
-                                targetMode === 'student'
-                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                        >
-                            <GraduationCap size={13} /> <span>Siswa</span>
-                        </button>
-                        <button
-                            onClick={() => setTargetMode('teacher')}
-                            className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
-                                targetMode === 'teacher'
-                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                        >
-                            <Briefcase size={13} /> <span>Guru & Staf</span>
-                        </button>
+                {/* Bottom Row: Mode Presensi + Mode Target + Camera Selector */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                    {/* Mode Presensi (Auto / Masuk / Pulang) */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Mode:</span>
+                        <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-center w-full sm:w-auto">
+                            <button
+                                onClick={() => setScanMode('Auto')}
+                                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                    scanMode === 'Auto'
+                                        ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <Zap size={13} /> <span>Auto (Masuk/Pulang)</span>
+                            </button>
+                            <button
+                                onClick={() => setScanMode('CheckIn')}
+                                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                    scanMode === 'CheckIn'
+                                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>🌅 Masuk Saja</span>
+                            </button>
+                            <button
+                                onClick={() => setScanMode('CheckOut')}
+                                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                    scanMode === 'CheckOut'
+                                        ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>🌇 Pulang Saja</span>
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Camera Device Selector if multiple devices exist */}
-                    {devices.length > 1 && (
-                        <select
-                            value={selectedDeviceId}
-                            onChange={(e) => setSelectedDeviceId(e.target.value)}
-                            aria-label="Pilih Perangkat Kamera"
-                            className="text-xs bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
-                        >
-                            {devices.map((d, i) => (
-                                <option key={d.deviceId || i} value={d.deviceId}>
-                                    {d.label || `Kamera ${i + 1}`}
-                                </option>
-                            ))}
-                        </select>
-                    )}
+                    {/* Target Filter & Device Selector */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 hidden sm:inline">Filter:</span>
+                        <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-center w-full sm:w-auto">
+                            <button
+                                onClick={() => setTargetMode('all')}
+                                className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${
+                                    targetMode === 'all'
+                                        ? 'bg-white text-emerald-700 shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                Semua
+                            </button>
+                            <button
+                                onClick={() => setTargetMode('student')}
+                                className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+                                    targetMode === 'student'
+                                        ? 'bg-white text-emerald-700 shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <GraduationCap size={13} /> <span>Siswa</span>
+                            </button>
+                            <button
+                                onClick={() => setTargetMode('teacher')}
+                                className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+                                    targetMode === 'teacher'
+                                        ? 'bg-white text-emerald-700 shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <Briefcase size={13} /> <span>Guru & Staf</span>
+                            </button>
+                        </div>
+
+                        {/* Camera Device Selector if multiple devices exist */}
+                        {devices.length > 1 && (
+                            <select
+                                value={selectedDeviceId}
+                                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                                aria-label="Pilih Perangkat Kamera"
+                                className="text-xs bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                            >
+                                {devices.map((d, i) => (
+                                    <option key={d.deviceId || i} value={d.deviceId}>
+                                        {d.label || `Kamera ${i + 1}`}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -858,11 +901,15 @@ const AttendanceFaceScanner: React.FC = () => {
                         {activeResult && (
                             <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white animate-in fade-in zoom-in-95 duration-300">
                                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-3 shadow-2xl border-2 ${
-                                    activeResult.status === 'Present'
+                                    activeResult.type === 'CheckOut'
+                                        ? 'bg-purple-500/20 border-purple-400 text-purple-400 shadow-purple-500/30'
+                                        : activeResult.status === 'Present'
                                         ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-emerald-500/30'
                                         : 'bg-amber-500/20 border-amber-400 text-amber-400 shadow-amber-500/30'
                                 }`}>
-                                    {activeResult.status === 'Present' ? (
+                                    {activeResult.type === 'CheckOut' ? (
+                                        <LogOut size={44} className="animate-pulse" />
+                                    ) : activeResult.status === 'Present' ? (
                                         <CheckCircle2 size={44} className="animate-bounce" />
                                     ) : (
                                         <Clock size={44} className="animate-pulse" />
@@ -870,15 +917,33 @@ const AttendanceFaceScanner: React.FC = () => {
                                 </div>
 
                                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide border shadow-sm">
-                                    <span className={`w-2 h-2 rounded-full ${activeResult.status === 'Present' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                                    <span className={activeResult.status === 'Present' ? 'text-emerald-300' : 'text-amber-300'}>
-                                        {activeResult.status === 'Present' ? 'Hadir Tepat Waktu' : `Terlambat ${activeResult.lateMinutes} Menit`}
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        activeResult.type === 'CheckOut'
+                                            ? 'bg-purple-400'
+                                            : activeResult.status === 'Present'
+                                            ? 'bg-emerald-400'
+                                            : 'bg-amber-400'
+                                    }`} />
+                                    <span className={
+                                        activeResult.type === 'CheckOut'
+                                            ? 'text-purple-300'
+                                            : activeResult.status === 'Present'
+                                            ? 'text-emerald-300'
+                                            : 'text-amber-300'
+                                    }>
+                                        {activeResult.type === 'CheckOut'
+                                            ? 'Presensi Pulang Berhasil'
+                                            : activeResult.status === 'Present'
+                                            ? 'Presensi Masuk Tepat Waktu'
+                                            : `Terlambat ${activeResult.lateMinutes} Menit`}
                                     </span>
                                 </div>
 
                                 <h2 className="text-2xl font-extrabold text-center tracking-tight max-w-md">{activeResult.name}</h2>
                                 <p className="text-xs text-slate-300 mb-1">{activeResult.identifier} • {activeResult.subtext}</p>
-                                <p className="text-[11px] text-emerald-400 font-mono mb-4">Jam Absen: {activeResult.timestamp}</p>
+                                <p className={`text-[11px] font-mono mb-4 ${activeResult.type === 'CheckOut' ? 'text-purple-300' : 'text-emerald-400'}`}>
+                                    Jam Absen: {activeResult.timestamp}
+                                </p>
 
                                 {/* Deduction Warning Card for Late Teacher */}
                                 {activeResult.role === 'Guru' && activeResult.status === 'Late' && (
@@ -919,48 +984,36 @@ const AttendanceFaceScanner: React.FC = () => {
                         )}
                     </div>
 
-                    {/* ─── Action & Simulation Control Bar ─── */}
+                    {/* ─── Action Control Bar ─── */}
                     <div className="bg-white/80 backdrop-blur-xl border border-white/60 p-4 rounded-3xl shadow-sm space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Zap size={16} className="text-amber-500" />
-                                <span className="text-xs font-bold text-slate-800">Aksi Presensi Kamera & Simulasi</span>
+                                <Camera size={16} className="text-emerald-600" />
+                                <span className="text-xs font-bold text-slate-800">Pemindai Wajah Kamera Langsung</span>
                             </div>
-                            <span className="text-[11px] text-slate-500">Pindai langsung atau uji coba:</span>
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                                <Clock size={12} className="text-amber-500" />
+                                <span>Masuk: <strong className="text-slate-700 font-semibold">{cutoffTime} WIB</strong></span>
+                                <span>•</span>
+                                <span>Pulang: <strong className="text-purple-700 font-semibold">{exitTime} WIB</strong></span>
+                                <Link
+                                    to="/dashboard/settings?tab=rfid_attendance"
+                                    className="text-[11px] text-emerald-600 hover:text-emerald-800 underline font-semibold flex items-center gap-0.5 ml-1"
+                                >
+                                    <Settings size={11} /> Ubah
+                                </Link>
+                            </span>
                         </div>
 
                         {/* Live Camera Scan Button */}
                         <button
                             onClick={handleLiveScan}
                             disabled={!hasCamera || isLiveScanning}
-                            className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 active:scale-[0.99]"
+                            className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 active:scale-[0.99]"
                         >
-                            <Camera size={16} />
-                            {isLiveScanning ? 'Sedang Memindai Wajah...' : 'Pindai Wajah dari Kamera Sekarang'}
+                            <Camera size={18} />
+                            {isLiveScanning ? 'Sedang Memproses Pemindaian Wajah...' : 'Pindai Wajah Sekarang'}
                         </button>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                            <button
-                                onClick={() => triggerScan('student_ontime')}
-                                className="px-3 py-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
-                            >
-                                <GraduationCap size={15} /> Siswa Tepat Waktu
-                            </button>
-
-                            <button
-                                onClick={() => triggerScan('teacher_ontime')}
-                                className="px-3 py-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
-                            >
-                                <UserCheck size={15} /> Guru Tepat Waktu
-                            </button>
-
-                            <button
-                                onClick={() => triggerScan('teacher_late')}
-                                className="px-3 py-2.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
-                            >
-                                <Clock size={15} /> Guru Terlambat (35 Mnt)
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -1068,6 +1121,13 @@ const AttendanceFaceScanner: React.FC = () => {
 
                                     <div className="text-right shrink-0">
                                         <div className="flex items-center gap-1 justify-end">
+                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                                scan.type === 'CheckOut'
+                                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                            }`}>
+                                                {scan.type === 'CheckOut' ? 'Pulang' : 'Masuk'}
+                                            </span>
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                                 scan.status === 'Present'
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
