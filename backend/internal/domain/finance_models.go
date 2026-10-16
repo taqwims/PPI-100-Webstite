@@ -443,7 +443,7 @@ type ExternalDebtPayment struct {
 // ------------------- Multi-Bill Payment -------------------
 // MultiBillPaymentRequest is used as request body only, not persisted to DB
 type MultiBillPaymentRequest struct {
-	BillIDs       []string `json:"bill_ids" binding:"required,min=2"`
+	BillIDs       []string `json:"bill_ids" binding:"required,min=1"`
 	Amount        float64  `json:"amount" binding:"required"`
 	PaymentMethod string   `json:"payment_method" binding:"required"`
 }

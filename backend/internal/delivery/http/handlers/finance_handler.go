@@ -447,7 +447,7 @@ func (h *FinanceHandler) GetBillByID(c *gin.Context) {
 func (h *FinanceHandler) MultiPayment(c *gin.Context) {
 	var req domain.MultiBillPaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Pilih minimal 1 tagihan dan pastikan data pembayaran valid"})
 		return
 	}
 

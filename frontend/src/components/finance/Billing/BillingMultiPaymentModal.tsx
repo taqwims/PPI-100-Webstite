@@ -29,7 +29,7 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
             <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50 shrink-0">
                     <h2 className="text-lg font-bold flex items-center text-slate-800">
-                        <ListChecks className="text-indigo-600 mr-2" size={22} /> Bayar Multi Tagihan
+                        <ListChecks className="text-indigo-600 mr-2" size={22} /> {selectedBillIds.length === 1 ? 'Bayar Tagihan' : 'Bayar Multi Tagihan'}
                     </h2>
                     <button onClick={() => setShowMultiPayModal(false)} className="text-slate-400 hover:text-slate-600 transition">
                         <X size={20} />
@@ -73,8 +73,8 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
 
                         {multiPayMethod === 'Midtrans' && activeGateway !== 'none' && (
                             <div className={clsx("p-4 rounded-xl border", activeGateway === 'mayar' ? "bg-purple-50 border-purple-100" : activeGateway === 'xendit' ? "bg-blue-50 border-blue-100" : "bg-indigo-50 border-indigo-100")}>
-                                <p className="font-semibold text-slate-800 mb-1">Pembayaran Multitagihan ({activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})</p>
-                                <p className="text-xs text-slate-500">Anda akan diarahkan ke {activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'} untuk membayar seluruh tagihan sekaligus.</p>
+                                <p className="font-semibold text-slate-800 mb-1">{selectedBillIds.length === 1 ? 'Pembayaran Tagihan' : 'Pembayaran Multitagihan'} ({activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'})</p>
+                                <p className="text-xs text-slate-500">Anda akan diarahkan ke {activeGateway === 'mayar' ? 'Mayar.id' : activeGateway === 'xendit' ? 'Xendit' : 'Midtrans'} untuk membayar {selectedBillIds.length === 1 ? 'tagihan ini.' : 'seluruh tagihan sekaligus.'}</p>
                             </div>
                         )}
 
@@ -82,7 +82,7 @@ const BillingMultiPaymentModal: React.FC<BillingMultiPaymentModalProps> = ({
                             <>
                                 <BankAccountInfo />
                                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <p className="text-xs text-blue-700">Untuk multi-pembayaran via transfer, setelah mengklik konfirmasi Anda perlu mengirim bukti ke admin.</p>
+                                    <p className="text-xs text-blue-700">Untuk {selectedBillIds.length === 1 ? 'pembayaran' : 'multi-pembayaran'} via transfer, setelah mengklik konfirmasi Anda perlu mengirim bukti ke admin.</p>
                                 </div>
                             </>
                         )}

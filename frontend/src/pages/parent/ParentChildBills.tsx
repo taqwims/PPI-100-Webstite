@@ -224,7 +224,7 @@ const ParentChildBills: React.FC = () => {
                                 <option value="80">80</option>
                             </select>
                         </div>
-                        {activeMainTab === 'unpaid' && bp.selectedBillIds.length >= 2 && (
+                        {activeMainTab === 'unpaid' && bp.selectedBillIds.length >= 1 && (
                             <button onClick={() => bp.setShowMultiPayModal(true)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition">
                                 Bayar Terpilih ({bp.selectedBillIds.length})
                             </button>
@@ -583,7 +583,7 @@ const ParentChildBills: React.FC = () => {
                             onClick={() => bp.setShowMultiPayModal(true)}
                             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/40 transition flex items-center gap-1.5"
                         >
-                            <DollarSign size={14} /> Bayar Sekaligus
+                            <DollarSign size={14} /> {bp.selectedBillIds.length === 1 ? 'Bayar Sekarang' : 'Bayar Sekaligus'}
                         </button>
                     </div>
                 </div>

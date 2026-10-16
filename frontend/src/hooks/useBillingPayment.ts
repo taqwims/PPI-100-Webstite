@@ -491,7 +491,7 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                 bill_ids: selectedBillIds,
                 amount: selectedTotal,
                 payment_method: actualMethod
-            });
+            }, { _suppressToast: true } as any);
 
             if (actualMethod === 'Mayar') {
                 const invoiceUrl = res.data.invoice_url || res.data.redirect_url;
