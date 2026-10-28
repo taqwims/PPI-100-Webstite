@@ -29,7 +29,8 @@ func (h *StudentHandler) SetStudentObligationUsecase(u *usecase.StudentObligatio
 
 func (h *StudentHandler) GetAllStudents(c *gin.Context) {
 	unitID, _ := strconv.Atoi(c.Query("unit_id"))
-	students, err := h.studentUsecase.GetAllStudents(uint(unitID))
+	classID, _ := strconv.Atoi(c.Query("class_id"))
+	students, err := h.studentUsecase.GetAllStudents(uint(unitID), uint(classID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

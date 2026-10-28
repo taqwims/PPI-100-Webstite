@@ -43,13 +43,23 @@ func (u *AuthUsecase) Register(name, email, password string, roleID, unitID uint
 }
 
 func (u *AuthUsecase) Login(email, password string) (string, error) {
-	user, err := u.userRepo.FindByEmail(email)
+	user, err := u.userRepo.FindByEmailForAuth(email)
 	if err != nil {
 		return "", errors.New("invalid email or password")
 	}
 
 	if !utils.CheckPasswordHash(password, user.PasswordHash) {
 		return "", errors.New("invalid email or password")
+	}
+
+	// If the existing password hash was generated with legacy high cost (e.g. cost 14),
+	// automatically migrate it to cost 10 in background so subsequent logins are instant.
+	if cost, err := utils.GetPasswordCost(user.PasswordHash); err == nil && cost > 10 {
+		go func(uid string, pass string) {
+			if newHash, err := utils.HashPassword(pass); err == nil {
+				_ = u.userRepo.UpdatePasswordHash(uid, newHash)
+			}
+		}(user.ID.String(), password)
 	}
 
 	token, err := utils.GenerateToken(user.ID, user.RoleID, user.UnitID, u.cfg)

@@ -93,24 +93,20 @@ func (h *StudentObligationHandler) GetAll(c *gin.Context) {
 		return
 	}
 
-	// Enrich with parent info
+	// Enrich with parent info directly from preloaded relations (O(1), zero extra DB queries)
 	type ObligationResponse struct {
 		domain.StudentObligation
 		ParentName  string `json:"parent_name"`
 		ParentPhone string `json:"parent_phone"`
 	}
 
-	var results []ObligationResponse
+	results := make([]ObligationResponse, 0, len(obs))
 	for _, ob := range obs {
 		resp := ObligationResponse{StudentObligation: ob}
-		if ob.Student.ParentID != nil {
-			_, parentUser, err := h.usecase.GetParentByStudentID(ob.Student.ParentID)
-			if err == nil && parentUser != nil {
-				resp.ParentName = parentUser.Name
-			}
-			parent, _, _ := h.usecase.GetParentByStudentID(ob.Student.ParentID)
-			if parent != nil {
-				resp.ParentPhone = parent.Phone
+		if ob.Student.Parent != nil {
+			resp.ParentPhone = ob.Student.Parent.Phone
+			if ob.Student.Parent.User.Name != "" {
+				resp.ParentName = ob.Student.Parent.User.Name
 			}
 		}
 		results = append(results, resp)

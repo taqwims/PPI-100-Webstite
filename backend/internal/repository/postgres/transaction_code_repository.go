@@ -82,16 +82,35 @@ type GlobalTransaction struct {
 func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate string, category string, codeID uint) ([]GlobalTransaction, error) {
 	var results []GlobalTransaction
 
-	// Build filters
-	dateArgs := []interface{}{}
-	dateFilter := ""
+	var start, end time.Time
+	hasDate := false
 	if startDate != "" && endDate != "" {
-		dateFilter = " AND t.date BETWEEN ? AND ?"
-		start, _ := time.Parse("2006-01-02", startDate)
-		end, _ := time.Parse("2006-01-02", endDate)
+		hasDate = true
+		start, _ = time.Parse("2006-01-02", startDate)
+		end, _ = time.Parse("2006-01-02", endDate)
 		end = end.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-		dateArgs = append(dateArgs, start, end)
 	}
+
+	var dateArgs []interface{}
+	dateCond := func(prefix string, col string) string {
+		if !hasDate {
+			return ""
+		}
+		dateArgs = append(dateArgs, start, end)
+		return fmt.Sprintf(" %s %s BETWEEN ? AND ?", prefix, col)
+	}
+
+	clDate := dateCond("WHERE", "cl.date")
+	diDate := dateCond("WHERE", "di.date")
+	pDate := dateCond("AND", "p.paid_at")
+	prDate := dateCond("AND", "pr.paid_at")
+	atDate := dateCond("WHERE", "at2.date")
+	stDate := dateCond("WHERE", "st.date")
+	soDate := dateCond("AND", "so.updated_at")
+	swDate := dateCond("WHERE", "sw.created_at")
+	srDate := dateCond("WHERE", "sr.created_at")
+	sw2Date := dateCond("WHERE", "sw2.created_at")
+	sr2Date := dateCond("WHERE", "sr2.created_at")
 
 	categoryFilter := ""
 	if category != "" {
@@ -111,13 +130,13 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 		FROM (
 			SELECT cl.date, cl.source, cl.item_name as description, cl.type, cl.amount,
 			       cl.category, CAST(cl.transaction_code_id AS INTEGER) as code_id, 'CashLedger' as module
-			FROM cash_ledgers cl
+			FROM cash_ledgers cl%s
 
 			UNION ALL
 
 			SELECT di.date, di.source, COALESCE(di.notes, 'Infaq') as description, di.type, di.amount,
 			       'Infaq' as category, CAST(di.transaction_code_id AS INTEGER) as code_id, 'DailyInfaq' as module
-			FROM daily_infaqs di
+			FROM daily_infaqs di%s
 
 			UNION ALL
 
@@ -128,7 +147,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			JOIN bills b ON p.bill_id = b.id
 			LEFT JOIN students s ON b.student_id = s.id
 			LEFT JOIN users u ON s.user_id = u.id
-			WHERE p.status = 'Success'
+			WHERE p.status = 'Success'%s
 
 			UNION ALL
 
@@ -138,7 +157,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       0 as code_id, 'Payroll' as module
 			FROM payrolls pr
 			LEFT JOIN users u ON pr.user_id = u.id
-			WHERE pr.status = 'Paid'
+			WHERE pr.status = 'Paid'%s
 
 			UNION ALL
 
@@ -148,7 +167,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       0 as code_id, 'Activity' as module
 			FROM activity_transactions at2
 			JOIN activities a ON at2.activity_id = a.id
-			LEFT JOIN users u2 ON at2.created_by_id = u2.id
+			LEFT JOIN users u2 ON at2.created_by_id = u2.id%s
 
 			UNION ALL
 
@@ -159,7 +178,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			FROM saving_transactions st
 			LEFT JOIN saving_accounts sa ON st.account_id = sa.id
 			LEFT JOIN students s3 ON sa.student_id = s3.id
-			LEFT JOIN users u3 ON s3.user_id = u3.id
+			LEFT JOIN users u3 ON s3.user_id = u3.id%s
 
 			UNION ALL
 
@@ -171,7 +190,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			JOIN payment_types pt ON so.payment_type_id = pt.id
 			JOIN students s4 ON so.student_id = s4.id
 			JOIN users u4 ON s4.user_id = u4.id
-			WHERE so.status != 'Unpaid'
+			WHERE so.status != 'Unpaid'%s
 
 			UNION ALL
 
@@ -179,7 +198,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       CONCAT('Penarikan Op: ', sw.purpose) as description,
 			       'Expense' as type, sw.amount, 'Operasional' as category,
 			       0 as code_id, 'SavingsOp' as module
-			FROM savings_operational_withdrawals sw
+			FROM savings_operational_withdrawals sw%s
 
 			UNION ALL
 
@@ -187,7 +206,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       sr.notes as description,
 			       'Income' as type, sr.amount, 'Operasional' as category,
 			       0 as code_id, 'SavingsOp' as module
-			FROM savings_operational_returns sr
+			FROM savings_operational_returns sr%s
 
 			UNION ALL
 
@@ -195,7 +214,7 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       CONCAT('Piutang: ', sw2.purpose) as description,
 			       'Expense' as type, sw2.amount, 'Piutang' as category,
 			       0 as code_id, 'SavingsReceivable' as module
-			FROM savings_receivable_withdrawals sw2
+			FROM savings_receivable_withdrawals sw2%s
 
 			UNION ALL
 
@@ -203,13 +222,13 @@ func (r *TransactionCodeRepository) GetGlobalTransactions(startDate, endDate str
 			       COALESCE(sr2.notes, 'Pengembalian Piutang') as description,
 			       'Income' as type, sr2.amount, 'Piutang' as category,
 			       0 as code_id, 'SavingsReceivable' as module
-			FROM savings_receivable_returns sr2
+			FROM savings_receivable_returns sr2%s
 		) t
 		LEFT JOIN transaction_codes tc ON t.code_id = tc.id
-		WHERE 1=1 %s %s %s
+		WHERE 1=1%s%s
 		ORDER BY t.date DESC
 		LIMIT 500
-	`, dateFilter, categoryFilter, codeFilter)
+	`, clDate, diDate, pDate, prDate, atDate, stDate, soDate, swDate, srDate, sw2Date, sr2Date, categoryFilter, codeFilter)
 
 	if err := r.db.Raw(query, dateArgs...).Scan(&results).Error; err != nil {
 		return nil, err

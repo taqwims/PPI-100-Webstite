@@ -34,6 +34,30 @@ func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
 	return &user, nil
 }
 
+// FindByEmailForAuth fetches only the required authentication fields for fast login (no heavy preloads)
+func (r *UserRepository) FindByEmailForAuth(email string) (*domain.User, error) {
+	var user domain.User
+	if err := r.db.Where("email = ?", email).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// UpdatePasswordHash updates the password hash (used for smooth migration from cost 14 to cost 10)
+func (r *UserRepository) UpdatePasswordHash(userID string, newHash string) error {
+	return r.db.Model(&domain.User{}).Where("id = ?", userID).Update("password_hash", newHash).Error
+}
+
+// GetStaffUsers returns only staff members (excluding students role 6 and parents role 7) with lightweight fields
+func (r *UserRepository) GetStaffUsers() ([]domain.User, error) {
+	var users []domain.User
+	err := r.db.Select("id, name, email, phone, role_id, unit_id").
+		Where("role_id NOT IN (6, 7)").
+		Order("name asc").
+		Find(&users).Error
+	return users, err
+}
+
 func (r *UserRepository) FindByEmailUnscoped(email string) (*domain.User, error) {
 	var user domain.User
 	if err := r.db.Unscoped().Where("email = ?", email).First(&user).Error; err != nil {
@@ -116,4 +140,10 @@ func (r *UserRepository) GetUsersWithFaceBiometric(unitID uint) ([]domain.User, 
 	}
 	err := query.Find(&users).Error
 	return users, err
+}
+
+func (r *UserRepository) CountUsers() (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.User{}).Where("deleted_at IS NULL").Count(&count).Error
+	return count, err
 }

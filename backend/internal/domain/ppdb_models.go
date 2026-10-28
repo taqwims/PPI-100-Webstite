@@ -13,20 +13,20 @@ type PPDBRegistration struct {
 	OriginSchool string    `json:"origin_school"`
 	ParentName   string    `json:"parent_name"`
 	Phone        string    `json:"phone"`
-	Status       string    `json:"status"` // Pending, Accepted, Rejected
-	UnitID       uint      `gorm:"not null" json:"unit_id"`
-	CreatedAt    time.Time `json:"created_at"`
+	Status       string    `gorm:"index" json:"status"` // Pending, Accepted, Rejected
+	UnitID       uint      `gorm:"not null;index" json:"unit_id"`
+	CreatedAt    time.Time `gorm:"index" json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type PPDBPayment struct {
 	ID                 uuid.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	PPDBRegistrationID uuid.UUID          `gorm:"type:uuid;not null" json:"ppdb_registration_id"`
+	PPDBRegistrationID uuid.UUID          `gorm:"type:uuid;not null;index" json:"ppdb_registration_id"`
 	PPDBRegistration   PPDBRegistration   `gorm:"foreignKey:PPDBRegistrationID" json:"ppdb_registration"`
-	InvoiceNumber      string             `gorm:"unique;not null" json:"invoice_number"`
+	InvoiceNumber      string             `gorm:"unique;not null;index" json:"invoice_number"`
 	TotalAmount        float64            `gorm:"not null;default:0" json:"total_amount"`
 	PaidAmount         float64            `gorm:"not null;default:0" json:"paid_amount"`
-	Status             string             `gorm:"not null;default:'Belum Bayar'" json:"status"` // Belum Bayar, DP Terpenuhi, Lunas
+	Status             string             `gorm:"not null;default:'Belum Bayar';index" json:"status"` // Belum Bayar, DP Terpenuhi, Lunas
 	Items              []PPDBPaymentItem  `gorm:"foreignKey:PPDBPaymentID" json:"items,omitempty"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`

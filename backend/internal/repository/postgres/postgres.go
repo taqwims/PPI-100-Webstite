@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"time"
 	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/domain"
 
@@ -24,6 +25,15 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 	}), &gorm.Config{})
 	if err != nil {
 		return nil, err
+	}
+
+	sqlDB, err := db.DB()
+	if err == nil {
+		// Connection pool optimization for high concurrency
+		sqlDB.SetMaxIdleConns(15)
+		sqlDB.SetMaxOpenConns(50)
+		sqlDB.SetConnMaxLifetime(time.Hour)
+		sqlDB.SetConnMaxIdleTime(15 * time.Minute)
 	}
 
 	return db, nil

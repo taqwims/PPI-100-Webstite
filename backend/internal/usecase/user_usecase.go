@@ -27,6 +27,14 @@ func (u *UserUsecase) GetAllUsers(roleID uint) ([]domain.User, error) {
 	return u.userRepo.GetAll(roleID)
 }
 
+func (u *UserUsecase) GetStaffUsers() ([]domain.User, error) {
+	return u.userRepo.GetStaffUsers()
+}
+
+func (u *UserUsecase) CountUsers() (int64, error) {
+	return u.userRepo.CountUsers()
+}
+
 func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID uint) error {
 	hashedPassword, err := utils.HashPassword(password)
 	if err != nil {

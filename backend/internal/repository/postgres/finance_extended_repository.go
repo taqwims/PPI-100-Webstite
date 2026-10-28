@@ -591,6 +591,52 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 		Students           []studentBrief `json:"students"`
 	}
 
+	// Batch query all active students with class_id
+	type rawStudentRow struct {
+		ID      uuid.UUID
+		ClassID uint
+		NISN    string
+		Status  string
+		Name    string
+	}
+	var allRawStudents []rawStudentRow
+	r.db.Table("students s").
+		Select("s.id, s.class_id, s.nisn, s.status, u.name").
+		Joins("JOIN users u ON s.user_id = u.id").
+		Where("s.deleted_at IS NULL").
+		Order("u.name ASC").
+		Scan(&allRawStudents)
+
+	studentsByClass := make(map[uint][]rawStudentRow)
+	for _, st := range allRawStudents {
+		studentsByClass[st.ClassID] = append(studentsByClass[st.ClassID], st)
+	}
+
+	// Batch aggregate student obligations grouped by student_id (1 query instead of 4 * N queries)
+	type studentObSummary struct {
+		StudentID     uuid.UUID `gorm:"column:student_id"`
+		PaidCount     int64     `gorm:"column:paid_count"`
+		UnpaidCount   int64     `gorm:"column:unpaid_count"`
+		PaidNominal   float64   `gorm:"column:paid_nominal"`
+		UnpaidNominal float64   `gorm:"column:unpaid_nominal"`
+	}
+	var obSummaries []studentObSummary
+	r.db.Table("student_obligations").
+		Select(`
+			student_id,
+			COUNT(CASE WHEN status = 'Paid' THEN 1 END) as paid_count,
+			COUNT(CASE WHEN status != 'Paid' THEN 1 END) as unpaid_count,
+			COALESCE(SUM(paid_amount), 0) as paid_nominal,
+			COALESCE(SUM(CASE WHEN status != 'Paid' THEN (amount - paid_amount) ELSE 0 END), 0) as unpaid_nominal
+		`).
+		Group("student_id").
+		Scan(&obSummaries)
+
+	obMap := make(map[uuid.UUID]studentObSummary, len(obSummaries))
+	for _, ob := range obSummaries {
+		obMap[ob.StudentID] = ob
+	}
+
 	var classesSummaryList []classSummary
 	for _, c := range classes {
 		teacherName := "-"
@@ -598,50 +644,30 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 			teacherName = c.HomeroomTeacher.User.Name
 		}
 
-		var rawStudents []struct {
-			ID     uuid.UUID
-			NISN   string
-			Status string
-			Name   string
-		}
-		r.db.Table("students s").
-			Select("s.id, s.nisn, s.status, u.name").
-			Joins("JOIN users u ON s.user_id = u.id").
-			Where("s.class_id = ? AND s.deleted_at IS NULL", c.ID).
-			Order("u.name ASC").
-			Scan(&rawStudents)
-
+		classStudents := studentsByClass[c.ID]
 		var classPaidCount int64
 		var classUnpaidCount int64
 		var classPaidNominal float64
 		var classUnpaidNominal float64
 		var studentBriefs []studentBrief
 
-		for _, st := range rawStudents {
-			var spPaidCount int64
-			var spUnpaidCount int64
-			var spPaidNominal sql.NullFloat64
-			var spUnpaidNominal sql.NullFloat64
+		for _, st := range classStudents {
+			ob := obMap[st.ID]
 
-			r.db.Model(&domain.StudentObligation{}).Where("student_id = ? AND status = 'Paid'", st.ID).Count(&spPaidCount)
-			r.db.Model(&domain.StudentObligation{}).Where("student_id = ? AND status != 'Paid'", st.ID).Count(&spUnpaidCount)
-			r.db.Model(&domain.StudentObligation{}).Where("student_id = ?", st.ID).Select("COALESCE(sum(paid_amount), 0)").Row().Scan(&spPaidNominal)
-			r.db.Model(&domain.StudentObligation{}).Where("student_id = ? AND status != 'Paid'", st.ID).Select("COALESCE(sum(amount - paid_amount), 0)").Row().Scan(&spUnpaidNominal)
-
-			classPaidCount += spPaidCount
-			classUnpaidCount += spUnpaidCount
-			classPaidNominal += spPaidNominal.Float64
-			classUnpaidNominal += spUnpaidNominal.Float64
+			classPaidCount += ob.PaidCount
+			classUnpaidCount += ob.UnpaidCount
+			classPaidNominal += ob.PaidNominal
+			classUnpaidNominal += ob.UnpaidNominal
 
 			studentBriefs = append(studentBriefs, studentBrief{
 				ID:                 st.ID.String(),
 				Name:               st.Name,
 				NISN:               st.NISN,
 				Status:             st.Status,
-				PaidCount:          spPaidCount,
-				UnpaidCount:        spUnpaidCount,
-				TotalPaidNominal:   spPaidNominal.Float64,
-				TotalUnpaidNominal: spUnpaidNominal.Float64,
+				PaidCount:          ob.PaidCount,
+				UnpaidCount:        ob.UnpaidCount,
+				TotalPaidNominal:   ob.PaidNominal,
+				TotalUnpaidNominal: ob.UnpaidNominal,
 			})
 		}
 
@@ -655,7 +681,7 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 			ClassID:            c.ID,
 			ClassName:          c.Name,
 			HomeroomTeacher:    teacherName,
-			StudentCount:       len(rawStudents),
+			StudentCount:       len(classStudents),
 			PaidCount:          classPaidCount,
 			UnpaidCount:        classUnpaidCount,
 			TotalPaidNominal:   classPaidNominal,
@@ -686,24 +712,47 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 		CollectionRate float64   `json:"collection_rate"`
 	}
 
+	// Batch aggregate activity obligations
+	type actObSummary struct {
+		ActivityID     uuid.UUID `gorm:"column:activity_id"`
+		Participants   int64     `gorm:"column:participants"`
+		TotalTarget    float64   `gorm:"column:total_target"`
+		TotalCollected float64   `gorm:"column:total_collected"`
+	}
+	var actObSummaries []actObSummary
+	r.db.Table("activity_obligations").
+		Select("activity_id, COUNT(*) as participants, COALESCE(SUM(amount), 0) as total_target, COALESCE(SUM(paid_amount), 0) as total_collected").
+		Group("activity_id").
+		Scan(&actObSummaries)
+
+	actObMap := make(map[uuid.UUID]actObSummary, len(actObSummaries))
+	for _, a := range actObSummaries {
+		actObMap[a.ActivityID] = a
+	}
+
+	// Batch aggregate activity expenses
+	type actExpSummary struct {
+		ActivityID   uuid.UUID `gorm:"column:activity_id"`
+		TotalExpense float64   `gorm:"column:total_expense"`
+	}
+	var actExpSummaries []actExpSummary
+	r.db.Table("activity_transactions").
+		Where("transaction_type = 'Expense'").
+		Select("activity_id, COALESCE(SUM(amount), 0) as total_expense").
+		Group("activity_id").
+		Scan(&actExpSummaries)
+
+	actExpMap := make(map[uuid.UUID]float64, len(actExpSummaries))
+	for _, a := range actExpSummaries {
+		actExpMap[a.ActivityID] = a.TotalExpense
+	}
+
 	var activeActivitiesList []activityDetailDTO
 	var allActivitiesList []activityDetailDTO
 
 	for _, act := range activities {
-		var obStats struct {
-			Participants   int64   `gorm:"column:participants"`
-			TotalTarget    float64 `gorm:"column:total_target"`
-			TotalCollected float64 `gorm:"column:total_collected"`
-		}
-		r.db.Table("activity_obligations").
-			Where("activity_id = ?", act.ID).
-			Select("count(*) as participants, COALESCE(sum(amount), 0) as total_target, COALESCE(sum(paid_amount), 0) as total_collected").
-			Scan(&obStats)
-
-		var actExpense sql.NullFloat64
-		r.db.Table("activity_transactions").
-			Where("activity_id = ? AND transaction_type = 'Expense'", act.ID).
-			Select("COALESCE(sum(amount), 0)").Row().Scan(&actExpense)
+		obStats := actObMap[act.ID]
+		actExpense := actExpMap[act.ID]
 
 		rate := 0.0
 		if obStats.TotalTarget > 0 {
@@ -721,8 +770,8 @@ func (r *financeExtendedRepository) GetDashboardAnalytics() (map[string]interfac
 			Participants:   obStats.Participants,
 			TotalTarget:    obStats.TotalTarget,
 			TotalCollected: obStats.TotalCollected,
-			TotalExpense:   actExpense.Float64,
-			Balance:        obStats.TotalCollected - actExpense.Float64,
+			TotalExpense:   actExpense,
+			Balance:        obStats.TotalCollected - actExpense,
 			CollectionRate: rate,
 		}
 

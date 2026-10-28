@@ -45,13 +45,13 @@ const AdminDashboard = () => {
     const { data: stats, isLoading } = useQuery({
         queryKey: ['admin-stats'],
         queryFn: async () => {
-            const [users, ppdb] = await Promise.all([
-                api.get('/users/'),
+            const [usersRes, ppdbRes] = await Promise.all([
+                api.get('/users/?count=true'),
                 api.get('/ppdb/')
             ]);
             return {
-                totalUsers: users.data.length,
-                totalPPDB: ppdb.data.length,
+                totalUsers: typeof usersRes.data?.count === 'number' ? usersRes.data.count : (usersRes.data?.length || 0),
+                totalPPDB: Array.isArray(ppdbRes.data) ? ppdbRes.data.length : 0,
             };
         }
     });
@@ -117,15 +117,16 @@ const TeacherDashboard = () => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const today = days[new Date().getDay()];
 
-    // Fetch Teacher Profile
-    const { data: teachers } = useQuery({
+    // Fetch Teacher Profile (prefer user.teacher from AuthContext, fallback if missing)
+    const { data: fallbackTeachers } = useQuery({
         queryKey: ['teachers'],
         queryFn: async () => {
             const response = await api.get('/teachers/');
             return response.data;
-        }
+        },
+        enabled: !user?.teacher
     });
-    const currentTeacher = teachers?.find((t: any) => t.user.id === user?.id);
+    const currentTeacher = user?.teacher || fallbackTeachers?.find((t: any) => t.user.id === user?.id);
 
     // Fetch Schedule
     const { data: schedules } = useQuery({
@@ -230,15 +231,16 @@ const StudentDashboard = () => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const today = days[new Date().getDay()];
 
-    // Fetch Student Profile
-    const { data: students } = useQuery({
-        queryKey: ['students'],
+    // Fetch Student Profile (prefer user.student from AuthContext, fallback if missing)
+    const { data: fallbackStudents } = useQuery({
+        queryKey: ['students-self'],
         queryFn: async () => {
             const res = await api.get('/students/');
             return res.data;
-        }
+        },
+        enabled: !user?.student
     });
-    const currentStudent = students?.find((s: any) => s.user.id === user?.id);
+    const currentStudent = user?.student || fallbackStudents?.find((s: any) => s.user.id === user?.id);
 
     // Fetch Schedule
     const { data: schedules } = useQuery({

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { CashLedgerEntry, StaffUser, TransactionCode } from '../types/cashLedgerTypes';
@@ -82,9 +82,8 @@ export const useCashLedger = () => {
 
     const fetchStaff = async () => {
         try {
-            const res = await api.get('/users');
-            const allUsers = res.data || [];
-            setStaffList(allUsers.filter((u: StaffUser) => ![6, 7].includes(u.role_id)));
+            const res = await api.get('/users?staff=true');
+            setStaffList(res.data || []);
         } catch (error) {
             console.error("Failed to fetch staff", error);
         }
@@ -262,73 +261,90 @@ export const useCashLedger = () => {
         setCurrentPage(1);
     };
 
-    // Filter, Sort and Paginate
-    let processedEntries = entries.filter(e => {
-        let match = true;
-        if (filterType !== 'all' && e.type !== filterType) {
-            match = false;
-        }
-        if (filterFundSources.length > 0) {
-            if (!filterFundSources.includes(e.fund_source)) match = false;
-        } else if (filterFundSource !== 'all' && e.fund_source !== filterFundSource) {
-            match = false;
-        }
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            if (!(
-                e.invoice_number?.toLowerCase().includes(q) ||
-                e.item_name?.toLowerCase().includes(q) ||
-                e.source?.toLowerCase().includes(q) ||
-                e.notes?.toLowerCase().includes(q) ||
-                e.category?.toLowerCase().includes(q) ||
-                e.component?.toLowerCase().includes(q) ||
-                e.responsible?.name?.toLowerCase().includes(q) ||
-                e.transaction_code?.code?.toLowerCase().includes(q) ||
-                e.transaction_code?.name?.toLowerCase().includes(q) ||
-                e.transaction_code?.parent_code?.code?.toLowerCase().includes(q) ||
-                e.transaction_code?.parent_code?.name?.toLowerCase().includes(q)
-            )) match = false;
-        }
-        if (filterStartDate && e.date.split('T')[0] < filterStartDate) match = false;
-        if (filterEndDate && e.date.split('T')[0] > filterEndDate) match = false;
-        
-        if (selectedSemesters.length > 0) {
-            const month = new Date(e.date).getMonth() + 1;
-            const isSem1 = month >= 7 && month <= 12; // Jul-Dec
-            const semStr = isSem1 ? '1' : '2';
-            if (!selectedSemesters.includes(semStr)) match = false;
-        } else if (selectedSemester !== 'all') {
-            const month = new Date(e.date).getMonth() + 1;
-            const isSem1 = month >= 7 && month <= 12; // Jul-Dec
-            if (selectedSemester === '1' && !isSem1) match = false;
-            if (selectedSemester === '2' && isSem1) match = false;
-        }
+    // Filter, Sort and Paginate (Optimized with useMemo)
+    const processedEntries = useMemo(() => {
+        const filtered = entries.filter(e => {
+            let match = true;
+            if (filterType !== 'all' && e.type !== filterType) {
+                match = false;
+            }
+            if (filterFundSources.length > 0) {
+                if (!filterFundSources.includes(e.fund_source)) match = false;
+            } else if (filterFundSource !== 'all' && e.fund_source !== filterFundSource) {
+                match = false;
+            }
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                if (!(
+                    e.invoice_number?.toLowerCase().includes(q) ||
+                    e.item_name?.toLowerCase().includes(q) ||
+                    e.source?.toLowerCase().includes(q) ||
+                    e.notes?.toLowerCase().includes(q) ||
+                    e.category?.toLowerCase().includes(q) ||
+                    e.component?.toLowerCase().includes(q) ||
+                    e.responsible?.name?.toLowerCase().includes(q) ||
+                    e.transaction_code?.code?.toLowerCase().includes(q) ||
+                    e.transaction_code?.name?.toLowerCase().includes(q) ||
+                    e.transaction_code?.parent_code?.code?.toLowerCase().includes(q) ||
+                    e.transaction_code?.parent_code?.name?.toLowerCase().includes(q)
+                )) match = false;
+            }
+            if (filterStartDate && e.date.split('T')[0] < filterStartDate) match = false;
+            if (filterEndDate && e.date.split('T')[0] > filterEndDate) match = false;
+            
+            if (selectedSemesters.length > 0) {
+                const month = new Date(e.date).getMonth() + 1;
+                const isSem1 = month >= 7 && month <= 12; // Jul-Dec
+                const semStr = isSem1 ? '1' : '2';
+                if (!selectedSemesters.includes(semStr)) match = false;
+            } else if (selectedSemester !== 'all') {
+                const month = new Date(e.date).getMonth() + 1;
+                const isSem1 = month >= 7 && month <= 12; // Jul-Dec
+                if (selectedSemester === '1' && !isSem1) match = false;
+                if (selectedSemester === '2' && isSem1) match = false;
+            }
 
-        if (filterTransactionCodeIds.length > 0) {
-            const tcMatches = (e.transaction_code_id != null && filterTransactionCodeIds.includes(e.transaction_code_id)) ||
-                              (e.transaction_code?.parent_code_id != null && filterTransactionCodeIds.includes(e.transaction_code.parent_code_id));
-            if (!tcMatches) match = false;
-        } else if (filterTransactionCodeId !== 'all') {
-            const targetId = Number(filterTransactionCodeId);
-            const tcMatches = e.transaction_code_id === targetId ||
-                              e.transaction_code?.parent_code_id === targetId;
-            if (!tcMatches) match = false;
-        }
-        return match;
-    });
+            if (filterTransactionCodeIds.length > 0) {
+                const tcMatches = (e.transaction_code_id != null && filterTransactionCodeIds.includes(e.transaction_code_id)) ||
+                                  (e.transaction_code?.parent_code_id != null && filterTransactionCodeIds.includes(e.transaction_code.parent_code_id));
+                if (!tcMatches) match = false;
+            } else if (filterTransactionCodeId !== 'all') {
+                const targetId = Number(filterTransactionCodeId);
+                const tcMatches = e.transaction_code_id === targetId ||
+                                  e.transaction_code?.parent_code_id === targetId;
+                if (!tcMatches) match = false;
+            }
+            return match;
+        });
 
-    processedEntries.sort((a, b) => {
-        const da = new Date(a.date).getTime();
-        const db = new Date(b.date).getTime();
-        return sortOrder === 'desc' ? db - da : da - db;
-    });
+        return filtered.sort((a, b) => {
+            const da = new Date(a.date).getTime();
+            const db = new Date(b.date).getTime();
+            return sortOrder === 'desc' ? db - da : da - db;
+        });
+    }, [entries, filterType, filterFundSources, filterFundSource, searchQuery, filterStartDate, filterEndDate, selectedSemesters, selectedSemester, filterTransactionCodeIds, filterTransactionCodeId, sortOrder]);
 
     const totalPages = Math.ceil(processedEntries.length / itemsPerPage);
-    const paginatedEntries = processedEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const paginatedEntries = useMemo(() => {
+        return processedEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    }, [processedEntries, currentPage, itemsPerPage]);
 
-    const totalIncome = entries.filter(e => e.type === 'Income').reduce((acc, curr) => acc + curr.amount, 0);
-    const totalExpense = entries.filter(e => e.type === 'Expense').reduce((acc, curr) => acc + curr.amount, 0);
-    const currentSaldo = entries.reduce((acc, curr) => curr.type === 'Income' ? acc + curr.amount : acc - curr.amount, 0);
+    const { totalIncome, totalExpense, currentSaldo } = useMemo(() => {
+        let income = 0;
+        let expense = 0;
+        for (const e of entries) {
+            if (e.type === 'Income') {
+                income += e.amount;
+            } else if (e.type === 'Expense') {
+                expense += e.amount;
+            }
+        }
+        return {
+            totalIncome: income,
+            totalExpense: expense,
+            currentSaldo: income - expense,
+        };
+    }, [entries]);
 
     return {
         // States

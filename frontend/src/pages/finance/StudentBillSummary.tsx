@@ -122,22 +122,25 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
         enabled: !!selectedYear?.id,
     });
 
-    // Fetch all activity obligations
+    // Fetch all activity obligations in parallel (fast concurrent fetch)
     const { data: activityObligations = [] } = useQuery<any[]>({
         queryKey: ['activity-obligations-all', activities],
         queryFn: async () => {
-            const allObs: any[] = [];
-            for (const act of activities) {
-                try {
-                    const res = await api.get(`/finance/activities/${act.id}/obligations`);
-                    const obs = (res.data || []).map((o: any) => ({
-                        ...o,
-                        _activityName: act.name,
-                    }));
-                    allObs.push(...obs);
-                } catch { /* skip */ }
-            }
-            return allObs;
+            if (!activities.length) return [];
+            const results = await Promise.all(
+                activities.map(async (act: any) => {
+                    try {
+                        const res = await api.get(`/finance/activities/${act.id}/obligations`);
+                        return (res.data || []).map((o: any) => ({
+                            ...o,
+                            _activityName: act.name,
+                        }));
+                    } catch {
+                        return [];
+                    }
+                })
+            );
+            return results.flat();
         },
         enabled: activities.length > 0,
     });

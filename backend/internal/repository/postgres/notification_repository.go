@@ -21,7 +21,7 @@ func (r *NotificationRepository) Create(notification *domain.Notification) error
 
 func (r *NotificationRepository) GetByUser(userID string) ([]domain.Notification, error) {
 	var notifications []domain.Notification
-	err := r.db.Where("user_id = ?", userID).Order("created_at desc").Find(&notifications).Error
+	err := r.db.Where("user_id = ?", userID).Order("created_at desc").Limit(50).Find(&notifications).Error
 	return notifications, err
 }
 

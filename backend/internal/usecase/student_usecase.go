@@ -54,8 +54,8 @@ func (u *StudentUsecase) getSetting(key, def string) string {
 	return strings.TrimSpace(s.Value)
 }
 
-func (u *StudentUsecase) GetAllStudents(unitID uint) ([]domain.Student, error) {
-	return u.studentRepo.GetAll(unitID)
+func (u *StudentUsecase) GetAllStudents(unitID uint, classID uint) ([]domain.Student, error) {
+	return u.studentRepo.GetAll(unitID, classID)
 }
 
 func (u *StudentUsecase) CreateStudent(name, email, password, nisn, rfid string, classID, unitID uint, parentID *uuid.UUID) error {

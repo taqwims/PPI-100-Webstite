@@ -60,11 +60,8 @@ const HomeroomStudents: React.FC = () => {
         queryKey: ['homeroom-students', homeroomClass?.id],
         queryFn: async () => {
             if (!homeroomClass?.id) return [];
-            // We need an endpoint to get students by class. 
-            // Assuming /students?class_id=... works or we filter client side from all students (less efficient).
-            // Let's try fetching all students for the unit and filtering by class_id.
-            const res = await api.get(`/students/?unit_id=${homeroomClass.unit_id}`);
-            return res.data.filter((s: any) => s.class_id === homeroomClass.id);
+            const res = await api.get(`/students/?class_id=${homeroomClass.id}`);
+            return res.data || [];
         },
         enabled: !!homeroomClass?.id,
     });
@@ -84,8 +81,8 @@ const HomeroomStudents: React.FC = () => {
     const { data: parents } = useQuery({
         queryKey: ['parents'],
         queryFn: async () => {
-            const res = await api.get('/users/');
-            return res.data.filter((u: any) => u.role_id === 7);
+            const res = await api.get('/users/?role=7');
+            return res.data || [];
         },
     });
 

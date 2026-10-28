@@ -9,19 +9,19 @@ import (
 // Notifikasi
 type Notification struct {
 	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID      uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	UserID      uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
 	User        User      `gorm:"foreignKey:UserID" json:"user"`
 	Title       string    `gorm:"not null" json:"title"`
 	Message     string    `gorm:"not null" json:"message"`
-	Type        string    `gorm:"not null" json:"type"` // Bill, BK, Task, etc.
+	Type        string    `gorm:"not null;index" json:"type"` // Bill, BK, Task, etc.
 	ReferenceID string    `json:"reference_id"`
-	IsRead      bool      `gorm:"default:false" json:"is_read"`
-	CreatedAt   time.Time `json:"created_at"`
+	IsRead      bool      `gorm:"default:false;index" json:"is_read"`
+	CreatedAt   time.Time `gorm:"index" json:"created_at"`
 }
 
 type NotificationToken struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
 	Token     string    `gorm:"not null" json:"token"`
 	Device    string    `json:"device"`
 	CreatedAt time.Time `json:"created_at"`
@@ -33,8 +33,8 @@ type ContactMessage struct {
 	Email     string    `gorm:"not null" json:"email"`
 	Subject   string    `gorm:"not null" json:"subject"`
 	Message   string    `gorm:"not null" json:"message"`
-	IsRead    bool      `gorm:"default:false" json:"is_read"`
-	CreatedAt time.Time `json:"created_at"`
+	IsRead    bool      `gorm:"default:false;index" json:"is_read"`
+	CreatedAt time.Time `gorm:"index" json:"created_at"`
 }
 
 // ------------------- WhatsApp Template -------------------

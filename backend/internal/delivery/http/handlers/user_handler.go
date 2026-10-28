@@ -19,6 +19,28 @@ func NewUserHandler(userUsecase *usecase.UserUsecase) *UserHandler {
 }
 
 func (h *UserHandler) GetAllUsers(c *gin.Context) {
+	// If only count is requested (fast count for dashboard metrics)
+	if c.Query("count") == "true" {
+		count, err := h.userUsecase.CountUsers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"count": count})
+		return
+	}
+
+	// If only staff users are requested (e.g. for dropdowns in BKU, Infaq, Payroll)
+	if c.Query("staff") == "true" || c.Query("is_staff") == "true" {
+		users, err := h.userUsecase.GetStaffUsers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, users)
+		return
+	}
+
 	roleStr := c.Query("role")
 	var roleID uint
 	if roleStr != "" {

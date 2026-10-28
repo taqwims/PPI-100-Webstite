@@ -29,6 +29,8 @@ func (r *StudentObligationRepository) GetAll(academicYearID uint, classID uint) 
 		Preload("Student").
 		Preload("Student.User").
 		Preload("Student.Class").
+		Preload("Student.Parent").
+		Preload("Student.Parent.User").
 		Preload("PaymentType").
 		Preload("AcademicYear").
 		Joins("JOIN students ON students.id = student_obligations.student_id").
@@ -54,6 +56,8 @@ func (r *StudentObligationRepository) GetByClassIDs(academicYearID uint, classID
 		Preload("Student").
 		Preload("Student.User").
 		Preload("Student.Class").
+		Preload("Student.Parent").
+		Preload("Student.Parent.User").
 		Preload("PaymentType").
 		Preload("AcademicYear").
 		Joins("JOIN students ON students.id = student_obligations.student_id").

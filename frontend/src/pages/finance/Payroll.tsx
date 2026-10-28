@@ -103,8 +103,8 @@ const Payroll: React.FC = () => {
 
     const fetchUsers = async () => {
         try {
-            const res = await api.get('/users/');
-            setUsers(res.data.filter((u: UserData) => ![6, 7].includes(u.role_id)));
+            const res = await api.get('/users/?staff=true');
+            setUsers(res.data || []);
         } catch (error) {
             console.error("Failed to fetch users", error);
         }

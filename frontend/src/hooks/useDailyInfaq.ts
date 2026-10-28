@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { exportDailyInfaqToExcel } from '../utils/exportUtils';
@@ -125,9 +125,8 @@ export const useDailyInfaq = () => {
 
     const fetchStaff = async () => {
         try {
-            const res = await api.get('/users');
-            const allUsers = res.data || [];
-            setStaffList(allUsers.filter((u: StaffUser) => ![6, 7].includes(u.role_id)));
+            const res = await api.get('/users?staff=true');
+            setStaffList(res.data || []);
         } catch (error) {
             console.error("Failed to fetch staff", error);
         }
@@ -272,32 +271,44 @@ export const useDailyInfaq = () => {
         }
     };
 
-    const filteredEntries = entries.filter(e => {
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            const matchSearch = (
-                e.source?.toLowerCase().includes(q) ||
-                e.notes?.toLowerCase().includes(q) ||
-                e.class_name?.toLowerCase().includes(q) ||
-                e.handled_by?.name?.toLowerCase().includes(q) ||
-                e.responsible?.name?.toLowerCase().includes(q)
-            );
-            if (!matchSearch) return false;
-        }
-        if (filterStartDate) {
-            const d = new Date(e.date).toISOString().split('T')[0];
-            if (d < filterStartDate) return false;
-        }
-        if (filterEndDate) {
-            const d = new Date(e.date).toISOString().split('T')[0];
-            if (d > filterEndDate) return false;
-        }
-        return true;
-    });
+    const filteredEntries = useMemo(() => {
+        return entries.filter(e => {
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                const matchSearch = (
+                    e.source?.toLowerCase().includes(q) ||
+                    e.notes?.toLowerCase().includes(q) ||
+                    e.class_name?.toLowerCase().includes(q) ||
+                    e.handled_by?.name?.toLowerCase().includes(q) ||
+                    e.responsible?.name?.toLowerCase().includes(q)
+                );
+                if (!matchSearch) return false;
+            }
+            if (filterStartDate) {
+                const d = new Date(e.date).toISOString().split('T')[0];
+                if (d < filterStartDate) return false;
+            }
+            if (filterEndDate) {
+                const d = new Date(e.date).toISOString().split('T')[0];
+                if (d > filterEndDate) return false;
+            }
+            return true;
+        });
+    }, [entries, searchQuery, filterStartDate, filterEndDate]);
 
-    const totalIncome = entries.filter((t) => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpense = entries.filter((t) => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0);
-    const netBalance = totalIncome - totalExpense;
+    const { totalIncome, totalExpense, netBalance } = useMemo(() => {
+        let income = 0;
+        let expense = 0;
+        for (const t of entries) {
+            if (t.type === 'Income') income += t.amount;
+            else if (t.type === 'Expense') expense += t.amount;
+        }
+        return {
+            totalIncome: income,
+            totalExpense: expense,
+            netBalance: income - expense,
+        };
+    }, [entries]);
 
     return {
         user, canManage, unitID, setUnitID,

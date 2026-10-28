@@ -20,11 +20,14 @@ func (r *StudentRepository) Create(student *domain.Student) error {
 	return r.db.Create(student).Error
 }
 
-func (r *StudentRepository) GetAll(unitID uint) ([]domain.Student, error) {
+func (r *StudentRepository) GetAll(unitID uint, classID uint) ([]domain.Student, error) {
 	var students []domain.Student
 	query := r.db.Joins("User").Where("\"User\".deleted_at IS NULL")
 	if unitID > 0 {
 		query = query.Where("students.unit_id = ?", unitID)
+	}
+	if classID > 0 {
+		query = query.Where("students.class_id = ?", classID)
 	}
 	err := query.Preload("User").Preload("Class").Preload("Parent").Preload("Parent.User").
 		Find(&students).Error
