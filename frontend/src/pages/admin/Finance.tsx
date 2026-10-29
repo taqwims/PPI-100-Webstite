@@ -41,6 +41,7 @@ interface Payment {
     payment_method: string;
     status: string;
     proof_url?: string;
+    recorded_by_name?: string;
     paid_at: string;
 }
 
@@ -701,14 +702,26 @@ const Finance: React.FC = () => {
                             {selectedPayBill.payments && selectedPayBill.payments.length > 0 && (
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                                     <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">Riwayat Pembayaran</p>
-                                    <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                                         {selectedPayBill.payments.map((p, i) => (
                                             <div key={i} className="flex justify-between items-center text-sm border-b border-slate-200 pb-1.5 last:border-0 last:pb-0">
                                                 <div>
-                                                    <span className={clsx("text-[10px] px-1.5 py-0.5 rounded font-medium", 
-                                                        p.status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                                    )}>{p.status}</span>
-                                                    <span className="text-xs text-slate-500 ml-2">{p.paid_at ? new Date(p.paid_at).toLocaleString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '-'}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className={clsx("text-[10px] px-1.5 py-0.5 rounded font-medium", 
+                                                            p.status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                                        )}>{p.status}</span>
+                                                        <span className="text-xs font-medium text-slate-700">
+                                                            {p.payment_method}
+                                                        </span>
+                                                        {p.recorded_by_name && (
+                                                            <span className="text-[10px] px-1.5 py-0.2 bg-slate-200/80 text-slate-700 rounded font-medium">
+                                                                PJ: {p.recorded_by_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
+                                                        {p.paid_at ? new Date(p.paid_at).toLocaleString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'}) : '-'}
+                                                    </span>
                                                 </div>
                                                 <span className="font-semibold text-slate-700">{formatCurrency(p.amount)}</span>
                                             </div>

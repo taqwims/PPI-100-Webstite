@@ -8,19 +8,21 @@ import (
 	"github.com/google/uuid"
 )
 
-func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method string, proofURL string) error {
+func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method string, proofURL string, recordedByID *uuid.UUID, recordedByName string) error {
 	status := "Pending"
 	if method == "Cash" {
 		status = "Success"
 	}
 
 	payment := &domain.Payment{
-		BillID:        billID,
-		Amount:        amount,
-		PaymentMethod: method,
-		Status:        status,
-		ProofURL:      proofURL,
-		PaidAt:        time.Now(),
+		BillID:         billID,
+		Amount:         amount,
+		PaymentMethod:  method,
+		Status:         status,
+		ProofURL:       proofURL,
+		PaidAt:         time.Now(),
+		RecordedByID:   recordedByID,
+		RecordedByName: recordedByName,
 	}
 
 	if amount <= 0 {
@@ -74,6 +76,8 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 			Type:              "Income",
 			Amount:            amount,
 			Category:          category,
+			ResponsibleID:     recordedByID,
+			ResponsibleName:   recordedByName,
 			TransactionCodeID: bill.TransactionCodeID,
 		}
 	}
@@ -99,13 +103,13 @@ func (u *FinanceUsecase) RecordPayment(billID uuid.UUID, amount float64, method 
 		u.triggerPaymentWA(&bill.Student, parent, bill, amount, method)
 		
 		// Sync obligation statuses
-		u.syncObligationStatus(bill, totalPaid, amount)
+		u.syncObligationStatus(bill, totalPaid, amount, recordedByName, method)
 	}
 
 	return nil
 }
 
-func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest) (*domain.MultiPaymentResult, error) {
+func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest, recordedByID *uuid.UUID, recordedByName string) (*domain.MultiPaymentResult, error) {
 	// Fetch all bills (can be by Bill ID or Obligation ID)
 	bills, err := u.financeRepo.GetBillsByIDsOrObligationIDs(req.BillIDs)
 	if err != nil {
@@ -178,12 +182,14 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 		}
 
 		payment := domain.Payment{
-			BillID:        bill.ID,
-			Amount:        payAmount,
-			PaymentMethod: req.PaymentMethod,
-			Status:        status,
-			TransactionID: invoiceNumber,
-			PaidAt:        time.Now(),
+			BillID:         bill.ID,
+			Amount:         payAmount,
+			PaymentMethod:  req.PaymentMethod,
+			Status:         status,
+			TransactionID:  invoiceNumber,
+			PaidAt:         time.Now(),
+			RecordedByID:   recordedByID,
+			RecordedByName: recordedByName,
 		}
 		payments = append(payments, payment)
 
@@ -230,6 +236,8 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 				Type:              "Income",
 				Amount:            payment.Amount,
 				Category:          category,
+				ResponsibleID:     recordedByID,
+				ResponsibleName:   recordedByName,
 				TransactionCodeID: bill.TransactionCodeID,
 			}
 			_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
@@ -252,7 +260,7 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 			}
 		}
 		
-		u.syncObligationStatus(bill, alreadyPaid + payment.Amount, payment.Amount)
+		u.syncObligationStatus(bill, alreadyPaid + payment.Amount, payment.Amount, recordedByName, req.PaymentMethod)
 	}
 
 	// 4. Notifications (Send once for the multi-payment)
@@ -291,7 +299,7 @@ func (u *FinanceUsecase) GetPendingPayments() ([]domain.Payment, error) {
 	return u.financeRepo.GetPendingPayments()
 }
 
-func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
+func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID, approverID *uuid.UUID, approverName string) error {
 	payment, err := u.financeRepo.GetPaymentByID(paymentID.String())
 	if err != nil {
 		return err
@@ -303,6 +311,8 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 
 	payment.Status = "Success"
 	payment.PaidAt = time.Now()
+	payment.RecordedByID = approverID
+	payment.RecordedByName = approverName
 
 	bill, err := u.financeRepo.GetBillByID(payment.BillID.String())
 	if err != nil {
@@ -341,6 +351,8 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 			Type:              "Income",
 			Amount:            payment.Amount,
 			Category:          category,
+			ResponsibleID:     approverID,
+			ResponsibleName:   approverName,
 			TransactionCodeID: bill.TransactionCodeID,
 		}
 	}
@@ -365,7 +377,7 @@ func (u *FinanceUsecase) ApprovePayment(paymentID uuid.UUID) error {
 	u.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, payment.PaymentMethod)
 
 	// Sync payment status back to StudentObligation or ActivityObligation
-	u.syncObligationStatus(bill, totalPaid, payment.Amount)
+	u.syncObligationStatus(bill, totalPaid, payment.Amount, approverName, payment.PaymentMethod)
 
 	return nil
 }

@@ -231,7 +231,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	{
 		staffAttendanceGroup.GET("/daily", faceAttendanceHandler.GetStaffDailyAttendance)
 		staffAttendanceGroup.GET("/export", faceAttendanceHandler.GetStaffAttendanceExport)
+		staffAttendanceGroup.GET("/leaderboard", faceAttendanceHandler.GetStaffLeaderboard)
 		staffAttendanceGroup.GET("/monthly-summary", faceAttendanceHandler.GetStaffMonthlySummary)
+		staffAttendanceGroup.POST("/:id/waive-penalty", middleware.RoleMiddleware(1, 8, 9), faceAttendanceHandler.WaiveStaffPenalty)
 	}
 
 	// Register modular mapped routes

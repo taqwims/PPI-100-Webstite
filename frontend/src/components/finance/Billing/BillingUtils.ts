@@ -20,7 +20,7 @@ export interface Bill {
         user: { name: string };
     };
     payment_link?: string;
-    payments?: { amount: number; status: string; payment_method: string; proof_url?: string; paid_at: string; transaction_id?: string; created_at: string; }[];
+    payments?: { amount: number; status: string; payment_method: string; proof_url?: string; paid_at: string; transaction_id?: string; created_at: string; recorded_by_id?: string; recorded_by_name?: string; }[];
 }
 
 export const formatCurrency = (amount: number) => {
@@ -47,10 +47,10 @@ export const hasPendingMidtrans = (bill: Bill) => {
 
 export const formatPaymentDate = (p: any) => {
     if (p.status === 'Success' && p.paid_at && !p.paid_at.startsWith('0001-01-01')) {
-        return new Date(p.paid_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return new Date(p.paid_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
     if (p.created_at && !p.created_at.startsWith('0001-01-01')) {
-        return new Date(p.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return new Date(p.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
     return '-';
 };

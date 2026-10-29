@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/repository/postgres"
 )
@@ -94,4 +95,23 @@ func (u *StaffAttendanceUsecase) GetMonthlyAttendanceSummary(userID string, mont
 		"calculated_lateness_penalty": calculatedPenalty,
 		"records":                     records,
 	}, nil
+}
+
+func (u *StaffAttendanceUsecase) GetStaffLeaderboard(unitID uint, startDateStr, endDateStr string) ([]domain.StaffAttendanceLeaderboardItem, error) {
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		startDate = time.Now().AddDate(-1, 0, 0)
+	}
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		endDate = time.Now()
+	}
+	return u.staffRepo.GetStaffLeaderboard(unitID, startDate, endDate)
+}
+
+func (u *StaffAttendanceUsecase) WaivePenalty(attID uuid.UUID, waivedBy string, reason string) (*domain.StaffAttendance, error) {
+	if strings.TrimSpace(reason) == "" {
+		reason = "Dihapus oleh Administrator"
+	}
+	return u.staffRepo.WaivePenalty(attID, waivedBy, reason)
 }

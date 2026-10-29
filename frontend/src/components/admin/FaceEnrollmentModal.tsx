@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Camera, RefreshCw, CheckCircle2, Trash2, Search,
     Users, GraduationCap, Briefcase, X, AlertCircle,
-    Upload, Sparkles
+    Upload, Sparkles, SwitchCamera
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -60,6 +60,16 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
     const [submitting, setSubmitting] = useState(false);
     const [isBulkSyncing, setIsBulkSyncing] = useState(false);
     const [isTabVisible, setIsTabVisible] = useState<boolean>(() => typeof document !== 'undefined' ? !document.hidden : true);
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+    const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
+
+    const toggleFacingMode = () => {
+        setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+    };
+
+    const toggleFitMode = () => {
+        setFitMode(prev => prev === 'contain' ? 'cover' : 'contain');
+    };
 
     // ─── Stop Camera Tracks Completely ───
     const stopCamera = () => {
@@ -140,12 +150,11 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
         const token = ++requestTokenRef.current;
 
         try {
-            const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: 'user',
-                    width: isMobile ? { ideal: 480 } : { ideal: 640 },
-                    height: isMobile ? { ideal: 640 } : { ideal: 480 }
+                    facingMode: facingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
             });
 
@@ -180,7 +189,7 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
         return () => {
             stopCamera();
         };
-    }, [isOpen, selectedUser, capturedImage, isTabVisible]);
+    }, [isOpen, selectedUser, capturedImage, isTabVisible, facingMode]);
 
     // Capture photo from video to canvas
     const handleCapture = () => {
@@ -588,17 +597,40 @@ export const FaceEnrollmentModal: React.FC<FaceEnrollmentModalProps> = ({
                                 )}
 
                                 {/* Camera Viewport: Portrait on mobile, Horizontal on desktop */}
-                                <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] sm:aspect-[4/3] flex items-center justify-center border border-slate-300 shadow-inner">
+                                <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] sm:aspect-[4/3] flex items-center justify-center border border-slate-300 shadow-inner group">
                                     {/* Video Stream */}
                                     <video
                                         ref={videoRef}
                                         autoPlay
                                         playsInline
                                         muted
-                                        className={`w-full h-full object-cover transform scale-x-[-1] ${
+                                        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'} transform ${facingMode === 'user' ? 'scale-x-[-1]' : 'scale-x-1'} ${
                                             capturedImage ? 'hidden' : 'block'
                                         }`}
                                     />
+
+                                    {/* Top floating camera quick toggles (flip camera & fit mode) */}
+                                    {!capturedImage && cameraActive && isTabVisible && (
+                                        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={toggleFacingMode}
+                                                className="px-2.5 py-1 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-white text-[11px] font-medium border border-white/20 flex items-center gap-1 shadow-sm transition active:scale-95"
+                                                title={`Ganti Kamera (${facingMode === 'user' ? 'Kamera Depan' : 'Kamera Belakang'})`}
+                                            >
+                                                <SwitchCamera size={12} className="text-emerald-400" />
+                                                <span>{facingMode === 'user' ? 'Depan' : 'Belakang'}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={toggleFitMode}
+                                                className="px-2 py-1 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-white/20 shadow-sm transition active:scale-95"
+                                                title={`Tampilan: ${fitMode === 'contain' ? 'Fit Utuh (Tanpa Zoom/Crop)' : 'Cover Penuh'}`}
+                                            >
+                                                {fitMode === 'contain' ? 'FIT' : 'CROP'}
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Captured Snapshot Preview */}
                                     {capturedImage && (

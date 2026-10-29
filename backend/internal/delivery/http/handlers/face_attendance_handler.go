@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"ppi-100-sis/internal/usecase"
 
 	"github.com/gin-gonic/gin"
@@ -143,6 +145,22 @@ func (h *FaceAttendanceHandler) GetStaffAttendanceExport(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": records})
 }
 
+func (h *FaceAttendanceHandler) GetStaffLeaderboard(c *gin.Context) {
+	unitIDStr := c.DefaultQuery("unit_id", "0")
+	unitID, _ := strconv.ParseUint(unitIDStr, 10, 32)
+
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	items, err := h.staffAttendanceUsecase.GetStaffLeaderboard(uint(unitID), startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
 func (h *FaceAttendanceHandler) GetStaffRecentDaily(c *gin.Context) {
 	unitIDStr := c.DefaultQuery("unit_id", "0")
 	unitID, _ := strconv.ParseUint(unitIDStr, 10, 32)
@@ -199,4 +217,35 @@ func (h *FaceAttendanceHandler) GetStaffMonthlySummary(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": summary})
+}
+
+func (h *FaceAttendanceHandler) WaiveStaffPenalty(c *gin.Context) {
+	idStr := c.Param("id")
+	attID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID presensi tidak valid"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	adminName := c.GetString("userName")
+	if adminName == "" {
+		adminName = "Administrator"
+	}
+
+	att, err := h.staffAttendanceUsecase.WaivePenalty(attID, adminName, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Gagal menghapus denda: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Potongan denda keterlambatan guru berhasil dihapus",
+		"data":    att,
+	})
 }

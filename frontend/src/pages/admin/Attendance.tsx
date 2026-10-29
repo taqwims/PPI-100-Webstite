@@ -5,7 +5,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import {
     CheckCircle, XCircle, Calendar, Users, Clock, AlertCircle, Coffee,
-    Radio, Search, RefreshCw, Camera, UserPlus, FileSpreadsheet
+    Radio, Search, RefreshCw, Camera, UserPlus, FileSpreadsheet, Trophy
 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
@@ -15,6 +15,7 @@ import { useFeatureStore } from '../../store/featureStore';
 import AttendanceRFID from './AttendanceRFID';
 import { FaceEnrollmentModal } from '../../components/admin/FaceEnrollmentModal';
 import AttendanceExportPanel from './AttendanceExportPanel';
+import AttendanceAnalyticsLeaderboard from './AttendanceAnalyticsLeaderboard';
 import { stopAllCameraStreams } from '../../utils/cameraGuard';
 
 interface Student {
@@ -79,14 +80,17 @@ const AttendancePage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
     const isFaceEnabled = useFeatureStore((s) => s.isFaceEnabled());
-    const initialTab = searchParams.get('tab') === 'export' ? 'export' : (isRFIDEnabled ? 'scanner' : 'daily');
-    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule' | 'export'>(initialTab);
+    const tabFromUrl = searchParams.get('tab');
+    const initialTab = tabFromUrl === 'export' ? 'export' : tabFromUrl === 'analytics' ? 'analytics' : (isRFIDEnabled ? 'scanner' : 'daily');
+    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule' | 'export' | 'analytics'>(initialTab);
     const [showFaceEnrollModal, setShowFaceEnrollModal] = useState(false);
 
     useEffect(() => {
         const tabParam = searchParams.get('tab');
         if (tabParam === 'export') {
             setActiveTab('export');
+        } else if (tabParam === 'analytics') {
+            setActiveTab('analytics');
         }
     }, [searchParams]);
 
@@ -261,13 +265,24 @@ const AttendancePage: React.FC = () => {
                     >
                         <FileSpreadsheet size={16} /> Export & Rekap
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('analytics')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                            activeTab === 'analytics'
+                                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <Trophy size={16} /> Leaderboard & Analitik
+                    </button>
                 </div>
 
                 {isFaceEnabled && (
                     <div className="flex items-center gap-2">
                         {user?.role_id === 1 && (
                             <Link
-                                to="/dashboard/settings?tab=rfid_attendance"
+                                to="/dashboard/admin/school-settings?tab=rfid_attendance"
                                 className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-all shadow-sm active:scale-95"
                                 title="Atur Jam Masuk, Batas Terlambat, dan Jam Pulang Sekolah"
                             >
@@ -553,6 +568,11 @@ const AttendancePage: React.FC = () => {
             {/* TAB 4: Export & Rekap Laporan */}
             {activeTab === 'export' && (
                 <AttendanceExportPanel onBack={() => setActiveTab('daily')} />
+            )}
+
+            {/* TAB 5: Leaderboard & Analitik Presensi */}
+            {activeTab === 'analytics' && (
+                <AttendanceAnalyticsLeaderboard />
             )}
 
             {/* Modal Pendaftaran Wajah */}

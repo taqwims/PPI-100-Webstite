@@ -646,13 +646,20 @@ func (u *MayarUsecase) processPaymentSuccess(orderID string) error {
 			category = bill.BillType
 		}
 
+		now := time.Now()
+		payment.RecordedByName = "Sistem Mayar"
+		payment.PaidAt = now
+		_ = u.financeRepo.UpdatePayment(payment)
+
 		cashLedgerEntry := domain.CashLedger{
-			Date:              time.Now(),
+			Date:              now,
 			Source:            bill.Student.User.Name,
 			ItemName:          "Pembayaran Mayar - " + bill.Title,
 			Type:              "Income",
 			Amount:            payment.Amount,
 			Category:          category,
+			ResponsibleName:   "Sistem Mayar",
+			Notes:             fmt.Sprintf("Auto-settled via Mayar (Order ID: %s, Timestamp: %s)", orderID, now.Format("2006-01-02 15:04:05")),
 			TransactionCodeID: bill.TransactionCodeID,
 		}
 		_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
@@ -675,7 +682,7 @@ func (u *MayarUsecase) processPaymentSuccess(orderID string) error {
 			u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
 
 			u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, "Mayar")
-			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
+			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount, "Sistem Mayar", "Mayar")
 		}
 	}
 	return nil

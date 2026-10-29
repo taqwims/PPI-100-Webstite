@@ -39,3 +39,14 @@ func NewFinanceUsecase(
 		schoolSettingRepo:     schoolSettingRepo,
 	}
 }
+
+func (u *FinanceUsecase) GetUserName(userID string) string {
+	if u.userRepo == nil || userID == "" {
+		return ""
+	}
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil || user == nil {
+		return ""
+	}
+	return user.Name
+}

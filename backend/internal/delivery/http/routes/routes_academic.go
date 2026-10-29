@@ -63,6 +63,7 @@ func RegisterAcademicRoutes(
 		}
 		students.GET("/attendance/daily", studentHandler.GetDailyAttendance)
 		students.GET("/attendance/export", studentHandler.GetAttendanceExport)
+		students.GET("/attendance/leaderboard", studentHandler.GetAttendanceLeaderboard)
 		students.GET("/attendance/live-recent", studentHandler.GetRecentDailyAttendance)
 		students.GET("/attendance/today-summary", studentHandler.GetTodaySummary)
 		students.GET("/attendance/:schedule_id", studentHandler.GetScheduleAttendance)

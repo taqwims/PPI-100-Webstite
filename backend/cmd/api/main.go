@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/delivery/http/routes"
 	"ppi-100-sis/internal/repository/postgres"
@@ -10,6 +11,14 @@ import (
 )
 
 func main() {
+	// Set default timezone server ke WIB (Asia/Jakarta, UTC+7)
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.FixedZone("WIB", 7*3600)
+	}
+	time.Local = loc
+	log.Printf("[Init] Server timezone set to: %s (current time: %s)", loc.String(), time.Now().Format("2006-01-02 15:04:05 MST"))
+
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)

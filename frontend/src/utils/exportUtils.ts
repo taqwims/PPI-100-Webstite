@@ -25,6 +25,24 @@ const formatDateIndo = (dateStr?: string) => {
     }
 };
 
+const formatDateTimeIndo = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleString('id-ID', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    } catch {
+        return dateStr;
+    }
+};
+
 /**
  * Export Payroll to Professional Excel (.xlsx) file
  */
@@ -247,9 +265,15 @@ export const exportCashLedgerToExcel = (
         totalExpense += credit;
         runningBalance += (debit - credit);
 
+        const resp = e.responsible_name || e.responsible?.name || (
+            e.notes?.toLowerCase().includes('midtrans') ? 'Sistem Midtrans' :
+            e.notes?.toLowerCase().includes('xendit') ? 'Sistem Xendit' :
+            e.notes?.toLowerCase().includes('mayar') ? 'Sistem Mayar' : '-'
+        );
+
         return [
             index + 1,
-            formatDateIndo(e.date),
+            formatDateTimeIndo(e.date),
             e.invoice_number || '-',
             e.transaction_code?.code || '-',
             e.transaction_code?.name || e.category || '-',
@@ -258,7 +282,7 @@ export const exportCashLedgerToExcel = (
             debit,
             credit,
             runningBalance,
-            e.responsible?.name || '-',
+            resp,
             e.notes || ''
         ];
     });

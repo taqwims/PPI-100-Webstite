@@ -366,6 +366,9 @@ func (r *financeExtendedRepository) UpdateCashLedgerEntry(req *domain.CashLedger
 	if req.ResponsibleID != nil {
 		updates["responsible_id"] = req.ResponsibleID
 	}
+	if req.ResponsibleName != "" {
+		updates["responsible_name"] = req.ResponsibleName
+	}
 	if req.InvoiceNumber != "" {
 		updates["invoice_number"] = req.InvoiceNumber
 	}

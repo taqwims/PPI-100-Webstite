@@ -83,12 +83,12 @@ const StudentBills: React.FC = () => {
         if (bill.payments && bill.payments.length > 0) {
             const lastPayment = bill.payments[bill.payments.length - 1];
             if (lastPayment.paid_at) {
-                return new Date(lastPayment.paid_at).toLocaleDateString('id-ID', {
-                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                return new Date(lastPayment.paid_at).toLocaleString('id-ID', {
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
                 });
             }
         }
-        return new Date(bill.created_at).toLocaleDateString('id-ID', {
+        return new Date(bill.created_at).toLocaleString('id-ID', {
             day: 'numeric', month: 'short', year: 'numeric'
         });
     };
@@ -426,9 +426,16 @@ const StudentBills: React.FC = () => {
                                             <td className="p-4 text-right font-semibold text-slate-800 whitespace-nowrap">{remainingAmount > 0 ? formatCurrency(remainingAmount) : '-'}</td>
                                             <td className="p-4 text-center text-sm text-slate-600 font-medium">
                                                 {activeMainTab === 'history' ? (
-                                                    <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 inline-block text-xs font-semibold">
-                                                        {getPaidDateText(bill)}
-                                                    </span>
+                                                    <div className="flex flex-col items-center gap-0.5">
+                                                        <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 inline-block text-xs font-semibold">
+                                                            {getPaidDateText(bill)}
+                                                        </span>
+                                                        {bill.payments && bill.payments.length > 0 && bill.payments[bill.payments.length - 1].recorded_by_name && (
+                                                            <span className="text-[10px] text-slate-500 font-medium">
+                                                                PJ: {bill.payments[bill.payments.length - 1].recorded_by_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     new Date(bill.due_date).toLocaleDateString('id-ID')
                                                 )}

@@ -19,9 +19,11 @@ export interface CashLedgerEntry {
     auto_generated: boolean;
     notes: string;
     responsible_id?: string;
+    responsible_name?: string;
     responsible?: { id: string; name: string };
     transaction_code_id?: number;
     transaction_code?: TransactionCode;
+    created_at?: string;
 }
 
 export interface TransactionCode {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, UserCheck, Printer, Pencil, Trash2, Image as ImageIcon, ExternalLink, X } from 'lucide-react';
+import { AlertCircle, UserCheck, Printer, Pencil, Trash2, Image as ImageIcon, ExternalLink, X, Clock } from 'lucide-react';
 import { CashLedgerEntry } from '../../../types/cashLedgerTypes';
 
 interface Props {
@@ -68,7 +68,13 @@ const CashLedgerTable: React.FC<Props> = ({
                         paginatedEntries.map((entry) => (
                             <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                                 <td className="p-4 text-slate-600 text-sm whitespace-nowrap">
-                                    {new Date(entry.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })}
+                                    <div className="font-medium text-slate-800">
+                                        {new Date(entry.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })}
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1 mt-0.5" title="Waktu Transaksi">
+                                        <Clock size={11} className="text-slate-400 shrink-0" />
+                                        {new Date(entry.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    </div>
                                 </td>
                                 <td className="p-4 text-sm whitespace-nowrap">
                                     {entry.invoice_number ? (
@@ -113,14 +119,46 @@ const CashLedgerTable: React.FC<Props> = ({
                                     )}
                                 </td>
                                 <td className="p-4 text-sm">
-                                    {entry.type === 'Expense' && entry.responsible ? (
-                                        <span className="flex items-center gap-1.5 text-slate-700">
-                                            <UserCheck size={14} className="text-blue-500" />
-                                            {entry.responsible.name}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-400">-</span>
-                                    )}
+                                    {(() => {
+                                        const respName = entry.responsible_name || entry.responsible?.name || (
+                                            entry.notes?.toLowerCase().includes('midtrans') ? 'Sistem Midtrans' :
+                                            entry.notes?.toLowerCase().includes('xendit') ? 'Sistem Xendit' :
+                                            entry.notes?.toLowerCase().includes('mayar') ? 'Sistem Mayar' : ''
+                                        );
+                                        if (!respName) {
+                                            return <span className="text-slate-400">-</span>;
+                                        }
+                                        if (respName.toLowerCase().includes('midtrans')) {
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 shadow-2xs">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                                                    Sistem Midtrans
+                                                </span>
+                                            );
+                                        }
+                                        if (respName.toLowerCase().includes('xendit')) {
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                    Sistem Xendit
+                                                </span>
+                                            );
+                                        }
+                                        if (respName.toLowerCase().includes('mayar')) {
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                                    Sistem Mayar
+                                                </span>
+                                            );
+                                        }
+                                        return (
+                                            <span className="flex items-center gap-1.5 text-slate-700 font-medium">
+                                                <UserCheck size={14} className="text-blue-500 shrink-0" />
+                                                <span className="truncate max-w-[140px]" title={respName}>{respName}</span>
+                                            </span>
+                                        );
+                                    })()}
                                 </td>
                                 <td className="p-4 text-center">
                                     {entry.proof_url ? (

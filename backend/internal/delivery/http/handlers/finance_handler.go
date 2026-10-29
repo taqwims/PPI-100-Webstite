@@ -184,7 +184,20 @@ func (h *FinanceHandler) RecordPayment(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeUsecase.RecordPayment(billUUID, req.Amount, req.Method, ""); err != nil {
+	var recordedByID *uuid.UUID
+	recordedByName := "Kasir (Tunai)"
+	if uidVal, exists := c.Get("userID"); exists {
+		if uidStr, ok := uidVal.(string); ok && uidStr != "" {
+			if uID, err := uuid.Parse(uidStr); err == nil {
+				recordedByID = &uID
+			}
+			if name := h.financeUsecase.GetUserName(uidStr); name != "" {
+				recordedByName = name
+			}
+		}
+	}
+
+	if err := h.financeUsecase.RecordPayment(billUUID, req.Amount, req.Method, "", recordedByID, recordedByName); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -354,7 +367,20 @@ func (h *FinanceHandler) UploadPaymentProof(c *gin.Context) {
 	}
 
 	// Record payment
-	if err := h.financeUsecase.RecordPayment(billUUID, amount, method, proofURL); err != nil {
+	var recordedByID *uuid.UUID
+	recordedByName := "Transfer Siswa/Ortu"
+	if uidVal, exists := c.Get("userID"); exists {
+		if uidStr, ok := uidVal.(string); ok && uidStr != "" {
+			if uID, err := uuid.Parse(uidStr); err == nil {
+				recordedByID = &uID
+			}
+			if name := h.financeUsecase.GetUserName(uidStr); name != "" {
+				recordedByName = name
+			}
+		}
+	}
+
+	if err := h.financeUsecase.RecordPayment(billUUID, amount, method, proofURL, recordedByID, recordedByName); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -451,7 +477,23 @@ func (h *FinanceHandler) MultiPayment(c *gin.Context) {
 		return
 	}
 
-	result, err := h.financeUsecase.ProcessMultiPayment(&req)
+	var recordedByID *uuid.UUID
+	recordedByName := "Kasir (Multi-Payment)"
+	if req.PaymentMethod == "Midtrans" {
+		recordedByName = "Sistem Midtrans"
+	}
+	if uidVal, exists := c.Get("userID"); exists {
+		if uidStr, ok := uidVal.(string); ok && uidStr != "" {
+			if uID, err := uuid.Parse(uidStr); err == nil {
+				recordedByID = &uID
+			}
+			if name := h.financeUsecase.GetUserName(uidStr); name != "" {
+				recordedByName = name
+			}
+		}
+	}
+
+	result, err := h.financeUsecase.ProcessMultiPayment(&req, recordedByID, recordedByName)
 	if err != nil {
 		msg := err.Error()
 		if strings.Contains(msg, "semua tagihan harus milik siswa yang sama") {
@@ -561,7 +603,20 @@ func (h *FinanceHandler) ApprovePayment(c *gin.Context) {
 		return
 	}
 
-	if err := h.financeUsecase.ApprovePayment(paymentUUID); err != nil {
+	var approverID *uuid.UUID
+	approverName := "Bendahara"
+	if uidVal, exists := c.Get("userID"); exists {
+		if uidStr, ok := uidVal.(string); ok && uidStr != "" {
+			if uID, err := uuid.Parse(uidStr); err == nil {
+				approverID = &uID
+			}
+			if name := h.financeUsecase.GetUserName(uidStr); name != "" {
+				approverName = name
+			}
+		}
+	}
+
+	if err := h.financeUsecase.ApprovePayment(paymentUUID, approverID, approverName); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

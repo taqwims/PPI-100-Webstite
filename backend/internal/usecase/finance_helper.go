@@ -175,7 +175,17 @@ func (u *FinanceUsecase) getParentByID(parentID uuid.UUID) (*domain.Parent, erro
 }
 
 // syncObligationStatus syncs payment status from a Bill back to the linked obligation
-func (u *FinanceUsecase) syncObligationStatus(bill *domain.Bill, totalPaid float64, currentPaymentAmount float64) {
+func (u *FinanceUsecase) syncObligationStatus(bill *domain.Bill, totalPaid float64, currentPaymentAmount float64, paymentDetails ...string) {
+	now := time.Now()
+	var paidByName string
+	var paymentMethod string
+	if len(paymentDetails) > 0 {
+		paidByName = paymentDetails[0]
+	}
+	if len(paymentDetails) > 1 {
+		paymentMethod = paymentDetails[1]
+	}
+
 	if bill.ObligationID != nil && u.studentObligationRepo != nil {
 		ob, err := u.studentObligationRepo.GetByID(*bill.ObligationID)
 		if err == nil {
@@ -184,6 +194,15 @@ func (u *FinanceUsecase) syncObligationStatus(bill *domain.Bill, totalPaid float
 				ob.Status = "Paid"
 			} else if totalPaid > 0 {
 				ob.Status = "Partial"
+			}
+			if paidByName != "" {
+				ob.PaidByName = paidByName
+			}
+			if paymentMethod != "" {
+				ob.PaymentMethod = paymentMethod
+			}
+			if totalPaid > 0 {
+				ob.PaidAt = &now
 			}
 			_ = u.studentObligationRepo.Update(ob)
 		}

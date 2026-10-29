@@ -131,8 +131,13 @@ type StaffAttendance struct {
 	Status        string         `gorm:"not null" json:"status"`       // Present, Late, Permission, Sick
 	LateMinutes   int            `gorm:"default:0" json:"late_minutes"`
 	HourlyRate    float64        `gorm:"default:0" json:"hourly_rate"`
-	PenaltyAmount float64        `gorm:"default:0" json:"penalty_amount"` // (LateMinutes / 60) * HourlyRate
-	DeviceID      string         `json:"device_id"`
+	PenaltyAmount       float64        `gorm:"default:0" json:"penalty_amount"` // (LateMinutes / 60) * HourlyRate (dimitigasi max penalty jika ada)
+	OriginalPenalty     float64        `gorm:"default:0" json:"original_penalty"`
+	IsPenaltyWaived     bool           `gorm:"default:false" json:"is_penalty_waived"`
+	PenaltyWaivedBy     *string        `json:"penalty_waived_by"`
+	PenaltyWaivedReason string         `json:"penalty_waived_reason"`
+	PenaltyWaivedAt     *time.Time     `json:"penalty_waived_at"`
+	DeviceID            string         `json:"device_id"`
 	Notes         string         `json:"notes"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
@@ -167,5 +172,41 @@ type StudentLeaveRequest struct {
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// ------------------- Attendance Analytics & Leaderboard Models -------------------
+type StudentAttendanceLeaderboardItem struct {
+	Rank                 int       `json:"rank"`
+	StudentID            uuid.UUID `json:"student_id"`
+	NISN                 string    `json:"nisn"`
+	Name                 string    `json:"name"`
+	ClassID              uint      `json:"class_id"`
+	ClassName            string    `json:"class_name"`
+	TotalPresent         int       `json:"total_present"`
+	TotalLate            int       `json:"total_late"`
+	TotalPermission      int       `json:"total_permission"`
+	TotalSick            int       `json:"total_sick"`
+	TotalAbsent          int       `json:"total_absent"`
+	TotalDays            int       `json:"total_days"`
+	AttendancePercentage float64   `json:"attendance_percentage"`
+	DisciplineScore      float64   `json:"discipline_score"`
+	Predicate            string    `json:"predicate"`
+}
+
+type StaffAttendanceLeaderboardItem struct {
+	Rank                 int       `json:"rank"`
+	UserID               uuid.UUID `json:"user_id"`
+	NIP                  string    `json:"nip"`
+	Name                 string    `json:"name"`
+	RoleName             string    `json:"role_name"`
+	TotalPresent         int       `json:"total_present"`
+	TotalLate            int       `json:"total_late"`
+	TotalLateMinutes     int       `json:"total_late_minutes"`
+	TotalPenaltyAmount   float64   `json:"total_penalty_amount"`
+	TotalCheckOut        int       `json:"total_checkout"`
+	TotalDays            int       `json:"total_days"`
+	AttendancePercentage float64   `json:"attendance_percentage"`
+	DisciplineScore      float64   `json:"discipline_score"`
+	Predicate            string    `json:"predicate"`
 }
 

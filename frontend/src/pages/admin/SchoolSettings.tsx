@@ -1508,9 +1508,12 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
         attendance_late_threshold: '07:15',
         student_check_in_time: '07:15',
         teacher_check_in_time: '07:00',
+        attendance_entry_end: '11:00',
         attendance_exit_start: '14:00',
+        attendance_exit_end: '18:00',
         attendance_cooldown_minutes: '3',
         teacher_late_hourly_rate: '30000',
+        teacher_late_max_penalty: '50000',
         rfid_device_api_key: '',
         wa_notif_attendance_in: '',
         wa_notif_attendance_out: '',
@@ -1630,7 +1633,7 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                     {/* Jam Buka Presensi Pagi */}
                     <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80">
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                            Jam Mulai Presensi Masuk (Pagi)
+                            Jam Mulai Presensi Masuk (Buka Pagi)
                         </label>
                         <input
                             type="time"
@@ -1638,13 +1641,13 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                             onChange={(e) => updateField('attendance_entry_start', e.target.value)}
                             className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 bg-white"
                         />
-                        <p className="text-[11px] text-slate-500 mt-1">Mulai buka scanner penerimaan hadir pagi.</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Mulai scanner menerima hadir pagi (sebelum jam ini ditolak).</p>
                     </div>
 
                     {/* Batas Jam Masuk Siswa */}
                     <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80">
                         <label className="block text-xs font-bold text-amber-900 mb-1">
-                            Batas Waktu Hadir Tepat Waktu (Siswa)
+                            Batas Hadir Tepat Waktu (Siswa)
                         </label>
                         <input
                             type="time"
@@ -1658,7 +1661,7 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                     {/* Batas Jam Masuk Guru */}
                     <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-200/80">
                         <label className="block text-xs font-bold text-blue-900 mb-1">
-                            Batas Waktu Hadir Tepat Waktu (Guru & Staf)
+                            Batas Hadir Tepat Waktu (Guru & Staf)
                         </label>
                         <input
                             type="time"
@@ -1669,10 +1672,24 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                         <p className="text-[11px] text-blue-700 mt-1">Batas guru hadir sebelum dikenakan denda keterlambatan.</p>
                     </div>
 
+                    {/* Batas Terakhir Presensi Masuk (Check-In Cutoff) */}
+                    <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-200/80">
+                        <label className="block text-xs font-bold text-rose-900 mb-1">
+                            Batas Terakhir Presensi Masuk (Tutup Masuk)
+                        </label>
+                        <input
+                            type="time"
+                            value={form.attendance_entry_end || '11:00'}
+                            onChange={(e) => updateField('attendance_entry_end', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-rose-300 text-sm font-mono font-bold text-rose-900 focus:ring-2 focus:ring-rose-500 bg-white"
+                        />
+                        <p className="text-[11px] text-rose-700 mt-1">Lewat jam ini presensi masuk ditutup / tidak diterima lagi.</p>
+                    </div>
+
                     {/* Jam Buka Pulang */}
                     <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200/80">
                         <label className="block text-xs font-bold text-emerald-900 mb-1">
-                            Jam Mulai Presensi Pulang (Check-Out)
+                            Jam Mulai Presensi Pulang (Buka Pulang)
                         </label>
                         <input
                             type="time"
@@ -1680,7 +1697,21 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                             onChange={(e) => updateField('attendance_exit_start', e.target.value)}
                             className="w-full px-3 py-2 rounded-xl border border-emerald-300 text-sm font-mono font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 bg-white"
                         />
-                        <p className="text-[11px] text-emerald-700 mt-1">Scan mulai jam ini otomatis dicatat sebagai <strong className="font-semibold">Pulang</strong>.</p>
+                        <p className="text-[11px] text-emerald-700 mt-1">Mulai presensi pulang (sebelum jam ini presensi pulang belum dibuka).</p>
+                    </div>
+
+                    {/* Batas Terakhir Presensi Pulang (Check-Out Cutoff) */}
+                    <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                            Batas Terakhir Presensi Pulang (Tutup Pulang)
+                        </label>
+                        <input
+                            type="time"
+                            value={form.attendance_exit_end || '18:00'}
+                            onChange={(e) => updateField('attendance_exit_end', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-500 mt-1">Lewat jam ini presensi kepulangan hari itu ditutup.</p>
                     </div>
 
                     {/* Jeda Anti Double Scan */}
@@ -1713,6 +1744,22 @@ const RFIDAttendanceTab: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
                             className="w-full px-3 py-2 rounded-xl border border-rose-300 text-sm font-mono font-bold text-rose-900 focus:ring-2 focus:ring-rose-500 bg-white"
                         />
                         <p className="text-[11px] text-rose-700 mt-1">Dihitung proporsional per menit keterlambatan pada slip gaji.</p>
+                    </div>
+
+                    {/* Batas Maksimal Potongan Denda Guru per Hari */}
+                    <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80">
+                        <label className="block text-xs font-bold text-amber-900 mb-1">
+                            Maksimal Potongan Keterlambatan per Hari (Rp)
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            step="5000"
+                            value={form.teacher_late_max_penalty || '50000'}
+                            onChange={(e) => updateField('teacher_late_max_penalty', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-amber-300 text-sm font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 bg-white"
+                        />
+                        <p className="text-[11px] text-amber-700 mt-1">Batas mitigasi maksimal denda per hari (isi 0 jika tanpa batas maksimal).</p>
                     </div>
                 </div>
             </CardGlass>

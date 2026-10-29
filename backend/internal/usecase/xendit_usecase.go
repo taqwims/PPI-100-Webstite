@@ -390,13 +390,20 @@ func (u *XenditUsecase) processPaymentSuccess(orderID string) error {
 			category = bill.BillType
 		}
 
+		now := time.Now()
+		payment.RecordedByName = "Sistem Xendit"
+		payment.PaidAt = now
+		_ = u.financeRepo.UpdatePayment(payment)
+
 		cashLedgerEntry := domain.CashLedger{
-			Date:              time.Now(),
+			Date:              now,
 			Source:            bill.Student.User.Name,
 			ItemName:          "Pembayaran Xendit - " + bill.Title,
 			Type:              "Income",
 			Amount:            payment.Amount,
 			Category:          category,
+			ResponsibleName:   "Sistem Xendit",
+			Notes:             fmt.Sprintf("Auto-settled via Xendit (Order ID: %s, Timestamp: %s)", orderID, now.Format("2006-01-02 15:04:05")),
 			TransactionCodeID: bill.TransactionCodeID,
 		}
 		_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
@@ -419,7 +426,7 @@ func (u *XenditUsecase) processPaymentSuccess(orderID string) error {
 			u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, payment.Amount)
 
 			u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, payment.Amount, "Xendit")
-			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount)
+			u.financeUsecase.syncObligationStatus(bill, totalPaid, payment.Amount, "Sistem Xendit", "Xendit")
 		}
 	}
 	return nil

@@ -39,6 +39,10 @@ interface Obligation {
     due_date?: string;
     installment_number?: number;
     total_installments?: number;
+    paid_by_id?: string;
+    paid_by_name?: string;
+    paid_at?: string;
+    payment_method?: string;
     created_at: string;
 }
 
@@ -596,6 +600,7 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                                         <th className="p-3 text-right font-medium">Terbayar</th>
                                                         <th className="p-3 text-right font-medium">Sisa</th>
                                                         <th className="p-3 text-center font-medium">Status</th>
+                                                        <th className="p-3 text-left font-medium">PJ & Waktu Bayar</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
@@ -607,7 +612,7 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                                     }, {} as Record<string, Obligation[]>)).map(([groupName, obs]) => (
                                                         <React.Fragment key={groupName}>
                                                             <tr className="bg-slate-50/50">
-                                                                <td colSpan={6} className="p-3 font-semibold text-slate-700">{groupName}</td>
+                                                                <td colSpan={7} className="p-3 font-semibold text-slate-700">{groupName}</td>
                                                             </tr>
                                                             {obs.map(o => {
                                                                 const sisa = o.amount - o.paid_amount;
@@ -634,6 +639,44 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                                                                 {o.status === 'Paid' ? 'Lunas' : o.status === 'Partial' ? 'Cicil' : 'Belum'}
                                                                             </span>
                                                                         </td>
+                                                                        <td className="p-3 text-left text-xs">
+                                                                            {o.paid_amount > 0 ? (
+                                                                                <div className="flex flex-col gap-0.5">
+                                                                                    <span className="font-medium text-slate-700">
+                                                                                        {o.paid_by_name?.toLowerCase().includes('midtrans') ? (
+                                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-sky-100 text-sky-800 font-semibold">
+                                                                                                Sistem Midtrans
+                                                                                            </span>
+                                                                                        ) : o.paid_by_name?.toLowerCase().includes('xendit') ? (
+                                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
+                                                                                                Sistem Xendit
+                                                                                            </span>
+                                                                                        ) : o.paid_by_name?.toLowerCase().includes('mayar') ? (
+                                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-800 font-semibold">
+                                                                                                Sistem Mayar
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span>{o.paid_by_name || (o.payment_method ? `Metode: ${o.payment_method}` : 'Kasir / Staff')}</span>
+                                                                                        )}
+                                                                                    </span>
+                                                                                    {o.paid_at && !o.paid_at.startsWith('0001-01-01') && (
+                                                                                        <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1" title="Waktu Pembayaran">
+                                                                                            <Clock size={10} className="text-slate-400 shrink-0" />
+                                                                                            {new Date(o.paid_at).toLocaleString('id-ID', {
+                                                                                                day: '2-digit',
+                                                                                                month: 'short',
+                                                                                                year: 'numeric',
+                                                                                                hour: '2-digit',
+                                                                                                minute: '2-digit',
+                                                                                                second: '2-digit'
+                                                                                            })}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className="text-slate-300">-</span>
+                                                                            )}
+                                                                        </td>
                                                                     </tr>
                                                                 );
                                                             })}
@@ -646,6 +689,7 @@ const StudentBillSummary: React.FC<StudentBillSummaryProps> = ({ isSubcomponent 
                                                         <td className="p-3 text-right">{formatCurrency(obligations.reduce((s, o) => s + o.amount, 0))}</td>
                                                         <td className="p-3 text-right text-emerald-600">{formatCurrency(totalPaid)}</td>
                                                         <td className="p-3 text-right text-red-600">{totalDebt > 0 ? formatCurrency(totalDebt) : '-'}</td>
+                                                        <td></td>
                                                         <td></td>
                                                     </tr>
                                                 </tfoot>

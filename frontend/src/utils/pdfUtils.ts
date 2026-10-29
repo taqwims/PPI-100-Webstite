@@ -114,6 +114,8 @@ interface CashLedgerData {
     amount: number;
     category: string;
     notes: string;
+    responsible_name?: string;
+    responsible?: { id?: string; name?: string };
 }
 
 export interface GlobalTransactionData {
@@ -142,6 +144,18 @@ const formatDate = (dateStr: string) => {
         year: 'numeric',
         month: 'long',
         day: '2-digit'
+    });
+};
+
+const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleString('id-ID', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
     });
 };
 
@@ -329,8 +343,12 @@ export const generateCashLedgerReceipt = async (entry: CashLedgerData, selectedR
     const maxValWidth = pageWidth - valueX - 12;
     let y = bodyStart + 2;
 
-    y = drawKeyValueRow(doc, 'Tanggal', formatDate(entry.date), labelX, valueX, maxValWidth, y, 8.5);
+    y = drawKeyValueRow(doc, 'Tanggal & Waktu', formatDateTime(entry.date), labelX, valueX, maxValWidth, y, 8.5);
     y = drawKeyValueRow(doc, 'Jenis', entry.type === 'Income' ? 'Pemasukan' : 'Pengeluaran', labelX, valueX, maxValWidth, y, 8.5);
+    const respName = (entry as any).responsible_name || entry.responsible?.name || ((entry as any).notes?.toLowerCase().includes('midtrans') ? 'Sistem Midtrans' : '');
+    if (respName) {
+        y = drawKeyValueRow(doc, 'Penanggung Jawab', respName, labelX, valueX, maxValWidth, y, 8.5);
+    }
     y = drawKeyValueRow(doc, 'Kategori', entry.category || '-', labelX, valueX, maxValWidth, y, 8.5);
     y = drawKeyValueRow(doc, 'Item/Keperluan', entry.item_name || '-', labelX, valueX, maxValWidth, y, 8.5);
     y = drawKeyValueRow(doc, 'Sumber/Tujuan', entry.source || '-', labelX, valueX, maxValWidth, y, 8.5);
@@ -475,20 +493,26 @@ export const generateCashLedgerReport = (
     // Table
     autoTable(doc, {
         startY: bodyStart + 16,
-        head: [['No', 'Tanggal', 'No. Invoice', 'Item/Keperluan', 'Sumber/Tujuan', 'Kategori', 'Pemasukan', 'Pengeluaran', 'Keterangan']],
+        head: [['No', 'Tanggal & Waktu', 'No. Invoice', 'Item/Keperluan', 'Sumber/Tujuan', 'Kategori', 'Pemasukan', 'Pengeluaran', 'Penanggung Jawab', 'Keterangan']],
         body: entries.map((e, i) => {
             const tc = (e as any).transaction_code;
             const ym = `${new Date(e.date).getFullYear()}${String(new Date(e.date).getMonth() + 1).padStart(2, '0')}`;
             const invoiceNo = (e as any).invoice_number || (tc ? `${tc.parent_code?.code || tc.code}-${ym}-0001` : '-');
+            const resp = (e as any).responsible_name || e.responsible?.name || (
+                (e as any).notes?.toLowerCase().includes('midtrans') ? 'Sistem Midtrans' :
+                (e as any).notes?.toLowerCase().includes('xendit') ? 'Sistem Xendit' :
+                (e as any).notes?.toLowerCase().includes('mayar') ? 'Sistem Mayar' : '-'
+            );
             return [
                 i + 1,
-                formatDate(e.date),
+                formatDateTime(e.date),
                 invoiceNo,
                 e.item_name,
                 e.source,
                 e.category,
                 e.type === 'Income' ? formatCurrency(e.amount) : '-',
                 e.type === 'Expense' ? formatCurrency(e.amount) : '-',
+                resp,
                 e.notes || '-'
             ];
         }),
@@ -1117,6 +1141,8 @@ interface ObligationReceiptData {
     installmentNumber?: number;
     totalInstallments?: number;
     paymentMethod?: string;
+    paidByName?: string;
+    paidAt?: string;
 }
 
 export const generateObligationReceipt = async (data: ObligationReceiptData, selectedRoles?: string[], format: 'A4' | 'A5' = 'A5') => {
@@ -1148,6 +1174,9 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
     sY = drawKeyValueRow(doc, 'Kelas', data.className, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     sY = drawKeyValueRow(doc, 'Jenis Bayar', data.paymentTypeName, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     sY = drawKeyValueRow(doc, 'Metode Bayar', data.paymentMethod || 'Tunai (Cash)', lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
+    if (data.paidByName) {
+        sY = drawKeyValueRow(doc, 'Penanggung Jawab', data.paidByName, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
+    }
 
     if (data.billingMonth && data.billingMonth > 0) {
         sY = drawKeyValueRow(doc, 'Bulan', monthNames[data.billingMonth] || '-', lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
@@ -1155,7 +1184,8 @@ export const generateObligationReceipt = async (data: ObligationReceiptData, sel
     if (data.installmentNumber && data.totalInstallments) {
         sY = drawKeyValueRow(doc, 'Cicilan', `${data.installmentNumber}/${data.totalInstallments}`, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
     }
-    sY = drawKeyValueRow(doc, 'Tanggal', formatDate(dateStr), lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
+    const tglText = data.paidAt ? formatDateTime(data.paidAt) : formatDate(dateStr);
+    sY = drawKeyValueRow(doc, 'Waktu Transaksi', tglText, lX, vX, maxValWidth, sY, format === 'A4' ? 9.5 : 8.5);
 
     sY += 2;
     doc.setDrawColor(203, 213, 225);

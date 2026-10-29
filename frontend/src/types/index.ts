@@ -163,10 +163,12 @@ export interface Payment {
     id: string;
     bill_id: string;
     amount: number;
-    payment_method: 'Transfer' | 'Cash' | 'Midtrans';
+    payment_method: 'Transfer' | 'Cash' | 'Midtrans' | string;
     status: 'Pending' | 'Success' | 'Failed';
     transaction_id?: string;
     proof_url?: string;
+    recorded_by_id?: string;
+    recorded_by_name?: string;
     paid_at: string;
     created_at: string;
     updated_at: string;
@@ -238,6 +240,10 @@ export interface StudentObligation {
     due_date?: string;
     installment_number: number;
     total_installments: number;
+    paid_by_id?: string;
+    paid_by_name?: string;
+    paid_at?: string;
+    payment_method?: string;
     notes: string;
     created_at: string;
     updated_at: string;
@@ -255,6 +261,7 @@ export interface CashLedger {
     notes: string;
     created_by: string;
     responsible_id?: string;
+    responsible_name?: string;
     responsible?: User;
     transaction_code_id?: number;
     transaction_code?: TransactionCode;

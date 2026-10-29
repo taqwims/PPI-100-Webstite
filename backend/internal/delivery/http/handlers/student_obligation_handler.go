@@ -197,7 +197,23 @@ func (h *StudentObligationHandler) RecordPayment(c *gin.Context) {
 		return
 	}
 
-	if err := h.usecase.RecordPayment(id, req.Amount, req.PaymentMethod); err != nil {
+	var recordedByID *uuid.UUID
+	recordedByName := "Kasir (Tunai)"
+	if req.PaymentMethod == "Midtrans" {
+		recordedByName = "Sistem Midtrans"
+	}
+	if uidVal, exists := c.Get("userID"); exists {
+		if uidStr, ok := uidVal.(string); ok && uidStr != "" {
+			if uID, err := uuid.Parse(uidStr); err == nil {
+				recordedByID = &uID
+			}
+			if name := h.usecase.GetUserName(uidStr); name != "" {
+				recordedByName = name
+			}
+		}
+	}
+
+	if err := h.usecase.RecordPayment(id, req.Amount, req.PaymentMethod, recordedByID, recordedByName); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

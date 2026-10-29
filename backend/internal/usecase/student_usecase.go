@@ -211,7 +211,6 @@ func (u *StudentUsecase) RecordRFIDAttendance(rfid string, unitID uint, schedule
 	}
 
 	now := time.Now()
-	nowHHMM := now.Format("15:04")
 
 	if method == "" {
 		method = "RFID"
@@ -272,8 +271,17 @@ func (u *StudentUsecase) RecordRFIDAttendance(rfid string, unitID uint, schedule
 		}
 	}
 
-	lateThreshold := u.getSetting("attendance_late_threshold", "07:15")
+	entryStart := u.getSetting("attendance_entry_start", "06:00")
+	lateThreshold := u.getSetting("student_check_in_time", u.getSetting("attendance_late_threshold", "07:15"))
+	entryEnd := u.getSetting("attendance_entry_end", "11:00")
 	exitStart := u.getSetting("attendance_exit_start", "14:00")
+	exitEnd := u.getSetting("attendance_exit_end", "18:00")
+
+	entryStartTime := parseTimeToday(entryStart, now)
+	cutoffTime := parseTimeToday(lateThreshold, now)
+	entryEndTime := parseTimeToday(entryEnd, now)
+	exitStartTime := parseTimeToday(exitStart, now)
+	exitEndTime := parseTimeToday(exitEnd, now)
 
 	var targetType string
 	var targetStatus string
@@ -283,8 +291,14 @@ func (u *StudentUsecase) RecordRFIDAttendance(rfid string, unitID uint, schedule
 		if hasCheckIn {
 			return nil, student, "ALREADY_CHECKED_IN", fmt.Errorf("siswa %s sudah melakukan presensi masuk hari ini", student.User.Name)
 		}
+		if now.Before(entryStartTime) {
+			return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi masuk belum dibuka (dibuka pukul %s WIB)", entryStart)
+		}
+		if now.After(entryEndTime) {
+			return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi masuk telah ditutup pada pukul %s WIB", entryEnd)
+		}
 		targetType = "CheckIn"
-		if nowHHMM > lateThreshold {
+		if now.After(cutoffTime) {
 			targetStatus = "Late"
 		} else {
 			targetStatus = "Present"
@@ -294,20 +308,44 @@ func (u *StudentUsecase) RecordRFIDAttendance(rfid string, unitID uint, schedule
 		if hasCheckOut {
 			return nil, student, "ALREADY_CHECKED_OUT", fmt.Errorf("siswa %s sudah melakukan presensi pulang hari ini", student.User.Name)
 		}
+		if now.Before(exitStartTime) {
+			return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi pulang belum dibuka (dibuka pukul %s WIB)", exitStart)
+		}
+		if now.After(exitEndTime) {
+			return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi pulang telah ditutup pada pukul %s WIB", exitEnd)
+		}
 		targetType = "CheckOut"
 		targetStatus = "Present"
 
 	default: // "auto" or empty
 		if !hasCheckIn {
-			targetType = "CheckIn"
-			if nowHHMM > lateThreshold {
-				targetStatus = "Late"
-			} else {
+			if now.Before(entryStartTime) {
+				return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi masuk belum dibuka (dibuka pukul %s WIB)", entryStart)
+			}
+			if now.After(entryEndTime) && now.Before(exitStartTime) {
+				return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi masuk telah ditutup pukul %s, dan presensi pulang baru dibuka pukul %s WIB", entryEnd, exitStart)
+			}
+			if now.After(exitEndTime) {
+				return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi hari ini telah berakhir (presensi pulang ditutup pukul %s WIB)", exitEnd)
+			}
+			if now.After(exitStartTime) {
+				targetType = "CheckOut"
 				targetStatus = "Present"
+			} else {
+				targetType = "CheckIn"
+				if now.After(cutoffTime) {
+					targetStatus = "Late"
+				} else {
+					targetStatus = "Present"
+				}
 			}
 		} else if !hasCheckOut {
-			// If already past exit start or student has already checked in and cooldown passed
-			_ = exitStart
+			if now.Before(exitStartTime) {
+				return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("siswa %s sudah presensi masuk. Presensi pulang baru dibuka pukul %s WIB", student.User.Name, exitStart)
+			}
+			if now.After(exitEndTime) {
+				return nil, student, "OUTSIDE_WINDOW", fmt.Errorf("presensi pulang telah ditutup pada pukul %s WIB", exitEnd)
+			}
 			targetType = "CheckOut"
 			targetStatus = "Present"
 		} else {
@@ -468,4 +506,31 @@ func (u *StudentUsecase) PromoteStudents(studentIDs []uuid.UUID, action string, 
 
 func (u *StudentUsecase) GetParentByID(parentID string) (*domain.Parent, error) {
 	return u.studentRepo.GetParentByID(parentID)
+}
+
+func (u *StudentUsecase) GetStudentAttendanceLeaderboard(unitID uint, startDateStr, endDateStr string, classID *uint) ([]domain.StudentAttendanceLeaderboardItem, error) {
+	var startDate, endDate time.Time
+	if startDateStr != "" {
+		s, err := time.Parse("2006-01-02", startDateStr)
+		if err == nil {
+			startDate = s
+		} else {
+			startDate = time.Now().AddDate(-1, 0, 0)
+		}
+	} else {
+		startDate = time.Now().AddDate(-1, 0, 0)
+	}
+
+	if endDateStr != "" {
+		e, err := time.Parse("2006-01-02", endDateStr)
+		if err == nil {
+			endDate = e
+		} else {
+			endDate = time.Now()
+		}
+	} else {
+		endDate = time.Now()
+	}
+
+	return u.attendanceRepo.GetStudentLeaderboard(unitID, startDate, endDate, classID)
 }

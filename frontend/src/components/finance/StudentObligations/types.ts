@@ -55,6 +55,10 @@ export interface Obligation {
     due_date: string | null;
     installment_number: number;
     total_installments: number;
+    paid_by_id?: string;
+    paid_by_name?: string;
+    paid_at?: string;
+    payment_method?: string;
     notes: string;
     parent_name: string;
     parent_phone: string;

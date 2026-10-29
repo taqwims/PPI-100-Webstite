@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import {
     Calendar, Users, GraduationCap, Printer,
     FileSpreadsheet, FileText, Search, RefreshCw, CheckCircle,
-    Clock, AlertCircle, Coffee, XCircle, ArrowLeft, Filter
+    Clock, AlertCircle, Coffee, XCircle, ArrowLeft, Filter, Trash2, ShieldCheck
 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
@@ -53,6 +53,36 @@ const AttendanceExportPanel: React.FC<AttendanceExportPanelProps> = ({ onBack, i
     const [startDate, setStartDate] = useState<string>(getMonthStart());
     const [endDate, setEndDate] = useState<string>(getToday());
     const [previewSearch, setPreviewSearch] = useState<string>('');
+
+    // State Hapus / Waive Potongan Keterlambatan Guru
+    const [waiveModalOpen, setWaiveModalOpen] = useState(false);
+    const [selectedWaiveRecord, setSelectedWaiveRecord] = useState<any>(null);
+    const [waiveReason, setWaiveReason] = useState('');
+    const [isSubmittingWaive, setIsSubmittingWaive] = useState(false);
+
+    const handleOpenWaiveModal = (rec: any) => {
+        setSelectedWaiveRecord(rec);
+        setWaiveReason('');
+        setWaiveModalOpen(true);
+    };
+
+    const handleConfirmWaive = async () => {
+        if (!selectedWaiveRecord) return;
+        setIsSubmittingWaive(true);
+        try {
+            await api.post(`/staff-attendance/${selectedWaiveRecord.id}/waive-penalty`, {
+                reason: waiveReason.trim() || 'Dispensasi Administrator'
+            });
+            toast.success(`Potongan denda keterlambatan untuk ${selectedWaiveRecord.user?.name || 'Guru'} berhasil dihapus!`);
+            setWaiveModalOpen(false);
+            setSelectedWaiveRecord(null);
+            refetch();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Gagal menghapus potongan denda');
+        } finally {
+            setIsSubmittingWaive(false);
+        }
+    };
 
     // Fetch Classes
     const { data: classes = [] } = useQuery({
@@ -771,7 +801,9 @@ const AttendanceExportPanel: React.FC<AttendanceExportPanelProps> = ({ onBack, i
                                     <TableHeadGlass>{targetType === 'student' ? 'NISN & Kelas' : 'NIP / Jabatan'}</TableHeadGlass>
                                     <TableHeadGlass>Status</TableHeadGlass>
                                     <TableHeadGlass>Metode Scan</TableHeadGlass>
+                                    {targetType === 'teacher' && <TableHeadGlass>Potongan Denda</TableHeadGlass>}
                                     <TableHeadGlass>Keterangan</TableHeadGlass>
+                                    {targetType === 'teacher' && <TableHeadGlass className="print:hidden text-center">Aksi</TableHeadGlass>}
                                 </TableRowGlass>
                             </TableHeaderGlass>
                             <TableBodyGlass>
@@ -810,7 +842,7 @@ const AttendanceExportPanel: React.FC<AttendanceExportPanelProps> = ({ onBack, i
                                                 {targetType === 'student' ? (
                                                     <div>
                                                         <span className="font-mono text-[11px] text-slate-500 block">
-                                                            {att.student?.nisn || '-'}
+                                                             {att.student?.nisn || '-'}
                                                         </span>
                                                         <span className="font-medium text-emerald-800">
                                                             {att.student?.class?.name || 'Tanpa Kelas'}
@@ -835,9 +867,58 @@ const AttendanceExportPanel: React.FC<AttendanceExportPanelProps> = ({ onBack, i
                                                     {att.method || (targetType === 'student' ? 'Manual' : 'Face')}
                                                 </span>
                                             </TableCellGlass>
+                                            {targetType === 'teacher' && (
+                                                <TableCellGlass className="text-xs font-mono">
+                                                    {att.is_penalty_waived ? (
+                                                        <div className="space-y-0.5">
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                                <ShieldCheck size={11} /> Dihapus
+                                                            </span>
+                                                            {att.original_penalty > 0 && (
+                                                                <span className="text-[10px] text-slate-400 line-through block">
+                                                                    Rp {Number(att.original_penalty).toLocaleString('id-ID')}
+                                                                </span>
+                                                            )}
+                                                            {att.penalty_waived_reason && (
+                                                                <span className="text-[10px] text-slate-500 block italic max-w-xs truncate" title={att.penalty_waived_reason}>
+                                                                    Ket: {att.penalty_waived_reason}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : att.penalty_amount > 0 ? (
+                                                        <div className="space-y-0.5">
+                                                            <span className="font-bold text-rose-700 block">
+                                                                Rp {Number(att.penalty_amount).toLocaleString('id-ID')}
+                                                            </span>
+                                                            {att.late_minutes > 0 && (
+                                                                <span className="text-[10px] text-amber-700 block">
+                                                                    ({att.late_minutes} menit)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400">-</span>
+                                                    )}
+                                                </TableCellGlass>
+                                            )}
                                             <TableCellGlass className="text-xs text-slate-500 max-w-xs truncate">
                                                 {att.notes || (att.late_minutes ? `Terlambat ${att.late_minutes} menit` : '-')}
                                             </TableCellGlass>
+                                            {targetType === 'teacher' && (
+                                                <TableCellGlass className="print:hidden text-center">
+                                                    {att.penalty_amount > 0 && (user?.role_id === 1 || user?.role_id === 8 || user?.role_id === 9) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenWaiveModal(att)}
+                                                            className="px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition shadow-xs flex items-center gap-1 active:scale-95 mx-auto"
+                                                            title="Hapus denda keterlambatan ini"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                            <span>Hapus Potongan</span>
+                                                        </button>
+                                                    )}
+                                                </TableCellGlass>
+                                            )}
                                         </TableRowGlass>
                                     );
                                 })}
@@ -866,6 +947,90 @@ const AttendanceExportPanel: React.FC<AttendanceExportPanelProps> = ({ onBack, i
                     <p className="text-[11px] text-slate-500 mt-0.5">Sistem Informasi Manajemen Presensi</p>
                 </div>
             </div>
+
+            {/* ─── Modal Dialog: Hapus / Waive Potongan Denda Keterlambatan Guru ─── */}
+            {waiveModalOpen && selectedWaiveRecord && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 rounded-2xl bg-rose-100 text-rose-700">
+                                <Trash2 size={22} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-900">
+                                    Hapus Potongan Denda Guru
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Dispensasi atau pembatalan denda keterlambatan
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Rincian Record */}
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Nama Guru / Staf:</span>
+                                <span className="font-bold text-slate-800">{selectedWaiveRecord.user?.name || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Tanggal Presensi:</span>
+                                <span className="font-medium text-slate-700">{formatDateIndo(selectedWaiveRecord.date || selectedWaiveRecord.check_in_time)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Keterlambatan:</span>
+                                <span className="font-bold text-amber-700">{selectedWaiveRecord.late_minutes} Menit</span>
+                            </div>
+                            <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                                <span className="text-slate-700 font-semibold">Nominal Potongan Denda:</span>
+                                <span className="font-extrabold text-rose-700 text-sm">
+                                    Rp {Number(selectedWaiveRecord.penalty_amount || 0).toLocaleString('id-ID')}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Input Alasan Penghapusan */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                Alasan / Keterangan Penghapusan Potongan: <span className="text-rose-500">*</span>
+                            </label>
+                            <textarea
+                                value={waiveReason}
+                                onChange={(e) => setWaiveReason(e.target.value)}
+                                placeholder="Contoh: Tugas luar sekolah / izin darurat / force majeure..."
+                                rows={3}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">
+                                Catatan ini akan dicatat ke dalam riwayat audit presensi dan slip gaji guru.
+                            </p>
+                        </div>
+
+                        {/* Tombol Aksi */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setWaiveModalOpen(false);
+                                    setSelectedWaiveRecord(null);
+                                }}
+                                disabled={isSubmittingWaive}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmWaive}
+                                disabled={isSubmittingWaive}
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm shadow-rose-600/30 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                            >
+                                <Trash2 size={13} />
+                                {isSubmittingWaive ? 'Menghapus...' : 'Hapus Potongan Denda'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

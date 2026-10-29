@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"time"
+
 	"ppi-100-sis/internal/domain"
 
 	"github.com/google/uuid"
@@ -113,7 +115,7 @@ func (r *StudentObligationRepository) Delete(id uuid.UUID) error {
 	return r.db.Delete(&domain.StudentObligation{}, "id = ?", id).Error
 }
 
-func (r *StudentObligationRepository) RecordPayment(id uuid.UUID, amount float64) error {
+func (r *StudentObligationRepository) RecordPayment(id uuid.UUID, amount float64, paidByID *uuid.UUID, paidByName string, paymentMethod string, paidAt time.Time) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var ob domain.StudentObligation
 		if err := tx.Where("id = ?", id).First(&ob).Error; err != nil {
@@ -125,14 +127,26 @@ func (r *StudentObligationRepository) RecordPayment(id uuid.UUID, amount float64
 		} else if ob.PaidAmount > 0 {
 			ob.Status = "Partial"
 		}
+		ob.PaidByID = paidByID
+		if paidByName != "" {
+			ob.PaidByName = paidByName
+		}
+		if paymentMethod != "" {
+			ob.PaymentMethod = paymentMethod
+		}
+		ob.PaidAt = &paidAt
 		return tx.Save(&ob).Error
 	})
 }
 
 func (r *StudentObligationRepository) ResetPayment(id uuid.UUID) error {
 	return r.db.Model(&domain.StudentObligation{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"paid_amount": 0,
-		"status":      "Unpaid",
+		"paid_amount":    0,
+		"status":         "Unpaid",
+		"paid_by_id":     nil,
+		"paid_by_name":   "",
+		"paid_at":        nil,
+		"payment_method": "",
 	}).Error
 }
 

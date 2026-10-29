@@ -160,6 +160,18 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                         {!isPaid && isPartial && (
                                                             <p className="text-[9px] text-red-600 font-semibold mt-0.5">Sisa {formatCurrency(remaining / 1000)}k</p>
                                                         )}
+                                                        {(isPaid || isPartial) && (
+                                                            <div className="mt-1 pt-1 border-t border-slate-200/50 text-[8px] leading-tight text-slate-500">
+                                                                <p className="truncate font-semibold text-slate-700" title={ob.paid_by_name || 'Kasir'}>
+                                                                    {ob.paid_by_name?.toLowerCase().includes('midtrans') ? 'Midtrans' : (ob.paid_by_name || 'Kasir')}
+                                                                </p>
+                                                                {ob.paid_at && !ob.paid_at.startsWith('0001-01-01') && (
+                                                                    <p className="text-[7.5px] text-slate-400 font-mono mt-0.5" title="Waktu Pembayaran">
+                                                                        {new Date(ob.paid_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {canManage && (
@@ -184,7 +196,7 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                     )}
                                                     {(isPaid || isPartial) && (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid, billingMonth: ob.billing_month }); }}
+                                                            onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid, billingMonth: ob.billing_month, paymentMethod: ob.payment_method, paidByName: ob.paid_by_name, paidAt: ob.paid_at }); }}
                                                             className="mt-1.5 w-full text-[8px] text-blue-600 border border-blue-100 py-0.5 rounded hover:bg-blue-50 font-bold transition uppercase"
                                                         >
                                                             Cetak
@@ -219,6 +231,18 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                 <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(displayStatus))}>{statusLabel(displayStatus)}</span>
                                                 {effectivePaid > 0 && <span className="text-xs text-slate-500">Terbayar: {formatCurrency(effectivePaid)}</span>}
                                             </div>
+                                            {(isPaid || isPartial) && (
+                                                <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 flex flex-col gap-0.5">
+                                                    <span className="font-medium text-slate-700">
+                                                        PJ: {ob.paid_by_name?.toLowerCase().includes('midtrans') ? 'Sistem Midtrans' : (ob.paid_by_name || 'Kasir / Staff')}
+                                                    </span>
+                                                    {ob.paid_at && !ob.paid_at.startsWith('0001-01-01') && (
+                                                        <span className="text-[11px] text-slate-400 font-mono">
+                                                            {new Date(ob.paid_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                             {canManage && (
                                                 <div className="mt-2 flex gap-1">
                                                     {!isPaid && (
@@ -240,7 +264,7 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                 </div>
                                             )}
                                             {(isPaid || isPartial) && (
-                                                <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid }); }} className="mt-2 w-full text-xs bg-blue-600 text-white py-1.5 rounded-lg hover:bg-blue-700 font-medium transition">Cetak Kuitansi</button>
+                                                <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid, paymentMethod: ob.payment_method, paidByName: ob.paid_by_name, paidAt: ob.paid_at }); }} className="mt-2 w-full text-xs bg-blue-600 text-white py-1.5 rounded-lg hover:bg-blue-700 font-medium transition">Cetak Kuitansi</button>
                                             )}
                                         </div>
                                     );
@@ -275,6 +299,18 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                 {effectivePaid > 0 && !isPaid && (
                                                     <p className="text-[10px] text-slate-500">Terbayar: {formatCurrency(effectivePaid)}</p>
                                                 )}
+                                                {(isPaid || isPartial) && (
+                                                    <div className="mt-1 pt-1 border-t border-slate-200/50 text-[10px] text-slate-500">
+                                                        <span className="font-semibold text-slate-700 block truncate" title={ob.paid_by_name || 'Kasir'}>
+                                                            {ob.paid_by_name?.toLowerCase().includes('midtrans') ? 'Midtrans' : (ob.paid_by_name || 'Kasir')}
+                                                        </span>
+                                                        {ob.paid_at && !ob.paid_at.startsWith('0001-01-01') && (
+                                                            <span className="text-[9px] text-slate-400 font-mono block">
+                                                                {new Date(ob.paid_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 {canManage && (
                                                     <div className="mt-2 flex gap-1 justify-center">
                                                         {!isPaid && (
@@ -296,7 +332,7 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                     </div>
                                                 )}
                                                 {(isPaid || isPartial) && (
-                                                    <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid, installmentNumber: ob.installment_number, totalInstallments: ob.total_installments }); }} className="mt-1 block w-full text-[10px] text-blue-600 hover:bg-blue-50 font-medium">Cetak</button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid, installmentNumber: ob.installment_number, totalInstallments: ob.total_installments, paymentMethod: ob.payment_method, paidByName: ob.paid_by_name, paidAt: ob.paid_at }); }} className="mt-1 block w-full text-[10px] text-blue-600 hover:bg-blue-50 font-medium">Cetak</button>
                                                 )}
                                             </div>
                                         );
@@ -327,11 +363,21 @@ export const StudentObligationsExpanded: React.FC<Props> = ({
                                                     <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold', statusColor(displayStatus))}>{statusLabel(displayStatus)}</span>
                                                     {effectivePaid > 0 && !isPaid && <span className="text-xs text-slate-500">Terbayar: {formatCurrency(effectivePaid)}</span>}
                                                     {ob.due_date && <span className="text-[10px] text-slate-400 flex items-center gap-0.5"><Calendar size={8} /> {new Date(ob.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                                                    {(isPaid || isPartial) && (
+                                                        <span className="text-[11px] text-slate-500">
+                                                            • PJ: <strong className="text-slate-700">{ob.paid_by_name?.toLowerCase().includes('midtrans') ? 'Sistem Midtrans' : (ob.paid_by_name || 'Kasir')}</strong>
+                                                            {ob.paid_at && !ob.paid_at.startsWith('0001-01-01') && (
+                                                                <span className="font-mono text-slate-400 ml-1">
+                                                                    ({new Date(ob.paid_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })})
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 {(isPaid || isPartial) && (
-                                                    <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid }); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Cetak Kuitansi">
+                                                    <button onClick={(e) => { e.stopPropagation(); handlePrintReceipt({ id: ob.id, studentName: group.student_name, className: group.class_name, paymentTypeName: typeName, amount: ob.amount, paidAmount: isPaid ? ob.amount : effectivePaid, paymentMethod: ob.payment_method, paidByName: ob.paid_by_name, paidAt: ob.paid_at }); }} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Cetak Kuitansi">
                                                         <FileText size={16} />
                                                     </button>
                                                 )}

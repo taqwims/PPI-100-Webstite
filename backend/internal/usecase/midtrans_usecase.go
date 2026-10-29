@@ -373,6 +373,10 @@ func (u *MidtransUsecase) processPaymentStatus(orderID, transactionStatus, fraud
 		if newStatus == "Success" {
 			now := time.Now()
 			p.PaidAt = now
+			p.RecordedByName = "Sistem Midtrans"
+			if p.PaymentMethod == "" {
+				p.PaymentMethod = "Midtrans"
+			}
 
 			bill, err := u.financeRepo.GetBillByID(p.BillID.String())
 			if err == nil && bill != nil {
@@ -404,6 +408,8 @@ func (u *MidtransUsecase) processPaymentStatus(orderID, transactionStatus, fraud
 						Type:              "Income",
 						Amount:            p.Amount,
 						Category:          category,
+						ResponsibleName:   "Sistem Midtrans",
+						Notes:             fmt.Sprintf("Auto-settled via Midtrans (Order ID: %s, Timestamp: %s)", orderID, now.Format("2006-01-02 15:04:05")),
 						TransactionCodeID: bill.TransactionCodeID,
 					}
 					_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
@@ -426,7 +432,7 @@ func (u *MidtransUsecase) processPaymentStatus(orderID, transactionStatus, fraud
 				if u.financeUsecase != nil {
 					u.financeUsecase.sendPaymentInAppNotifications(&bill.Student, bill, parent, p.Amount)
 					u.financeUsecase.triggerPaymentWA(&bill.Student, parent, bill, p.Amount, "Midtrans")
-					u.financeUsecase.syncObligationStatus(bill, totalPaid, p.Amount)
+					u.financeUsecase.syncObligationStatus(bill, totalPaid, p.Amount, "Sistem Midtrans", "Midtrans")
 				}
 			}
 		}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Camera, Maximize2, Minimize2, Volume2, VolumeX,
     CheckCircle2, Clock, Coins, RefreshCw,
-    GraduationCap, Briefcase, Info, Zap, UserPlus, Smile, LogOut, Settings
+    GraduationCap, Briefcase, Info, Zap, UserPlus, Smile, LogOut, Settings, SwitchCamera
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -217,8 +217,19 @@ const AttendanceFaceScanner: React.FC = () => {
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+    const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
     const [isLiveScanning, setIsLiveScanning] = useState(false);
     const [isTabVisible, setIsTabVisible] = useState<boolean>(() => typeof document !== 'undefined' ? !document.hidden : true);
+
+    const toggleFacingMode = () => {
+        setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+        setSelectedDeviceId('');
+    };
+
+    const toggleFitMode = () => {
+        setFitMode(prev => prev === 'contain' ? 'cover' : 'contain');
+    };
     const [currentTime, setCurrentTime] = useState<string>(() =>
         new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB'
     );
@@ -345,15 +356,15 @@ const AttendanceFaceScanner: React.FC = () => {
             if (token !== requestTokenRef.current || !isMountedRef.current) return;
             setDevices(videoDevs);
 
-            const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
             const constraints: MediaStreamConstraints = {
                 video: selectedDeviceId
                     ? { deviceId: { exact: selectedDeviceId } }
                     : {
-                        facingMode: 'user',
-                        width: isMobile ? { ideal: 720 } : { ideal: 1280 },
-                        height: isMobile ? { ideal: 1280 } : { ideal: 720 }
-                    }
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                audio: false
             };
 
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -397,7 +408,7 @@ const AttendanceFaceScanner: React.FC = () => {
         return () => {
             stopCamera();
         };
-    }, [isScanning, isTabVisible, showEnrollModal, selectedDeviceId]);
+    }, [isScanning, isTabVisible, showEnrollModal, selectedDeviceId, facingMode]);
 
     // ─── Fetch Real Live Attendance Records from Backend ───
     const fetchLiveRecent = async () => {
@@ -658,7 +669,7 @@ const AttendanceFaceScanner: React.FC = () => {
 
                         {/* Settings Button */}
                         <Link
-                            to="/dashboard/settings?tab=rfid_attendance"
+                            to="/dashboard/admin/school-settings?tab=rfid_attendance"
                             className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
                             title="Pengaturan Jam Masuk & Pulang Sekolah"
                         >
@@ -782,7 +793,7 @@ const AttendanceFaceScanner: React.FC = () => {
                             autoPlay
                             playsInline
                             muted
-                            className="w-full h-full object-cover transform scale-x-[-1]"
+                            className={`w-full h-full transition-all duration-300 ${fitMode === 'contain' ? 'object-contain' : 'object-cover'} transform ${facingMode === 'user' ? 'scale-x-[-1]' : 'scale-x-1'}`}
                         />
                         <canvas ref={canvasRef} className="hidden" />
 
@@ -842,7 +853,7 @@ const AttendanceFaceScanner: React.FC = () => {
 
                         {/* ─── Modern Minimalist Camera HUD Overlay ─── */}
                         <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 sm:p-5">
-                            {/* Top Corner Badges: Clean pills at left & right corners, open in the center */}
+                            {/* Top Corner Badges & Camera Controls */}
                             <div className="flex items-center justify-between w-full">
                                 {/* Left: Minimalist Live Status */}
                                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-[11px] font-bold text-emerald-300 uppercase tracking-wider shadow-sm">
@@ -850,10 +861,34 @@ const AttendanceFaceScanner: React.FC = () => {
                                     <span>LIVE CAM</span>
                                 </div>
 
-                                {/* Right: Real-time Clock Badge */}
-                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-[11px] font-mono text-slate-200 shadow-sm">
-                                    <Clock size={11} className="text-amber-400" />
-                                    <span>{currentTime}</span>
+                                {/* Right: Real-time Clock Badge & Quick Camera Controls */}
+                                <div className="flex items-center gap-2 pointer-events-auto">
+                                    {/* Switch Camera Button (Front/Rear) */}
+                                    <button
+                                        type="button"
+                                        onClick={toggleFacingMode}
+                                        className="p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/20 text-white text-[11px] font-medium flex items-center gap-1.5 shadow-sm transition active:scale-95"
+                                        title={`Beralih Kamera: ${facingMode === 'user' ? 'Kamera Depan' : 'Kamera Belakang'}`}
+                                    >
+                                        <SwitchCamera size={13} className="text-emerald-400" />
+                                        <span className="hidden sm:inline">{facingMode === 'user' ? 'Kamera Depan' : 'Kamera Belakang'}</span>
+                                    </button>
+
+                                    {/* Contain / Cover Fit Mode Toggle Button */}
+                                    <button
+                                        type="button"
+                                        onClick={toggleFitMode}
+                                        className="px-2.5 py-1 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/20 text-white text-[11px] font-medium flex items-center gap-1 shadow-sm transition active:scale-95"
+                                        title={`Mode Tampilan: ${fitMode === 'contain' ? 'Fit Utuh (Tanpa Zoom/Crop)' : 'Cover (Isi Penuh)'}`}
+                                    >
+                                        <span className="text-[10px] font-bold text-amber-300 uppercase">{fitMode === 'contain' ? 'FIT' : 'CROP'}</span>
+                                    </button>
+
+                                    {/* Clock Badge */}
+                                    <div className="hidden xs:flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-[11px] font-mono text-slate-200 shadow-sm">
+                                        <Clock size={11} className="text-amber-400" />
+                                        <span>{currentTime}</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -997,7 +1032,7 @@ const AttendanceFaceScanner: React.FC = () => {
                                 <span>•</span>
                                 <span>Pulang: <strong className="text-purple-700 font-semibold">{exitTime} WIB</strong></span>
                                 <Link
-                                    to="/dashboard/settings?tab=rfid_attendance"
+                                    to="/dashboard/admin/school-settings?tab=rfid_attendance"
                                     className="text-[11px] text-emerald-600 hover:text-emerald-800 underline font-semibold flex items-center gap-0.5 ml-1"
                                 >
                                     <Settings size={11} /> Ubah
