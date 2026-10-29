@@ -4,7 +4,7 @@ import {
     Tag, Table2, ClipboardList, BarChart2, LucideIcon, Heart, MessageCircle, Upload, Package, ShieldCheck,
     LayoutDashboard, Users, BookOpen, AlertTriangle, Bell, Mail, GraduationCap, FileText, CreditCard,
     Activity, Inbox, Wallet, Calendar, Settings, PieChart, X, LogOut, Building2, ChevronLeft, ChevronRight, Layers,
-    Radio, Globe, FileSpreadsheet, Camera
+    Radio, Globe, FileSpreadsheet, Camera, Briefcase
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicYear } from '../../context/AcademicYearContext';
@@ -77,6 +77,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: Users, label: 'Manajemen User', path: '/dashboard/users' },
                 { icon: Users, label: isRFID ? 'Data Siswa & RFID' : 'Data Siswa', path: '/dashboard/students' },
                 ...attendanceMenuItems,
+                { icon: Users, label: 'Monitoring Status Kehadiran', path: '/dashboard/attendance/daily-status' },
+                { icon: ShieldCheck, label: 'Approval Izin Siswa', path: '/dashboard/homeroom/leave-approvals' },
+                { icon: Briefcase, label: 'Approval Izin Guru', path: '/dashboard/admin/staff-leave-approvals' },
                 { icon: FileSpreadsheet, label: 'Export Presensi', path: '/dashboard/attendance/export' },
                 { icon: Upload, label: 'Bulk Import Akun', path: '/dashboard/admin/bulk-import' },
                 { icon: BookOpen, label: 'Akademik', path: '/dashboard/academic' },
@@ -159,6 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 { icon: AlertTriangle, label: 'Lapor BK', path: '/dashboard/teacher/bk-report', feature: 'bk' },
                 { icon: FileText, label: 'Riwayat Kuitansi', path: '/dashboard/finance/invoices' },
                 { icon: Wallet, label: 'Gajian', path: '/dashboard/finance/payroll', feature: 'payroll' },
+                { icon: Briefcase, label: 'Pengajuan Izin & Tugas Luar', path: '/dashboard/teacher/leave-requests' },
             ]
         };
 
@@ -205,6 +209,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             items: [
                 { icon: PieChart, label: 'Rekap Finansial', path: '/dashboard/principal/finance-summary' },
                 { icon: BarChart2, label: 'Dashboard Eksekutif', path: '/dashboard/finance/executive-dashboard' },
+                { icon: Users, label: 'Kehadiran Hari Ini & Izin', path: '/dashboard/principal/attendance' },
+                { icon: ShieldCheck, label: 'Approval Izin Guru', path: '/dashboard/principal/leave-approvals' },
             ]
         };
         const principalDetail: MenuGroup = {
@@ -269,40 +275,82 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         };
 
         // Role ID mapping: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara Umum, 10=Teller Tabungan, 11=Teller Transaksional
-        switch (user?.role_id) {
-            case 1: // Super Admin
-                return [dashboardGroup, adminManagement, adminContent, adminData, finTransaksi, finAnggaran, finPengaturan];
-            case 2: // Admin MTS
-            case 3: // Admin MA
-                return [dashboardGroup, adminManagement, adminContent, adminData, adminFinance];
-            case 4: // Guru
-                return [dashboardGroup, teacherGroup];
-            case 5: // Wali Kelas
-                return [dashboardGroup, teacherGroup, homeroomGroup];
-            case 6: // Siswa
-                return [dashboardGroup, studentGroup];
-            case 7: // Orang Tua
-                return [dashboardGroup, parentGroup];
-            case 8: // Pimpinan
-                return [dashboardGroup, principalOverview, principalDetail];
-            case 9: // Bendahara Umum
-                return [dashboardGroup, finTransaksi, finAnggaran, finPengaturan];
-            case 10: // Teller Tabungan
-                return [dashboardGroup, tellerTabungan];
-            case 11: // Teller Transaksional
-                return [dashboardGroup, transactionalTellerTransaksi, transactionalTellerTabungan, transactionalTellerKonten, transactionalTellerPengaturan];
-            default:
-                return [dashboardGroup];
+        const roleIds = user?.role_ids && user.role_ids.length > 0 ? user.role_ids : (user?.role_id ? [user.role_id] : []);
+
+        // Super Admin gets everything
+        if (roleIds.includes(1)) {
+            return [dashboardGroup, adminManagement, adminContent, adminData, finTransaksi, finAnggaran, finPengaturan];
         }
+
+        const groups: MenuGroup[] = [dashboardGroup];
+        const addedTitles = new Set<string>();
+
+        const addGroups = (...newGroups: MenuGroup[]) => {
+            for (const g of newGroups) {
+                if (!g.title || !addedTitles.has(g.title)) {
+                    if (g.title) addedTitles.add(g.title);
+                    groups.push(g);
+                }
+            }
+        };
+
+        // Admin MTS / Admin MA
+        if (roleIds.includes(2) || roleIds.includes(3)) {
+            addGroups(adminManagement, adminContent, adminData, adminFinance);
+        }
+
+        // Pimpinan
+        if (roleIds.includes(8)) {
+            addGroups(principalOverview, principalDetail);
+        }
+
+        // Bendahara Umum
+        if (roleIds.includes(9)) {
+            addGroups(finTransaksi, finAnggaran, finPengaturan);
+        }
+
+        // Teller Transaksional
+        if (roleIds.includes(11)) {
+            addGroups(transactionalTellerTransaksi, transactionalTellerTabungan, transactionalTellerKonten, transactionalTellerPengaturan);
+        }
+
+        // Teller Tabungan
+        if (roleIds.includes(10)) {
+            addGroups(tellerTabungan);
+        }
+
+        // Guru
+        if (roleIds.includes(4)) {
+            addGroups(teacherGroup);
+        }
+
+        // Wali Kelas
+        if (roleIds.includes(5)) {
+            addGroups(teacherGroup, homeroomGroup);
+        }
+
+        // Orang Tua
+        if (roleIds.includes(7)) {
+            addGroups(parentGroup);
+        }
+
+        // Siswa
+        if (roleIds.includes(6)) {
+            addGroups(studentGroup);
+        }
+
+        return groups;
     };
 
-    const getRoleName = (roleId?: number) => {
+    const getUserRoleNames = (): string[] => {
         const roles: Record<number, string> = {
             1: 'Super Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
             5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
             9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Teller Transaksional'
         };
-        return roleId && roles[roleId] ? roles[roleId] : 'User';
+        const roleIds = user?.role_ids && user.role_ids.length > 0 ? user.role_ids : (user?.role_id ? [user.role_id] : []);
+        const names = roleIds.map(rid => roles[rid] || `Role ${rid}`);
+        return names.length > 0 ? names : ['User'];
     };
 
     const menuGroups = getMenuGroups();
@@ -451,9 +499,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
                 <div className={clsx("p-4 border-t border-slate-200", isCollapsed ? "flex flex-col items-center" : "")}>
                     {!isCollapsed && (
-                        <div className="mb-4 px-4">
-                            <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-                            <p className="text-xs text-slate-500 capitalize truncate">{getRoleName(user?.role_id)}</p>
+                        <div className="mb-4 px-2">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{user?.name}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                                {getUserRoleNames().map((rName, idx) => (
+                                    <span
+                                        key={idx}
+                                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200"
+                                    >
+                                        {rName}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )}
                     <button

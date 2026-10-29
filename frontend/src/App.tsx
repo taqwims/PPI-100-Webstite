@@ -61,6 +61,9 @@ import ParentChildBills from './pages/parent/ParentChildBills';
 import ParentChildBK from './pages/parent/ParentChildBK';
 import ParentLeaveRequests from './pages/parent/ParentLeaveRequests';
 import HomeroomLeaveApprovals from './pages/teacher/HomeroomLeaveApprovals';
+import StaffLeaveRequests from './pages/teacher/StaffLeaveRequests';
+import StaffLeaveApprovals from './pages/admin/StaffLeaveApprovals';
+import AttendanceDailyPersonnelStatus from './pages/admin/AttendanceDailyPersonnelStatus';
 import AdminNotificationManagement from './pages/admin/AdminNotificationManagement';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import AdminPPDB from './pages/admin/AdminPPDB';
@@ -136,6 +139,10 @@ function App() {
                                     <Route path="attendance/rfid" element={<AttendanceRFID />} />
                                     <Route path="attendance/face" element={<AttendanceFaceScanner />} />
                                     <Route path="attendance/export" element={<AttendanceExportPanel />} />
+                                    <Route path="attendance/daily-status" element={<AttendanceDailyPersonnelStatus />} />
+                                    <Route path="admin/staff-leave-approvals" element={<StaffLeaveApprovals />} />
+                                    <Route path="principal/attendance" element={<AttendanceDailyPersonnelStatus />} />
+                                    <Route path="principal/leave-approvals" element={<StaffLeaveApprovals />} />
                                     <Route path="finance" element={<Finance />} />
                                     <Route path="bk" element={<BK />} />
                                     <Route path="elearning" element={<Elearning />} />
@@ -266,6 +273,7 @@ function App() {
                                     <Route path="homeroom" element={<HomeroomClass />} />
                                     <Route path="homeroom/report-card/:studentId" element={<HomeroomReportCards />} />
                                     <Route path="homeroom/leave-approvals" element={<HomeroomLeaveApprovals />} />
+                                    <Route path="teacher/leave-requests" element={<StaffLeaveRequests />} />
                                     <Route path="student/schedule" element={<StudentSchedule />} />
                                     <Route path="student/elearning" element={<StudentElearning />} />
                                     <Route path="student/grades" element={<StudentGrades />} />

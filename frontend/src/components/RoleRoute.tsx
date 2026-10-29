@@ -34,6 +34,19 @@ export const getDefaultRoute = (roleId: number): string => {
     return routes[roleId] ?? '/dashboard';
 };
 
+export const getUserDefaultRoute = (user: { role_id: number; role_ids?: number[] }): string => {
+    const roleIds = user.role_ids && user.role_ids.length > 0 ? user.role_ids : [user.role_id];
+    if (roleIds.includes(1) || roleIds.includes(2) || roleIds.includes(3)) return '/dashboard';
+    if (roleIds.includes(9)) return '/dashboard/finance/cash-ledger';
+    if (roleIds.includes(8)) return '/dashboard/principal/finance-summary';
+    if (roleIds.includes(5)) return '/dashboard/homeroom';
+    if (roleIds.includes(4)) return '/dashboard/teacher/schedule';
+    if (roleIds.includes(10) || roleIds.includes(11)) return '/dashboard/finance/cash-ledger';
+    if (roleIds.includes(7)) return '/dashboard/children';
+    if (roleIds.includes(6)) return '/dashboard/bills';
+    return getDefaultRoute(user.role_id);
+};
+
 interface RoleRouteProps {
     children: React.ReactNode;
     /** Daftar role ID yang diizinkan mengakses route ini */
@@ -59,11 +72,17 @@ const RoleRoute: React.FC<RoleRouteProps> = ({ children, allowedRoles, fallback 
         return null;
     }
 
-    if (!allowedRoles.includes(user.role_id)) {
+    const userRoleIds: number[] = user.role_ids && user.role_ids.length > 0 
+        ? user.role_ids 
+        : [user.role_id];
+
+    const hasAccess = allowedRoles.some(r => userRoleIds.includes(r));
+
+    if (!hasAccess) {
         if (fallback) {
             return <>{fallback}</>;
         }
-        return <Navigate to={getDefaultRoute(user.role_id)} replace />;
+        return <Navigate to={getUserDefaultRoute(user)} replace />;
     }
 
     return <>{children}</>;

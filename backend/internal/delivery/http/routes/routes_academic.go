@@ -114,6 +114,7 @@ func RegisterAcademicRoutes(
 		leaveRequests.GET("/my", studentLeaveHandler.GetMyStudentLeaveRequests)
 		leaveRequests.GET("/children", studentLeaveHandler.GetChildrenLeaveRequests)
 		leaveRequests.GET("/homeroom", studentLeaveHandler.GetHomeroomLeaveRequests)
+		leaveRequests.GET("/all", studentLeaveHandler.GetAllLeaveRequests)
 		leaveRequests.PUT("/:id/approval", studentLeaveHandler.ApproveLeaveRequest)
 	}
 }

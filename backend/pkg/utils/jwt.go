@@ -10,17 +10,32 @@ import (
 )
 
 type Claims struct {
-	UserID uuid.UUID `json:"user_id"`
-	RoleID uint      `json:"role_id"`
-	UnitID uint      `json:"unit_id"`
+	UserID  uuid.UUID `json:"user_id"`
+	RoleID  uint      `json:"role_id"`
+	RoleIDs []uint    `json:"role_ids,omitempty"`
+	UnitID  uint      `json:"unit_id"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uuid.UUID, roleID, unitID uint, cfg *config.Config) (string, error) {
+func GenerateToken(userID uuid.UUID, roleID, unitID uint, cfg *config.Config, roleIDs ...uint) (string, error) {
+	allRoleIDs := make([]uint, 0)
+	roleMap := make(map[uint]bool)
+	if roleID > 0 {
+		allRoleIDs = append(allRoleIDs, roleID)
+		roleMap[roleID] = true
+	}
+	for _, rid := range roleIDs {
+		if rid > 0 && !roleMap[rid] {
+			allRoleIDs = append(allRoleIDs, rid)
+			roleMap[rid] = true
+		}
+	}
+
 	claims := &Claims{
-		UserID: userID,
-		RoleID: roleID,
-		UnitID: unitID,
+		UserID:  userID,
+		RoleID:  roleID,
+		RoleIDs: allRoleIDs,
+		UnitID:  unitID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

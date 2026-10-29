@@ -34,6 +34,15 @@ func (r *TeacherRepository) FindByID(id string) (*domain.Teacher, error) {
 	return &teacher, err
 }
 
+func (r *TeacherRepository) FindByUserID(userID string) (*domain.Teacher, error) {
+	var teacher domain.Teacher
+	err := r.db.Preload("User").First(&teacher, "user_id = ?", userID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &teacher, nil
+}
+
 func (r *TeacherRepository) DeleteByUserID(userID string) error {
 	return r.db.Where("user_id = ?", userID).Delete(&domain.Teacher{}).Error
 }

@@ -202,6 +202,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	studentLeaveUsecase := usecase.NewStudentLeaveUsecase(studentLeaveRepo, studentRepo, userRepo, notificationRepo, db)
 	studentLeaveHandler := handlers.NewStudentLeaveHandler(studentLeaveUsecase, db)
 
+	// Staff Leave Requests (Izin Guru, Tugas Luar Dinas & Dispensasi)
+	staffLeaveRepo := postgres.NewStaffLeaveRepository(db)
+	staffLeaveUsecase := usecase.NewStaffLeaveUsecase(staffLeaveRepo, userRepo, notificationRepo, db)
+	staffLeaveHandler := handlers.NewStaffLeaveHandler(staffLeaveUsecase, db)
+
+	// Attendance Monitoring Handler (Monitoring Kehadiran Harian Eksekutif)
+	attendanceMonitoringHandler := handlers.NewAttendanceMonitoringHandler(db)
+
 	// Public Routes
 	apiGroup := r.Group("/api")
 	RegisterPublicRoutes(apiGroup, cfg, authHandler, publicHandler, midtransHandler, xenditHandler, mayarHandler, invoiceSignatureHandler, schoolBankUsecase, schoolSettingUsecase, studentHandler)
@@ -235,6 +243,20 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		staffAttendanceGroup.GET("/monthly-summary", faceAttendanceHandler.GetStaffMonthlySummary)
 		staffAttendanceGroup.POST("/:id/waive-penalty", middleware.RoleMiddleware(1, 8, 9), faceAttendanceHandler.WaiveStaffPenalty)
 	}
+
+	// Staff Leave Requests (Izin Guru, Cuti, & Tugas Luar Dinas)
+	staffLeaveGroup := protectedGroup.Group("/staff/leave-requests")
+	{
+		staffLeaveGroup.POST("", staffLeaveHandler.CreateLeaveRequest)
+		staffLeaveGroup.POST("/", staffLeaveHandler.CreateLeaveRequest)
+		staffLeaveGroup.GET("/my", staffLeaveHandler.GetMyLeaveRequests)
+		staffLeaveGroup.GET("", middleware.RoleMiddleware(1, 2, 3, 8), staffLeaveHandler.GetAllLeaveRequests)
+		staffLeaveGroup.GET("/", middleware.RoleMiddleware(1, 2, 3, 8), staffLeaveHandler.GetAllLeaveRequests)
+		staffLeaveGroup.PUT("/:id/approval", middleware.RoleMiddleware(1, 2, 3, 8), staffLeaveHandler.ApproveLeaveRequest)
+	}
+
+	// Monitoring Kehadiran Harian Personil & Alasan Ketidakhadiran (Eksekutif & Admin)
+	protectedGroup.GET("/attendance/daily-personnel-status", middleware.RoleMiddleware(1, 2, 3, 8), attendanceMonitoringHandler.GetDailyPersonnelStatus)
 
 	// Register modular mapped routes
 	RegisterAcademicRoutes(protectedGroup, academicHandler, teacherHandler, studentHandler, bkHandler, elearningHandler, studentLeaveHandler, cfg.FeatureBK, cfg.FeatureElearning, cfg.FeatureRFIDAttendance)

@@ -31,6 +31,8 @@ interface User {
     email: string;
     phone?: string;
     role_id: number;
+    role_ids?: number[];
+    roles?: { id: number; name: string }[];
     unit_id: number;
     student?: {
         id: string;
@@ -118,7 +120,7 @@ const UserManagement: React.FC = () => {
     const initialUnitId = user?.role_id === 1 ? defaultUnitId : user?.unit_id || defaultUnitId;
 
     const [formData, setFormData] = useState({
-        name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId,
+        name: '', email: '', password: '', role_id: 6, role_ids: [6] as number[], unit_id: initialUnitId,
         nisn: '', rfid: '', class_id: 0, parent_id: '',
     });
 
@@ -244,11 +246,13 @@ const UserManagement: React.FC = () => {
         .filter((u: User) => {
             const isGlobalAdmin = [1, 9, 10, 11].includes(user?.role_id || 0);
             if (!isGlobalAdmin && user?.unit_id && u.unit_id !== user?.unit_id) return false;
-            if (activeTab !== 0 && u.role_id !== activeTab) return false;
+
+            const userRoleIds = u.role_ids && u.role_ids.length > 0 ? u.role_ids : [u.role_id];
+            if (activeTab !== 0 && !userRoleIds.includes(activeTab)) return false;
 
             // Class filter (only for students or in "Semua" tab)
             if (selectedClassId !== 0) {
-                if (u.role_id !== 6 || u.student?.class_id !== selectedClassId) return false;
+                if (!userRoleIds.includes(6) || u.student?.class_id !== selectedClassId) return false;
             }
 
             if (searchQuery.trim()) {
@@ -278,7 +282,10 @@ const UserManagement: React.FC = () => {
         });
 
     const roleCounts = users.reduce((acc: Record<number, number>, u: User) => {
-        acc[u.role_id] = (acc[u.role_id] || 0) + 1;
+        const rids = u.role_ids && u.role_ids.length > 0 ? u.role_ids : [u.role_id];
+        rids.forEach(rid => {
+            acc[rid] = (acc[rid] || 0) + 1;
+        });
         return acc;
     }, {} as Record<number, number>);
 
@@ -296,11 +303,13 @@ const UserManagement: React.FC = () => {
                     parent_id: data.parent_id || undefined,
                 });
             }
+            const uniqueRoleIds = Array.from(new Set([Number(data.role_id), ...(data.role_ids || [])]));
             return api.post('/users/', {
                 name: data.name,
                 email: data.email,
                 password: data.password,
                 role_id: Number(data.role_id),
+                role_ids: uniqueRoleIds,
                 unit_id: Number(data.unit_id),
             });
         },
@@ -333,11 +342,13 @@ const UserManagement: React.FC = () => {
                     parent_id: data.parent_id || '',
                 });
             }
+            const uniqueRoleIds = Array.from(new Set([Number(data.role_id), ...(data.role_ids || [])]));
             return api.put(`/users/${editingUser?.id}`, {
                 name: data.name,
                 email: data.email,
                 password: data.password || undefined,
                 role_id: Number(data.role_id),
+                role_ids: uniqueRoleIds,
                 unit_id: Number(data.unit_id),
             });
         },
@@ -371,7 +382,7 @@ const UserManagement: React.FC = () => {
         setIsModalOpen(false);
         setEditingUser(null);
         setEditingStudentRecord(null);
-        setFormData({ name: '', email: '', password: '', role_id: 6, unit_id: initialUnitId, nisn: '', rfid: '', class_id: 0, parent_id: '' });
+        setFormData({ name: '', email: '', password: '', role_id: 6, role_ids: [6], unit_id: initialUnitId, nisn: '', rfid: '', class_id: 0, parent_id: '' });
     };
 
     const handleEdit = (u: User) => {
@@ -391,11 +402,13 @@ const UserManagement: React.FC = () => {
 
         const resolvedParentUserId = resolveParentIdToUserId(rawParentId);
 
+        const uRoleIds = u.role_ids && u.role_ids.length > 0 ? u.role_ids : [u.role_id];
         setFormData({
             name: u.name,
             email: u.email,
             password: '',
             role_id: u.role_id,
+            role_ids: uRoleIds,
             unit_id: u.unit_id,
             nisn: u.student?.nisn || studentRec?.nisn || '',
             rfid: u.student?.rfid || studentRec?.rfid || '',
@@ -552,9 +565,13 @@ const UserManagement: React.FC = () => {
                                             </td>
                                             <td className="px-5 py-3 text-slate-500 text-sm">{u.email}</td>
                                             <td className="px-5 py-3">
-                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roleColor(u.role_id)}`}>
-                                                    {getRoleName(u.role_id)}
-                                                </span>
+                                                <div className="flex flex-wrap gap-1 max-w-xs">
+                                                    {(u.role_ids && u.role_ids.length > 0 ? u.role_ids : [u.role_id]).map((rid) => (
+                                                        <span key={rid} className={`px-2 py-0.5 rounded-full text-xs font-medium ${roleColor(rid)}`}>
+                                                            {getRoleName(rid)}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </td>
                                             {(activeTab === 0 || activeTab === 6) && isRFIDEnabled && (
                                                 <td className="px-5 py-3 text-sm">
@@ -647,12 +664,23 @@ const UserManagement: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Role Utama</label>
                                     <div className="relative">
                                         <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        <select value={formData.role_id} onChange={e => setFormData({ ...formData, role_id: Number(e.target.value) })}
+                                        <select
+                                            value={formData.role_id}
+                                            onChange={e => {
+                                                const newRoleId = Number(e.target.value);
+                                                setFormData(prev => {
+                                                    const nextRoleIds = newRoleId === 6
+                                                        ? [6]
+                                                        : Array.from(new Set([newRoleId, ...(prev.role_ids || []).filter(r => r !== 6)]));
+                                                    return { ...prev, role_id: newRoleId, role_ids: nextRoleIds };
+                                                });
+                                            }}
                                             className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm appearance-none"
-                                            disabled={!!editingUser}>
+                                            disabled={editingUser?.role_id === 6}
+                                        >
                                             {getRoleOptions().map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                         </select>
                                     </div>
@@ -675,6 +703,53 @@ const UserManagement: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Multi-role selector for non-students */}
+                            {formData.role_id !== 6 && (
+                                <div className="space-y-2 pt-2 border-t border-slate-100">
+                                    <label className="block text-sm font-medium text-slate-700">
+                                        Peran Tambahan (Multi-Role)
+                                    </label>
+                                    <p className="text-xs text-slate-500">
+                                        Pilih peran tambahan yang dapat dijalankan akun ini (contoh: Guru + Wali Kelas, Guru + Bendahara, dll).
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                        {getRoleOptions().filter(r => r.id !== 6).map(r => {
+                                            const isChecked = formData.role_ids?.includes(r.id);
+                                            const isPrimary = formData.role_id === r.id;
+                                            return (
+                                                <label key={r.id} className={clsx(
+                                                    "flex items-center gap-2 p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors border",
+                                                    isChecked ? "bg-white border-blue-200 text-blue-900 shadow-xs" : "bg-transparent border-transparent text-slate-600 hover:bg-slate-100"
+                                                )}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        disabled={isPrimary}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    role_ids: [...(prev.role_ids || []), r.id]
+                                                                }));
+                                                            } else {
+                                                                if (!isPrimary) {
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        role_ids: (prev.role_ids || []).filter(id => id !== r.id)
+                                                                    }));
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                    />
+                                                    <span>{r.name} {isPrimary ? '(Utama)' : ''}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Student Fields */}
                             {formData.role_id === 6 && (

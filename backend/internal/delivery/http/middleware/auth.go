@@ -44,6 +44,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		c.Set("userID", claims.UserID.String())
 		c.Set("roleID", claims.RoleID)
+		c.Set("roleIDs", claims.RoleIDs)
 		c.Set("unitID", claims.UnitID)
 		c.Next()
 	}
@@ -51,6 +52,21 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 func RoleMiddleware(allowedRoles ...int) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 1. Cek dari daftar roleIDs di token JWT (O(1) in-memory check, sub-millisecond latency)
+		if roleIDsVal, exists := c.Get("roleIDs"); exists && roleIDsVal != nil {
+			if rids, ok := roleIDsVal.([]uint); ok && len(rids) > 0 {
+				for _, userRole := range rids {
+					for _, allowed := range allowedRoles {
+						if int(userRole) == allowed {
+							c.Next()
+							return
+						}
+					}
+				}
+			}
+		}
+
+		// 2. Fallback ke single roleID (backward compatibility)
 		roleIDVal, exists := c.Get("roleID")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})

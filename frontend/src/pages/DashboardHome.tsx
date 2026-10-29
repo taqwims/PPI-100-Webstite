@@ -4,7 +4,7 @@ import CardGlass from '../components/ui/glass/CardGlass';
 import { 
     Users, BookOpen, DollarSign, Clock, AlertCircle, FileText, 
     CreditCard, Activity, Inbox, Wallet, ShieldCheck, TrendingDown,
-    LayoutDashboard, Calendar
+    LayoutDashboard, Calendar, Briefcase
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -16,29 +16,97 @@ import ExecutiveDashboard from './finance/ExecutiveDashboard';
 const DashboardHome: React.FC = () => {
     const { user } = useAuth();
 
-    // Role IDs: 1=Super Admin, 2=Admin MTS, 3=Admin MA, 4=Guru, 5=Wali Kelas, 6=Siswa, 7=Orang Tua, 8=Pimpinan, 9=Bendahara, 10=Teller Tabungan, 11=Teller Transaksional
+    const roleMap: Record<number, string> = {
+        1: 'Admin', 2: 'Admin MTS', 3: 'Admin MA', 4: 'Guru',
+        5: 'Wali Kelas', 6: 'Siswa', 7: 'Orang Tua', 8: 'Pimpinan',
+        9: 'Bendahara Umum', 10: 'Teller Tabungan', 11: 'Teller Transaksional'
+    };
+
+    const userRoleIds: number[] = React.useMemo(() => {
+        if (!user) return [];
+        return user.role_ids && user.role_ids.length > 0 ? user.role_ids : [user.role_id];
+    }, [user]);
+
+    const [selectedRole, setSelectedRole] = React.useState<number>(() => {
+        if (!user) return 1;
+        const saved = localStorage.getItem(`active-role-view-${user.id}`);
+        const parsed = saved ? parseInt(saved, 10) : NaN;
+        const available = user.role_ids && user.role_ids.length > 0 ? user.role_ids : [user.role_id];
+        if (!isNaN(parsed) && available.includes(parsed)) {
+            return parsed;
+        }
+        return user.role_id;
+    });
+
+    React.useEffect(() => {
+        if (user && !userRoleIds.includes(selectedRole)) {
+            setSelectedRole(user.role_id);
+        }
+    }, [user, userRoleIds, selectedRole]);
+
+    const handleSwitchRole = (roleId: number) => {
+        setSelectedRole(roleId);
+        if (user) {
+            localStorage.setItem(`active-role-view-${user.id}`, String(roleId));
+        }
+    };
 
     if (!user) return null;
 
-    if (user.role_id <= 3) {
-        return <AdminDashboard />;
-    } else if (user.role_id === 4 || user.role_id === 5) {
-        return <TeacherDashboard />;
-    } else if (user.role_id === 6) {
-        return <StudentDashboard />;
-    } else if (user.role_id === 7) {
-        return <ParentDashboard />;
-    } else if (user.role_id === 8) {
-        return <PrincipalDashboard />;
-    } else if (user.role_id === 9) {
-        return <ExecutiveDashboard />;
-    } else if (user.role_id === 10) {
-        return <TellerTabunganDashboard />;
-    } else if (user.role_id === 11) {
-        return <TellerTransactionalDashboard />;
-    } else {
-        return <div className="text-slate-900">Dashboard for role {user.role_id} is under construction.</div>;
-    }
+    const renderRoleDashboard = (roleId: number) => {
+        if (roleId <= 3) {
+            return <AdminDashboard />;
+        } else if (roleId === 4 || roleId === 5) {
+            return <TeacherDashboard />;
+        } else if (roleId === 6) {
+            return <StudentDashboard />;
+        } else if (roleId === 7) {
+            return <ParentDashboard />;
+        } else if (roleId === 8) {
+            return <PrincipalDashboard />;
+        } else if (roleId === 9) {
+            return <ExecutiveDashboard />;
+        } else if (roleId === 10) {
+            return <TellerTabunganDashboard />;
+        } else if (roleId === 11) {
+            return <TellerTransactionalDashboard />;
+        } else {
+            return <div className="text-slate-900">Dashboard for role {roleId} is under construction.</div>;
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            {/* Multi-role Switcher Bar */}
+            {userRoleIds.length > 1 && (
+                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 p-3 rounded-2xl border border-emerald-200/50 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-2 text-slate-700">
+                        <Briefcase size={18} className="text-emerald-600" />
+                        <span className="text-sm font-semibold">Tampilan Peran Aktif:</span>
+                        <span className="text-xs text-slate-500">(Akun Anda memiliki {userRoleIds.length} peran)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {userRoleIds.map(rid => (
+                            <button
+                                key={rid}
+                                onClick={() => handleSwitchRole(rid)}
+                                className={clsx(
+                                    "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 shadow-xs",
+                                    selectedRole === rid
+                                        ? "bg-emerald-600 text-white shadow-emerald-600/20"
+                                        : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
+                                )}
+                            >
+                                {roleMap[rid] || `Role ${rid}`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {renderRoleDashboard(selectedRole)}
+        </div>
+    );
 };
 
 const AdminDashboard = () => {
@@ -96,14 +164,22 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <CardGlass className="p-6">
                     <h3 className="text-lg font-bold text-slate-900 mb-4">Aksi Cepat</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <Link to="/dashboard/ppdb" className="p-4 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
-                            <Users className="mx-auto mb-2 text-purple-600" />
-                            <span className="text-sm text-slate-600">Cek PPDB</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <Link to="/dashboard/ppdb" className="p-3 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
+                            <Users className="mx-auto mb-1 text-purple-600" size={20} />
+                            <span className="text-xs font-semibold text-slate-700 block">Cek PPDB</span>
                         </Link>
-                        <Link to="/dashboard/admin/notifications" className="p-4 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
-                            <AlertCircle className="mx-auto mb-2 text-yellow-600" />
-                            <span className="text-sm text-slate-600">Kirim Notif</span>
+                        <Link to="/dashboard/admin/notifications" className="p-3 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
+                            <AlertCircle className="mx-auto mb-1 text-yellow-600" size={20} />
+                            <span className="text-xs font-semibold text-slate-700 block">Kirim Notif</span>
+                        </Link>
+                        <Link to="/dashboard/attendance/daily-status" className="p-3 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
+                            <Calendar className="mx-auto mb-1 text-emerald-600" size={20} />
+                            <span className="text-xs font-semibold text-slate-700 block">Status Presensi</span>
+                        </Link>
+                        <Link to="/dashboard/homeroom/leave-approvals" className="p-3 bg-white/40 rounded-xl hover:bg-white/60 transition-colors text-center shadow-sm border border-white/20">
+                            <ShieldCheck className="mx-auto mb-1 text-blue-600" size={20} />
+                            <span className="text-xs font-semibold text-slate-700 block">Approval Izin</span>
                         </Link>
                     </div>
                 </CardGlass>
@@ -193,6 +269,12 @@ const TeacherDashboard = () => {
                                 <BookOpen size={18} />
                             </div>
                             <span className="text-slate-600 text-sm">Kelola E-Learning</span>
+                        </Link>
+                        <Link to="/dashboard/teacher/leave-requests" className="p-3 bg-white/40 rounded-lg hover:bg-white/60 transition-colors flex items-center gap-3 shadow-sm border border-white/20">
+                            <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-600">
+                                <Briefcase size={18} />
+                            </div>
+                            <span className="text-slate-600 text-sm">Izin & Tugas Luar</span>
                         </Link>
                     </div>
                 </CardGlass>

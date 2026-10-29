@@ -62,7 +62,7 @@ func (u *AuthUsecase) Login(email, password string) (string, error) {
 		}(user.ID.String(), password)
 	}
 
-	token, err := utils.GenerateToken(user.ID, user.RoleID, user.UnitID, u.cfg)
+	token, err := utils.GenerateToken(user.ID, user.RoleID, user.UnitID, u.cfg, user.RoleIDs...)
 	if err != nil {
 		return "", err
 	}

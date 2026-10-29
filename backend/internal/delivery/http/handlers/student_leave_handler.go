@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"ppi-100-sis/internal/domain"
 	"ppi-100-sis/internal/usecase"
+	"strconv"
 	"strings"
 	"time"
 
@@ -197,6 +198,31 @@ func (h *StudentLeaveHandler) GetChildrenLeaveRequests(c *gin.Context) {
 	}
 
 	leaves, err := h.leaveUsecase.GetParentChildrenLeaveRequests(userUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, leaves)
+}
+
+// GET /academic/leave-requests/all - Daftar pengajuan izin seluruh siswa untuk Admin & Pimpinan
+func (h *StudentLeaveHandler) GetAllLeaveRequests(c *gin.Context) {
+	unitIDStr := c.DefaultQuery("unit_id", "0")
+	unitID, _ := strconv.ParseUint(unitIDStr, 10, 32)
+
+	classIDStr := c.Query("class_id")
+	var classID *uint
+	if classIDStr != "" {
+		if cid, err := strconv.ParseUint(classIDStr, 10, 32); err == nil {
+			uid := uint(cid)
+			classID = &uid
+		}
+	}
+
+	status := c.DefaultQuery("status", "all")
+
+	leaves, err := h.leaveUsecase.GetAllStudentLeaveRequests(uint(unitID), classID, status)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

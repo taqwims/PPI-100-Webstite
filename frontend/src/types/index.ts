@@ -36,6 +36,8 @@ export interface User {
     phone?: string;
     address?: string;
     role_id: number;
+    roles?: Role[];
+    role_ids?: number[];
     unit_id: number;
     photo_url?: string;
     bank_name?: string;

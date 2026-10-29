@@ -43,6 +43,7 @@ func AutoMigrate(db *gorm.DB) error {
 	err := db.AutoMigrate(
 		&domain.User{},
 		&domain.Role{},
+		&domain.UserRole{},
 		&domain.Unit{},
 		&domain.Student{},
 		&domain.Parent{},
@@ -53,6 +54,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&domain.Attendance{},
 		&domain.StaffAttendance{},
 		&domain.StudentLeaveRequest{},
+		&domain.StaffLeaveRequest{},
 		&domain.Violation{},
 		&domain.StudentViolation{},
 		&domain.BKCall{},
@@ -132,6 +134,13 @@ func AutoMigrate(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+
+	// Backfill existing user roles into user_roles table
+	_ = db.Exec(`
+		INSERT INTO user_roles (user_id, role_id, created_at)
+		SELECT id, role_id, NOW() FROM users
+		ON CONFLICT (user_id, role_id) DO NOTHING;
+	`).Error
 
 	// Ensure foreign key cascading delete on payments and bill_items referencing bills
 	_ = db.Exec(`

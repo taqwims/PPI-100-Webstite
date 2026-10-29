@@ -28,6 +28,7 @@ func (r *StudentLeaveRepository) GetByID(id uuid.UUID) (*domain.StudentLeaveRequ
 		Preload("Student.Parent.User").
 		Preload("ApplicantUser").
 		Preload("ApproverTeacher.User").
+		Preload("ApproverUser").
 		First(&leave, "id = ?", id).Error
 	if err != nil {
 		return nil, err
@@ -41,6 +42,7 @@ func (r *StudentLeaveRepository) GetByStudentID(studentID uuid.UUID) ([]domain.S
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("ApproverTeacher.User").
+		Preload("ApproverUser").
 		Where("student_id = ?", studentID).
 		Order("created_at DESC").
 		Find(&leaves).Error
@@ -56,6 +58,7 @@ func (r *StudentLeaveRepository) GetByStudentIDs(studentIDs []uuid.UUID) ([]doma
 		Preload("Student.User").
 		Preload("Student.Class").
 		Preload("ApproverTeacher.User").
+		Preload("ApproverUser").
 		Where("student_id IN ?", studentIDs).
 		Order("created_at DESC").
 		Find(&leaves).Error
@@ -84,9 +87,36 @@ func (r *StudentLeaveRepository) GetByHomeroomTeacherID(teacherID uuid.UUID, sta
 		Preload("Student.Parent.User").
 		Preload("ApplicantUser").
 		Preload("ApproverTeacher.User").
+		Preload("ApproverUser").
 		Joins("JOIN students ON students.id = student_leave_requests.student_id").
 		Where("students.class_id IN ?", classIDs)
 
+	if status != "" && status != "all" {
+		query = query.Where("student_leave_requests.status = ?", status)
+	}
+
+	var leaves []domain.StudentLeaveRequest
+	err := query.Order("student_leave_requests.created_at DESC").Find(&leaves).Error
+	return leaves, err
+}
+
+// GetAll mengambil semua pengajuan izin siswa untuk admin & pimpinan lintas kelas
+func (r *StudentLeaveRepository) GetAll(unitID uint, classID *uint, status string) ([]domain.StudentLeaveRequest, error) {
+	query := r.db.
+		Preload("Student.User").
+		Preload("Student.Class").
+		Preload("Student.Parent.User").
+		Preload("ApplicantUser").
+		Preload("ApproverTeacher.User").
+		Preload("ApproverUser").
+		Joins("JOIN students ON students.id = student_leave_requests.student_id")
+
+	if unitID > 0 {
+		query = query.Where("students.unit_id = ?", unitID)
+	}
+	if classID != nil && *classID > 0 {
+		query = query.Where("students.class_id = ?", *classID)
+	}
 	if status != "" && status != "all" {
 		query = query.Where("student_leave_requests.status = ?", status)
 	}

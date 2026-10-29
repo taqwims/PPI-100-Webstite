@@ -62,6 +62,7 @@ type CreateUserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	RoleID   uint   `json:"role_id" binding:"required"`
+	RoleIDs  []uint `json:"role_ids"`
 	UnitID   uint   `json:"unit_id" binding:"required"`
 }
 
@@ -72,7 +73,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.userUsecase.CreateUser(req.Name, req.Email, req.Password, req.RoleID, req.UnitID); err != nil {
+	if err := h.userUsecase.CreateUser(req.Name, req.Email, req.Password, req.RoleID, req.UnitID, req.RoleIDs...); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -94,6 +95,7 @@ type UpdateUserRequest struct {
 	Email    string `json:"email" binding:"email"`
 	Password string `json:"password"`
 	RoleID   uint   `json:"role_id"`
+	RoleIDs  []uint `json:"role_ids"`
 	UnitID   uint   `json:"unit_id"`
 }
 
@@ -111,16 +113,21 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
+	primaryRoleID := req.RoleID
+	if primaryRoleID == 0 && len(req.RoleIDs) > 0 {
+		primaryRoleID = req.RoleIDs[0]
+	}
+
 	user := &domain.User{
 		ID:           userUUID,
 		Name:         req.Name,
 		Email:        req.Email,
 		PasswordHash: req.Password, // Usecase will handle hashing if not empty
-		RoleID:       req.RoleID,
+		RoleID:       primaryRoleID,
 		UnitID:       req.UnitID,
 	}
 
-	if err := h.userUsecase.UpdateUser(user, req.Password); err != nil {
+	if err := h.userUsecase.UpdateUser(user, req.Password, req.RoleIDs); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

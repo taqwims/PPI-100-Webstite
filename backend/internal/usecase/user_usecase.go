@@ -35,7 +35,7 @@ func (u *UserUsecase) CountUsers() (int64, error) {
 	return u.userRepo.CountUsers()
 }
 
-func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID uint) error {
+func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID uint, optionalRoleIDs ...uint) error {
 	hashedPassword, err := utils.HashPassword(password)
 	if err != nil {
 		return err
@@ -62,8 +62,44 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 		return err
 	}
 
+	// Compile roleIDs
+	roleIDs := []uint{}
+	if roleID > 0 {
+		roleIDs = append(roleIDs, roleID)
+	}
+	for _, rid := range optionalRoleIDs {
+		if rid > 0 {
+			already := false
+			for _, existingRid := range roleIDs {
+				if existingRid == rid {
+					already = true
+					break
+				}
+			}
+			if !already {
+				roleIDs = append(roleIDs, rid)
+			}
+		}
+	}
+	if len(roleIDs) == 0 {
+		roleIDs = []uint{roleID}
+	}
+
+	_ = u.userRepo.SetUserRoles(user.ID, roleIDs)
+
+	hasParent := false
+	hasTeacher := false
+	for _, rid := range roleIDs {
+		if rid == parentRoleID {
+			hasParent = true
+		}
+		if rid == 4 || rid == 5 {
+			hasTeacher = true
+		}
+	}
+
 	// Auto-create Parent record when role is Orang Tua (7)
-	if roleID == parentRoleID {
+	if hasParent {
 		parent := &domain.Parent{
 			UserID: user.ID,
 		}
@@ -75,7 +111,7 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 	}
 
 	// Auto-create Teacher record when role is Guru (4) or Wali Kelas (5)
-	if roleID == 4 || roleID == 5 {
+	if hasTeacher {
 		teacher := &domain.Teacher{
 			UserID: user.ID,
 			UnitID: unitID,
@@ -91,7 +127,7 @@ func (u *UserUsecase) CreateUser(name, email, password string, roleID, unitID ui
 	return nil
 }
 
-func (u *UserUsecase) UpdateUser(user *domain.User, newPassword string) error {
+func (u *UserUsecase) UpdateUser(user *domain.User, newPassword string, optionalRoleIDs ...[]uint) error {
 	if newPassword != "" {
 		hashedPassword, err := utils.HashPassword(newPassword)
 		if err != nil {
@@ -106,7 +142,66 @@ func (u *UserUsecase) UpdateUser(user *domain.User, newPassword string) error {
 		}
 		user.PasswordHash = existingUser.PasswordHash
 	}
-	return u.userRepo.Update(user)
+
+	if err := u.userRepo.Update(user); err != nil {
+		return err
+	}
+
+	// Process multi-role sync if provided
+	if len(optionalRoleIDs) > 0 && len(optionalRoleIDs[0]) > 0 {
+		roleIDs := optionalRoleIDs[0]
+		// Ensure user.RoleID is present
+		hasPrimary := false
+		for _, rid := range roleIDs {
+			if rid == user.RoleID {
+				hasPrimary = true
+				break
+			}
+		}
+		if !hasPrimary && user.RoleID > 0 {
+			roleIDs = append([]uint{user.RoleID}, roleIDs...)
+		}
+
+		if err := u.userRepo.SetUserRoles(user.ID, roleIDs); err != nil {
+			return err
+		}
+
+		// Auto-sync relations:
+		hasTeacher := false
+		hasParent := false
+		for _, rid := range roleIDs {
+			if rid == 4 || rid == 5 {
+				hasTeacher = true
+			}
+			if rid == parentRoleID {
+				hasParent = true
+			}
+		}
+
+		if hasTeacher {
+			existingTeacher, _ := u.teacherRepo.FindByUserID(user.ID.String())
+			if existingTeacher == nil {
+				teacher := &domain.Teacher{
+					UserID: user.ID,
+					UnitID: user.UnitID,
+					NIP:    fmt.Sprintf("NIP-%d", time.Now().UnixNano()),
+				}
+				_ = u.teacherRepo.Create(teacher)
+			}
+		}
+
+		if hasParent {
+			existingParent, _ := u.parentRepo.FindByUserID(user.ID.String())
+			if existingParent == nil {
+				parent := &domain.Parent{
+					UserID: user.ID,
+				}
+				_ = u.parentRepo.Create(parent)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (u *UserUsecase) ChangePassword(userID string, oldPassword, newPassword string) error {
@@ -131,21 +226,25 @@ func (u *UserUsecase) ChangePassword(userID string, oldPassword, newPassword str
 func (u *UserUsecase) DeleteUser(id string) error {
 	// Check if user is a parent — clean up Parent record & unlink children
 	user, err := u.userRepo.FindByID(id)
-	if err == nil && user.RoleID == parentRoleID && user.Parent != nil {
-		parentID := user.Parent.ID.String()
-		// Unlink children
-		children, err := u.studentRepo.GetByParent(parentID)
-		if err == nil {
-			for _, child := range children {
-				child.ParentID = nil
-				u.studentRepo.Update(&child)
+	if err == nil {
+		if (user.RoleID == parentRoleID || user.HasRole(parentRoleID)) && user.Parent != nil {
+			parentID := user.Parent.ID.String()
+			// Unlink children
+			children, err := u.studentRepo.GetByParent(parentID)
+			if err == nil {
+				for _, child := range children {
+					child.ParentID = nil
+					u.studentRepo.Update(&child)
+				}
 			}
+			u.parentRepo.Delete(parentID)
 		}
-		u.parentRepo.Delete(parentID)
-	} else if err == nil && (user.RoleID == 4 || user.RoleID == 5) {
-		u.teacherRepo.DeleteByUserID(id)
-	} else if err == nil && user.RoleID == studentRoleID {
-		u.studentRepo.DeleteByUserID(id)
+		if user.RoleID == 4 || user.RoleID == 5 || user.HasRole(4) || user.HasRole(5) {
+			u.teacherRepo.DeleteByUserID(id)
+		}
+		if user.RoleID == studentRoleID || user.HasRole(studentRoleID) {
+			u.studentRepo.DeleteByUserID(id)
+		}
 	}
 	return u.userRepo.Delete(id)
 }

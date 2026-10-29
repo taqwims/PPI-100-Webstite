@@ -3,8 +3,10 @@ import api from '../../services/api';
 import { 
     Users, GraduationCap, CheckCircle, Wallet, 
     PieChart, Calendar, Layers, Printer, ChevronRight, Activity, Award, BarChart3, 
-    RefreshCw, Eye, Sparkles, X
+    RefreshCw, Eye, Sparkles, X, ShieldCheck
 } from 'lucide-react';
+import AttendanceDailyPersonnelStatus from '../admin/AttendanceDailyPersonnelStatus';
+import StaffLeaveApprovals from '../admin/StaffLeaveApprovals';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
     CartesianGrid, PieChart as RePieChart, Pie, Cell, Legend 
@@ -163,7 +165,7 @@ const PrincipalDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [academicYearName, setAcademicYearName] = useState<string>('Tahun Ajaran Aktif');
     const [selectedClass, setSelectedClass] = useState<ClassSummary | null>(null);
-    const [activeTab, setActiveTab] = useState<'classes' | 'savings' | 'finance'>('classes');
+    const [activeTab, setActiveTab] = useState<'classes' | 'savings' | 'finance' | 'attendance' | 'staff_leave'>('classes');
 
     const fetchDashboardStats = async () => {
         setLoading(true);
@@ -597,6 +599,30 @@ const PrincipalDashboard: React.FC = () => {
                         <PieChart size={16} />
                         <span>Analisis Arus Kas & RKAS</span>
                     </button>
+
+                    <button
+                        onClick={() => setActiveTab('attendance')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+                            activeTab === 'attendance' 
+                                ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80' 
+                                : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        <Calendar size={16} />
+                        <span>Kehadiran Hari Ini & Izin</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab('staff_leave')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+                            activeTab === 'staff_leave' 
+                                ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80' 
+                                : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        <ShieldCheck size={16} />
+                        <span>Persetujuan Izin Guru</span>
+                    </button>
                 </div>
 
                 <div className="p-6">
@@ -957,6 +983,14 @@ const PrincipalDashboard: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'attendance' && (
+                        <AttendanceDailyPersonnelStatus isEmbedded />
+                    )}
+
+                    {activeTab === 'staff_leave' && (
+                        <StaffLeaveApprovals isEmbedded />
                     )}
                 </div>
             </div>

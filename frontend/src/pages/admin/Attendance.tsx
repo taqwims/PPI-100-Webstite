@@ -5,7 +5,8 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import {
     CheckCircle, XCircle, Calendar, Users, Clock, AlertCircle, Coffee,
-    Radio, Search, RefreshCw, Camera, UserPlus, FileSpreadsheet, Trophy
+    Radio, Search, RefreshCw, Camera, UserPlus, FileSpreadsheet, Trophy,
+    Briefcase
 } from 'lucide-react';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import { TableGlass, TableHeaderGlass, TableBodyGlass, TableRowGlass, TableHeadGlass, TableCellGlass } from '../../components/ui/glass/TableGlass';
@@ -16,6 +17,8 @@ import AttendanceRFID from './AttendanceRFID';
 import { FaceEnrollmentModal } from '../../components/admin/FaceEnrollmentModal';
 import AttendanceExportPanel from './AttendanceExportPanel';
 import AttendanceAnalyticsLeaderboard from './AttendanceAnalyticsLeaderboard';
+import AttendanceDailyPersonnelStatus from './AttendanceDailyPersonnelStatus';
+import StaffLeaveApprovals from './StaffLeaveApprovals';
 import { stopAllCameraStreams } from '../../utils/cameraGuard';
 
 interface Student {
@@ -81,8 +84,8 @@ const AttendancePage: React.FC = () => {
     const isRFIDEnabled = useFeatureStore((s) => s.isRFIDEnabled());
     const isFaceEnabled = useFeatureStore((s) => s.isFaceEnabled());
     const tabFromUrl = searchParams.get('tab');
-    const initialTab = tabFromUrl === 'export' ? 'export' : tabFromUrl === 'analytics' ? 'analytics' : (isRFIDEnabled ? 'scanner' : 'daily');
-    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule' | 'export' | 'analytics'>(initialTab);
+    const initialTab = tabFromUrl === 'export' ? 'export' : tabFromUrl === 'analytics' ? 'analytics' : tabFromUrl === 'monitoring' ? 'monitoring' : tabFromUrl === 'staff_leave' ? 'staff_leave' : (isRFIDEnabled ? 'scanner' : 'daily');
+    const [activeTab, setActiveTab] = useState<'scanner' | 'daily' | 'schedule' | 'export' | 'analytics' | 'monitoring' | 'staff_leave'>(initialTab);
     const [showFaceEnrollModal, setShowFaceEnrollModal] = useState(false);
 
     useEffect(() => {
@@ -91,6 +94,10 @@ const AttendancePage: React.FC = () => {
             setActiveTab('export');
         } else if (tabParam === 'analytics') {
             setActiveTab('analytics');
+        } else if (tabParam === 'monitoring') {
+            setActiveTab('monitoring');
+        } else if (tabParam === 'staff_leave') {
+            setActiveTab('staff_leave');
         }
     }, [searchParams]);
 
@@ -275,6 +282,28 @@ const AttendancePage: React.FC = () => {
                         }`}
                     >
                         <Trophy size={16} /> Leaderboard & Analitik
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('monitoring')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                            activeTab === 'monitoring'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <Users size={16} /> Status Harian & Izin
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('staff_leave')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                            activeTab === 'staff_leave'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                    >
+                        <Briefcase size={16} /> Izin Guru & Dinas
                     </button>
                 </div>
 
@@ -573,6 +602,16 @@ const AttendancePage: React.FC = () => {
             {/* TAB 5: Leaderboard & Analitik Presensi */}
             {activeTab === 'analytics' && (
                 <AttendanceAnalyticsLeaderboard />
+            )}
+
+            {/* TAB 6: Monitoring Kehadiran Harian Personil & Izin */}
+            {activeTab === 'monitoring' && (
+                <AttendanceDailyPersonnelStatus isEmbedded />
+            )}
+
+            {/* TAB 7: Persetujuan Izin Guru & Staf */}
+            {activeTab === 'staff_leave' && (
+                <StaffLeaveApprovals isEmbedded />
             )}
 
             {/* Modal Pendaftaran Wajah */}

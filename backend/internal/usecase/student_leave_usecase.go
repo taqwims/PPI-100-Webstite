@@ -159,10 +159,15 @@ func (u *StudentLeaveUsecase) GetHomeroomLeaveRequests(teacherUserID uuid.UUID, 
 	return u.leaveRepo.GetByHomeroomTeacherID(teacher.ID, status)
 }
 
-// ApproveLeaveRequest memproses keputusan persetujuan/penolakan oleh wali kelas
+// GetAllStudentLeaveRequests mengambil semua pengajuan izin siswa lintas kelas (Admin & Pimpinan)
+func (u *StudentLeaveUsecase) GetAllStudentLeaveRequests(unitID uint, classID *uint, status string) ([]domain.StudentLeaveRequest, error) {
+	return u.leaveRepo.GetAll(unitID, classID, status)
+}
+
+// ApproveLeaveRequest memproses keputusan persetujuan/penolakan oleh wali kelas atau admin/pimpinan
 func (u *StudentLeaveUsecase) ApproveLeaveRequest(
 	leaveID uuid.UUID,
-	teacherUserID uuid.UUID,
+	approverUserID uuid.UUID,
 	action string, // "Approved" atau "Rejected"
 	approvedDays int,
 	approvedStartDateStr string,
@@ -178,28 +183,32 @@ func (u *StudentLeaveUsecase) ApproveLeaveRequest(
 		return nil, fmt.Errorf("pengajuan ini sudah berstatus '%s'", leave.Status)
 	}
 
-	// Cari data guru yang melakukan approval
-	var teacher domain.Teacher
-	if err := u.db.Preload("User").Where("user_id = ?", teacherUserID).First(&teacher).Error; err != nil {
-		return nil, errors.New("guru tidak ditemukan")
+	// Cari data pengguna yang melakukan approval
+	var approverUser domain.User
+	if err := u.db.First(&approverUser, "id = ?", approverUserID).Error; err != nil {
+		return nil, errors.New("pengguna penyetujui tidak ditemukan")
 	}
 
-	// Validasi wali kelas (pastikan guru ini adalah wali kelas siswa tersebut, atau role admin)
-	// Cari user untuk cek role
-	var approverUser domain.User
-	if err := u.db.First(&approverUser, "id = ?", teacherUserID).Error; err == nil {
-		isAdmin := approverUser.RoleID <= 3
-		isHomeroom := leave.Student.Class.HomeroomTeacherID != nil && *leave.Student.Class.HomeroomTeacherID == teacher.ID
+	// Cek apakah user adalah guru
+	var teacher domain.Teacher
+	hasTeacher := u.db.Preload("User").Where("user_id = ?", approverUserID).First(&teacher).Error == nil
 
-		if !isAdmin && !isHomeroom {
-			return nil, errors.New("hanya wali kelas yang berhak memberikan persetujuan izin untuk siswa ini")
-		}
+	isAdminOrPrincipal := approverUser.RoleID <= 3 || approverUser.RoleID == 8
+	isHomeroom := hasTeacher && leave.Student.Class.HomeroomTeacherID != nil && *leave.Student.Class.HomeroomTeacherID == teacher.ID
+
+	if !isAdminOrPrincipal && !isHomeroom {
+		return nil, errors.New("hanya wali kelas atau admin/pimpinan yang berhak memberikan persetujuan izin untuk siswa ini")
 	}
 
 	now := time.Now()
 	typeIndo := "Izin"
 	if leave.Type == "Sick" {
 		typeIndo = "Sakit"
+	}
+
+	approverRoleTitle := "Wali Kelas"
+	if isAdminOrPrincipal && !isHomeroom {
+		approverRoleTitle = "Admin/Pimpinan"
 	}
 
 	if action == "Approved" {
@@ -230,7 +239,10 @@ func (u *StudentLeaveUsecase) ApproveLeaveRequest(
 		leave.ApprovedDays = approvedDays
 		leave.ApprovedStartDate = &appStart
 		leave.ApprovedEndDate = &appEnd
-		leave.ApproverTeacherID = &teacher.ID
+		if hasTeacher {
+			leave.ApproverTeacherID = &teacher.ID
+		}
+		leave.ApproverUserID = &approverUser.ID
 		leave.ApprovalNotes = approvalNotes
 		leave.ApprovedAt = &now
 
@@ -239,14 +251,14 @@ func (u *StudentLeaveUsecase) ApproveLeaveRequest(
 		}
 
 		// Sinkronisasi otomatis ke tabel Presensi Siswa (attendances)
-		noteText := fmt.Sprintf("%s Disetujui Wali Kelas (%s): %s", typeIndo, teacher.User.Name, leave.Reason)
+		noteText := fmt.Sprintf("%s Disetujui %s (%s): %s", typeIndo, approverRoleTitle, approverUser.Name, leave.Reason)
 		_ = u.leaveRepo.RecordAttendanceForLeave(leave.StudentID, appStart, appEnd, leave.Type, noteText)
 
 		// Kirim Notifikasi ke Siswa
 		_ = u.notificationRepo.Create(&domain.Notification{
 			UserID:      leave.Student.UserID,
 			Title:       fmt.Sprintf("Pengajuan %s Disetujui", typeIndo),
-			Message:     fmt.Sprintf("Pengajuan %s Anda telah disetujui selama %d hari (%s s/d %s) oleh Wali Kelas (%s). Catatan: %s", typeIndo, approvedDays, appStart.Format("02 Jan 2006"), appEnd.Format("02 Jan 2006"), teacher.User.Name, approvalNotes),
+			Message:     fmt.Sprintf("Pengajuan %s Anda telah disetujui selama %d hari (%s s/d %s) oleh %s (%s). Catatan: %s", typeIndo, approvedDays, appStart.Format("02 Jan 2006"), appEnd.Format("02 Jan 2006"), approverRoleTitle, approverUser.Name, approvalNotes),
 			Type:        "LeaveApproval",
 			ReferenceID: leave.ID.String(),
 			IsRead:      false,

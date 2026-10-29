@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import CardGlass from '../../components/ui/glass/CardGlass';
 import {
     CheckCircle, Clock, XCircle,
@@ -41,12 +42,25 @@ interface LeaveRequestItem {
 }
 
 export const HomeroomLeaveApprovals: React.FC = () => {
+    const { user } = useAuth();
     const queryClient = useQueryClient();
 
+    const isAdminOrPrincipal = !!user && (user.role_id <= 3 || user.role_id === 8);
+    const [selectedClassId, setSelectedClassId] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<'all' | 'Pending' | 'Approved' | 'Rejected'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedLeave, setSelectedLeave] = useState<LeaveRequestItem | null>(null);
     const [previewModalUrl, setPreviewModalUrl] = useState<string | null>(null);
+
+    // Fetch classes for Admin/Principal
+    const { data: classes } = useQuery<any[]>({
+        queryKey: ['classes-list'],
+        queryFn: async () => {
+            const res = await api.get('/classes');
+            return res.data || [];
+        },
+        enabled: isAdminOrPrincipal
+    });
 
     // Approval Decision Modal State
     const [decisionModalOpen, setDecisionModalOpen] = useState(false);
@@ -56,11 +70,14 @@ export const HomeroomLeaveApprovals: React.FC = () => {
     const [approvalNotes, setApprovalNotes] = useState<string>('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Fetch Homeroom Leave Requests
+    // Fetch Leave Requests (All for Admin/Principal, Homeroom for teacher)
     const { data: leaves, isLoading, refetch } = useQuery<LeaveRequestItem[]>({
-        queryKey: ['homeroom-leave-requests'],
+        queryKey: ['student-leave-requests', isAdminOrPrincipal, selectedClassId],
         queryFn: async () => {
-            const res = await api.get('/academic/leave-requests/homeroom');
+            const url = isAdminOrPrincipal
+                ? `/academic/leave-requests/all${selectedClassId !== 'all' ? `?class_id=${selectedClassId}` : ''}`
+                : '/academic/leave-requests/homeroom';
+            const res = await api.get(url);
             return res.data || [];
         }
     });
@@ -113,7 +130,8 @@ export const HomeroomLeaveApprovals: React.FC = () => {
 
             setDecisionModalOpen(false);
             setSelectedLeave(null);
-            queryClient.invalidateQueries({ queryKey: ['homeroom-leave-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['student-leave-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['executive-daily-personnel-status'] });
         } catch (err: any) {
             console.error('Error approving leave:', err);
             toast.error(err.response?.data?.error || 'Gagal memproses persetujuan izin');
@@ -144,7 +162,7 @@ export const HomeroomLeaveApprovals: React.FC = () => {
                 <div>
                     <div className="flex items-center gap-2 mb-2">
                         <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-semibold uppercase tracking-wider">
-                            Pusat Persetujuan Wali Kelas
+                            {isAdminOrPrincipal ? 'Panel Administrator & Pimpinan' : 'Pusat Persetujuan Wali Kelas'}
                         </span>
                         {pendingCount > 0 && (
                             <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-900 text-xs font-bold animate-pulse">
@@ -153,10 +171,12 @@ export const HomeroomLeaveApprovals: React.FC = () => {
                         )}
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                        Persetujuan Izin & Sakit Siswa
+                        {isAdminOrPrincipal ? 'Persetujuan & Monitoring Izin Seluruh Siswa' : 'Persetujuan Izin & Sakit Siswa'}
                     </h1>
                     <p className="text-emerald-100 text-xs sm:text-sm mt-1 max-w-xl">
-                        Tinjau permohonan ketidakhadiran siswa di kelas perwalian Anda. Tentukan jumlah hari yang disetujui, dan sistem akan langsung memperbarui buku presensi harian secara otomatis.
+                        {isAdminOrPrincipal
+                            ? 'Pantau dan berikan persetujuan dispensasi/izin siswa lintas kelas secara terpusat. Sistem akan otomatis memperbarui buku presensi harian.'
+                            : 'Tinjau permohonan ketidakhadiran siswa di kelas perwalian Anda. Tentukan jumlah hari yang disetujui, dan sistem akan langsung memperbarui buku presensi harian secara otomatis.'}
                     </p>
                 </div>
 
@@ -242,15 +262,34 @@ export const HomeroomLeaveApprovals: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="relative w-full md:w-72">
-                    <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Cari siswa, NISN, alasan..."
-                        className="w-full pl-9 pr-3.5 py-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+                    {isAdminOrPrincipal && classes && classes.length > 0 && (
+                        <div className="w-full sm:w-48">
+                            <select
+                                value={selectedClassId}
+                                onChange={(e) => setSelectedClassId(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                                <option value="all">Semua Kelas</option>
+                                {classes.map((c: any) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="relative w-full sm:w-64">
+                        <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari siswa, NISN, alasan..."
+                            className="w-full pl-9 pr-3.5 py-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
                 </div>
             </CardGlass>
 

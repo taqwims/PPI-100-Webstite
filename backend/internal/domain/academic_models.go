@@ -166,12 +166,82 @@ type StudentLeaveRequest struct {
 	ApprovedEndDate    *time.Time     `gorm:"type:date" json:"approved_end_date"`
 	ApproverTeacherID  *uuid.UUID     `gorm:"type:uuid" json:"approver_teacher_id"`
 	ApproverTeacher    *Teacher       `gorm:"foreignKey:ApproverTeacherID" json:"approver_teacher,omitempty"`
+	ApproverUserID     *uuid.UUID     `gorm:"type:uuid;index" json:"approver_user_id"`
+	ApproverUser       *User          `gorm:"foreignKey:ApproverUserID" json:"approver_user,omitempty"`
 	ApprovalNotes      string         `json:"approval_notes"`
 	ApprovedAt         *time.Time     `json:"approved_at"`
 
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// StaffLeaveRequest (Portal Pengajuan Izin / Sakit / Tugas Luar Sekolah / Dispensasi Guru & Tenaga Kependidikan)
+type StaffLeaveRequest struct {
+	ID                 uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID             uuid.UUID      `gorm:"type:uuid;not null;index" json:"user_id"`
+	User               User           `gorm:"foreignKey:UserID" json:"user"`
+	UnitID             uint           `gorm:"not null;index" json:"unit_id"`
+	Type               string         `gorm:"not null;index" json:"type"` // "Duty" (Tugas Luar/Dinas), "Sick" (Sakit), "Permission" (Izin), "Dispensation" (Dispensasi), "Leave" (Cuti)
+	StartDate          time.Time      `gorm:"type:date;not null;index" json:"start_date"`
+	EndDate            time.Time      `gorm:"type:date;not null;index" json:"end_date"`
+	TotalDaysRequested int            `gorm:"not null" json:"total_days_requested"`
+	Reason             string         `gorm:"type:text;not null" json:"reason"`
+	AttachmentURL      string         `json:"attachment_url"` // Surat tugas dinas / surat keterangan dokter
+
+	// Status & Keputusan Pimpinan / Admin
+	Status             string         `gorm:"not null;default:'Pending';index" json:"status"` // "Pending", "Approved", "Rejected"
+	ApprovedDays       int            `gorm:"default:0" json:"approved_days"`
+	ApprovedStartDate  *time.Time     `gorm:"type:date" json:"approved_start_date"`
+	ApprovedEndDate    *time.Time     `gorm:"type:date" json:"approved_end_date"`
+	ApproverUserID     *uuid.UUID     `gorm:"type:uuid;index" json:"approver_user_id"`
+	ApproverUser       *User          `gorm:"foreignKey:ApproverUserID" json:"approver_user,omitempty"`
+	ApprovalNotes      string         `json:"approval_notes"`
+	ApprovedAt         *time.Time     `json:"approved_at"`
+
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// ------------------- Executive Attendance & Personnel Status Models -------------------
+type PersonnelDailyStatusItem struct {
+	ID            string  `json:"id"`
+	UserID        string  `json:"user_id"`
+	Name          string  `json:"name"`
+	Role          string  `json:"role"`       // "Student", "Teacher", "Staff"
+	RoleTitle     string  `json:"role_title"` // e.g. "Kelas 8A", "Guru Matematika / Wali Kelas"
+	UnitID        uint    `json:"unit_id"`
+	UnitName      string  `json:"unit_name"`
+	Status        string  `json:"status"`     // "Present", "Late", "Duty", "Sick", "Permission", "Absent"
+	CheckInTime   *string `json:"check_in_time"`
+	LateMinutes   int     `json:"late_minutes"`
+	PenaltyAmount float64 `json:"penalty_amount"`
+	Reason        string  `json:"reason"`
+	AttachmentURL string  `json:"attachment_url"`
+	ApprovedBy    string  `json:"approved_by"`
+	LeaveType     string  `json:"leave_type"`
+}
+
+type PersonnelCategorySummary struct {
+	Total      int `json:"total"`
+	Present    int `json:"present"`
+	Late       int `json:"late"`
+	Duty       int `json:"duty"`
+	Sick       int `json:"sick"`
+	Permission int `json:"permission"`
+	Absent     int `json:"absent"`
+}
+
+type DailyPersonnelStatusSummary struct {
+	Students PersonnelCategorySummary `json:"students"`
+	Staff    PersonnelCategorySummary `json:"staff"`
+}
+
+type DailyPersonnelStatusResponse struct {
+	Date      string                       `json:"date"`
+	Summary   DailyPersonnelStatusSummary  `json:"summary"`
+	Personnel []PersonnelDailyStatusItem   `json:"personnel"`
 }
 
 // ------------------- Attendance Analytics & Leaderboard Models -------------------
