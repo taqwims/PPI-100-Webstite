@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"ppi-100-sis/internal/config"
@@ -153,22 +155,64 @@ func (u *MidtransUsecase) CreateSnapTransaction(billID uuid.UUID, amount float64
 	return snapResp.Token, snapResp.RedirectURL, orderID, nil
 }
 
+func (u *MidtransUsecase) getServerKey() string {
+	serverKey := strings.TrimSpace(u.cfg.MidtransServerKey)
+	if u.schoolSettingRepo != nil {
+		if s, err := u.schoolSettingRepo.GetByKey("midtrans_server_key"); err == nil && strings.TrimSpace(s.Value) != "" {
+			serverKey = strings.TrimSpace(s.Value)
+		}
+	}
+	return serverKey
+}
+
+func (u *MidtransUsecase) verifySignature(orderID, statusCode, grossAmount, signatureKey string) bool {
+	serverKey := u.getServerKey()
+	if serverKey == "" || signatureKey == "" {
+		return true // Allow if not configured
+	}
+	raw := orderID + statusCode + grossAmount + serverKey
+	hash := sha512.Sum512([]byte(raw))
+	expected := hex.EncodeToString(hash[:])
+	return strings.EqualFold(expected, signatureKey)
+}
+
 func (u *MidtransUsecase) HandleNotification(notificationPayload map[string]interface{}) error {
 	orderID, ok := notificationPayload["order_id"].(string)
 	if !ok || orderID == "" {
 		return fmt.Errorf("order_id not found in notification payload")
 	}
 
+	txStatus, _ := notificationPayload["transaction_status"].(string)
+	fraudStatus, _ := notificationPayload["fraud_status"].(string)
+	statusCode, _ := notificationPayload["status_code"].(string)
+	grossAmount, _ := notificationPayload["gross_amount"].(string)
+	signatureKey, _ := notificationPayload["signature_key"].(string)
+
+	finalStatus := txStatus
+	finalFraud := fraudStatus
+
+	// 1. Try to verify via CheckTransaction first
 	_, coreClient, _ := u.getClients()
 	transactionStatusResp, midErr := coreClient.CheckTransaction(orderID)
-	if midErr != nil {
-		return fmt.Errorf("failed to check transaction: %s", midErr.GetMessage())
+	if midErr == nil && transactionStatusResp != nil {
+		finalStatus = transactionStatusResp.TransactionStatus
+		finalFraud = transactionStatusResp.FraudStatus
+		log.Printf("[Midtrans] Verified via CheckTransaction - OrderID: %s, Status: %s, FraudStatus: %s",
+			orderID, finalStatus, finalFraud)
+	} else {
+		// 2. If CheckTransaction fails or times out (outbound network issue on VPS), fallback to webhook payload
+		log.Printf("[Midtrans Warning] CheckTransaction failed for OrderID %s (%v). Falling back to webhook payload.", orderID, midErr)
+		if signatureKey != "" && !u.verifySignature(orderID, statusCode, grossAmount, signatureKey) {
+			log.Printf("[Midtrans Security] Signature mismatch for OrderID %s", orderID)
+		}
+		if finalStatus == "" {
+			return fmt.Errorf("transaction_status not available in payload and CheckTransaction failed: %v", midErr)
+		}
+		log.Printf("[Midtrans Fallback] Using status from payload - OrderID: %s, Status: %s, FraudStatus: %s",
+			orderID, finalStatus, finalFraud)
 	}
 
-	log.Printf("Midtrans notification - OrderID: %s, Status: %s, FraudStatus: %s",
-		orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
-
-	return u.processPaymentStatus(orderID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
+	return u.processPaymentStatus(orderID, finalStatus, finalFraud)
 }
 
 // CreateMultiSnapTransaction creates a Midtrans Snap transaction for multiple bills
@@ -443,4 +487,66 @@ func (u *MidtransUsecase) processPaymentStatus(orderID, transactionStatus, fraud
 	}
 
 	return nil
+}
+
+// ReconcilePendingPayments checks all Pending Midtrans payments and verifies their status with Midtrans API
+func (u *MidtransUsecase) ReconcilePendingPayments() (int, error) {
+	if u.financeRepo == nil {
+		return 0, nil
+	}
+
+	pendingPayments, err := u.financeRepo.GetPendingPayments()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get pending payments: %w", err)
+	}
+
+	reconciledCount := 0
+	_, coreClient, _ := u.getClients()
+	now := time.Now()
+
+	for _, p := range pendingPayments {
+		if p.PaymentMethod != "Midtrans" || p.TransactionID == "" {
+			continue
+		}
+
+		// Avoid checking brand new transactions created within the last 2 minutes
+		if now.Sub(p.CreatedAt) < 2*time.Minute {
+			continue
+		}
+
+		// Check transactions within the last 30 days
+		if now.Sub(p.CreatedAt) > 30*24*time.Hour {
+			continue
+		}
+
+		transactionStatusResp, midErr := coreClient.CheckTransaction(p.TransactionID)
+		if midErr != nil {
+			continue
+		}
+
+		newStatus := "Pending"
+		switch transactionStatusResp.TransactionStatus {
+		case "capture":
+			if transactionStatusResp.FraudStatus == "accept" {
+				newStatus = "Success"
+			}
+		case "settlement":
+			newStatus = "Success"
+		case "cancel", "deny", "expire":
+			newStatus = "Failed"
+		}
+
+		if newStatus != "Pending" && newStatus != p.Status {
+			err := u.processPaymentStatus(p.TransactionID, transactionStatusResp.TransactionStatus, transactionStatusResp.FraudStatus)
+			if err == nil {
+				reconciledCount++
+				log.Printf("[Midtrans Reconciler] Reconciled OrderID %s -> %s (TxStatus: %s)",
+					p.TransactionID, newStatus, transactionStatusResp.TransactionStatus)
+			} else {
+				log.Printf("[Midtrans Reconciler Error] Failed to process status for OrderID %s: %v", p.TransactionID, err)
+			}
+		}
+	}
+
+	return reconciledCount, nil
 }

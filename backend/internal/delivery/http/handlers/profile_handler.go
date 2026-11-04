@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"ppi-100-sis/internal/usecase"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -92,22 +93,39 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Update fields
+	// Update fields - preserve existing values if not provided
 	user.ID = uuid
-	user.Name = req.Name
-	user.Email = req.Email
-	user.Phone = req.Phone
-	user.Address = req.Address
-	user.BankName = req.BankName
-	user.BankAccountNumber = req.BankAccountNumber
-	user.BankAccountHolder = req.BankAccountHolder
+	if strings.TrimSpace(req.Name) != "" {
+		user.Name = strings.TrimSpace(req.Name)
+	}
+	if strings.TrimSpace(req.Email) != "" {
+		user.Email = strings.TrimSpace(req.Email)
+	}
+	if strings.TrimSpace(req.Phone) != "" {
+		user.Phone = strings.TrimSpace(req.Phone)
+	}
+	if strings.TrimSpace(req.Address) != "" {
+		user.Address = strings.TrimSpace(req.Address)
+	}
+	if strings.TrimSpace(req.BankName) != "" {
+		user.BankName = strings.TrimSpace(req.BankName)
+	}
+	if strings.TrimSpace(req.BankAccountNumber) != "" {
+		user.BankAccountNumber = strings.TrimSpace(req.BankAccountNumber)
+	}
+	if strings.TrimSpace(req.BankAccountHolder) != "" {
+		user.BankAccountHolder = strings.TrimSpace(req.BankAccountHolder)
+	}
 
 	if err := h.userUsecase.UpdateUser(user, ""); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Profile updated successfully",
+		"user":    user,
+	})
 }
 
 type ProfileChangePasswordRequest struct {

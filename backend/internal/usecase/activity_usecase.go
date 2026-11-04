@@ -128,13 +128,13 @@ func (u *ActivityUsecase) RecordPayment(obligationID uuid.UUID, amount float64, 
 	}
 
 	// Sync payment status to the linked Bill (if any)
-	u.syncBillFromActivityObligation(obligationID, ob)
+	u.syncBillFromActivityObligation(obligationID, ob, amount, createdByID)
 
 	return nil
 }
 
 // syncBillFromActivityObligation syncs payment status from ActivityObligation to linked Bill
-func (u *ActivityUsecase) syncBillFromActivityObligation(obligationID uuid.UUID, ob *domain.ActivityObligation) {
+func (u *ActivityUsecase) syncBillFromActivityObligation(obligationID uuid.UUID, ob *domain.ActivityObligation, amount float64, createdByID uuid.UUID) {
 	if u.financeRepo == nil {
 		return
 	}
@@ -143,6 +143,19 @@ func (u *ActivityUsecase) syncBillFromActivityObligation(obligationID uuid.UUID,
 		return
 	}
 	_ = u.financeRepo.UpdateBillStatus(bill.ID.String(), ob.Status)
+
+	if amount > 0 {
+		payment := &domain.Payment{
+			BillID:         bill.ID,
+			Amount:         amount,
+			PaymentMethod:  "Cash",
+			Status:         "Success",
+			PaidAt:         time.Now(),
+			RecordedByID:   &createdByID,
+			RecordedByName: "Petugas Kegiatan",
+		}
+		_ = u.financeRepo.CreatePayment(payment)
+	}
 }
 
 // ------------------- Activity Transactions -------------------

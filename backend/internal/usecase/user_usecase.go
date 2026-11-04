@@ -147,6 +147,17 @@ func (u *UserUsecase) UpdateUser(user *domain.User, newPassword string, optional
 		return err
 	}
 
+	// Keep Parent phone & address in sync if user has a parent record
+	if existingParent, _ := u.parentRepo.FindByUserID(user.ID.String()); existingParent != nil {
+		if strings.TrimSpace(user.Phone) != "" {
+			existingParent.Phone = strings.TrimSpace(user.Phone)
+		}
+		if strings.TrimSpace(user.Address) != "" {
+			existingParent.Address = strings.TrimSpace(user.Address)
+		}
+		_ = u.parentRepo.Update(existingParent)
+	}
+
 	// Process multi-role sync if provided
 	if len(optionalRoleIDs) > 0 && len(optionalRoleIDs[0]) > 0 {
 		roleIDs := optionalRoleIDs[0]

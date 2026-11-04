@@ -122,10 +122,12 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
                 }
 
                 let endpoint = '/finance/midtrans/check-status';
-                if (pending.order_id.startsWith('MAY-') || pending.payment_method === 'Mayar') {
+                if (pending.payment_method === 'Mayar' || pending.order_id.startsWith('MAY-')) {
                     endpoint = '/finance/mayar/check-status';
-                } else if (pending.order_id.startsWith('XEN-') || pending.order_id.startsWith('MULTI-') || pending.payment_method === 'Xendit') {
+                } else if (pending.payment_method === 'Xendit' || pending.order_id.startsWith('XEN-')) {
                     endpoint = '/finance/xendit/check-status';
+                } else {
+                    endpoint = '/finance/midtrans/check-status';
                 }
 
                 try {
@@ -192,8 +194,10 @@ export const useBillingPayment = (refetch: () => void, bills: Bill[] | undefined
         let endpoint = '/finance/midtrans/check-status';
         if (orderId.startsWith('MAY-') || targetBill?.payments?.some(p => p.transaction_id === orderId && p.payment_method === 'Mayar')) {
             endpoint = '/finance/mayar/check-status';
-        } else if (orderId.startsWith('XEN-') || orderId.startsWith('MULTI-') || targetBill?.payments?.some(p => p.transaction_id === orderId && p.payment_method === 'Xendit')) {
+        } else if (orderId.startsWith('XEN-') || targetBill?.payments?.some(p => p.transaction_id === orderId && p.payment_method === 'Xendit')) {
             endpoint = '/finance/xendit/check-status';
+        } else {
+            endpoint = '/finance/midtrans/check-status';
         }
 
         try {

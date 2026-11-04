@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log"
 	"ppi-100-sis/internal/config"
 	"ppi-100-sis/internal/delivery/http/handlers"
 	"ppi-100-sis/internal/delivery/http/middleware"
@@ -8,6 +9,7 @@ import (
 	"ppi-100-sis/internal/service/storage"
 	"ppi-100-sis/internal/usecase"
 	"ppi-100-sis/internal/utils"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -91,6 +93,24 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	// Midtrans Payment Gateway
 	midtransUsecase := usecase.NewMidtransUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)
 	midtransHandler := handlers.NewMidtransHandler(midtransUsecase)
+
+	// Automatic Midtrans Reconciler (Runs every 5 minutes)
+	if cfg.FeatureMidtrans {
+		go func() {
+			time.Sleep(10 * time.Second)
+			if count, err := midtransUsecase.ReconcilePendingPayments(); err == nil && count > 0 {
+				log.Printf("[Midtrans Init Reconciler] Reconciled %d pending payments on startup", count)
+			}
+
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				if count, err := midtransUsecase.ReconcilePendingPayments(); err == nil && count > 0 {
+					log.Printf("[Midtrans Background Reconciler] Auto-reconciled %d pending payments", count)
+				}
+			}
+		}()
+	}
 
 	// Xendit Payment Gateway
 	xenditUsecase := usecase.NewXenditUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)

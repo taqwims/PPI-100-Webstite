@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import PWAPrompt from '../ui/PWAPrompt';
+import PhonePromptModal from '../common/PhonePromptModal';
 import { stopAllCameraStreams } from '../../utils/cameraGuard';
 
 interface DashboardLayoutProps {
@@ -41,6 +42,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </div>
             
             <PWAPrompt />
+            <PhonePromptModal />
         </div>
     );
 };

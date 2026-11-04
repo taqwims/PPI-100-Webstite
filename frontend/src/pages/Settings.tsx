@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import CardGlass from '../components/ui/glass/CardGlass';
 import InputGlass from '../components/ui/glass/InputGlass';
 import ButtonGlass from '../components/ui/glass/ButtonGlass';
@@ -96,8 +97,11 @@ const Settings: React.FC = () => {
         mutationFn: async (data: { name: string; email: string; phone: string; address: string; bank_name: string; bank_account_number: string; bank_account_holder: string }) => {
             return await api.put('/profile', data);
         },
-        onSuccess: () => {
-            toast.success('Profil berhasil diperbarui. Silakan login ulang untuk melihat perubahan.');
+        onSuccess: (res: any) => {
+            if (res.data?.user) {
+                useAuthStore.getState().setUser(res.data.user);
+            }
+            toast.success('Profil berhasil diperbarui.');
         },
         onError: (error: any) => {
             toast.error(error.response?.data?.error || 'Gagal memperbarui profil');

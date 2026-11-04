@@ -60,6 +60,7 @@ func RegisterFinanceRoutes(
 			finance.POST("/midtrans/create-transaction", midtransHandler.CreateSnapTransaction)
 			finance.POST("/midtrans/check-status", midtransHandler.CheckTransactionStatus)
 			finance.POST("/midtrans/cancel-transaction", midtransHandler.CancelTransaction)
+			finance.POST("/midtrans/sync-pending", middleware.RoleMiddleware(1, 2, 3, 9, 11), midtransHandler.SyncPendingPayments)
 		}
 
 		// ── Xendit ──

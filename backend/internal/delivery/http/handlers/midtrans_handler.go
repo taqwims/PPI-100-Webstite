@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"ppi-100-sis/internal/usecase"
 
@@ -108,4 +109,19 @@ func (h *MidtransHandler) CancelTransaction(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Transaksi berhasil dibatalkan", "status": "Failed"})
+}
+
+// SyncPendingPayments manually reconciles all pending Midtrans transactions
+// POST /finance/midtrans/sync-pending (authenticated - Admin/Bendahara)
+func (h *MidtransHandler) SyncPendingPayments(c *gin.Context) {
+	count, err := h.midtransUsecase.ReconcilePendingPayments()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":          fmt.Sprintf("Sinkronisasi selesai. %d transaksi berhasil diverifikasi/diselesaikan.", count),
+		"reconciled_count": count,
+	})
 }

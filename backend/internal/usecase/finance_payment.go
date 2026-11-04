@@ -209,84 +209,90 @@ func (u *FinanceUsecase) ProcessMultiPayment(req *domain.MultiBillPaymentRequest
 	}
 
 	// Post-transaction tasks (CashLedger, RKAS, Obligations, Notifications)
-	for _, payment := range payments {
-		var bill *domain.Bill
-		for i := range bills {
-			if bills[i].ID == payment.BillID {
-				bill = &bills[i]
-				break
-			}
-		}
-		
-		if bill == nil { continue }
-
-		// 1. Sync to CashLedger (Skip for Kegiatan)
-		if bill.BillType != "Kegiatan" {
-			category := "Lain-lain"
-			if bill.TransactionCode != nil {
-				category = bill.TransactionCode.Category
-			} else if bill.BillType != "" {
-				category = bill.BillType
+	// ONLY FOR IMMEDIATE SUCCESSFUL PAYMENTS (e.g. Cash)
+	// For online gateways (Midtrans, Xendit, Mayar) or Transfer, post-transaction tasks are handled
+	// when the payment actually succeeds (via webhook or approval) to prevent double counting
+	// and premature "Paid" status.
+	if req.PaymentMethod == "Cash" {
+		for _, payment := range payments {
+			var bill *domain.Bill
+			for i := range bills {
+				if bills[i].ID == payment.BillID {
+					bill = &bills[i]
+					break
+				}
 			}
 			
-			cashLedgerEntry := domain.CashLedger{
-				Date:              time.Now(),
-				Source:            bill.Student.User.Name,
-				ItemName:          "Pembayaran " + bill.Title,
-				Type:              "Income",
-				Amount:            payment.Amount,
-				Category:          category,
-				ResponsibleID:     recordedByID,
-				ResponsibleName:   recordedByName,
-				TransactionCodeID: bill.TransactionCodeID,
+			if bill == nil { continue }
+
+			// 1. Sync to CashLedger (Skip for Kegiatan)
+			if bill.BillType != "Kegiatan" {
+				category := "Lain-lain"
+				if bill.TransactionCode != nil {
+					category = bill.TransactionCode.Category
+				} else if bill.BillType != "" {
+					category = bill.BillType
+				}
+				
+				cashLedgerEntry := domain.CashLedger{
+					Date:              time.Now(),
+					Source:            bill.Student.User.Name,
+					ItemName:          "Pembayaran " + bill.Title,
+					Type:              "Income",
+					Amount:            payment.Amount,
+					Category:          category,
+					ResponsibleID:     recordedByID,
+					ResponsibleName:   recordedByName,
+					TransactionCodeID: bill.TransactionCodeID,
+				}
+				_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
 			}
-			_ = u.financeRepo.AddCashLedgerEntry(&cashLedgerEntry)
+
+			// 2. Auto-realize RKAS
+			if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 {
+				var billingMonth int
+				if bill.Obligation != nil {
+					billingMonth = bill.Obligation.BillingMonth
+				}
+				_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, payment.Amount, billingMonth)
+			}
+
+			// 3. Sync Obligation Statuses
+			alreadyPaid := float64(0)
+			for _, p := range bill.Payments {
+				if p.Status == "Success" {
+					alreadyPaid += p.Amount
+				}
+			}
+			
+			u.syncObligationStatus(bill, alreadyPaid+payment.Amount, payment.Amount, recordedByName, req.PaymentMethod)
 		}
 
-		// 2. Auto-realize RKAS
-		if bill.TransactionCodeID != nil && *bill.TransactionCodeID > 0 {
-			var billingMonth int
-			if bill.Obligation != nil {
-				billingMonth = bill.Obligation.BillingMonth
+		// 4. Notifications (Send once for the multi-payment)
+		if len(bills) > 0 {
+			student := bills[0].Student
+			_ = u.notificationUsecase.SendNotification(
+				student.UserID,
+				"Pembayaran Multi-Tagihan Berhasil",
+				fmt.Sprintf("Pembayaran %d tagihan sebesar Rp%.0f telah diverifikasi.", len(payments), req.Amount),
+				"payment",
+				invoiceNumber,
+			)
+			var parent *domain.Parent
+			if student.ParentID != nil {
+				if p, err := u.getParentByID(*student.ParentID); err == nil {
+					parent = p
+					_ = u.notificationUsecase.SendNotification(
+						parent.UserID,
+						"Pembayaran Tagihan Anak Berhasil",
+						fmt.Sprintf("Pembayaran %d tagihan untuk %s sebesar Rp%.0f telah diverifikasi.", len(payments), student.User.Name, req.Amount),
+						"payment",
+						invoiceNumber,
+					)
+				}
 			}
-			_ = u.budgetRepo.AddRealizationByTransactionCodeID(*bill.TransactionCodeID, payment.Amount, billingMonth)
+			u.triggerMultiPaymentWA(&student, parent, len(payments), req.Amount)
 		}
-
-		// 3. Sync Obligation Statuses
-		alreadyPaid := float64(0)
-		for _, p := range bill.Payments {
-			if p.Status == "Success" {
-				alreadyPaid += p.Amount
-			}
-		}
-		
-		u.syncObligationStatus(bill, alreadyPaid + payment.Amount, payment.Amount, recordedByName, req.PaymentMethod)
-	}
-
-	// 4. Notifications (Send once for the multi-payment)
-	if len(bills) > 0 {
-		student := bills[0].Student
-		_ = u.notificationUsecase.SendNotification(
-			student.UserID,
-			"Pembayaran Multi-Tagihan Berhasil",
-			fmt.Sprintf("Pembayaran %d tagihan sebesar Rp%.0f telah diverifikasi.", len(payments), req.Amount),
-			"payment",
-			invoiceNumber,
-		)
-		var parent *domain.Parent
-		if student.ParentID != nil {
-			if p, err := u.getParentByID(*student.ParentID); err == nil {
-				parent = p
-				_ = u.notificationUsecase.SendNotification(
-					parent.UserID,
-					"Pembayaran Tagihan Anak Berhasil",
-					fmt.Sprintf("Pembayaran %d tagihan untuk %s sebesar Rp%.0f telah diverifikasi.", len(payments), student.User.Name, req.Amount),
-					"payment",
-					invoiceNumber,
-				)
-			}
-		}
-		u.triggerMultiPaymentWA(&student, parent, len(payments), req.Amount)
 	}
 
 	return &domain.MultiPaymentResult{
