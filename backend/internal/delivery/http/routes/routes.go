@@ -112,6 +112,16 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		}()
 	}
 
+	// Clean orphaned activity bills on startup
+	go func() {
+		time.Sleep(3 * time.Second)
+		if err := activityRepo.CleanOrphanedBills(); err != nil {
+			log.Printf("[Activity Repo] Failed to clean orphaned bills: %v", err)
+		} else {
+			log.Printf("[Activity Repo] Successfully verified and cleaned orphaned activity bills")
+		}
+	}()
+
 	// Xendit Payment Gateway
 	xenditUsecase := usecase.NewXenditUsecase(cfg, schoolSettingRepo, financeRepo, studentRepo, userRepo, notificationUsecase, financeUsecase, studentObligationRepo, activityRepo, budgetRepo)
 	xenditHandler := handlers.NewXenditHandler(xenditUsecase)

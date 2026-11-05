@@ -8,7 +8,8 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'images/logo.jpeg', 'images/logo.jpeg'],
+            injectRegister: 'auto',
+            includeAssets: ['favicon.ico', 'images/logo.jpeg'],
             manifest: {
                 name: 'SDIT AN-NUR - Sistem Keuangan',
                 short_name: 'SDIT Keuangan',
@@ -38,8 +39,13 @@ export default defineConfig({
                 dir: 'ltr',
             },
             workbox: {
-                maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limits
+                skipWaiting: true,
+                clientsClaim: true,
+                cleanupOutdatedCaches: true,
+                maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB limits
                 globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff,woff2}'],
+                navigateFallback: '/index.html',
+                navigateFallbackDenylist: [/^\/api/, /^\/uploads/],
                 runtimeCaching: [
                     {
                         urlPattern: /^https?:\/\/fonts\.googleapis\.com\/.*/i,
@@ -57,15 +63,6 @@ export default defineConfig({
                             cacheName: 'gstatic-fonts-cache',
                             expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
                             cacheableResponse: { statuses: [0, 200] }
-                        }
-                    },
-                    {
-                        urlPattern: /\/api\/.*/i,
-                        handler: 'NetworkFirst',
-                        options: {
-                            cacheName: 'api-cache',
-                            expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 },
-                            networkTimeoutSeconds: 10
                         }
                     }
                 ]

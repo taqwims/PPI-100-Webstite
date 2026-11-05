@@ -61,7 +61,73 @@ func (r *ActivityRepository) Update(activity *domain.Activity) error {
 }
 
 func (r *ActivityRepository) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Activity{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Dapatkan detail kegiatan (untuk mengambil nama kegiatan)
+		var activity domain.Activity
+		_ = tx.First(&activity, "id = ?", id).Error
+
+		// 2. Dapatkan semua ID kewajiban (activity_obligations) untuk kegiatan ini
+		var obligationIDs []uuid.UUID
+		if err := tx.Model(&domain.ActivityObligation{}).
+			Where("activity_id = ?", id).
+			Pluck("id", &obligationIDs).Error; err != nil {
+			return err
+		}
+
+		// 3. Dapatkan semua ID tagihan (bills) yang terhubung
+		var billIDs []uuid.UUID
+		if len(obligationIDs) > 0 {
+			_ = tx.Model(&domain.Bill{}).
+				Where("activity_obligation_id IN ?", obligationIDs).
+				Pluck("id", &billIDs).Error
+		}
+
+		// Juga bersihkan jika ada tagihan dengan nama kegiatan yang sama dan bertipe Kegiatan
+		if activity.Name != "" {
+			var namedBillIDs []uuid.UUID
+			_ = tx.Model(&domain.Bill{}).
+				Where("bill_type = 'Kegiatan' AND title = ?", activity.Name).
+				Pluck("id", &namedBillIDs).Error
+			billIDs = append(billIDs, namedBillIDs...)
+		}
+
+		// 4. Hapus tagihan beserta pembayaran dan itemnya
+		if len(billIDs) > 0 {
+			uniqueBillIDs := make([]uuid.UUID, 0, len(billIDs))
+			seenBills := make(map[uuid.UUID]bool)
+			for _, bID := range billIDs {
+				if !seenBills[bID] {
+					seenBills[bID] = true
+					uniqueBillIDs = append(uniqueBillIDs, bID)
+				}
+			}
+
+			if err := tx.Where("bill_id IN ?", uniqueBillIDs).Delete(&domain.Payment{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("bill_id IN ?", uniqueBillIDs).Delete(&domain.BillItem{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", uniqueBillIDs).Delete(&domain.Bill{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// 5. Hapus kewajiban kegiatan
+		if len(obligationIDs) > 0 {
+			if err := tx.Where("id IN ?", obligationIDs).Delete(&domain.ActivityObligation{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// 6. Hapus transaksi kas kegiatan
+		if err := tx.Where("activity_id = ?", id).Delete(&domain.ActivityTransaction{}).Error; err != nil {
+			return err
+		}
+
+		// 7. Hapus kegiatan itu sendiri
+		return tx.Delete(&domain.Activity{}, "id = ?", id).Error
+	})
 }
 
 // ------------------- Activity Obligations (Tagihan) -------------------
@@ -90,7 +156,80 @@ func (r *ActivityRepository) UpdateObligation(obligation *domain.ActivityObligat
 }
 
 func (r *ActivityRepository) DeleteObligation(id uuid.UUID) error {
-	return r.db.Delete(&domain.ActivityObligation{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Cari semua tagihan yang terhubung dengan kewajiban kegiatan ini
+		var billIDs []uuid.UUID
+		if err := tx.Model(&domain.Bill{}).
+			Where("activity_obligation_id = ?", id).
+			Pluck("id", &billIDs).Error; err != nil {
+			return err
+		}
+
+		// 2. Hapus tagihan dan pembayaran/item terkait
+		if len(billIDs) > 0 {
+			if err := tx.Where("bill_id IN ?", billIDs).Delete(&domain.Payment{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("bill_id IN ?", billIDs).Delete(&domain.BillItem{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", billIDs).Delete(&domain.Bill{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// 3. Hapus data kewajiban kegiatan
+		return tx.Delete(&domain.ActivityObligation{}, "id = ?", id).Error
+	})
+}
+
+// CleanOrphanedBills membersihkan tagihan kegiatan yang kegiatannya sudah tidak ada di database
+func (r *ActivityRepository) CleanOrphanedBills() error {
+	return CleanOrphanedActivityBills(r.db)
+}
+
+// CleanOrphanedActivityBills membersihkan tagihan kegiatan yang kegiatannya sudah tidak ada di database
+func CleanOrphanedActivityBills(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Cari ID tagihan orphaned
+		queryOrphanedBills := `
+			SELECT id FROM bills 
+			WHERE bill_type = 'Kegiatan' AND (
+				activity_obligation_id IS NULL 
+				OR activity_obligation_id NOT IN (SELECT id FROM activity_obligations)
+				OR activity_obligation_id IN (
+					SELECT ao.id FROM activity_obligations ao 
+					LEFT JOIN activities a ON ao.activity_id = a.id 
+					WHERE a.id IS NULL
+				)
+			)
+		`
+
+		var orphanedBillIDs []uuid.UUID
+		if err := tx.Raw(queryOrphanedBills).Scan(&orphanedBillIDs).Error; err != nil {
+			return err
+		}
+
+		if len(orphanedBillIDs) > 0 {
+			_ = tx.Where("bill_id IN ?", orphanedBillIDs).Delete(&domain.Payment{}).Error
+			_ = tx.Where("bill_id IN ?", orphanedBillIDs).Delete(&domain.BillItem{}).Error
+			_ = tx.Where("id IN ?", orphanedBillIDs).Delete(&domain.Bill{}).Error
+		}
+
+		// Bersihkan activity_obligations yang tidak punya kegiatan
+		_ = tx.Exec(`
+			DELETE FROM activity_obligations 
+			WHERE activity_id NOT IN (SELECT id FROM activities)
+		`).Error
+
+		// Bersihkan activity_transactions yang tidak punya kegiatan
+		_ = tx.Exec(`
+			DELETE FROM activity_transactions 
+			WHERE activity_id NOT IN (SELECT id FROM activities)
+		`).Error
+
+		return nil
+	})
 }
 
 func (r *ActivityRepository) BulkAssignClass(activityID uuid.UUID, classID uint, createdByID uuid.UUID) (int, error) {

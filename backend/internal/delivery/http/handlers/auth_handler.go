@@ -57,9 +57,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Set httpOnly cookie untuk keamanan (tidak bisa diakses JavaScript/XSS)
+	// Set httpOnly cookie untuk keamanan (180 hari / 6 bulan untuk sesi PWA jangka panjang)
 	// Backward compatible: token juga dikembalikan di response body
-	c.SetCookie("token", token, 86400*7, "/", "", false, true)
+	c.SetCookie("token", token, 86400*180, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 

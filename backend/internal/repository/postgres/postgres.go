@@ -174,6 +174,9 @@ func AutoMigrate(db *gorm.DB) error {
 		   OR title IN (SELECT name FROM activities WHERE payment_schedule = 'Bertahap' OR is_installment = true);
 	`).Error
 
+	// Clean up any orphaned activity bills, obligations, or transactions whose activities were deleted
+	_ = CleanOrphanedActivityBills(db)
+
 	return nil
 }
 

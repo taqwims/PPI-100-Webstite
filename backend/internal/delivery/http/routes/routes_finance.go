@@ -205,6 +205,7 @@ func RegisterFinanceRoutes(
 			finance.GET("/activities/:id", middleware.RoleMiddleware(1, 4, 5, 8, 9, 11), activityHandler.GetByID)
 			finance.PUT("/activities/:id", middleware.RoleMiddleware(1, 8, 9, 11), activityHandler.Update)
 			finance.DELETE("/activities/:id", middleware.RoleMiddleware(1, 8, 9, 11), activityHandler.Delete)
+			finance.POST("/activities/clean-orphaned", middleware.RoleMiddleware(1, 8, 9, 11), activityHandler.CleanOrphanedBills)
 			finance.GET("/activities/:id/summary", middleware.RoleMiddleware(1, 8, 9, 11), activityHandler.GetSummary)
 			finance.POST("/activities/:id/obligations/bulk-assign", middleware.RoleMiddleware(1, 8, 9, 11), activityHandler.BulkAssignClass)
 			finance.POST("/activities/:id/obligations/assign-student", middleware.RoleMiddleware(1, 8, 9, 11), activityHandler.AssignStudent)

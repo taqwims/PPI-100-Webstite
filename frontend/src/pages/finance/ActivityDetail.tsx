@@ -120,6 +120,9 @@ const ActivityDetail = () => {
         mutationFn: (obId: string) => api.delete(`/finance/activities/obligations/${obId}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['activity-obligations'] });
+            queryClient.invalidateQueries({ queryKey: ['student-bills'] });
+            queryClient.invalidateQueries({ queryKey: ['child-bills'] });
+            queryClient.invalidateQueries({ queryKey: ['student-obligations'] });
             toast.success('Hapus tagihan berhasil');
         }
     });

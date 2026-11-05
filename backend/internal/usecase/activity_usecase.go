@@ -65,6 +65,10 @@ func (u *ActivityUsecase) Delete(id uuid.UUID) error {
 	return u.activityRepo.Delete(id)
 }
 
+func (u *ActivityUsecase) CleanOrphanedBills() error {
+	return u.activityRepo.CleanOrphanedBills()
+}
+
 // ------------------- Activity Obligations -------------------
 
 func (u *ActivityUsecase) CreateObligation(req *domain.ActivityObligation) error {

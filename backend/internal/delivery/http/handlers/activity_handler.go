@@ -115,6 +115,14 @@ func (h *ActivityHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "activity deleted successfully"})
 }
 
+func (h *ActivityHandler) CleanOrphanedBills(c *gin.Context) {
+	if err := h.usecase.CleanOrphanedBills(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "orphaned activity bills cleaned successfully"})
+}
+
 // ------------------- Activity Obligations -------------------
 
 func (h *ActivityHandler) GetObligations(c *gin.Context) {

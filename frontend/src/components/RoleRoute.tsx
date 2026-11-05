@@ -61,7 +61,16 @@ interface RoleRouteProps {
  * Jika role tidak diizinkan → redirect ke default route atau render fallback
  */
 const RoleRoute: React.FC<RoleRouteProps> = ({ children, allowedRoles, fallback }) => {
-    const { user, isAuthenticated } = useAuthStore();
+    const { user, isAuthenticated, isInitialized } = useAuthStore();
+
+    // Tunggu inisialisasi session jika belum ada user di cache agar tidak mental ke /login saat reopen PWA
+    if (!isInitialized && !user) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+            </div>
+        );
+    }
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;

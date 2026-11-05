@@ -92,7 +92,11 @@ const Activities = () => {
         mutationFn: (id: string) => api.delete(`/finance/activities/${id}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['activities'] });
-            toast.success('Kegiatan berhasil dihapus');
+            queryClient.invalidateQueries({ queryKey: ['activities-all'] });
+            queryClient.invalidateQueries({ queryKey: ['activity-obligations-all'] });
+            queryClient.invalidateQueries({ queryKey: ['student-bills'] });
+            queryClient.invalidateQueries({ queryKey: ['child-bills'] });
+            toast.success('Kegiatan dan seluruh tagihannya berhasil dihapus');
         },
     });
 

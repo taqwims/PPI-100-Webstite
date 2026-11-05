@@ -26,6 +26,7 @@ func (r *FinanceRepository) CreateBill(bill *domain.Bill) error {
 func (r *FinanceRepository) GetBillsByStudent(studentID string) ([]domain.Bill, error) {
 	var bills []domain.Bill
 	err := r.db.Where("student_id = ?", studentID).
+		Where("NOT (bill_type = 'Kegiatan' AND (activity_obligation_id IS NULL OR activity_obligation_id NOT IN (SELECT ao.id FROM activity_obligations ao JOIN activities a ON ao.activity_id = a.id)))").
 		Preload("Payments").
 		Preload("Student.User").
 		Preload("Student.Class").
@@ -39,7 +40,8 @@ func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 	var bills []domain.Bill
 	query := r.db.Joins("JOIN students ON students.id = bills.student_id").
 		Joins("JOIN users ON users.id = students.user_id").
-		Where("students.deleted_at IS NULL AND users.deleted_at IS NULL")
+		Where("students.deleted_at IS NULL AND users.deleted_at IS NULL").
+		Where("NOT (bills.bill_type = 'Kegiatan' AND (bills.activity_obligation_id IS NULL OR bills.activity_obligation_id NOT IN (SELECT ao.id FROM activity_obligations ao JOIN activities a ON ao.activity_id = a.id)))")
 
 	if unitID > 0 {
 		query = query.Where("students.unit_id = ?", unitID)
@@ -51,6 +53,7 @@ func (r *FinanceRepository) GetAllBills(unitID uint) ([]domain.Bill, error) {
 		Preload("AcademicYear").
 		Preload("TransactionCode").
 		Preload("Obligation.PaymentType").
+		Order("bills.created_at desc").
 		Find(&bills).Error
 	return bills, err
 }
@@ -61,6 +64,7 @@ func (r *FinanceRepository) GetBillsByStudentIDs(studentIDs []uuid.UUID) ([]doma
 		return bills, nil
 	}
 	err := r.db.Where("student_id IN ?", studentIDs).
+		Where("NOT (bill_type = 'Kegiatan' AND (activity_obligation_id IS NULL OR activity_obligation_id NOT IN (SELECT ao.id FROM activity_obligations ao JOIN activities a ON ao.activity_id = a.id)))").
 		Preload("Payments").
 		Preload("Student.User").
 		Preload("Student.Class").
@@ -322,6 +326,7 @@ func (r *FinanceRepository) GetBillsByIDsOrObligationIDs(ids []string) ([]domain
 	}
 	// Check standard ID, student obligation ID, and activity obligation ID
 	err := r.db.Where("id IN ? OR obligation_id IN ? OR activity_obligation_id IN ?", ids, ids, ids).
+		Where("NOT (bill_type = 'Kegiatan' AND (activity_obligation_id IS NULL OR activity_obligation_id NOT IN (SELECT ao.id FROM activity_obligations ao JOIN activities a ON ao.activity_id = a.id)))").
 		Preload("Payments").
 		Preload("Student.User").
 		Preload("Student.Class").

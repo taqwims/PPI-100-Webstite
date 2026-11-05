@@ -31,13 +31,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [featuresLoaded, fetchFeatures]);
 
-    // Fetch user profile on mount to check cookie session
+    // Fetch user profile on mount to check cookie/token session
     useEffect(() => {
         if (!isInitialized) {
+            const hasToken = Boolean(localStorage.getItem('token'));
+            if (!hasToken) {
+                useAuthStore.getState().setInitialized(true);
+                return;
+            }
+
             api.get('/profile')
-                .then((response) => setUser(response.data))
-                .catch(() => {
-                    logout(); // This will set isInitialized = true
+                .then((response) => {
+                    setUser(response.data);
+                })
+                .catch((err) => {
+                    // Hanya logout jika server secara tegas merespons 401 Unauthorized
+                    if (err.response?.status === 401) {
+                        logout();
+                    } else {
+                        // Jika koneksi internet putus/offline atau timeout, pertahankan sesi login PWA!
+                        useAuthStore.getState().setInitialized(true);
+                    }
                 });
         }
     }, [isInitialized, setUser, logout]);

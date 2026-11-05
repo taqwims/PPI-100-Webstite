@@ -37,7 +37,7 @@ func GenerateToken(userID uuid.UUID, roleID, unitID uint, cfg *config.Config, ro
 		RoleIDs: allRoleIDs,
 		UnitID:  unitID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(180 * 24 * time.Hour)), // 180 hari (6 bulan) untuk login PWA/Web jangka panjang
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
